@@ -199,3 +199,32 @@ What the POC uses and proved:
 ### Status note
 
 Architecture direction only. The **main app is still not built, deployed, or connected to Supabase/Vercel/Magna Sales Pro.** Nothing in the main app is built or verified by this decision.
+
+## ADR-0012 — MVP database is single-tenant with RLS-first access control and a restricted telesales view
+
+Date: 2026-07-10  
+Status: **Accepted (design direction)** — no SQL, no schema, nothing built or verified.
+
+### Context
+
+A data-model + permissions + RLS proposal was reviewed and accepted with corrections. This ADR records the binding decisions; the table catalogue lives in `docs/03_DATA_MODEL.md` and the access rules in `docs/06_SECURITY.md`.
+
+### Decision
+
+1. **Single tenant for MVP.** No real `organisation` / multi-tenant model. Global context lives in `app_settings` / `integration_status`. Multi-org is Phase 2 or later.
+2. **RLS-first access control.** Every table has RLS enabled, deny-by-default; browser clients use the authenticated key; the pipeline uses the service role server-side only.
+3. **Restricted telesales surface.** Telesales reads `v_telesales_leads` — a **security-invoker (RLS-safe) view** — plus assigned export items and assigned triggers. **Telesales must never read `discovered_leads` directly.** If secure-view behaviour is not proven in RLS tests, **fall back to a physical `telesales_lead_assignments` table populated by service-role code.**
+4. **Audit minimisation.** `audit_logs.before_json` / `after_json` must **redact or hash** sensitive PII rather than store it raw. Append-only; no update/delete for anyone.
+5. **Customer master stays server-side.** `existing_customers` is server-side by default; **telesales never sees it**; management gets aggregate overlays later, not the full master.
+6. **Geometry is not stored as ordinary rows.** Large postcode-boundary and road geometries are **map assets stored separately** (object storage / static assets). The database holds **configs, coverage summaries, postcode codes, and delivery memberships** only.
+7. **`coverage_summary` is a maintained/rebuilt table** for MVP, updated by service-role jobs after each run.
+8. **Suppression / erasure are minimised.** `suppression_list` and `erasure_tombstones` use hashed/minimised data; erasure tombstones are **hash-only and retained** to prevent re-import.
+9. **Developer-UAT = separate UAT Supabase project** (ADR-0007), **not** a broad production developer role.
+
+### Reason
+
+RLS-first keeps sensitive lead/customer/audit data protected by default; a restricted telesales view enforces least privilege at the data layer; keeping geometry out of relational rows keeps the DB lean and the accepted map-asset architecture (ADR-0011) intact; minimised audit/suppression/erasure respects UK GDPR data-minimisation.
+
+### Status note
+
+Design only. Nothing here is built, migrated, deployed, or verified. Dedup-dependent and export-dependent tables remain blocked by ISS-0001, ISS-0002, ISS-0003.

@@ -49,6 +49,10 @@ A real-data geospatial coverage map POC has been built and **visually accepted b
 - Proven: real postcode polygons, hover/click, coverage shading, delivery gaps layer, A-road display modes.
 - Open before production: final boundary-accuracy standard still needs review; feeder routes must be configurable, not hardcoded.
 
+## Data model & access control (design accepted, not built)
+
+The data-model + permissions + Supabase RLS design has been **reviewed and accepted with corrections** (**ADR-0012**). Single-tenant MVP, RLS-first, restricted telesales view (`v_telesales_leads`), geometry stored as separate map assets, `coverage_summary` as a maintained table, hashed suppression/erasure, separate UAT project. **Design only — no SQL, no migrations, no Supabase set up.** Dedup/export tables remain blocked by ISS-0001/0002/0003. See `docs/03_DATA_MODEL.md` and `docs/06_SECURITY.md`.
+
 ## Territory model
 
 Territory selection is a **flexible per-run configuration** (ADR-0009), not a fixed MVP scope. One run may mix outer codes, inner sectors, uploaded delivery boundary lists, pasted lists, and expansion lists (`territory_sets` / `territory_items`). A single sector such as `UB1 2` is a manual-test input only. This resolves **ISS-0004**.

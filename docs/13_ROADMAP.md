@@ -14,6 +14,7 @@
 ## Design (before app scaffolding)
 
 - **Create the first UI/UX screen map before any app scaffolding.** Covers: login, role-based dashboard, territory selector, new pipeline run setup, upload customer postcode file, upload delivery boundary file, lead results dashboard, ignored leads audit view, reactivation list, expansion pipeline, run history, export/review screen, settings.
+- **Data model + permissions + RLS design accepted (ADR-0012).** Single-tenant MVP, RLS-first, restricted telesales view, geometry stored as separate map assets, `coverage_summary` as a maintained table, hashed suppression/erasure, separate UAT project. Design only — no SQL/migrations yet; dedup/export tables blocked by ISS-0001/0002/0003. Multi-org is Phase 2.
 
 ## MVP
 
@@ -37,6 +38,7 @@
 - More business types.
 - Reactivation list workflow.
 - Dashboard enhancements.
+- Multi-org / multi-tenant model (deferred from MVP single-tenant, ADR-0012); saved map layer presets; management aggregate customer overlays.
 - **Shared map engine (future — see ADR-0010; stack accepted via ADR-0011).** Extend the Phase 1 lead-search coverage map into a single reusable map engine used across the system, not a separate map per feature. Same postcode-boundary, road, coverage and layer-control architecture, driven by swappable data overlays:
   - Lead search coverage history (Phase 1, built first).
   - Active vs inactive customer map.

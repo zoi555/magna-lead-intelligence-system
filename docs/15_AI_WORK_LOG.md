@@ -1,5 +1,22 @@
 # AI Work Log — Magna Lead Intelligence System
 
+## Session: 2026-07-10 — Data model + RLS design accepted (documentation only)
+
+Tool used: Claude Code
+Human request: Record the accepted data-model + permissions + Supabase/RLS design proposal with six corrections. Documentation only — no SQL, no schema, no app code.
+Files changed (main repo, docs only):
+- `docs/09_DECISIONS.md` — added **ADR-0012** (single-tenant MVP, RLS-first, restricted telesales view).
+- `docs/06_SECURITY.md` — added MVP access-control design: roles, permission matrix, RLS strategy, telesales secure-view rule + fallback, hidden fields, audit minimisation, service-role ops, blocked-by-issues.
+- `docs/03_DATA_MODEL.md` — added proposed application schema catalogue + storage corrections (geometry as map assets, maintained coverage_summary, hashed suppression/erasure, single-tenant).
+- `docs/13_ROADMAP.md` — data-model/RLS design step under Design; multi-org deferred to Phase 2.
+- `PROJECT_STATUS.md` — data model & access control section (accepted, not built).
+- `docs/15_AI_WORK_LOG.md` — this entry.
+Corrections captured: (1) audit before/after JSON redacted/hashed; (2) existing_customers server-side, telesales never; (3) geometry stored as separate map assets, DB holds configs/coverage/codes/memberships; (4) coverage_summary maintained/rebuilt by service-role jobs; (5) suppression/erasure hashed/minimised, erasure hash-only + retained; (6) Developer-UAT = separate UAT project, not a broad prod role.
+Decisions made: ADR-0012.
+Bugs fixed: none. Tests run: none. App code created: none.
+Not built/verified: no SQL, no migrations, no Supabase, no Vercel, no APIs. Dedup/export tables blocked by ISS-0001/0002/0003.
+Next action: resolve ISS-0001 to ISS-0003; first UI/UX screen map; then SQL/RLS only after design sign-off.
+
 ## Session: 2026-07-10 — Map POC accepted; recorded in main docs (documentation only)
 
 Tool used: Claude Code

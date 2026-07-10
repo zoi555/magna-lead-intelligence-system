@@ -84,6 +84,51 @@ Still a forward-looking note — no schema, no app table exists yet.
 
 Do not create one giant 102-column table as the permanent internal model. That is spreadsheet-thinking in database trousers. Use a normalised internal schema, then export a flattened CRM/import shape when needed.
 
+## Proposed application schema (ADR-0012 — design only, not built)
+
+Reviewed and accepted with corrections. **No SQL, no migrations, nothing built.** Access rules per table live in `docs/06_SECURITY.md`.
+
+### Storage corrections (binding)
+
+- **Single tenant for MVP** — no `organisation`/multi-tenant table; global context in `app_settings` / `integration_status`. Multi-org = Phase 2+.
+- **Geometry is NOT stored as ordinary rows.** Large postcode-boundary and road geometries are **map assets stored separately** (object storage / static assets, per ADR-0011). The database stores **configs, coverage summaries, postcode codes, and delivery memberships** only.
+- **`coverage_summary` is a maintained/rebuilt table** for MVP, refreshed by service-role jobs after each run (not a live view).
+- **Telesales** reads a **restricted RLS-safe view** (`v_telesales_leads`), never `discovered_leads`; physical `telesales_lead_assignments` is the fallback if the view isn't RLS-proven.
+- **`suppression_list` / `erasure_tombstones`** hold **hashed/minimised** data; erasure tombstones are **hash-only, retained** to block re-import.
+- **`audit_logs`** redact/hash sensitive PII in before/after payloads; append-only.
+
+### Entities (MVP unless marked Phase 2)
+
+| Table | Purpose | Writes | Notes |
+|---|---|---|---|
+| `user_profiles` | role + profile per auth user | O/A | role enum owner/admin/management/telesales/developer |
+| `app_settings` / `integration_status` | global config + connection status (no secrets) | O/A | replaces multi-tenant org |
+| `territory_sets`, `territory_items` | per-run mixed territory (ADR-0009) | O/A | |
+| `delivery_boundaries`, `delivery_boundary_items` | approved delivery footprint + memberships | SR/O-A | **codes/memberships only, not geometry**; blocked by ISS-0002 |
+| `road_display_configs` | configurable feeder-route lists (ADR-0011) | O/A | MVP config; management UI Phase 2 |
+| `map_layer_configs` *(Phase 2)* | saved map/overlay presets | owner of preset | MVP uses a fixed default |
+| `pipeline_runs` | one run + telemetry (cost/duration/stage counts) | SR | |
+| `run_territory_items` | immutable snapshot of items a run used | SR | append-only |
+| `run_coverage_units` | per-postcode run result | SR | append-only |
+| `coverage_summary` | cumulative coverage by postcode code (feeds map) | SR job | maintained/rebuilt table; joinable-by-code overlay base |
+| `uploaded_files` | file metadata (bytes in private Storage) | O/A | PII files private |
+| `customer_postcode_imports` | parsed customer import | SR | blocked by ISS-0001 |
+| `delivery_boundary_imports` | parsed boundary import | SR | blocked by ISS-0002 |
+| `existing_customers` | NetSuite master for dedup | SR | **server-side; telesales never; management aggregate later** |
+| `discovered_leads` (+ children `lead_brands`, `lead_contacts`, `fsa_matches`, `company_profiles`, `company_financials`, `platform_profiles`, `lead_scores`, `lead_triggers`) | canonical lead + normalised detail | SR; O/A edit status | financials = O/A/M only |
+| `v_telesales_leads` *(view)* | telesales-safe lead surface | — | RLS-safe view; fallback `telesales_lead_assignments` |
+| `ignored_leads_audit` | auto-discards + reason codes | SR | O/A/M only |
+| `reactivation_leads` | inactive-customer matches (70% case) | SR/O-A | O/A/M only |
+| `expansion_leads` | verified out-of-area, held | SR/O-A | |
+| `same_day_trigger_queue` | trigger-flagged leads (ADR-0008) | SR; assigned rep updates status | telesales assigned-only |
+| `crm_field_mappings` | internal→Sales Pro map + verified flag | O/A | export disabled until verified; blocked by ISS-0003 |
+| `sales_pro_export_batches`, `sales_pro_export_items` | manual export batches + items | O/A (SR builds) | **approval gate**; blocked by ISS-0003 |
+| `suppression_list` | do-not-contact (hashed) | O/A/SR | never delete; SR enforces pre-run/pre-export |
+| `erasure_tombstones` | GDPR erasure (hash-only) | O/A/SR | append-only, retained |
+| `audit_logs` | immutable action/decision trace | all via triggers/SR | append-only; redacted/hashed PII |
+
+MVP set and Phase 2 items are enumerated in the accepted proposal; overlays for active/inactive customers, demographics, and route planning are Phase 2 (shared map engine, ADR-0010/0011) and reuse `coverage_summary`'s joinable-by-postcode shape.
+
 ## Full flat CRM/import layout from workbook
 
 | Field | Type | Notes |
