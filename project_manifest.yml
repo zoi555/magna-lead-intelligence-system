@@ -8,7 +8,7 @@ project:
   project_type: "new_build_mvp"
 
 repo:
-  github_url: ""
+  github_url: "https://github.com/zoi555/magna-lead-intelligence-system.git"
   default_branch: "main"
   project_board: "Open Projects - Master Board"
 
@@ -75,7 +75,7 @@ health:
 maintenance:
   current_blocker: "Missing postcode file, delivery postcode list, CTO field validation"
   next_review_date: ""
-  last_ai_session: "2026-07-09 starter pack generated"
+  last_ai_session: "2026-07-10 documentation-only setup corrections (repo status, protocol pointer files, wrap-up command)"
   last_release: "none"
 
 documentation:
