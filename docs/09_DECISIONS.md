@@ -161,3 +161,41 @@ One engine, many overlays: avoids duplicated mapping stacks, keeps licensing/att
 ### Status note
 
 This is a direction-setting note only. Nothing here is built or verified. Revisit and promote to Accepted when Phase 2 map work is scoped.
+
+## ADR-0011 — Self-hosted MapLibre + OS open geospatial data accepted as map architecture direction after POC
+
+Date: 2026-07-10  
+Status: **Accepted (architecture direction)** — proven by an accepted proof-of-concept; the main app map is **not built, deployed, or integrated**.
+
+### Context
+
+A real-data geospatial coverage map was built as a standalone proof-of-concept and **visually accepted by Zoeb** on 2026-07-10.
+
+- Local: `~/Projects/magna/lead-intelligence-map-poc/`
+- GitHub: `https://github.com/zoi555/magna-lead-intelligence-map-poc.git`
+
+### Decision
+
+Adopt a **self-hosted MapLibre GL JS + Ordnance Survey open-data** stack as the map architecture direction for the system. The POC established that this meets requirements on free, self-hostable, non-billing terms.
+
+What the POC uses and proved:
+
+- Current **OS Code-Point Open derived** postcode boundaries (area / district / sector) — feasibility layer.
+- **OS Open Roads** for motorways and A roads.
+- **MapLibre GL JS** running locally.
+- **No** Google Maps · **no** Mapbox paid tiles · **no** paid hosted map services · **no** billing-enabled services.
+- Real postcode polygons render; hover/click works; coverage shading works; delivery gaps layer works; A-road display modes work.
+
+### Requirements this sets for the MVP map
+
+- **Delivery boundary and remaining delivery gaps are now part of the MVP map requirement** (not just lead-search coverage).
+- **Key feeder routes must be configurable in the final app, not permanently hardcoded** (the POC seed list is illustrative only).
+- The **shared map engine** (ADR-0010) remains the future architecture for active/inactive customers, demographics, and route planning overlays.
+
+### Open before production
+
+- **Final production boundary-accuracy standard still requires review before launch.** The Code-Point Open derived boundaries are accepted for the POC; paid GeoLytix (hand-edited) or OS Code-Point with Polygons (unit-level) remain approval-gated upgrades if the free route is judged insufficient.
+
+### Status note
+
+Architecture direction only. The **main app is still not built, deployed, or connected to Supabase/Vercel/Magna Sales Pro.** Nothing in the main app is built or verified by this decision.

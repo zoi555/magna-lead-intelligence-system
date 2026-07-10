@@ -27,6 +27,7 @@
 - Ignored leads log.
 - Manual CRM export.
 - Basic dashboard for review/telemetry.
+- **Lead-search coverage map** — self-hosted MapLibre + OS open data (ADR-0011, accepted via POC). MVP map requirement now includes **delivery boundary** and **remaining delivery gaps**, not just coverage history. Feeder routes must be **configurable**, not hardcoded. Map POC accepted and preserved separately (`magna-lead-intelligence-map-poc`); still to be integrated into the app.
 
 ## Phase 2
 
@@ -36,7 +37,7 @@
 - More business types.
 - Reactivation list workflow.
 - Dashboard enhancements.
-- **Shared map engine (future — see ADR-0010).** Extend the Phase 1 lead-search coverage map into a single reusable map engine used across the system, not a separate map per feature. Same postcode-boundary, road, coverage and layer-control architecture, driven by swappable data overlays:
+- **Shared map engine (future — see ADR-0010; stack accepted via ADR-0011).** Extend the Phase 1 lead-search coverage map into a single reusable map engine used across the system, not a separate map per feature. Same postcode-boundary, road, coverage and layer-control architecture, driven by swappable data overlays:
   - Lead search coverage history (Phase 1, built first).
   - Active vs inactive customer map.
   - Customer / prospect demographics map.

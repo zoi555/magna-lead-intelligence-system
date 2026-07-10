@@ -38,6 +38,17 @@ Not created yet. Supabase UAT and production should be separate.
 - Repo hygiene: untracked `docs/.DS_Store` junk removed from disk (already gitignored).
 - No application build started — no app code, package.json, database, or pipeline.
 
+## Map proof-of-concept (separate repo)
+
+A real-data geospatial coverage map POC has been built and **visually accepted by Zoeb** as the map architecture direction (see **ADR-0011**). It is **not** part of the main app.
+
+- Local: `~/Projects/magna/lead-intelligence-map-poc/`
+- GitHub: `https://github.com/zoi555/magna-lead-intelligence-map-poc.git`
+- Status: **visually accepted proof-of-concept — not yet integrated into the main app.**
+- Stack: self-hosted **MapLibre GL JS** + **OS Code-Point Open** (derived postcode boundaries, feasibility) + **OS Open Roads**. No Google Maps, no Mapbox paid tiles, no paid hosted map service, no billing-enabled service.
+- Proven: real postcode polygons, hover/click, coverage shading, delivery gaps layer, A-road display modes.
+- Open before production: final boundary-accuracy standard still needs review; feeder routes must be configurable, not hardcoded.
+
 ## Territory model
 
 Territory selection is a **flexible per-run configuration** (ADR-0009), not a fixed MVP scope. One run may mix outer codes, inner sectors, uploaded delivery boundary lists, pasted lists, and expansion lists (`territory_sets` / `territory_items`). A single sector such as `UB1 2` is a manual-test input only. This resolves **ISS-0004**.

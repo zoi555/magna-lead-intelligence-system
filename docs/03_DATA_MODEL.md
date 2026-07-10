@@ -71,6 +71,15 @@ Note only — not built or verified. The geospatial map is intended to become a 
 
 Practical implication for a future schema: keep coverage/customer/demographic aggregates **joinable by postcode code** (area/district/sector) rather than baked into a single lead-specific table, so any overlay can bind to the shared boundary layer. No schema change is required now — this is a forward-looking constraint for Phase 2.
 
+### Map POC validated the approach (ADR-0011 — not built in the app)
+
+The accepted map POC (`magna-lead-intelligence-map-poc`) confirmed the joinable shape works in practice: real postcode **area/district/sector** polygons (derived from current OS Code-Point Open), an OS Open Roads layer, and a **delivery-area membership** layer, all joined to coverage by postcode code. This reinforces the constraint above and adds two MVP map data needs (see ADR-0011):
+
+- **delivery boundary + remaining-delivery-gap** membership per postcode code (in-delivery, targeted vs not, expansion, outside),
+- a **configurable feeder-route list** (road numbers) — data/config, not a hardcoded constant.
+
+Still a forward-looking note — no schema, no app table exists yet.
+
 ## Important modelling rule
 
 Do not create one giant 102-column table as the permanent internal model. That is spreadsheet-thinking in database trousers. Use a normalised internal schema, then export a flattened CRM/import shape when needed.

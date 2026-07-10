@@ -1,5 +1,21 @@
 # AI Work Log — Magna Lead Intelligence System
 
+## Session: 2026-07-10 — Map POC accepted; recorded in main docs (documentation only)
+
+Tool used: Claude Code
+Human request: Record that the real-data map POC is visually accepted and preserved in its own repo. Documentation only — no app code.
+Context: A standalone map POC (`~/Projects/magna/lead-intelligence-map-poc/`, GitHub `magna-lead-intelligence-map-poc`) was built and **visually accepted by Zoeb**. It uses self-hosted MapLibre GL JS + current OS Code-Point Open derived postcode boundaries + OS Open Roads. No Google Maps, no Mapbox paid tiles, no paid hosted map service, no billing-enabled service. Proven: real polygons, hover/click, coverage shading, delivery gaps layer, A-road display modes.
+Files changed (main repo, docs only):
+- `PROJECT_STATUS.md` — added a Map proof-of-concept section (accepted, separate repo, not integrated).
+- `docs/09_DECISIONS.md` — added **ADR-0011** (self-hosted MapLibre + OS open data accepted as map architecture direction after POC).
+- `docs/13_ROADMAP.md` — MVP now includes the lead-search coverage map with delivery boundary + remaining delivery gaps; Phase 2 shared-engine note references ADR-0011.
+- `docs/03_DATA_MODEL.md` — note that the POC validated the joinable-by-postcode approach; adds delivery-membership + configurable feeder-route data needs.
+- `docs/15_AI_WORK_LOG.md` — this entry.
+Decisions made: ADR-0011.
+Bugs fixed: none. Tests run: none. App code created: none.
+Not built/verified: the main app is still not built, deployed, or connected to Supabase/Vercel/Magna Sales Pro. Map POC accepted for feasibility; final production boundary accuracy still requires review.
+Next action: resolve blockers ISS-0001 to ISS-0003; produce the first UI/UX screen map; keep the map POC frozen until integration is scoped.
+
 ## Session: 2026-07-10 — Flexible territory model (documentation only)
 
 Tool used: Claude Code
