@@ -48,17 +48,22 @@ CTO confirms accepted fields, rejected fields, required transformations, and imp
 ## ISS-0004 — MVP territory conflict
 
 Date: 2026-07-09  
+Resolved: 2026-07-10  
 Severity: High  
 Owner: Zoeb  
-Status: Needs decision
+Status: Resolved (see ADR-0009)
 
 ### Problem
 
 Volume 4 says MVP is one outer code. Presentation says MVP is one inner postcode sector `UB1 2`.
 
-### Next action
+### Resolution
 
-Choose exact MVP search scope before any API/run setup.
+The "outer vs inner" conflict is obsolete. Per **ADR-0009**, territory is a flexible per-run configuration: one run may mix outer codes, inner sectors, uploaded delivery boundary lists, pasted lists, and expansion lists (`territory_sets` / `territory_items`). A single sector is only ever a manual-test input, never a hardcoded product rule. No fixed MVP scope needs to be chosen.
+
+### Note
+
+This is a resolved design conflict, not a verified feature. Nothing has been built.
 
 ## ISS-0005 — Dedup threshold conflict
 

@@ -107,3 +107,28 @@ New business, ownership change, and review complaint triggers bypass normal week
 ### Reason
 
 Buying signals decay quickly; a week-late lead is often just a historical footnote with a phone number.
+
+## ADR-0009 — Territory selection is flexible per-run configuration, not a hardcoded MVP value
+
+Date: 2026-07-10  
+Status: Accepted
+
+### Context
+
+Earlier documents disagreed on MVP scope: Volume 4 said "one outer code", the presentation said one inner sector `UB1 2`. Treating either as a fixed product rule is wrong — the business needs to run different territory shapes for different purposes (a tight manual test, a full delivery-boundary sweep, an out-of-area expansion probe).
+
+### Decision
+
+Territory selection is a **flexible, per-run configuration**. One pipeline run may include a mixed territory set containing any combination of:
+
+- one or more outer postcode codes (e.g. `UB1`, `UB2`, `HA0`),
+- one or more inner postcode sectors (e.g. `UB1 2`, `UB3 5`, `TW3 1`),
+- uploaded delivery postcode boundary lists,
+- custom pasted postcode lists,
+- expansion / out-of-area territory lists.
+
+A single sector (e.g. `UB1 2`) may be used **only as a manual test input**, never as a hardcoded product rule. This is modelled as `territory_sets` (a named collection selected per run) and `territory_items` (the individual codes/sectors/lists inside it); each `pipeline_runs` row references one `territory_set`.
+
+### Reason
+
+Hardcoding a single scope would force a code change every time the business wanted a different area, and would bake a test convenience into the product. Per-run configuration keeps the pipeline reusable and auditable, and resolves the ISS-0004 conflict by making the "outer vs inner" debate obsolete — both are just item types within a territory set.

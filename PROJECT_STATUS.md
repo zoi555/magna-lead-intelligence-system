@@ -38,21 +38,26 @@ Not created yet. Supabase UAT and production should be separate.
 - Repo hygiene: untracked `docs/.DS_Store` junk removed from disk (already gitignored).
 - No application build started — no app code, package.json, database, or pipeline.
 
+## Territory model
+
+Territory selection is a **flexible per-run configuration** (ADR-0009), not a fixed MVP scope. One run may mix outer codes, inner sectors, uploaded delivery boundary lists, pasted lists, and expansion lists (`territory_sets` / `territory_items`). A single sector such as `UB1 2` is a manual-test input only. This resolves **ISS-0004**.
+
 ## What is blocked
 
 - **ISS-0001** — Missing postcode file for existing customer records.
 - **ISS-0002** — Delivery postcode list still needed.
 - **ISS-0003** — CTO must validate the 102-field schema against Magna Sales Pro.
-- **ISS-0004** — MVP territory scope conflict must be resolved: one outer code vs one inner sector `UB1 2`.
+- ~~**ISS-0004**~~ — Resolved by ADR-0009 (territory is flexible per run).
 - API accounts/secrets not yet configured.
 - No manual one-business test has been completed.
 
 ## Immediate next action
 
-1. Resolve blockers **ISS-0001 to ISS-0004** before any build work.
-2. Create GitHub issues from `docs/11_ISSUES_LOG.md`.
-3. Run the manual one-business end-to-end test (see `docs/modules/MANUAL_TEST_PROTOCOL.md`).
-4. Do not build until blockers are resolved.
+1. Resolve remaining blockers **ISS-0001 to ISS-0003** before any build work.
+2. Create the **first UI/UX screen map before app scaffolding** (see `DESIGN.md` for the screen list).
+3. Create GitHub issues from `docs/11_ISSUES_LOG.md`.
+4. Run the manual one-business end-to-end test (see `docs/modules/MANUAL_TEST_PROTOCOL.md`).
+5. Do not build until blockers are resolved.
 
 ## Do not touch yet
 

@@ -2,9 +2,9 @@
 
 ## MVP requirements
 
-1. Run lead discovery for one confirmed postcode scope.
+1. Run lead discovery for a selected **territory set** (see ADR-0009). One run may mix outer codes, inner sectors, uploaded delivery boundary lists, pasted lists, and expansion/out-of-area lists. Territory is per-run configuration, never a hardcoded scope.
 2. Use delivery platforms as primary discovery, not Google Places bulk search.
-3. Filter to in-scope business postcodes.
+3. Filter to the postcodes contained in the selected territory set.
 4. Group platform brands by physical address.
 5. Deduplicate against Magna customer records.
 6. Auto-discard active customer matches.
@@ -49,6 +49,6 @@
 
 ## Open requirement conflicts
 
-1. MVP scope conflict: Volume 4 says one outer code; presentation says one inner sector `UB1 2`.
+1. ~~MVP scope conflict: Volume 4 says one outer code; presentation says one inner sector `UB1 2`.~~ **Resolved by ADR-0009** — territory is a flexible per-run set, not a fixed scope. A single sector is a manual-test input only.
 2. Dedup threshold conflict: technical docs use 80%+; presentation mentions 70%+ for inactive/reactivation special case.
 3. Presentation still shows Google Places as discovery stage, but Volume 2 supersedes it with platform-first discovery.

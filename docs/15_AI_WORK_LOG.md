@@ -1,5 +1,29 @@
 # AI Work Log — Magna Lead Intelligence System
 
+## Session: 2026-07-10 — Flexible territory model (documentation only)
+
+Tool used: Claude Code
+Human request: Make territory selection fully flexible in the docs. One run may mix outer codes, inner sectors, uploaded delivery boundary lists, pasted lists, and expansion lists. Add territory_sets / territory_items concepts and a UI/UX screen-map task. Documentation only — no app code.
+Files changed:
+- `docs/09_DECISIONS.md` — added ADR-0009: territory is flexible per-run configuration, not a hardcoded value.
+- `docs/01_REQUIREMENTS.md` — MVP req 1 and 3 rewritten around a selected territory set; open conflict 1 marked resolved.
+- `docs/03_DATA_MODEL.md` — added `territory_sets` and `territory_items` tables; `pipeline_runs` references a territory set; added a territory item-type table.
+- `docs/04_WORKFLOWS.md` — run now starts from a selected mixed territory set.
+- `docs/11_ISSUES_LOG.md` — ISS-0004 marked Resolved (design conflict only, nothing built).
+- `docs/13_ROADMAP.md` — added a Design phase (first UI/UX screen map before scaffolding); territory line updated.
+- `DESIGN.md` — added territory note and the first UI/UX screen-map task with the full screen list.
+- `PROJECT_STATUS.md` — added territory model section; ISS-0004 removed from active blockers; UX screen-map added to next actions.
+- `project_manifest.yml` — current_blocker, current_focus, and next_actions updated.
+- `docs/15_AI_WORK_LOG.md` — this entry.
+Summary of work: Replaced the "one outer vs one inner sector" MVP framing with a flexible per-run territory model, and recorded a UI/UX screen-map task to precede any scaffolding.
+Problems found: None new.
+Bugs fixed: None — no app code exists.
+Decisions made: ADR-0009 (flexible per-run territory selection).
+Tests run: None. No build, test, or deployment executed.
+App code created: None.
+Remaining blockers: ISS-0001, ISS-0002, ISS-0003 (ISS-0004 resolved by ADR-0009).
+Next action: Resolve ISS-0001 to ISS-0003, produce the first UI/UX screen map, then run the manual one-business test before any build.
+
 ## Session: 2026-07-10 — Documentation-only setup corrections
 
 Tool used: Claude Code

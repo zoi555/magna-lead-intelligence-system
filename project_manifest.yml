@@ -73,7 +73,7 @@ health:
   last_verification_method: ""
 
 maintenance:
-  current_blocker: "ISS-0001 missing existing-customer postcode file; ISS-0002 missing delivery postcode boundary list; ISS-0003 CTO validation of Magna Sales Pro 102-field schema; ISS-0004 MVP territory conflict"
+  current_blocker: "ISS-0001 missing existing-customer postcode file; ISS-0002 missing delivery postcode boundary list; ISS-0003 CTO validation of Magna Sales Pro 102-field schema (ISS-0004 territory conflict resolved by ADR-0009)"
   next_review_date: ""
   last_ai_session: "2026-07-10 documentation-only setup corrections (repo status, protocol pointer files, wrap-up command)"
   last_release: "none"
@@ -87,10 +87,11 @@ documentation:
   ai_work_log_md: true
 
 current_focus:
-  - "Confirm MVP postcode scope: one outer code vs one inner sector UB1 2"
+  - "Territory is flexible per run (ADR-0009): support mixed outer codes, inner sectors, uploaded delivery boundary lists, pasted lists, and expansion lists"
   - "Get completed missing postcode file for existing customers"
   - "Get delivery postcode list"
   - "Get CTO validation of 102-field schema against Magna Sales Pro"
+  - "Produce first UI/UX screen map before app scaffolding"
 
 risks:
   - "Building before data boundaries and CRM field acceptance are confirmed"
@@ -99,8 +100,8 @@ risks:
   - "Calling active customers as prospects if deduplication is wrong"
 
 next_actions:
-  - "Confirm MVP territory scope, recommended: UB1 2 inner postcode sector"
   - "Obtain completed existing-customer postcode file for deduplication"
   - "Obtain delivery postcode boundary list"
   - "Get CTO validation of the 102-field Magna Sales Pro schema"
+  - "Create the first UI/UX screen map before app scaffolding"
   - "Run one manual business through the full pipeline before any automation build"

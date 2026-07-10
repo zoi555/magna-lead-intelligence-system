@@ -3,7 +3,8 @@
 ## MVP workflow
 
 ```text
-Postcode scope selected
+Territory set selected (mixed: outer codes, inner sectors,
+  uploaded delivery boundary lists, pasted lists, expansion lists)
   -> platform discovery
   -> postcode/address filter
   -> group brands at same premises

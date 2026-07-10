@@ -25,7 +25,9 @@ The uploaded field schema workbook contains 102 fields across these groups:
 
 | Table | Purpose |
 |---|---|
-| `pipeline_runs` | One row per discovery/scoring run |
+| `territory_sets` | A named, reusable collection of territory items selected for a run (see ADR-0009) |
+| `territory_items` | Individual entries in a set: outer code, inner sector, uploaded delivery boundary list, pasted list, or expansion/out-of-area list |
+| `pipeline_runs` | One row per discovery/scoring run; **references one `territory_set`** |
 | `run_telemetry` | Counts, duration, cost and failures by stage |
 | `leads` | Canonical lead record |
 | `lead_brands` | Multiple brands at one physical premises |
@@ -42,6 +44,20 @@ The uploaded field schema workbook contains 102 fields across these groups:
 | `crm_exports` | Manual export batches to Magna Sales Pro |
 | `audit_events` | Immutable trace of every material action/decision |
 | `manual_test_runs` | One-business manual validation runs |
+
+## Territory model (ADR-0009)
+
+Territory is per-run configuration, not a hardcoded scope. A `territory_set` is a named collection; a run points at exactly one set. Each `territory_item` carries a type so the pipeline knows how to expand it into postcodes:
+
+| Item type | Example value | Notes |
+|---|---|---|
+| `outer_code` | `UB1`, `HA0` | One or more outer codes |
+| `inner_sector` | `UB1 2`, `TW3 1` | One or more inner sectors; a single sector is valid as a manual-test input only |
+| `delivery_boundary_upload` | uploaded file reference | Approved delivery postcode boundary list |
+| `pasted_list` | free-text postcode list | Custom pasted postcodes |
+| `expansion_list` | out-of-area list | Verified out-of-area / future-route postcodes |
+
+The existing `Search_Code` flat field (outer or inner) remains the export-shape summary of what a lead was found under; it does not replace the normalised territory tables.
 
 ## Important modelling rule
 
