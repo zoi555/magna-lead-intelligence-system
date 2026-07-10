@@ -73,7 +73,7 @@ health:
   last_verification_method: ""
 
 maintenance:
-  current_blocker: "Missing postcode file, delivery postcode list, CTO field validation"
+  current_blocker: "ISS-0001 missing existing-customer postcode file; ISS-0002 missing delivery postcode boundary list; ISS-0003 CTO validation of Magna Sales Pro 102-field schema; ISS-0004 MVP territory conflict"
   next_review_date: ""
   last_ai_session: "2026-07-10 documentation-only setup corrections (repo status, protocol pointer files, wrap-up command)"
   last_release: "none"
@@ -99,7 +99,8 @@ risks:
   - "Calling active customers as prospects if deduplication is wrong"
 
 next_actions:
-  - "Set up local project folder and commit documentation pack"
-  - "Create GitHub repo and project issues"
-  - "Confirm blocked input files"
-  - "Prepare manual one-business test protocol before any automation"
+  - "Confirm MVP territory scope, recommended: UB1 2 inner postcode sector"
+  - "Obtain completed existing-customer postcode file for deduplication"
+  - "Obtain delivery postcode boundary list"
+  - "Get CTO validation of the 102-field Magna Sales Pro schema"
+  - "Run one manual business through the full pipeline before any automation build"
