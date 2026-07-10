@@ -36,6 +36,13 @@
 - More business types.
 - Reactivation list workflow.
 - Dashboard enhancements.
+- **Shared map engine (future — see ADR-0010).** Extend the Phase 1 lead-search coverage map into a single reusable map engine used across the system, not a separate map per feature. Same postcode-boundary, road, coverage and layer-control architecture, driven by swappable data overlays:
+  - Lead search coverage history (Phase 1, built first).
+  - Active vs inactive customer map.
+  - Customer / prospect demographics map.
+  - New route planning map.
+  - Expansion territory map.
+  - Not built or verified yet — architecture note only.
 
 ## Later
 

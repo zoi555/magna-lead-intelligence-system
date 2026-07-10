@@ -59,6 +59,18 @@ Territory is per-run configuration, not a hardcoded scope. A `territory_set` is 
 
 The existing `Search_Code` flat field (outer or inner) remains the export-shape summary of what a lead was found under; it does not replace the normalised territory tables.
 
+## Map layers must support multiple business overlays later (FUTURE — see ADR-0010)
+
+Note only — not built or verified. The geospatial map is intended to become a **shared map engine** (ADR-0010), so the data model should later allow the same postcode-boundary/road base map to be joined to **multiple business overlays**, keyed by postcode area/district/sector:
+
+- lead-search coverage (Phase 1),
+- active vs inactive customers,
+- customer/prospect demographics,
+- new route planning,
+- expansion territories.
+
+Practical implication for a future schema: keep coverage/customer/demographic aggregates **joinable by postcode code** (area/district/sector) rather than baked into a single lead-specific table, so any overlay can bind to the shared boundary layer. No schema change is required now — this is a forward-looking constraint for Phase 2.
+
 ## Important modelling rule
 
 Do not create one giant 102-column table as the permanent internal model. That is spreadsheet-thinking in database trousers. Use a normalised internal schema, then export a flattened CRM/import shape when needed.

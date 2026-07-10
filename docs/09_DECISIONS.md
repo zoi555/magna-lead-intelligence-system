@@ -132,3 +132,32 @@ A single sector (e.g. `UB1 2`) may be used **only as a manual test input**, neve
 ### Reason
 
 Hardcoding a single scope would force a code change every time the business wanted a different area, and would bake a test convenience into the product. Per-run configuration keeps the pipeline reusable and auditable, and resolves the ISS-0004 conflict by making the "outer vs inner" debate obsolete — both are just item types within a territory set.
+
+## ADR-0010 — Shared map engine across the system (FUTURE — not built)
+
+Date: 2026-07-10  
+Status: **Proposed / future architecture note** — not implemented, not verified.
+
+### Context
+
+Phase 1 builds a geospatial coverage map for **lead-search coverage** (real OS Code-Point Open derived postcode polygons + OS Open Roads, self-hosted, free/open, MapLibre — see the map POC). The mapping capability is broadly useful, not specific to lead search.
+
+### Decision (intended direction, not yet actioned)
+
+The geospatial map should become a **single shared map engine** reused across the Magna Lead Intelligence System — **not** a separate mapping system per feature. All map views reuse the same postcode-boundary layer, road layer, coverage/shading model, and layer-control architecture, differing only by the **data overlay** applied.
+
+Intended future map views (Phase 2+):
+
+1. Lead search coverage history (Phase 1 — built first).
+2. Active vs inactive customer map.
+3. Customer / prospect demographics map.
+4. New route planning map.
+5. Expansion territory map.
+
+### Reason
+
+One engine, many overlays: avoids duplicated mapping stacks, keeps licensing/attribution and self-hosting decisions in one place, and lets each business view be a data layer rather than a new build. Phase 1 stays focused on lead-search coverage; the shared-engine generalisation is explicitly deferred to Phase 2.
+
+### Status note
+
+This is a direction-setting note only. Nothing here is built or verified. Revisit and promote to Accepted when Phase 2 map work is scoped.
