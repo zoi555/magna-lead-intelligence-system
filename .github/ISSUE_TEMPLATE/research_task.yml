@@ -1,0 +1,33 @@
+---
+name: Research Task
+about: Research Task
+title: "[Research Task] "
+labels: research, documentation
+assignees: ""
+---
+
+## Question to answer
+
+
+## Why it matters
+
+
+## Decision needed after research
+
+
+## Sources checked
+
+- 
+
+
+## Documentation updated
+- [ ] PROJECT_STATUS.md
+- [ ] docs/09_DECISIONS.md, if relevant
+- [ ] docs/10_BUGS_AND_FIXES.md, if fixed bug
+- [ ] docs/11_ISSUES_LOG.md, if unresolved issue
+- [ ] docs/15_AI_WORK_LOG.md
+
+## Verification required
+- [ ] Command/test recorded
+- [ ] Manual check recorded
+- [ ] Preview/production check recorded if relevant

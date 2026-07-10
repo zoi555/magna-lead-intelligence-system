@@ -1,0 +1,38 @@
+---
+name: Feature Request
+about: Feature Request
+title: "[Feature Request] "
+labels: feature, needs-review
+assignees: ""
+---
+
+## User/problem
+
+
+## MVP requirement or later feature?
+
+MVP / Phase 2 / Later
+
+## Business value
+
+
+## Acceptance criteria
+
+- 
+
+## Not included
+
+- 
+
+
+## Documentation updated
+- [ ] PROJECT_STATUS.md
+- [ ] docs/09_DECISIONS.md, if relevant
+- [ ] docs/10_BUGS_AND_FIXES.md, if fixed bug
+- [ ] docs/11_ISSUES_LOG.md, if unresolved issue
+- [ ] docs/15_AI_WORK_LOG.md
+
+## Verification required
+- [ ] Command/test recorded
+- [ ] Manual check recorded
+- [ ] Preview/production check recorded if relevant

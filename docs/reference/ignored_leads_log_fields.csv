@@ -1,0 +1,12 @@
+Field Name,Data Type,Notes,Example
+Ignored_Date,Date,,2026-07-14
+Brand_Name,Text,,Pepes Piri Piri - Hounslow
+Address,Text,,"6A Kingsley Road, Hounslow"
+Postcode,Text,,TW3 1NP
+Reason_Code,Text,ACTIVE_MATCH / DISSOLVED / OUT_OF_AREA / NOT_FOOD / LOW_SCORE / NO_FSA,ACTIVE_MATCH
+Reason_Detail,Text,Plain English,88% match to active customer
+Matched_Account_Code,Text,,B435
+Match_Pct,Percent,,88
+Matched_Fields,Text,,"Phone exact, Postcode exact, Name 71%"
+CH_Status,Text,If dissolved,Dissolved 12 May 2026
+Notes,Text,,Director trace found Khan Grill Ltd

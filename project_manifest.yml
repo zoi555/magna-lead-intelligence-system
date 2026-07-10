@@ -1,0 +1,105 @@
+project:
+  name: "Magna Lead Intelligence System"
+  slug: "lead-intelligence-system"
+  company: "Magna"
+  status: "planning"
+  priority: "critical"
+  owner: "Zoeb"
+  project_type: "new_build_mvp"
+
+repo:
+  github_url: ""
+  default_branch: "main"
+  project_board: "Open Projects - Master Board"
+
+local:
+  path: "~/Projects/magna/lead-intelligence-system"
+
+deployment:
+  provider: "vercel"
+  production_url: ""
+  preview_url: ""
+  production_branch: "main"
+
+database:
+  provider: "supabase"
+  uat_project_ref: ""
+  production_project_ref: ""
+  has_rls: false
+
+auth:
+  provider: "supabase"
+  required: true
+  roles:
+    - owner
+    - management_viewer
+    - telesales_viewer
+    - admin
+
+integrations:
+  github: true
+  vercel: true
+  supabase: true
+  netsuite: true
+  magna_sales_pro: true
+  fsa_api: true
+  companies_house_api: true
+  google_places_api: true
+  apify: true
+  justeat_public_endpoint: true
+  whatsapp_public_links: true
+  data_ledger: false
+
+security:
+  stores_personal_data: true
+  contains_pii: true
+  data_classification: "business-contact-data-internal"
+  requires_audit_log: true
+  rls_required: true
+  public_access: false
+  secrets_manager: "AWS Secrets Manager or equivalent; never code/spreadsheets"
+  retention_policy: "Operational/audit need only; define before production"
+
+environments:
+  local: true
+  preview: false
+  uat: false
+  production: false
+
+health:
+  status: "not_verified"
+  last_verified_at: ""
+  last_verified_by: ""
+  last_verification_method: ""
+
+maintenance:
+  current_blocker: "Missing postcode file, delivery postcode list, CTO field validation"
+  next_review_date: ""
+  last_ai_session: "2026-07-09 starter pack generated"
+  last_release: "none"
+
+documentation:
+  claude_md: true
+  architecture_md: true
+  data_model_md: true
+  bugs_and_fixes_md: true
+  decisions_md: true
+  ai_work_log_md: true
+
+current_focus:
+  - "Confirm MVP postcode scope: one outer code vs one inner sector UB1 2"
+  - "Get completed missing postcode file for existing customers"
+  - "Get delivery postcode list"
+  - "Get CTO validation of 102-field schema against Magna Sales Pro"
+
+risks:
+  - "Building before data boundaries and CRM field acceptance are confirmed"
+  - "Treating lead generation as a fix for retention failure"
+  - "Scraping/platform ToS risk if scale is careless"
+  - "Calling active customers as prospects if deduplication is wrong"
+
+next_actions:
+  - "Set up local project folder and commit documentation pack"
+  - "Create GitHub repo and project issues"
+  - "Confirm blocked input files"
+  - "Prepare manual one-business test protocol before any automation"

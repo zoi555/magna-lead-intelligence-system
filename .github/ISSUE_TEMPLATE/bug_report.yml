@@ -1,0 +1,50 @@
+---
+name: Bug Report
+about: Bug Report
+title: "[Bug Report] "
+labels: bug, needs-review
+assignees: ""
+---
+
+## Problem
+
+
+## Severity
+
+Critical / High / Medium / Low
+
+## Affected system
+
+GitHub / Vercel / Supabase / NetSuite / WordPress / TMS / Email / WhatsApp / Other
+
+## Reproduction steps
+
+1. 
+2. 
+3. 
+
+## Expected result
+
+
+## Actual result
+
+
+## Suspected cause
+
+
+## Files/areas affected
+
+- 
+
+
+## Documentation updated
+- [ ] PROJECT_STATUS.md
+- [ ] docs/09_DECISIONS.md, if relevant
+- [ ] docs/10_BUGS_AND_FIXES.md, if fixed bug
+- [ ] docs/11_ISSUES_LOG.md, if unresolved issue
+- [ ] docs/15_AI_WORK_LOG.md
+
+## Verification required
+- [ ] Command/test recorded
+- [ ] Manual check recorded
+- [ ] Preview/production check recorded if relevant
