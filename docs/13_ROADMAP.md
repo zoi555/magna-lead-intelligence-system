@@ -15,7 +15,7 @@
 
 - **Create the first UI/UX screen map before any app scaffolding.** Covers: login, role-based dashboard, territory selector, new pipeline run setup, upload customer postcode file, upload delivery boundary file, lead results dashboard, ignored leads audit view, reactivation list, expansion pipeline, run history, export/review screen, settings.
 - **Data model + permissions + RLS design accepted (ADR-0012).** Single-tenant MVP, RLS-first, restricted telesales view, geometry stored as separate map assets, `coverage_summary` as a maintained table, hashed suppression/erasure, separate UAT project. Design only — no SQL/migrations yet; dedup/export tables blocked by ISS-0001/0002/0003. Multi-org is Phase 2.
-- **SaaS-neutral UI & branding guidelines created** (`docs/18_UI_BRANDING_GUIDELINES.md`). Product is SaaS-ready ("Lead Intelligence Platform"); **not** Magna-branded — Magna is the first internal tenant only; tenant name configurable. Colour/typography/layout/map tokens defined for the future app shell. Design direction only — no app code. White-label/multi-tenant branding + SaaS domain are later work.
+- **SaaS-neutral UI & branding guidelines created** (`docs/18_UI_BRANDING_GUIDELINES.md`). Product is SaaS-ready ("Lead Intelligence Platform"); **not** Magna-branded — Magna is the first internal tenant only; tenant name/logo/accent configurable. **Fixed** colour/typography/layout/map tokens, sidebar nav, usability rules, component/badge rules, accessibility, and Claude implementation rules defined for the future app shell. Design direction only — no app code. White-label/multi-tenant branding + SaaS domain are later work.
 
 ## MVP
 
