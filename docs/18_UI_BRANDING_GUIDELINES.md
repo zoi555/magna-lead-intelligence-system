@@ -1,16 +1,20 @@
 # UI & Branding Guidelines — Lead Intelligence Platform
 
-> **Brand is NOT locked.** The product name, logo direction, and final colour identity are **not
-> chosen yet**. This document therefore separates the **current official baseline** (what the app
-> uses today) from **candidate visual directions** under evaluation.
+> **Working product brand: AspectLead (DRAFT — not final, not legally cleared).** See
+> `docs/19_ASPECTLEAD_BRAND_IDENTITY_DRAFT.md` and the brand board
+> `docs/design-previews/aspectlead-brand-board.html`. Domain direction `aspectlead.app`.
 >
-> - **Current official state:** the **SaaS-neutral baseline design tokens** in §A below. These are
->   what the running app shell implements. They are intentionally neutral and safe.
-> - **Candidate direction (under evaluation, NOT final):** **Signal Command** — §B. A static visual
->   proof lives at `docs/design-previews/signal-command-preview.html`.
-> - **Rule:** **final brand colours, logo, and UI identity must be chosen only AFTER the brand
->   name and logo direction are selected** (see the brand-route exploration). Do not implement
->   candidate colours as if they were final.
+> - **Current official (implemented) state:** the **SaaS-neutral baseline design tokens** in §A
+>   below — what the running app shell uses today. **These remain valid until the AspectLead brand
+>   is approved and promoted.**
+> - **AspectLead brand identity (DRAFT):** now **supersedes random palette exploration** as the
+>   direction for future UI work — wordmark-led (no generic "A" icon), dual dark/light theme, new
+>   AspectLead palette tied to the wordmark. **Not yet implemented; brand/logo/colours/legal not
+>   locked.**
+> - **Signal Command** (§B) remains only a **candidate visual direction** to evaluate — not final.
+> - **Rule:** final colours, logo, and UI identity are chosen and promoted into §A only **after**
+>   the AspectLead brand is approved and cleared (domain/trademark/social). Do not implement
+>   candidate/draft colours as if they were final.
 >
 > Not implemented beyond §A · not production · no Supabase · no real data. **"Magna" is NOT the
 > product brand** — Magna Foodservice is only the first internal tenant/example.

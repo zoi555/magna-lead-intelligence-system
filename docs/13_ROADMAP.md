@@ -11,6 +11,13 @@
 - Get CTO field validation.
 - ~~Confirm exact MVP scope.~~ Resolved — territory is flexible per run (ADR-0009).
 
+## Branding stage (before UI redesign)
+
+1. **AspectLead brand identity draft** — `docs/19_ASPECTLEAD_BRAND_IDENTITY_DRAFT.md` + brand board (`docs/design-previews/aspectlead-brand-board.html`): wordmark-led logo directions, dual dark/light theme (Auto/Light/Dark, remembered), new palette. *(Draft; not final, not legally cleared.)*
+2. **Brand board review** — choose a wordmark route; run domain/trademark/social clearance (classes 9/35/42).
+3. **Finalise wordmark + palette** — designer pass; promote approved tokens into `docs/18` §A.
+4. **Then implement** the app theme system + redesign (tokens/fonts → components → screens), IA and data contracts unchanged.
+
 ## Design (before app scaffolding)
 
 - **Create the first UI/UX screen map before any app scaffolding.** Covers: login, role-based dashboard, territory selector, new pipeline run setup, upload customer postcode file, upload delivery boundary file, lead results dashboard, ignored leads audit view, reactivation list, expansion pipeline, run history, export/review screen, settings.

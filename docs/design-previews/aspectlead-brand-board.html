@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en-GB" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AspectLead — brand board (draft)</title>
+<style>
+  /* ---- brand accents (constant across themes) ---- */
+  :root{
+    --blue:#2563FF; --indigo:#4338CA; --cyan:#00D9F5; --violet:#7C3AED;
+    --amber:#F59E0B; --red:#E5484D; --orange:#FF7A59; --green:#16A34A;
+    --blue-text:#1D4ED8; --amber-text:#B45309; --red-text:#C0343A;
+    /* dark surface constants (for always-dark tiles) */
+    --carbon:#0F1115; --midnight:#0B1220; --navy:#101827; --border-dark:#223049;
+    --platinum:#F4F6FA; --steel:#8A92A6; --ink:#0F172A; --border-light:#E2E8F0;
+    --font-head:"Space Grotesk","Sora",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --font-ui:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --font-mono:"JetBrains Mono","IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  /* ---- theme-aware page tokens ---- */
+  :root, :root[data-theme="light"]{
+    --bg:#F4F6FA; --card:#FFFFFF; --text:#0F172A; --muted:#64748B; --border:#E2E8F0; --chrome:#0B1220;
+  }
+  :root[data-theme="dark"]{
+    --bg:#0F1115; --card:#101827; --text:#F4F6FA; --muted:#8A92A6; --border:#223049; --chrome:#0B1220;
+  }
+  @media (prefers-color-scheme: dark){
+    :root[data-theme="auto"]{ --bg:#0F1115; --card:#101827; --text:#F4F6FA; --muted:#8A92A6; --border:#223049; --chrome:#0B1220; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:var(--font-ui);background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased}
+  .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+  h1,h2,h3{font-family:var(--font-head);margin:0}
+  .micro{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+  .wrap{max-width:1080px;margin:0 auto;padding:20px}
+  .draftbadge{font-size:11px;font-weight:700;color:#b45309;background:#fdf3e1;border:1px solid #f2d9a6;border-radius:5px;padding:2px 8px}
+
+  /* topbar */
+  .topbar{position:sticky;top:0;z-index:5;background:var(--chrome);color:#e2e8f0;border-bottom:1px solid var(--border-dark);
+    display:flex;align-items:center;gap:12px;padding:10px 20px}
+  .toggle{margin-left:auto;display:inline-flex;background:#0c1322;border:1px solid var(--border-dark);border-radius:9px;padding:3px}
+  .toggle button{background:transparent;border:0;color:#94a3b8;font:inherit;font-size:12px;font-weight:600;padding:5px 11px;border-radius:7px;cursor:pointer}
+  .toggle button.on{background:var(--blue);color:#fff}
+
+  section{margin:26px 0}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px}
+  .p{padding:16px}
+  .grid{display:grid;gap:14px}
+
+  /* wordmark tiles */
+  .tile{border-radius:12px;border:1px solid var(--border-light);display:flex;align-items:center;justify-content:center;padding:22px;min-height:96px}
+  .tile.dark{background:var(--carbon);border-color:var(--border-dark)}
+  .tile.light{background:#fff}
+  .tile.plat{background:var(--platinum)}
+  .tlabel{font-size:11px;color:var(--muted);margin:6px 0 4px;font-weight:600}
+  .routecard{border:1px solid var(--border);border-radius:16px;background:var(--card);padding:16px;margin-bottom:16px}
+  .routehd{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}
+  .routehd h3{font-size:17px}
+  .note{font-size:12.5px;color:var(--muted);line-height:1.5}
+  .note b{color:var(--text)}
+
+  /* palette */
+  .swatch{border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  .swatch .chip{height:52px}
+  .swatch .meta{padding:8px 10px}
+  .swatch .role{font-size:12px;font-weight:600}
+  .swatch .hex{font-family:var(--font-mono);font-size:11px;color:var(--muted)}
+
+  /* badges */
+  .bdg{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;border-radius:999px;padding:2px 9px;border:1px solid}
+  .bdg .d{width:7px;height:7px;border-radius:50%}
+  .b-live{color:#0e7490;background:#e6feff;border-color:#a5f3fc}.b-live .d{background:var(--cyan)}
+  .b-ok{color:#15803d;background:#eafaf0;border-color:#bbf7d0}.b-ok .d{background:var(--green)}
+  .b-warn{color:#b45309;background:#fef4e6;border-color:#fde3b0}.b-warn .d{background:var(--amber)}
+  .b-block{color:#b91c1c;background:#fdecec;border-color:#fbcaca}.b-block .d{background:var(--red)}
+  .b-ai{color:#6d28d9;background:#f3eefe;border-color:#ddd0fb}.b-ai .d{background:var(--violet)}
+
+  /* UI samples */
+  .rail{background:var(--midnight);border:1px solid var(--border-dark);border-radius:14px;padding:12px;color:#e2e8f0;width:210px}
+  .rail .navi{display:flex;gap:8px;align-items:center;font-size:13px;color:#aeb7c6;padding:7px 9px;border-radius:8px;border-left:2px solid transparent}
+  .rail .navi.on{background:#151f36;color:#fff;border-left:2px solid var(--cyan)}
+  .stile{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
+  .stile .num{font-family:var(--font-mono);font-size:26px;font-weight:600}
+  .chip{font-size:11px;font-weight:600;border-radius:7px;padding:2px 8px;border:1px solid}
+  .gate{border:1px solid #f2d9a6;background:#fff8ec;border-radius:12px;padding:12px;color:#92600b;font-size:13px;display:flex;gap:10px;align-items:center}
+  .lead{border:1px solid var(--border);border-radius:12px;background:var(--card);padding:12px;display:flex;gap:10px;align-items:center}
+  .lead.prio{border-left:3px solid var(--amber)}
+  .phone{font-family:var(--font-mono);font-size:13px}
+  .btn{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:7px 13px;font:inherit;font-weight:600;font-size:13px;cursor:pointer}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span style="font-family:var(--font-head);font-weight:700;letter-spacing:.2px">AspectLead — Brand Board</span>
+  <span class="draftbadge">DRAFT · not final · not legally cleared</span>
+  <div class="toggle" id="tg">
+    <button data-t="auto" class="on">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- intro -->
+  <section>
+    <h1 style="font-size:26px">AspectLead</h1>
+    <p class="note" style="margin-top:6px;max-width:640px">
+      Working product brand — <b>see every angle of the market, detect sales signals, win territory</b>.
+      Wordmark-led (no generic “A” icon). Domain direction <span class="mono">aspectlead.app</span>.
+      Draft only — brand, colours, logo, and legal clearance are not finalised, and the app UI is unchanged.
+    </p>
+    <div class="grid" style="grid-template-columns:1fr 1fr 1fr;margin-top:12px">
+      <div class="card p"><span class="micro">Short premium</span><div style="font-family:var(--font-head);font-size:16px;margin-top:4px">Every angle. Every signal.</div></div>
+      <div class="card p"><span class="micro">Descriptive</span><div style="font-family:var(--font-head);font-size:16px;margin-top:4px">Territory lead intelligence for modern sales teams.</div></div>
+      <div class="card p"><span class="micro">Command-centre</span><div style="font-family:var(--font-head);font-size:16px;margin-top:4px">See the market. Command the territory.</div></div>
+    </div>
+  </section>
+
+  <!-- WORDMARK ROUTE A: CONTOUR -->
+  <section>
+    <div class="routecard">
+      <div class="routehd"><h3>A · Contour Line Wordmark</h3><span class="micro">geographic · calm · territory</span></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div><div class="tlabel">Primary · light</div><div class="tile light">
+          <svg viewBox="0 0 272 56" width="220" height="45">
+            <text x="0" y="38" font-family="var(--font-head)" font-weight="600" font-size="34" letter-spacing="-.5"><tspan fill="#0F172A">Aspect</tspan><tspan fill="#2563FF">Lead</tspan></text>
+            <path d="M4 46 C 46 40, 86 52, 128 46 S 210 40, 268 46" fill="none" stroke="#8A92A6" stroke-width="1.6" opacity=".8"/>
+            <path d="M4 50 C 54 46, 96 55, 146 50 S 214 46, 268 50" fill="none" stroke="#2563FF" stroke-width="1.4" opacity=".5"/>
+          </svg></div></div>
+        <div><div class="tlabel">Primary · dark (white-on-dark)</div><div class="tile dark">
+          <svg viewBox="0 0 272 56" width="220" height="45">
+            <text x="0" y="38" font-family="var(--font-head)" font-weight="600" font-size="34" letter-spacing="-.5"><tspan fill="#F4F6FA">Aspect</tspan><tspan fill="#00D9F5">Lead</tspan></text>
+            <path d="M4 46 C 46 40, 86 52, 128 46 S 210 40, 268 46" fill="none" stroke="#8A92A6" stroke-width="1.6" opacity=".7"/>
+            <path d="M4 50 C 54 46, 96 55, 146 50 S 214 46, 268 50" fill="none" stroke="#00D9F5" stroke-width="1.4" opacity=".55"/>
+          </svg></div></div>
+        <div><div class="tlabel">Compact (sidebar/header)</div><div class="tile plat" style="min-height:64px">
+          <svg viewBox="0 0 200 40" width="150" height="30">
+            <text x="0" y="27" font-family="var(--font-head)" font-weight="600" font-size="24"><tspan fill="#0F172A">Aspect</tspan><tspan fill="#2563FF">Lead</tspan></text>
+            <path d="M3 33 C 40 30, 70 37, 110 33 S 160 30, 197 33" fill="none" stroke="#2563FF" stroke-width="1.2" opacity=".5"/>
+          </svg></div></div>
+        <div><div class="tlabel">Single-colour (mono ink) · white-on-dark · favicon</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div class="tile light" style="min-height:64px;flex:1"><svg viewBox="0 0 200 40" width="150" height="30"><text x="0" y="27" font-family="var(--font-head)" font-weight="600" font-size="24" fill="#0F172A">AspectLead</text><path d="M3 33 C 60 30, 120 37, 197 33" fill="none" stroke="#0F172A" stroke-width="1.2" opacity=".55"/></svg></div>
+            <div class="tile dark" style="min-height:64px;flex:1"><svg viewBox="0 0 200 40" width="150" height="30"><text x="0" y="27" font-family="var(--font-head)" font-weight="600" font-size="24" fill="#F4F6FA">AspectLead</text></svg></div>
+            <div class="tile plat" style="min-height:64px;width:64px;padding:8px"><svg viewBox="0 0 40 40" width="40" height="40"><rect width="40" height="40" rx="10" fill="#0B1220"/><path d="M8 23 C 16 19, 24 27, 32 21" stroke="#2563FF" stroke-width="2.2" fill="none"/><path d="M8 28 C 16 24, 24 32, 32 26" stroke="#8A92A6" stroke-width="2" fill="none"/><circle cx="30" cy="14" r="2.6" fill="#00D9F5"/></svg></div>
+          </div></div>
+      </div>
+      <p class="note" style="margin-top:10px"><b>Why it works:</b> the contour reads as a territory boundary / map — instantly says “geographic intelligence,” stays calm and premium. <b>Risks:</b> the line can look decorative or get lost at tiny sizes; keep it subtle and drop it below ~16px height.</p>
+    </div>
+  </section>
+
+  <!-- WORDMARK ROUTE B: PERSPECTIVE CUT -->
+  <section>
+    <div class="routecard">
+      <div class="routehd"><h3>B · Perspective Cut Wordmark</h3><span class="micro">sharp · premium · likely front-runner</span></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div><div class="tlabel">Primary · light</div><div class="tile light">
+          <svg viewBox="0 0 285 56" width="230" height="45">
+            <g transform="skewX(-7)">
+              <text x="8" y="38" font-family="var(--font-head)" font-weight="700" font-size="34" letter-spacing="-.8"><tspan fill="#0F172A">Aspect</tspan><tspan fill="#2563FF">Lead</tspan></text>
+            </g>
+            <!-- perspective facet cut under 'Lead' -->
+            <path d="M170 44 L 268 30 L 268 34 L 170 48 Z" fill="#2563FF" opacity=".85"/>
+          </svg></div></div>
+        <div><div class="tlabel">Primary · dark (white-on-dark)</div><div class="tile dark">
+          <svg viewBox="0 0 285 56" width="230" height="45">
+            <g transform="skewX(-7)">
+              <text x="8" y="38" font-family="var(--font-head)" font-weight="700" font-size="34" letter-spacing="-.8"><tspan fill="#F4F6FA">Aspect</tspan><tspan fill="#00D9F5">Lead</tspan></text>
+            </g>
+            <path d="M170 44 L 268 30 L 268 34 L 170 48 Z" fill="#00D9F5" opacity=".9"/>
+          </svg></div></div>
+        <div><div class="tlabel">Compact (sidebar/header)</div><div class="tile plat" style="min-height:64px">
+          <svg viewBox="0 0 210 40" width="160" height="30"><g transform="skewX(-7)"><text x="6" y="27" font-family="var(--font-head)" font-weight="700" font-size="24" letter-spacing="-.6"><tspan fill="#0F172A">Aspect</tspan><tspan fill="#2563FF">Lead</tspan></text></g></svg></div></div>
+        <div><div class="tlabel">Single-colour · white-on-dark · favicon</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div class="tile light" style="min-height:64px;flex:1"><svg viewBox="0 0 210 40" width="160" height="30"><g transform="skewX(-7)"><text x="6" y="27" font-family="var(--font-head)" font-weight="700" font-size="24" letter-spacing="-.6" fill="#0F172A">AspectLead</text></g></svg></div>
+            <div class="tile dark" style="min-height:64px;flex:1"><svg viewBox="0 0 210 40" width="160" height="30"><g transform="skewX(-7)"><text x="6" y="27" font-family="var(--font-head)" font-weight="700" font-size="24" letter-spacing="-.6" fill="#F4F6FA">AspectLead</text></g></svg></div>
+            <div class="tile plat" style="min-height:64px;width:64px;padding:8px"><svg viewBox="0 0 40 40" width="40" height="40"><rect width="40" height="40" rx="10" fill="#0B1220"/><polygon points="10,30 24,10 30,10 30,15 16,30" fill="#2563FF"/><polygon points="20,30 30,18 30,30" fill="#00D9F5" opacity=".9"/></svg></div>
+          </div></div>
+      </div>
+      <p class="note" style="margin-top:10px"><b>Why it works:</b> the skew + facet cut expresses “aspect / viewpoint / angle” inside the type itself — sharp, modern, ownable, distinctly SaaS. The favicon derives from the facet, not an “A”. <b>Risks:</b> skew must stay subtle (≤7°) to keep legibility; a heavier cut could read like an italic gimmick — needs a real type-designer pass to refine the letterforms.</p>
+    </div>
+  </section>
+
+  <!-- WORDMARK ROUTE C: ROUTE STROKE -->
+  <section>
+    <div class="routecard">
+      <div class="routehd"><h3>C · Route Stroke Wordmark</h3><span class="micro">discovery · movement · signal</span></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr">
+        <div><div class="tlabel">Primary · light</div><div class="tile light">
+          <svg viewBox="0 0 290 60" width="235" height="48">
+            <text x="0" y="36" font-family="var(--font-head)" font-weight="600" font-size="34" letter-spacing="-.5"><tspan fill="#0F172A">Aspect</tspan><tspan fill="#2563FF">Lead</tspan></text>
+            <path d="M6 50 Q 96 60, 156 49 T 270 44" fill="none" stroke="#2563FF" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="6" cy="50" r="3.2" fill="#0F172A"/><circle cx="270" cy="44" r="4.6" fill="#00D9F5"/><circle cx="270" cy="44" r="8" fill="none" stroke="#00D9F5" stroke-width="1" opacity=".5"/>
+          </svg></div></div>
+        <div><div class="tlabel">Primary · dark (white-on-dark)</div><div class="tile dark">
+          <svg viewBox="0 0 290 60" width="235" height="48">
+            <text x="0" y="36" font-family="var(--font-head)" font-weight="600" font-size="34" letter-spacing="-.5"><tspan fill="#F4F6FA">Aspect</tspan><tspan fill="#00D9F5">Lead</tspan></text>
+            <path d="M6 50 Q 96 60, 156 49 T 270 44" fill="none" stroke="#2563FF" stroke-width="2" stroke-linecap="round"/>
+            <circle cx="6" cy="50" r="3.2" fill="#F4F6FA"/><circle cx="270" cy="44" r="4.6" fill="#00D9F5"/><circle cx="270" cy="44" r="8" fill="none" stroke="#00D9F5" stroke-width="1" opacity=".6"/>
+          </svg></div></div>
+        <div><div class="tlabel">Compact (sidebar/header)</div><div class="tile plat" style="min-height:64px">
+          <svg viewBox="0 0 210 42" width="160" height="32"><text x="0" y="26" font-family="var(--font-head)" font-weight="600" font-size="24"><tspan fill="#0F172A">Aspect</tspan><tspan fill="#2563FF">Lead</tspan></text><path d="M3 34 Q 70 40, 120 33 T 197 31" fill="none" stroke="#2563FF" stroke-width="1.4" stroke-linecap="round"/><circle cx="197" cy="31" r="3" fill="#00D9F5"/></svg></div></div>
+        <div><div class="tlabel">Single-colour · white-on-dark · favicon</div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div class="tile light" style="min-height:64px;flex:1"><svg viewBox="0 0 210 42" width="160" height="32"><text x="0" y="26" font-family="var(--font-head)" font-weight="600" font-size="24" fill="#0F172A">AspectLead</text><path d="M3 34 Q 70 40, 120 33 T 197 31" fill="none" stroke="#0F172A" stroke-width="1.4"/><circle cx="197" cy="31" r="3" fill="#0F172A"/></svg></div>
+            <div class="tile dark" style="min-height:64px;flex:1"><svg viewBox="0 0 210 42" width="160" height="32"><text x="0" y="26" font-family="var(--font-head)" font-weight="600" font-size="24" fill="#F4F6FA">AspectLead</text><path d="M3 34 Q 70 40, 120 33 T 197 31" fill="none" stroke="#00D9F5" stroke-width="1.4"/><circle cx="197" cy="31" r="3" fill="#00D9F5"/></svg></div>
+            <div class="tile plat" style="min-height:64px;width:64px;padding:8px"><svg viewBox="0 0 40 40" width="40" height="40"><rect width="40" height="40" rx="10" fill="#0B1220"/><path d="M9 28 Q 20 12, 31 20" stroke="#2563FF" stroke-width="2.4" fill="none" stroke-linecap="round"/><circle cx="9" cy="28" r="2.6" fill="#F4F6FA"/><circle cx="31" cy="20" r="3.2" fill="#00D9F5"/></svg></div>
+          </div></div>
+      </div>
+      <p class="note" style="margin-top:10px"><b>Why it works:</b> the route + signal node reads as opportunity discovery, sales movement, and territory expansion; the cyan end-node = a live signal. <b>Risks:</b> a route/path can drift toward a delivery/logistics look — keep it abstract (node-dots, not trucks/arrows) and never add a pin or vehicle.</p>
+    </div>
+  </section>
+
+  <!-- PALETTE -->
+  <section>
+    <h2 style="font-size:18px;margin-bottom:8px">Draft palette (AspectLead)</h2>
+    <div class="grid" style="grid-template-columns:repeat(6,1fr)">
+      <div class="swatch"><div class="chip" style="background:#2563FF"></div><div class="meta"><div class="role">Brand primary</div><div class="hex">#2563FF</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#4338CA"></div><div class="meta"><div class="role">Brand secondary</div><div class="hex">#4338CA</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#00D9F5"></div><div class="meta"><div class="role">Signal / live</div><div class="hex">#00D9F5</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#7C3AED"></div><div class="meta"><div class="role">Intelligence / AI</div><div class="hex">#7C3AED</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#F59E0B"></div><div class="meta"><div class="role">Warning / gap</div><div class="hex">#F59E0B</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#E5484D"></div><div class="meta"><div class="role">Danger</div><div class="hex">#E5484D</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#16A34A"></div><div class="meta"><div class="role">Success</div><div class="hex">#16A34A</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#FF7A59"></div><div class="meta"><div class="role">Critical accent</div><div class="hex">#FF7A59</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#0F1115"></div><div class="meta"><div class="role">Dark base</div><div class="hex">#0F1115</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#0B1220"></div><div class="meta"><div class="role">Command dark</div><div class="hex">#0B1220</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#101827"></div><div class="meta"><div class="role">Panel dark</div><div class="hex">#101827</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#F4F6FA;border-bottom:1px solid #E2E8F0"></div><div class="meta"><div class="role">Light app bg</div><div class="hex">#F4F6FA</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#FFFFFF;border-bottom:1px solid #E2E8F0"></div><div class="meta"><div class="role">Card</div><div class="hex">#FFFFFF</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#E2E8F0"></div><div class="meta"><div class="role">Border (light)</div><div class="hex">#E2E8F0</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#223049"></div><div class="meta"><div class="role">Border (dark)</div><div class="hex">#223049</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#8A92A6"></div><div class="meta"><div class="role">Muted text</div><div class="hex">#8A92A6</div></div></div>
+      <div class="swatch"><div class="chip" style="background:#0F172A"></div><div class="meta"><div class="role">Main text</div><div class="hex">#0F172A</div></div></div>
+    </div>
+    <div class="card p note" style="margin-top:12px">
+      <b>Accessibility guardrails:</b> Signal Cyan <span class="mono">#00D9F5</span> must <b>not</b> be paragraph text on light — use on dark surfaces, icons, dots, borders, glows.
+      Route Amber as text on white → darken to <span class="mono">#B45309</span>. Aspect Blue small text/links on white → <span class="mono">#1D4ED8</span>.
+      Alert Red text on white → <span class="mono">#C0343A</span>. <b>Never rely on colour alone for status</b> — always pair a dot/label/icon.
+    </div>
+  </section>
+
+  <!-- TYPOGRAPHY -->
+  <section>
+    <h2 style="font-size:18px;margin-bottom:8px">Typography</h2>
+    <div class="grid" style="grid-template-columns:1fr 1fr">
+      <div class="card p"><span class="micro">Headings · Space Grotesk / Sora</span><div style="font-family:var(--font-head);font-size:24px;font-weight:600;margin-top:6px">Territory Intelligence</div><div class="note">Geometric, technical-premium; matches the wordmark.</div></div>
+      <div class="card p"><span class="micro">UI / body · Inter</span><div style="font-size:15px;margin-top:6px">Clean, legible at 13–14px — the workhorse for tables, forms, and long sessions.</div></div>
+      <div class="card p"><span class="micro">Metrics / IDs · JetBrains Mono</span><div class="mono" style="font-size:18px;margin-top:6px">RUN-0042 · UB1 2AA · 146 · 41%</div><div class="note">Tabular figures = telemetry/intelligence feel.</div></div>
+      <div class="card p"><span class="micro">Wordmark · custom geometric</span><div style="font-family:var(--font-head);font-weight:700;font-size:22px;margin-top:6px"><span style="color:var(--text)">Aspect</span><span style="color:var(--blue)">Lead</span></div><div class="note">Custom-styled, not plain type; two-tone Aspect + Lead.</div></div>
+    </div>
+  </section>
+
+  <!-- UI IN PRODUCT -->
+  <section>
+    <h2 style="font-size:18px;margin-bottom:8px">Brand in product (samples)</h2>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+      <div class="rail">
+        <div style="font-family:var(--font-head);font-weight:700;font-size:15px;margin:2px 4px 10px"><span style="color:#f4f6fa">Aspect</span><span style="color:#00D9F5">Lead</span></div>
+        <div class="navi on">◧ Overview</div><div class="navi">◑ Coverage Map</div><div class="navi">▤ Territories</div><div class="navi">☎ Telesales</div>
+        <div style="border-top:1px solid var(--border-dark);margin-top:8px;padding-top:8px;font-size:11px;color:#8A92A6">Demo Company · Owner/Admin</div>
+      </div>
+      <div style="display:grid;gap:12px;flex:1;min-width:280px">
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <div class="stile" style="min-width:150px"><span class="micro">New leads</span> <span class="bdg b-live" style="vertical-align:middle"><span class="d"></span>live</span><div class="num">146</div></div>
+          <div class="stile" style="min-width:150px"><span class="micro">Delivery gaps</span><div class="num" style="color:#b45309">17</div></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <span class="chip" style="color:#1d4ed8;background:#e8efff;border-color:#c7d7ff">Territory · <span class="mono">UB1</span></span>
+          <span class="bdg b-live"><span class="d"></span>Running</span>
+          <span class="bdg b-ok"><span class="d"></span>Complete</span>
+          <span class="bdg b-warn"><span class="d"></span>Gap</span>
+          <span class="bdg b-block"><span class="d"></span>Blocked</span>
+          <span class="bdg b-ai"><span class="d"></span>AI insight</span>
+        </div>
+        <div class="gate">🔒 Export held until CRM field mappings are verified (<span class="mono">ISS-0003</span>).</div>
+        <div class="lead prio"><div style="flex:1"><div style="font-weight:600">New Flame BBQ</div><div class="note"><span class="mono">HA0 1LT</span> · <span class="phone">07xxx 100990</span> · Tier A</div></div><span class="chip" style="color:#b45309;background:#fef4e6;border-color:#fde3b0">Trigger · new FSA</span></div>
+      </div>
+    </div>
+    <p class="note" style="margin-top:10px">Use the <b>Auto / Light / Dark</b> toggle (top right) to see the same brand across both themes — dark for command/live/map, light for work/tables. Your choice persists (remembered).</p>
+  </section>
+
+  <p class="note" style="margin:30px 0 10px">Draft brand board · not final · not legally cleared · app UI unchanged · mock content only.</p>
+</div>
+
+<script>
+  const root=document.documentElement, tg=document.getElementById('tg');
+  const saved=localStorage.getItem('al-theme')||'auto';
+  set(saved);
+  function set(t){
+    root.setAttribute('data-theme',t);
+    localStorage.setItem('al-theme',t);
+    tg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  }
+  tg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>set(b.dataset.t)));
+</script>
+</body>
+</html>

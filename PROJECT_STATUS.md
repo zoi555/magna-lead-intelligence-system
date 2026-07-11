@@ -53,6 +53,18 @@ A real-data geospatial coverage map POC has been built and **visually accepted b
 
 The data-model + permissions + Supabase RLS design has been **reviewed and accepted with corrections** (**ADR-0012**). Single-tenant MVP, RLS-first, restricted telesales view (`v_telesales_leads`), geometry stored as separate map assets, `coverage_summary` as a maintained table, hashed suppression/erasure, separate UAT project. **Design only — no SQL, no migrations, no Supabase set up.** Dedup/export tables remain blocked by ISS-0001/0002/0003. See `docs/03_DATA_MODEL.md` and `docs/06_SECURITY.md`.
 
+## Brand: AspectLead (working direction, DRAFT — not implemented)
+
+**Working product brand/domain direction: AspectLead · `aspectlead.app`** (draft; **not** legally
+cleared — trademark/domain/social checks outstanding). **"Magna" is not the product brand** (Magna =
+future first tenant only). Brand identity draft in `docs/19_ASPECTLEAD_BRAND_IDENTITY_DRAFT.md`; a
+static **brand board** with three **wordmark-led** logo directions (Contour Line, Perspective Cut,
+Route Stroke — no generic "A" icon), a new AspectLead palette, and a **dual dark/light theme** system
+(Auto/Light/Dark, user override remembered) is at `docs/design-previews/aspectlead-brand-board.html`.
+- **Logo / colour / theme design is in DRAFT** — front-runner wordmark is *Perspective Cut* (B), not locked.
+- **No app implementation has been done** — the running Next.js shell still uses the SaaS-neutral baseline
+  tokens; nothing built, applied, or production-ready; no Supabase/real data.
+
 ## Branding: not locked — SaaS-neutral baseline + candidate directions
 
 **The brand is NOT chosen.** Product name, logo, and final colour identity are still open.
