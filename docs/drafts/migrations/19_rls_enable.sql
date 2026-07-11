@@ -71,7 +71,18 @@ alter table public.audit_logs                 enable row level security;
 
 -- ── FORCE RLS on the most protected / immutable / compliance tables ─────────────────────────
 -- (subjects the table owner to RLS too; service_role still bypasses — see comments above)
-alter table public.audit_logs         force row level security;
+--
+-- audit_logs is INTENTIONALLY *NOT* force-RLS'd:
+--   * Audit rows are written by app_private.write_audit(...), a SECURITY DEFINER function owned by
+--     the trusted migration/database owner, which runs the INSERT AS that owner.
+--   * FORCE RLS would subject that owner/definer INSERT path to audit_logs' RLS policies.
+--   * By design audit_logs has NO INSERT policy (file 20), so FORCE RLS would REJECT the definer
+--     INSERT and break audit capture entirely.
+--   * Browser users are still fully protected: RLS is ENABLED, audit_logs is SELECT-only via the
+--     O/A policy (file 20) + a matching SELECT grant (file 21), and there is NO INSERT grant to
+--     authenticated (file 21).
+--   * audit_logs IMMUTABILITY is enforced by the 17 guard trigger (blocks UPDATE/DELETE for every
+--     role incl. service_role) plus the 21 REVOKE UPDATE,DELETE — NOT by FORCE RLS.
 alter table public.erasure_tombstones force row level security;
 alter table public.suppression_list   force row level security;
 alter table public.existing_customers force row level security;
