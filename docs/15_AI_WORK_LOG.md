@@ -1,5 +1,20 @@
 # AI Work Log — Magna Lead Intelligence System
 
+## Session: 2026-07-11 — SaaS-neutral UI & branding guidelines (documentation only)
+
+Tool used: Claude Code
+Human request: Before the app shell, create SaaS-neutral UI/branding guidelines. Correction: do NOT use "Magna" in product name/branding/colours/domain/UI — Magna is only the first internal tenant. Documentation only.
+Files changed:
+- `docs/18_UI_BRANDING_GUIDELINES.md` (new) — 18-section SaaS design direction: product naming ("Lead Intelligence Platform"), tenant branding model, future domain placeholders, colour tokens (neutral navy/charcoal + blue accent; status; map colours consistent with the accepted map POC), typography, layout, sidebar/nav, cards, tables, forms, buttons, badges, map UI, prototype/mock banner, accessibility, do/don't, Next.js app-shell application, white-label considerations.
+- `PROJECT_STATUS.md` — added UI/branding direction section (SaaS-neutral, design only).
+- `docs/13_ROADMAP.md` — recorded branding guidelines under Design; white-label/domain as later work.
+- `docs/15_AI_WORK_LOG.md` — this entry.
+Summary: established a SaaS-ready, brand-neutral visual direction; "Magna" removed from product identity (first tenant only).
+Decisions made: none new (branding direction; not an ADR).
+Bugs fixed: none. Tests run: none. App code created: none.
+Not built/verified: no app shell, no code, no package.json, no Supabase/Vercel. Design direction only.
+Next action: keep migrations/tests drafts under review; app shell to apply these tokens later, config-driven tenant identity.
+
 ## Session: 2026-07-10 — Data model + RLS design accepted (documentation only)
 
 Tool used: Claude Code
