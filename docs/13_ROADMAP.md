@@ -14,8 +14,11 @@
 ## Branding stage (before UI redesign)
 
 1. **AspectLead brand identity draft** — `docs/19_ASPECTLEAD_BRAND_IDENTITY_DRAFT.md` + brand board (`docs/design-previews/aspectlead-brand-board.html`): wordmark-led logo directions, dual dark/light theme (Auto/Light/Dark, remembered), new palette. *(Draft; not final, not legally cleared.)*
-2. **Brand board review** — choose a wordmark route; run domain/trademark/social clearance (classes 9/35/42).
-3. **Finalise wordmark + palette** — designer pass; promote approved tokens into `docs/18` §A.
+2. **Brand board review** — ✅ **Route B *Perspective Cut* carried forward as preferred.** Refinement
+   brief for the designer: `docs/20_ASPECTLEAD_WORDMARK_REFINEMENT_BRIEF.md`. Still to run:
+   domain/trademark/social clearance (classes 9/35/42) and typeface licensing.
+3. **Finalise wordmark + palette** — professional designer rebuilds Perspective Cut as vector per the
+   brief; promote approved tokens into `docs/18` §A **only after** clearance + explicit approval.
 4. **Then implement** the app theme system + redesign (tokens/fonts → components → screens), IA and data contracts unchanged.
 
 ## Design (before app scaffolding)

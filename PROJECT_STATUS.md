@@ -61,7 +61,9 @@ future first tenant only). Brand identity draft in `docs/19_ASPECTLEAD_BRAND_IDE
 static **brand board** with three **wordmark-led** logo directions (Contour Line, Perspective Cut,
 Route Stroke — no generic "A" icon), a new AspectLead palette, and a **dual dark/light theme** system
 (Auto/Light/Dark, user override remembered) is at `docs/design-previews/aspectlead-brand-board.html`.
-- **Logo / colour / theme design is in DRAFT** — front-runner wordmark is *Perspective Cut* (B), not locked.
+- **Logo / colour / theme design is in DRAFT** — **Route B *Perspective Cut* is now the carried-forward
+  preferred wordmark direction** (not locked). A designer refinement brief for it is at
+  `docs/20_ASPECTLEAD_WORDMARK_REFINEMENT_BRIEF.md` (spec only — no vector artwork, no legal clearance).
 - **No app implementation has been done** — the running Next.js shell still uses the SaaS-neutral baseline
   tokens; nothing built, applied, or production-ready; no Supabase/real data.
 
