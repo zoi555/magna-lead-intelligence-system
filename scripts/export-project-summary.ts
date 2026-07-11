@@ -11,6 +11,5 @@ ${readFileSync(file, 'utf8')}` : `
 # ${file}
 
 MISSING`);
-writeFileSync('PROJECT_SUMMARY_EXPORT.md', parts.join('
-'), 'utf8');
+writeFileSync('PROJECT_SUMMARY_EXPORT.md', parts.join('\n'), 'utf8');
 console.log('Wrote PROJECT_SUMMARY_EXPORT.md');

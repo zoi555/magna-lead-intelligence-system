@@ -1,33 +1,46 @@
 import React from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
-import { telesalesAssignments } from "@/lib/mock-data";
+import { EmptyState } from "@/components/EmptyState";
+import { loadLatestResult } from "@/lib/pipeline/run-store";
+
+// SAFE telesales queue only. The rows come from the run's telesalesSafe projection,
+// which by construction contains no score, no match internals, and no financials.
+export const dynamic = "force-dynamic";
 
 export default function TelesalesPage() {
+  const result = loadLatestResult();
+  const safe = result?.telesalesSafe ?? [];
+
   return (
     <div>
       <PageHeader
-        title="Telesales"
-        subtitle="Assigned, exported leads — safe contact fields only (no financials, scores, or match data)."
+        title="Telesales — Safe Queue"
+        subtitle="Safe fields only: no internal score, no matching internals, no financials."
       />
-      <DataTable
-        columns={[
-          { key: "id", label: "Assignment" },
-          { key: "brand", label: "Business" },
-          { key: "postcode", label: "Postcode" },
-          { key: "phone", label: "Contact" },
-          { key: "tier", label: "Tier" },
-          { key: "trigger", label: "Trigger" },
-          { key: "worked", label: "Worked", badge: true },
-        ]}
-        rows={telesalesAssignments}
-        searchKeys={["brand", "postcode"]}
-        searchPlaceholder="Search assignments…"
-        filter={{ key: "worked", label: "Worked", options: ["Open", "In progress", "Contacted"] }}
-        actionLabel="Open"
-        emptyTitle="No assignments"
-        emptyHint="Assignments appear when an export batch is approved and assigned to a rep."
-      />
+      {!result ? (
+        <div className="rounded-card border border-bordergrey bg-card p-4 shadow-soft">
+          <EmptyState title="No assignments yet" hint="Run the pipeline: npm run leads:first" />
+        </div>
+      ) : (
+        <DataTable
+          columns={[
+            { key: "business_name", label: "Business" },
+            { key: "postcode", label: "Postcode" },
+            { key: "phone", label: "Phone" },
+            { key: "category", label: "Category" },
+            { key: "trigger_reason", label: "Trigger" },
+            { key: "assigned_rep", label: "Rep" },
+            { key: "worked_status", label: "Worked", badge: true },
+          ]}
+          rows={safe}
+          searchKeys={["business_name", "postcode", "assigned_rep"]}
+          searchPlaceholder="Search safe queue…"
+          filter={{ key: "worked_status", label: "Worked", options: ["Open", "In progress", "Contacted"] }}
+          actionLabel="Open"
+          emptyTitle="No assignments"
+        />
+      )}
     </div>
   );
 }

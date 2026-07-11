@@ -13,3 +13,12 @@ These are design corrections, not app bug fixes:
 | DESIGN-FIX-003 | Manual review queue risked becoming too heavy | 80%+ matches auto-ignored with full audit trail |
 | DESIGN-FIX-004 | Paid enrichment could run too early | Free filters before paid calls |
 | DESIGN-FIX-005 | Turnover data unavailable for many small firms | Review volume used as size proxy |
+
+## 2026-07-11 — Vertical Slice 001 build fixes
+
+- **BUG:** `scripts/export-project-summary.ts` had an unterminated string literal
+  (`parts.join('` with a raw newline). Because `tsconfig` includes `**/*.ts`, this failed
+  `next build` type-check. **Fix:** `parts.join('\n')`. Restores the script's intent; unblocks build.
+- **BUG:** `listRunIds()` in `src/lib/pipeline/run-store.ts` matched `<run>.records.json`, so
+  `leads:status` loaded the records array as a run state and crashed on `status.toUpperCase()`.
+  **Fix:** also exclude `*.records.json` from the run-id listing. Verified `npm run leads:status`.
