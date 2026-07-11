@@ -12,13 +12,12 @@ create table public.user_profiles (
   user_id     uuid primary key references auth.users(id) on delete restrict,  -- keep actor durable; NOT cascade
   role        user_role   not null default 'telesales',
   full_name   text,
-  rep_code    text,                     -- links a telesales user to discovered_leads.assigned_rep
+  -- rep_code links a telesales user to discovered_leads.assigned_rep (and other assigned_rep FKs).
+  -- Uses a NAMED UNIQUE CONSTRAINT (not a partial unique index) so it can be the target of a
+  -- foreign key. A UNIQUE constraint still permits multiple NULL rep_codes (NULLs are distinct in
+  -- PostgreSQL), so "many users without a rep_code" is preserved, while non-null rep_codes stay unique.
+  rep_code    text        constraint user_profiles_rep_code_key unique,
   is_active   boolean     not null default true,
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
 );
-
--- rep_code unique WHERE NOT NULL: many users may have no rep_code, but a set rep_code is unique.
--- (A plain UNIQUE would already permit multiple NULLs, but a partial index states the intent.)
-create unique index user_profiles_rep_code_key
-  on public.user_profiles (rep_code) where rep_code is not null;
