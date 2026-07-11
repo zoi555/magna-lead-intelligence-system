@@ -1,0 +1,29 @@
+{
+  "name": "lead-intelligence-app-shell",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Lead Intelligence Platform — SaaS-neutral app shell (mock data only, not production).",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "^16.2.10",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.12",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "10.4.19",
+    "postcss": "^8.5.16",
+    "tailwindcss": "3.4.7",
+    "typescript": "5.5.4"
+  },
+  "overrides": {
+    "postcss": "^8.5.16"
+  }
+}
