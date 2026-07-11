@@ -320,4 +320,7 @@ This document does not grant that approval.
 - **Custom letters:** `A` (primary), `L` in `Lead` (secondary echo), `t`/`d` terminals (optional).
 - **Signature:** one shared cut angle + ~5–7° skew, two-tone `Aspect`(ink)+`Lead`(accent).
 - **Icon:** abstract the *cut*, never a generic "A".
+- **Map visuals:** follow the accepted map POC (see `docs/18` §D / `docs/19` §14) — GB-wide framing, local
+  territory as a focused lens, POC colour language, POC-derived static asset only. NI data source unconfirmed
+  (GB-only POC data — ISS-0009). Not this brief's scope; noted for consistency.
 - **Status:** DRAFT. Not final. Not legally cleared. Not implemented in the app. No colours locked.

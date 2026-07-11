@@ -99,6 +99,26 @@ implemented.** Evaluate before committing.
 
 ---
 
+# §D. Map source direction (design authority for all map visuals)
+
+- The **accepted map POC** (`~/Projects/magna/lead-intelligence-map-poc`, visually accepted 2026-07-10,
+  frozen) is the **visual source of truth** for every AspectLead map surface: self-hosted **MapLibre GL JS**,
+  **OS Code-Point Open** derived postcode polygons, **OS Open Roads**. No Google/Mapbox/paid tiles.
+- **POC colour language (reuse verbatim):** coverage ramp blue→purple `rgba(84,120,205,.32)…rgba(156,42,166,.82)`
+  (no green in coverage), delivery fill `rgba(38,96,180,.10)` / outline `#2B6CB0`, delivery gaps
+  `rgba(232,150,25,.42)`, current/selected territory `#C85A00`, expansion dashed `#6A4A9A`, motorway
+  `#123C66`, A road `#3A9E63`, postcode outline grey `#9AA4AD`. Granularity Area/District/Sector; A-road
+  modes feeder/primary/all/custom; planning layers delivery boundary / gaps / expansion.
+- **Design previews use a POC-DERIVED static asset only** (`docs/design-previews/assets/aspectlead-map-data.js`,
+  regenerated from the POC). **No fake decorative blob maps.** The brand board frames the map **GB-wide** with
+  any local territory (e.g. `UB1`) as a **focused lens**, never a West-London-only tool.
+- **Production app must use the real MapLibre POC implementation** — not the static preview.
+- **UK-wide coverage must be verified before production.** Current POC data is **Great Britain only**
+  (Code-Point Open / OS Open Roads); a **Northern Ireland source must be confirmed** (OSNI / Royal Mail PAF).
+  NI is shown hatched + flagged, not faked. Tracked as **ISS-0009**.
+
+---
+
 # §C. What must happen before any brand/colour is locked
 1. **Choose a brand name + logo direction** (names are unverified — clear trademark/domain/social first).
 2. Only then select the **final palette, typography, and UI identity** — anchored to the chosen brand,

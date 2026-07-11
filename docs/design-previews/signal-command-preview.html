@@ -326,57 +326,11 @@
       <!-- ============ SCREEN 2: TERRITORY INTELLIGENCE MAP ============ -->
       <section class="screen" id="s-map">
         <div class="ph">
-          <div><h1>Territory Intelligence</h1><p>Cumulative coverage · schematic mock (real map uses OS open data, per POC)</p></div>
+          <div><h1>Territory Intelligence</h1><p>POC-derived West London coverage · real geometry from the accepted map POC (OS open data). GB-wide framing + NI caveat: see the AspectLead brand board.</p></div>
         </div>
 
         <div class="mapwrap">
-          <svg viewBox="0 0 900 470" width="100%" style="display:block;background:#0B1020">
-            <defs>
-              <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-                <feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-              </filter>
-            </defs>
-            <!-- road corridors -->
-            <path d="M0 360 Q 220 400 460 366 Q 700 335 900 372" fill="none" stroke="#334155" stroke-width="5" opacity=".9"/>
-            <text x="470" y="352" fill="#64748b" font-size="11" font-family="monospace">Thames / A4 corridor</text>
-            <line x1="0" y1="150" x2="900" y2="150" stroke="#16A34A" stroke-width="3" stroke-dasharray="12 6" opacity=".65"/>
-            <text x="20" y="142" fill="#3f9c5f" font-size="11" font-family="monospace">A40</text>
-            <!-- coverage tiles -->
-            <g font-family="monospace" font-size="12">
-              <!-- helper: fills by level -->
-              <!-- row logic inlined -->
-              <!-- level0 gap -->
-              <g>
-                <rect x="20" y="20" width="128" height="92" rx="8" fill="#0f1728" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="0" opacity=".9"/>
-                <rect x="20" y="20" width="128" height="92" rx="8" fill="rgba(245,158,11,.28)"/>
-                <text x="30" y="42" fill="#fde3b0" font-weight="700">HA2</text><text x="30" y="102" fill="#fbbf24" font-size="10">gap</text>
-              </g>
-              <g><rect x="160" y="20" width="128" height="92" rx="8" fill="rgba(37,99,235,.35)" stroke="#223049"/><text x="170" y="42" fill="#dbeafe" font-weight="700">UB4</text><text x="170" y="102" fill="#93c5fd" font-size="10">1× runs</text></g>
-              <g><rect x="300" y="20" width="128" height="92" rx="8" fill="rgba(59,130,246,.8)" stroke="#223049" filter="url(#glow)"/><text x="310" y="42" fill="#eaf2ff" font-weight="700">HA0</text><text x="310" y="102" fill="#e0eaff" font-size="10">4× · 96 leads</text></g>
-              <g><rect x="440" y="20" width="128" height="92" rx="8" fill="rgba(37,99,235,.6)" stroke="#223049"/><text x="450" y="42" fill="#eaf2ff" font-weight="700">HA1</text><text x="450" y="102" fill="#cfe0ff" font-size="10">2× runs</text></g>
-              <g><rect x="580" y="20" width="128" height="92" rx="8" fill="rgba(37,99,235,.35)" stroke="#223049"/><text x="590" y="42" fill="#dbeafe" font-weight="700">W5</text><text x="590" y="102" fill="#93c5fd" font-size="10">1× runs</text></g>
-              <g><rect x="720" y="20" width="128" height="92" rx="8" fill="#0f1728" stroke="#8B5CF6" stroke-width="1.5" stroke-dasharray="6 3"/><text x="730" y="42" fill="#d8c9fb" font-weight="700">SL2</text><text x="730" y="102" fill="#a78bfa" font-size="10">expansion</text></g>
-
-              <g><rect x="20" y="124" width="128" height="92" rx="8" fill="rgba(37,99,235,.6)" stroke="#223049"/><text x="30" y="146" fill="#eaf2ff" font-weight="700">UB3</text><text x="30" y="206" fill="#cfe0ff" font-size="10">2× runs</text></g>
-              <!-- selected UB1 (cyan ring) -->
-              <g>
-                <rect x="160" y="124" width="128" height="92" rx="8" fill="rgba(139,92,246,.9)" stroke="#22D3EE" stroke-width="2.5" filter="url(#glow)"/>
-                <rect x="156" y="120" width="136" height="100" rx="10" fill="none" stroke="#22D3EE" stroke-width="1" opacity=".5"/>
-                <text x="170" y="146" fill="#fff" font-weight="700">UB1</text><text x="170" y="206" fill="#e9ddff" font-size="10">5+ · 146 leads</text>
-              </g>
-              <g><rect x="300" y="124" width="128" height="92" rx="8" fill="#0f1728" stroke="#f59e0b" stroke-width="1.5"/><rect x="300" y="124" width="128" height="92" rx="8" fill="rgba(245,158,11,.28)"/><text x="310" y="146" fill="#fde3b0" font-weight="700">UB6</text><text x="310" y="206" fill="#fbbf24" font-size="10">gap</text></g>
-              <g><rect x="440" y="124" width="128" height="92" rx="8" fill="#0f1728" stroke="#f59e0b" stroke-width="1.5"/><rect x="440" y="124" width="128" height="92" rx="8" fill="rgba(245,158,11,.28)"/><text x="450" y="146" fill="#fde3b0" font-weight="700">W7</text><text x="450" y="206" fill="#fbbf24" font-size="10">gap</text></g>
-              <g><rect x="580" y="124" width="128" height="92" rx="8" fill="rgba(37,99,235,.6)" stroke="#223049"/><text x="590" y="146" fill="#eaf2ff" font-weight="700">W3</text><text x="590" y="206" fill="#cfe0ff" font-size="10">2× runs</text></g>
-              <g><rect x="720" y="124" width="128" height="92" rx="8" fill="#0f1728" stroke="#223049" stroke-dasharray="3 3"/><text x="730" y="146" fill="#94a3b8" font-weight="700">W13</text><text x="730" y="206" fill="#64748b" font-size="10">not targeted</text></g>
-
-              <g><rect x="20" y="228" width="128" height="92" rx="8" fill="rgba(59,130,246,.8)" stroke="#223049" filter="url(#glow)"/><text x="30" y="250" fill="#eaf2ff" font-weight="700">UB2</text><text x="30" y="310" fill="#e0eaff" font-size="10">3× · 88 leads</text></g>
-              <g><rect x="160" y="228" width="128" height="92" rx="8" fill="rgba(37,99,235,.35)" stroke="#223049"/><text x="170" y="250" fill="#dbeafe" font-weight="700">TW5</text><text x="170" y="310" fill="#93c5fd" font-size="10">1× runs</text></g>
-              <g><rect x="300" y="228" width="128" height="92" rx="8" fill="rgba(59,130,246,.8)" stroke="#223049" filter="url(#glow)"/><text x="310" y="250" fill="#eaf2ff" font-weight="700">TW3</text><text x="310" y="310" fill="#e0eaff" font-size="10">3× · 70 leads</text></g>
-              <g><rect x="440" y="228" width="128" height="92" rx="8" fill="#0f1728" stroke="#f59e0b" stroke-width="1.5"/><rect x="440" y="228" width="128" height="92" rx="8" fill="rgba(245,158,11,.28)"/><text x="450" y="250" fill="#fde3b0" font-weight="700">TW7</text><text x="450" y="310" fill="#fbbf24" font-size="10">gap</text></g>
-              <g><rect x="580" y="228" width="128" height="92" rx="8" fill="#0f1728" stroke="#223049" stroke-dasharray="3 3"/><text x="590" y="250" fill="#94a3b8" font-weight="700">W4</text><text x="590" y="310" fill="#64748b" font-size="10">not targeted</text></g>
-              <g><rect x="720" y="228" width="128" height="92" rx="8" fill="#0f1728" stroke="#8B5CF6" stroke-width="1.5" stroke-dasharray="6 3"/><text x="730" y="250" fill="#d8c9fb" font-weight="700">SL1</text><text x="730" y="310" fill="#a78bfa" font-size="10">expansion</text></g>
-            </g>
-          </svg>
+          <div id="scmap" style="height:470px;background:#070C15"></div>
 
           <!-- floating layer controls -->
           <div class="mapctl">
@@ -393,11 +347,11 @@
           <!-- legend -->
           <div class="legend">
             <div class="micro-d" style="margin:0 0 4px">Coverage · run count</div>
-            <div class="lg"><span class="sw" style="background:rgba(37,99,235,.35)"></span> 1</div>
-            <div class="lg"><span class="sw" style="background:rgba(37,99,235,.6)"></span> 2–3</div>
-            <div class="lg"><span class="sw" style="background:rgba(59,130,246,.85)"></span> 4</div>
-            <div class="lg"><span class="sw" style="background:#8B5CF6"></span> 5+</div>
-            <div class="lg"><span class="sw" style="background:rgba(245,158,11,.4)"></span> delivery gap</div>
+            <div class="lg"><span class="sw" style="background:rgba(96,132,220,.34)"></span> low</div>
+            <div class="lg"><span class="sw" style="background:rgba(150,96,214,.58)"></span> mid</div>
+            <div class="lg"><span class="sw" style="background:rgba(198,64,200,.82)"></span> high</div>
+            <div class="lg"><span class="sw" style="background:rgba(232,150,25,.4)"></span> delivery gap</div>
+            <div class="lg"><span class="sw" style="background:none;border:2px solid #FF8A3A"></span> territory</div>
             <div class="lg"><span class="sw" style="background:none;border:1px dashed #8B5CF6"></span> expansion</div>
           </div>
 
@@ -489,6 +443,31 @@
   }
   document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>show(t.dataset.screen)));
   document.querySelectorAll('.navi[data-tab]').forEach(n=>n.addEventListener('click',()=>show(n.dataset.tab)));
+</script>
+<script src="assets/aspectlead-map-data.js"></script>
+<script>
+(function(){
+  var el=document.getElementById('scmap'); if(!el) return;
+  var M=window.AL_MAP;
+  if(!M||!M.districts){ el.innerHTML='<div style="padding:22px;color:#94a3b8;font:13px monospace">POC-derived map asset not loaded — serve via http.server so assets/aspectlead-map-data.js resolves.</div>'; return; }
+  var cov=['rgba(96,132,220,.34)','rgba(120,116,214,.46)','rgba(150,96,214,.58)','rgba(172,72,206,.70)','rgba(198,64,200,.82)'];
+  var poly='';
+  M.districts.forEach(function(d){
+    var fill='transparent', extra='';
+    if(d.cat==='gap') fill='rgba(232,150,25,.40)';
+    else if(d.cat==='expansion') extra='<polygon points="'+d.pts+'" fill="none" stroke="#A884F5" stroke-width="1.3" stroke-dasharray="4 2"/>';
+    else if(d.band>=1) fill=cov[Math.min(4,d.band-1)];
+    poly+='<polygon points="'+d.pts+'" fill="'+fill+'" stroke="#3A4A63" stroke-width=".5"/>'+extra;
+    if(d.sel) poly+='<polygon points="'+d.pts+'" fill="none" stroke="#FF8A3A" stroke-width="2"/>';
+  });
+  var roads='';
+  M.roads.forEach(function(r){
+    roads+= r.cls==='m' ? '<polyline points="'+r.pts+'" fill="none" stroke="#5A86C4" stroke-width="2.1"/>'
+                        : '<polyline points="'+r.pts+'" fill="none" stroke="#4BB877" stroke-width="1" opacity=".85"/>';
+  });
+  var note='<text x="8" y="16" fill="rgba(232,237,245,.7)" font-family="monospace" font-size="9">WEST LONDON LENS · POC-derived · GB-only data; NI source TBC</text>';
+  el.innerHTML='<svg viewBox="'+M.lensViewBox+'" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" style="display:block;background:#070C15"><rect x="0" y="0" width="320" height="270" fill="#101B30"/>'+poly+roads+note+'</svg>';
+})();
 </script>
 </body>
 </html>

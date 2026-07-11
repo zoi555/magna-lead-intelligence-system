@@ -124,3 +124,18 @@ Architecture references Claude Code cloud routine for scheduling/orchestration. 
 ### Next action
 
 Verify whether Claude Code can reliably run scheduled cloud routines for this use case, or replace with AWS EventBridge/GitHub Actions/n8n.
+
+## ISS-0009 — UK-wide map coverage: Northern Ireland data source unconfirmed (GB-only POC data)
+
+Date: 2026-07-11  
+Severity: Medium  
+Owner: Zoeb  
+Status: Outstanding (design/branding note)
+
+### Problem
+
+The accepted map POC (`magna-lead-intelligence-map-poc`) uses **OS Code-Point Open + OS Open Roads**, which are **Great Britain only** — no Northern Ireland. The product/brand direction requires **UK-wide** map framing. The AspectLead brand board therefore shows a GB-wide base with NI drawn hatched and flagged; NI is not faked as covered.
+
+### Next action
+
+Before any production map work, confirm a Northern Ireland postcode/road data source (e.g. OSNI / Royal Mail PAF / OSNI Pointer) and its licence, or explicitly scope the product as GB-only for MVP. Then verify UK-wide coverage.

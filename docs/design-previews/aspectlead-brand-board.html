@@ -77,8 +77,9 @@
 
   /* UI samples */
   .rail{background:var(--midnight);border:1px solid var(--border-dark);border-radius:14px;padding:12px;color:#e2e8f0;width:210px}
-  .rail .navi{display:flex;gap:8px;align-items:center;font-size:13px;color:#aeb7c6;padding:7px 9px;border-radius:8px;border-left:2px solid transparent}
-  .rail .navi.on{background:#151f36;color:#fff;border-left:2px solid var(--cyan)}
+  .rail .navi{position:relative;display:flex;gap:8px;align-items:center;font-size:13px;color:#aeb7c6;padding:7px 9px;border-radius:8px}
+  .rail .navi.on{background:#151f36;color:#fff}
+  .rail .navi.on::before{content:"";position:absolute;left:-1px;top:5px;bottom:5px;width:3px;background:var(--cyan);transform:skewX(-8deg);transform-origin:top}
   .stile{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
   .stile .num{font-family:var(--font-mono);font-size:26px;font-weight:600}
   .chip{font-size:11px;font-weight:600;border-radius:7px;padding:2px 8px;border:1px solid}
@@ -87,6 +88,242 @@
   .lead.prio{border-left:3px solid var(--amber)}
   .phone{font-family:var(--font-mono);font-size:13px}
   .btn{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:7px 13px;font:inherit;font-weight:600;font-size:13px;cursor:pointer}
+
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,217,245,.5)}50%{box-shadow:0 0 0 4px rgba(0,217,245,0)}}
+  .hint{font-size:11px;color:var(--muted);font-family:var(--font-mono);margin:0 0 10px}
+
+  /* ================================================================
+     AspectLead SPATIAL COMMAND — a map-first territory-intelligence
+     cockpit. ONE product language, TWO themes (.ald.light/.dark).
+     GLASS only on spatial/command overlays; SOLID panels for dense
+     data (tables, gate, telesales, setup). Perspective-cut accents,
+     coordinate grids, contour/route strokes, mono codes.
+     ================================================================ */
+  .ald{position:relative;font-family:var(--font-ui);border:1px solid var(--ln);border-radius:10px;overflow:hidden;background:var(--bg);color:var(--tx)}
+  .ald.light{
+    --panel:#FFFFFF; --panel2:#F4F6FA; --inset:#EEF2F8; --bg:#E9EEF6;
+    --ln:#E2E8F0; --ln2:#D3DBE7; --tx:#0F172A; --mut:#5A6576; --fnt:#94A3B8;
+    --grid:rgba(15,23,42,.06); --contour:rgba(37,99,255,.34);
+    --blueI:#1D4ED8; --cyanI:#0E7490; --violetI:#6D28D9; --amberI:#B45309; --redI:#C0343A; --greenI:#15803D;
+    --tilebg:#FFFFFF; --baroff:#D3DCEA;
+    /* map — POC colour language (light) */
+    --mapland:#EEF2F5; --mapsea:#DCE6EF; --coast:#B7C4D8; --node:#2563FF;
+    --cov1:rgba(84,120,205,.32); --cov2:rgba(98,96,196,.44); --cov3:rgba(118,74,186,.56); --cov4:rgba(138,58,176,.68); --cov5:rgba(156,42,166,.82);
+    --pcline:#9AA4AD; --deliv:rgba(38,96,180,.10); --delivln:#2B6CB0;
+    --gapfill:rgba(232,150,25,.42); --gapln:#B06A12; --terr:#C85A00; --expln:#6A4A9A;
+    --roadm:#123C66; --roada:#3A9E63; --zlab:rgba(15,23,42,.62);
+    --glassbg:rgba(255,255,255,.60); --glassbd:rgba(255,255,255,.85); --glasssolid:#FFFFFF; --glasstx:#0F172A; --blur:14px;
+    --glassshadow:0 10px 30px rgba(20,40,80,.16);
+  }
+  .ald.dark{
+    --panel:#101A2E; --panel2:#0D1524; --inset:#0C1322; --bg:#0A0F1A;
+    --ln:#223049; --ln2:#2A3A55; --tx:#E8EDF5; --mut:#94A0B4; --fnt:#5F6B80;
+    --grid:rgba(255,255,255,.05); --contour:rgba(0,217,245,.30);
+    --blueI:#5AA2FF; --cyanI:#67E8F9; --violetI:#A884F5; --amberI:#F0B866; --redI:#F0A0A0; --greenI:#5ECB7E;
+    --tilebg:#0F1A30; --baroff:#2A3652;
+    /* map — POC colour language (dark, same hues tuned for dark land) */
+    --mapland:#101B30; --mapsea:#070C15; --coast:#26374F; --node:#00D9F5;
+    --cov1:rgba(96,132,220,.34); --cov2:rgba(120,116,214,.46); --cov3:rgba(150,96,214,.58); --cov4:rgba(172,72,206,.70); --cov5:rgba(198,64,200,.82);
+    --pcline:#3A4A63; --deliv:rgba(60,130,220,.12); --delivln:#4B86C9;
+    --gapfill:rgba(232,150,25,.40); --gapln:#E8A23A; --terr:#FF8A3A; --expln:#A884F5;
+    --roadm:#5A86C4; --roada:#4BB877; --zlab:rgba(232,237,245,.78);
+    --glassbg:rgba(14,22,40,.52); --glassbd:rgba(255,255,255,.10); --glasssolid:#0F1A2E; --glasstx:#E8EDF5; --blur:16px;
+    --glassshadow:0 12px 34px rgba(0,0,0,.5);
+  }
+
+  /* top command bar (solid) */
+  .ald .bar{position:relative;z-index:3;display:flex;align-items:center;gap:12px;padding:11px 16px;background:var(--panel);border-bottom:1px solid var(--ln);flex-wrap:wrap}
+  .ald .wm{font-family:var(--font-head);font-weight:700;font-size:15.5px;letter-spacing:-.3px;white-space:nowrap}
+  .ald .wm .a{color:var(--tx)} .ald .wm .l{color:var(--blueI)}
+  .ald .tnt{font-size:12px;color:var(--mut);border-left:1px solid var(--ln2);padding-left:12px;white-space:nowrap}
+  .ald .env{font-family:var(--font-mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--amberI);border:1px solid var(--ln2);padding:2px 7px;border-radius:2px}
+  .ald .cmd{flex:1;min-width:120px;display:flex;align-items:center;gap:7px;background:var(--inset);border:1px solid var(--ln);border-radius:4px;padding:6px 10px;color:var(--fnt);font-size:12px}
+  .ald .cmd .kbd{margin-left:auto;font-family:var(--font-mono);font-size:9px;border:1px solid var(--ln2);border-radius:2px;padding:0 5px;color:var(--mut)}
+  .ald .tsel{display:flex;border:1px solid var(--ln2);border-radius:4px;overflow:hidden}
+  .ald .tsel span{font-family:var(--font-ui);font-size:10.5px;padding:4px 8px;color:var(--mut);border-right:1px solid var(--ln2);cursor:default}
+  .ald .tsel span:last-child{border-right:0}
+  .ald .tsel span.on{background:var(--blue);color:#fff}
+  .ald .runst{display:flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:11px;color:var(--tx);white-space:nowrap}
+  .ald .runst .dot{width:7px;height:7px;border-radius:50%;background:var(--cyan);animation:pulse 2.4s infinite}
+
+  /* map cockpit — GB/UK-wide base (main surface), POC colour language */
+  .ald .cockpit{position:relative;min-height:600px;background:var(--mapsea);border-bottom:1px solid var(--ln)}
+  .ald .mapcanvas{position:absolute;inset:0}
+  .ald .mapcanvas svg{width:100%;height:100%;display:block}
+  .ald .land{fill:var(--mapland);stroke:var(--coast);stroke-width:1}
+  .ald .ni{stroke:var(--coast);stroke-width:1;stroke-dasharray:3 2}
+  .ald .mtick{fill:var(--fnt);font-family:var(--font-mono);font-size:8.5px;opacity:.75}
+  .ald .loc circle{fill:var(--pcline)}
+  .ald .loc text{fill:var(--zlab);font-family:var(--font-mono);font-size:8.5px;font-weight:600}
+  .ald .focus{fill:none;stroke:var(--terr);stroke-width:2}
+  .ald .focuslab{fill:var(--terr);font-family:var(--font-mono);font-size:9px;font-weight:600}
+  .ald .lead-mroad{stroke:var(--roadm);fill:none}
+  .ald .mnode{animation:mpulse 2.6s ease-in-out infinite}
+  @keyframes mpulse{0%,100%{opacity:1}50%{opacity:.4}}
+  /* territory lens (real POC-derived West London detail) */
+  .ald .lensmap{position:relative;border:1px solid var(--glassbd);border-radius:5px;overflow:hidden;background:var(--mapland);height:150px}
+  .ald .lensmap svg{width:100%;height:100%;display:block}
+  .ald .zlab{fill:var(--zlab);font-family:var(--font-mono);font-size:7px;font-weight:600}
+  .ald .pcln{stroke:var(--pcline);fill:none;stroke-width:.5}
+  .ald .roadm{stroke:var(--roadm);fill:none}
+  .ald .roada{stroke:var(--roada);fill:none}
+  .ald .shield{font-family:var(--font-mono);font-size:6.5px;font-weight:700;fill:#fff}
+  .ald .lens-legend{display:flex;flex-wrap:wrap;gap:5px 9px;margin-top:8px;font-family:var(--font-mono);font-size:8px;color:var(--glasstx)}
+  .ald .lens-legend span{display:inline-flex;align-items:center;gap:4px}
+  .ald .lens-legend i{width:11px;height:8px;border-radius:1px;display:inline-block;border:1px solid var(--glassbd)}
+
+  /* glass overlays — spatial/command only */
+  .ald .ov{position:absolute;z-index:2;overflow:hidden;border-radius:11px;color:var(--glasstx);
+    background:var(--glassbg);border:1px solid var(--glassbd);box-shadow:var(--glassshadow);
+    -webkit-backdrop-filter:blur(var(--blur)) saturate(1.25);backdrop-filter:blur(var(--blur)) saturate(1.25)}
+  .ald .ov .oh{position:relative;display:flex;align-items:center;gap:7px;padding:8px 11px 8px 15px;border-bottom:1px solid var(--glassbd);
+    font-family:var(--font-head);font-weight:600;font-size:12px;color:var(--glasstx)}
+  .ald .ov .oh::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;transform:skewX(-8deg);transform-origin:top;background:var(--node);opacity:.65}
+  .ald .ov .ob{padding:10px 12px}
+  .ald .ov .dot{width:7px;height:7px;border-radius:50%;background:var(--cyan);animation:pulse 2.4s infinite;flex:none}
+  .ald .ov.ctrl{top:14px;left:14px;width:188px}
+  .ald .ov.run{top:14px;right:14px;width:226px}
+  .ald .ov.lens{bottom:14px;left:14px;width:250px}
+  .ald .ov.detail{bottom:14px;right:14px;width:240px}
+
+  /* control layer */
+  .ald .lay{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;padding:5px 0;color:var(--glasstx)}
+  .ald .sw{width:26px;height:15px;border-radius:8px;background:var(--baroff);position:relative;flex:none}
+  .ald .sw.on{background:var(--blue)}
+  .ald .sw::after{content:"";position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#fff}
+  .ald .sw.on::after{left:13px}
+  .ald .cap{font-family:var(--font-mono);font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:9px 0 3px}
+  .ald .seg{display:flex;border:1px solid var(--glassbd);border-radius:5px;overflow:hidden}
+  .ald .seg span{flex:1;text-align:center;font-family:var(--font-mono);font-size:9.5px;padding:4px 0;color:var(--mut)}
+  .ald .seg span.on{background:var(--blue);color:#fff}
+  .ald .legend{display:flex;align-items:center;gap:5px;margin-top:10px;font-family:var(--font-mono);font-size:8px;color:var(--mut)}
+  .ald .legend i{width:12px;height:8px;border-radius:2px;display:inline-block}
+
+  /* run monitor + progress + stages */
+  .ald .rrow{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:10px;color:var(--mut)}
+  .ald .rrow b{color:var(--glasstx)}
+  .ald .meter{height:6px;background:var(--inset);border:1px solid var(--ln);border-radius:3px;overflow:hidden;margin-top:8px}
+  .ald .ov .meter{background:rgba(120,140,170,.25);border-color:var(--glassbd)}
+  .ald .meter i{display:block;height:100%;background:var(--blue)}
+  .ald .msub{font-family:var(--font-mono);font-size:9px;color:var(--fnt);margin-top:4px}
+  .ald .stages{display:flex;gap:3px;margin-top:10px}
+  .ald .stg{flex:1;text-align:center}
+  .ald .stg .b{height:3px;border-radius:2px;background:var(--baroff)}
+  .ald .stg.done .b{background:var(--cyan)} .ald .stg.now .b{background:var(--blue)}
+  .ald .stg .l{font-family:var(--font-mono);font-size:7px;letter-spacing:.02em;color:var(--fnt);margin-top:4px}
+  .ald .stg.done .l{color:var(--cyanI)} .ald .stg.now .l{color:var(--blueI)}
+  .ald .rfoot{display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:9px;color:var(--fnt);margin-top:9px;border-top:1px solid var(--glassbd);padding-top:6px}
+
+  /* territory lens */
+  .ald .lensname{font-family:var(--font-head);font-weight:700;font-size:13px;color:var(--glasstx)}
+  .ald .lenssub{font-family:var(--font-mono);font-size:9px;color:var(--fnt);margin:1px 0 9px}
+  .ald .lensgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+  .ald .lg .k{font-family:var(--font-mono);font-size:8px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
+  .ald .lg .v{font-family:var(--font-mono);font-size:15px;font-weight:600;color:var(--glasstx);margin-top:1px}
+
+  /* detail drawer */
+  .ald .dname{font-family:var(--font-head);font-weight:700;font-size:13px;color:var(--glasstx)}
+  .ald .dsub{font-family:var(--font-mono);font-size:9px;color:var(--fnt);margin:1px 0 8px}
+  .ald .kv{display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid var(--glassbd)}
+  .ald .kv .k{color:var(--mut);font-family:var(--font-mono);font-size:9.5px}
+  .ald .kv .v{font-family:var(--font-mono);color:var(--glasstx)}
+  .ald .next{margin-top:9px;border:1px solid var(--glassbd);border-left:3px solid var(--blue);background:rgba(120,140,180,.10);padding:7px 9px;font-size:11px;color:var(--glasstx)}
+  .ald .next .k{font-family:var(--font-mono);font-size:8px;text-transform:uppercase;color:var(--blueI);letter-spacing:.07em;display:block;margin-bottom:3px}
+  .ald .audit{font-family:var(--font-mono);font-size:9px;color:var(--fnt);margin-top:8px;border-top:1px solid var(--glassbd);padding-top:6px;line-height:1.7}
+
+  /* SOLID dense work region (below the map) */
+  .ald .work{display:grid;grid-template-columns:1.55fr 1fr;gap:12px;padding:12px}
+  .ald .workcol{display:grid;gap:12px;align-content:start;min-width:0}
+  .ald .pnl{position:relative;background:var(--panel);border:1px solid var(--ln);min-width:0;
+    clip-path:polygon(0 0, calc(100% - 15px) 0, 100% 15px, 100% 100%, 0 100%)}
+  .ald .pnl.plain{clip-path:none;border-radius:5px}
+  .ald .phd{position:relative;display:flex;align-items:center;gap:8px;padding:9px 12px 9px 15px;border-bottom:1px solid var(--ln);
+    font-family:var(--font-mono);font-size:9.5px;color:var(--mut)}
+  .ald .phd::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;transform:skewX(-8deg);transform-origin:top;background:var(--blue);opacity:.5}
+  .ald .phd b{font-family:var(--font-head);font-size:12.5px;font-weight:600;color:var(--tx);letter-spacing:-.1px}
+  .ald .phd .code{margin-left:auto;font-family:var(--font-mono);font-size:9px;color:var(--fnt)}
+  .ald .pbd{padding:12px}
+
+  /* lead signal stack */
+  .ald .lq{display:grid;gap:7px}
+  .ald .lr{position:relative;display:flex;align-items:center;gap:11px;background:var(--panel);border:1px solid var(--ln);
+    padding:9px 12px;clip-path:polygon(13px 0,100% 0,100% 100%,0 100%);min-width:0}
+  .ald .lr .acc{position:absolute;left:0;top:0;bottom:0;width:3px;transform:skewX(-8deg);transform-origin:top}
+  .ald .lr .sv{flex:none;border:1px solid var(--ln);border-radius:2px;background:var(--panel2)}
+  .ald .lr .nm{font-weight:600;font-size:13px;color:var(--tx);letter-spacing:-.1px}
+  .ald .lr .mt{font-family:var(--font-mono);font-size:9.5px;color:var(--mut);margin-top:3px;letter-spacing:.02em}
+  .ald .lr .tg{font-size:10px;margin-top:4px}
+  .ald .bars{display:flex;align-items:flex-end;gap:2px;height:16px}
+  .ald .bars i{width:3.5px;background:var(--baroff);display:block}
+  .ald .bars i.on{background:var(--cyan)}
+  .ald .slab{font-family:var(--font-mono);font-size:8px;color:var(--fnt);text-align:center;margin-top:4px;letter-spacing:.03em}
+  .ald .arail{display:flex;flex-direction:column;border:1px solid var(--ln);border-radius:3px;overflow:hidden;flex:none}
+  .ald .arail button{font-family:var(--font-mono);font-size:9.5px;color:var(--mut);background:var(--panel2);border:0;border-bottom:1px solid var(--ln);padding:4px 9px;cursor:pointer;text-align:left;white-space:nowrap}
+  .ald .arail button:last-child{border-bottom:0}
+  .ald .arail button.pri{color:var(--blueI);font-weight:600}
+
+  /* export gate console (solid) */
+  .ald .gate3{display:flex;border:1px solid var(--ln2);background:var(--panel2);border-radius:3px;overflow:hidden}
+  .ald .gate3 .rail{width:8px;flex:none;background:repeating-linear-gradient(-45deg,var(--amber) 0 5px,transparent 5px 10px)}
+  .ald .gate3 .gb{padding:10px 13px;flex:1;min-width:0}
+  .ald .gate3 .gh{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ald .gate3 .gh .t{font-family:var(--font-head);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--amberI)}
+  .ald .gate3 .gh .iss{font-family:var(--font-mono);font-size:9.5px;color:var(--amberI);border:1px solid var(--ln2);padding:1px 6px;border-radius:2px}
+  .ald .gate3 .gh .lk{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--amberI)}
+  .ald .gate3 .gr{font-size:11.5px;color:var(--mut);margin-top:6px}
+  .ald .gate3 .gs{display:flex;gap:14px;align-items:center;margin-top:8px;font-family:var(--font-mono);font-size:9.5px;color:var(--fnt);flex-wrap:wrap}
+  .ald .gate3 .gs b{color:var(--tx)}
+  .ald .gate3 .gs .act{margin-left:auto;color:var(--blueI);border:1px solid var(--ln2);padding:2px 8px;border-radius:2px;cursor:pointer}
+
+  /* telesales safe workload (solid) */
+  .ald .safe{font-family:var(--font-mono);font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--greenI);display:inline-flex;align-items:center;gap:6px}
+  .ald .safe::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--green)}
+  .ald .counts{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ln);border:1px solid var(--ln);border-radius:3px;overflow:hidden;margin:8px 0}
+  .ald .cc{background:var(--panel);padding:6px 8px;text-align:center}
+  .ald .cc .k{font-family:var(--font-mono);font-size:8px;text-transform:uppercase;color:var(--fnt)}
+  .ald .cc .v{font-family:var(--font-mono);font-size:15px;font-weight:600;color:var(--tx);margin-top:1px}
+  .ald .rep{display:flex;align-items:center;gap:9px;font-size:11px;color:var(--tx);padding:3px 0}
+  .ald .rep .av{width:20px;height:20px;border-radius:3px;background:var(--inset);border:1px solid var(--ln);font-family:var(--font-mono);font-size:8.5px;display:flex;align-items:center;justify-content:center;color:var(--mut)}
+  .ald .rep .qn{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--mut)}
+  .ald .rep .qn b{color:var(--tx)}
+  .ald .redact{font-family:var(--font-mono);font-size:9px;color:var(--fnt);margin-top:8px;border-top:1px dashed var(--ln2);padding-top:6px}
+
+  /* setup readiness strip (solid) */
+  .ald .setup{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .ald .su{display:flex;gap:9px;align-items:center;background:var(--panel2);border:1px solid var(--ln);padding:8px 10px;border-radius:3px}
+  .ald .su .n{width:16px;height:16px;flex:none;border-radius:50%;border:1px solid var(--ln2);font-family:var(--font-mono);font-size:8px;display:flex;align-items:center;justify-content:center;color:var(--mut)}
+  .ald .su .iss{font-family:var(--font-mono);font-size:9.5px;color:var(--amberI)}
+  .ald .su .ds{font-size:10.5px;color:var(--mut);margin-top:1px}
+  .ald .su .pend{margin-left:auto;font-family:var(--font-mono);font-size:8px;letter-spacing:.06em;color:var(--amberI)}
+
+  /* responsive: overlays reflow below the map on narrow screens */
+  @media(max-width:820px){
+    .ald .cockpit{min-height:0}
+    .ald .mapcanvas{position:relative;height:240px}
+    .ald .ov{position:static;width:auto;margin:10px 12px 0;box-shadow:none}
+    .ald .work{grid-template-columns:1fr}
+    .ald .setup{grid-template-columns:1fr}
+  }
+  /* accessibility: reduced-transparency → solid glass; reduced-motion → no pulse */
+  @media (prefers-reduced-transparency: reduce){
+    .ald .ov{background:var(--glasssolid);-webkit-backdrop-filter:none;backdrop-filter:none}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .ald .runst .dot,.ald .ov .dot,.ald .mnode{animation:none}
+  }
+
+  /* design-decisions grid (hairline rows, not soft cards) */
+  .decgrid{display:grid;grid-template-columns:160px 1fr}
+  .decgrid .dk{font-family:var(--font-mono);font-size:11px;font-weight:600;color:var(--text);padding:10px 12px;border-bottom:1px solid var(--border);background:var(--bg)}
+  .decgrid .dv{font-size:12.5px;line-height:1.5;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border);border-left:1px solid var(--border)}
+  .decgrid .dv b{color:var(--text)}
+  .decgrid .dk:last-of-type,.decgrid .dv:last-of-type{border-bottom:0}
+  @media(max-width:560px){.decgrid{grid-template-columns:1fr}.decgrid .dv{border-left:0}}
+
+  .dashwrap{display:grid;gap:16px}
+  .dashcap{font-family:var(--font-mono);font-size:11px;color:var(--muted);margin:0 0 8px;display:flex;align-items:center;gap:9px}
+  .dashcap b{font-family:var(--font-head);color:var(--text);font-size:13.5px;letter-spacing:-.2px}
+  .dashcap .pin{font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border:1px solid var(--border);border-radius:3px;padding:2px 7px}
 
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -254,33 +491,89 @@
     </div>
   </section>
 
-  <!-- UI IN PRODUCT -->
+  <!-- SPATIAL COMMAND PREVIEWS -->
   <section>
-    <h2 style="font-size:18px;margin-bottom:8px">Brand in product (samples)</h2>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
-      <div class="rail">
-        <div style="font-family:var(--font-head);font-weight:700;font-size:15px;margin:2px 4px 10px"><span style="color:#f4f6fa">Aspect</span><span style="color:#00D9F5">Lead</span></div>
-        <div class="navi on">◧ Overview</div><div class="navi">◑ Coverage Map</div><div class="navi">▤ Territories</div><div class="navi">☎ Telesales</div>
-        <div style="border-top:1px solid var(--border-dark);margin-top:8px;padding-top:8px;font-size:11px;color:#8A92A6">Demo Company · Owner/Admin</div>
+    <h2 style="font-size:18px;margin-bottom:2px">AspectLead Spatial Command — Light &amp; Dark</h2>
+    <p class="note" style="margin:0 0 14px;max-width:760px">A map-first territory-intelligence <b>cockpit</b>. The <b>GB-wide base map</b> is the main surface; the <b>Territory Lens</b> zooms to the selected <span class="mono">UB1</span> / West London detail — <b>a focused lens, not the whole product</b>. Map colours and layers follow the <b>accepted map POC</b> (blue→purple coverage, amber gaps, orange territory, dashed-purple expansion, dark-blue motorways, green A roads). <b>Glass command overlays</b> float above the map; <b>solid panels</b> carry the dense work below. Same layout and data in both themes — only the tokens change.</p>
+    <div class="dashwrap">
+      <div>
+        <p class="dashcap"><b>AspectLead Spatial Command — Light Theme</b><span class="pin">GB base · platinum · white glass</span></p>
+        <div class="ald light" id="dash-light"></div>
       </div>
-      <div style="display:grid;gap:12px;flex:1;min-width:280px">
-        <div style="display:flex;gap:12px;flex-wrap:wrap">
-          <div class="stile" style="min-width:150px"><span class="micro">New leads</span> <span class="bdg b-live" style="vertical-align:middle"><span class="d"></span>live</span><div class="num">146</div></div>
-          <div class="stile" style="min-width:150px"><span class="micro">Delivery gaps</span><div class="num" style="color:#b45309">17</div></div>
-        </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <span class="chip" style="color:#1d4ed8;background:#e8efff;border-color:#c7d7ff">Territory · <span class="mono">UB1</span></span>
-          <span class="bdg b-live"><span class="d"></span>Running</span>
-          <span class="bdg b-ok"><span class="d"></span>Complete</span>
-          <span class="bdg b-warn"><span class="d"></span>Gap</span>
-          <span class="bdg b-block"><span class="d"></span>Blocked</span>
-          <span class="bdg b-ai"><span class="d"></span>AI insight</span>
-        </div>
-        <div class="gate">🔒 Export held until CRM field mappings are verified (<span class="mono">ISS-0003</span>).</div>
-        <div class="lead prio"><div style="flex:1"><div style="font-weight:600">New Flame BBQ</div><div class="note"><span class="mono">HA0 1LT</span> · <span class="phone">07xxx 100990</span> · Tier A</div></div><span class="chip" style="color:#b45309;background:#fef4e6;border-color:#fde3b0">Trigger · new FSA</span></div>
+      <div>
+        <p class="dashcap"><b>AspectLead Spatial Command — Dark Theme</b><span class="pin">GB base · midnight · smoked glass</span></p>
+        <div class="ald dark" id="dash-dark"></div>
       </div>
     </div>
-    <p class="note" style="margin-top:10px">Use the <b>Auto / Light / Dark</b> toggle (top right) to see the same brand across both themes — dark for command/live/map, light for work/tables. Your choice persists (remembered).</p>
+    <div class="card p note" style="margin-top:12px">
+      <b>Accessibility.</b> Glass overlays fall back to <b>solid surfaces</b> under <span class="mono">prefers-reduced-transparency: reduce</span>; <b>backdrop blur is never animated</b>. Dense tables, the export field checks and setup use <b>solid</b> panels only — glass is never placed where readability is critical. Contrast is maintained (cyan stays a dot/border/icon colour on light, never body text; amber/blue text darkened on light). Motion is minimal and honours <span class="mono">prefers-reduced-motion</span>.
+    </div>
+  </section>
+
+  <!-- MAP SOURCE DIRECTION -->
+  <section>
+    <h2 style="font-size:18px;margin-bottom:8px">Map source direction</h2>
+    <div class="card" style="overflow:hidden;border-radius:6px">
+      <div class="decgrid">
+        <div class="dk">Source of truth</div><div class="dv">The <b>accepted map POC</b> (<span class="mono">~/Projects/magna/lead-intelligence-map-poc</span>, visually accepted 2026-07-10, frozen) is the visual source of truth for all AspectLead map styling — MapLibre GL JS, OS Code-Point Open derived postcode polygons, OS Open Roads.</div>
+        <div class="dk">This board</div><div class="dv">Uses a <b>POC-derived static preview only</b>. The West London Territory Lens geometry is <b>derived from the real POC data</b> (see <span class="mono">docs/design-previews/assets/aspectlead-map-data.js</span>); the GB base is a styling <b>impression</b>. <b>No fake decorative blob maps.</b></div>
+        <div class="dk">Future app</div><div class="dv">The production app must use the <b>real MapLibre implementation</b> from the POC (self-hosted, OS open data, no paid tiles) — not this static preview.</div>
+        <div class="dk">UK-wide coverage</div><div class="dv"><b>Must be verified before production.</b> The map should frame the whole operating market, with any local territory (e.g. <span class="mono">UB1</span>) only a selected lens — never implying a West-London-only tool.</div>
+        <div class="dk" style="color:var(--warning,#B45309)">Northern Ireland</div><div class="dv"><b>Current POC map data appears GB-focused</b> (OS Code-Point Open + OS Open Roads are Great Britain only). <b>UK-wide production coverage requires confirming a Northern Ireland data source</b> (e.g. OSNI / Royal Mail PAF). NI is shown hatched + flagged on the base map; it is <b>not</b> faked as covered. Tracked as an open branding/design issue.</div>
+      </div>
+    </div>
+    <p class="note" style="margin-top:8px">POC colour language reused verbatim: coverage blue→purple <span class="mono">rgba(84,120,205…)→rgba(156,42,166…)</span>, delivery gaps <span class="mono">amber</span>, current territory <span class="mono">#C85A00</span>, expansion dashed <span class="mono">#6A4A9A</span>, motorways <span class="mono">#123C66</span>, A roads <span class="mono">#3A9E63</span>.</p>
+  </section>
+
+  <!-- WHAT WE LEARNED -->
+  <section>
+    <h2 style="font-size:18px;margin-bottom:8px">What we learned from dashboard references</h2>
+    <div class="card" style="overflow:hidden;border-radius:6px">
+      <div class="decgrid">
+        <div class="dk">Hierarchy first</div><div class="dv">One dominant surface (the map), a clear command bar, then supporting overlays and dense panels in priority order — instead of a flat grid of equal cards.</div>
+        <div class="dk">Spatial context</div><div class="dv">A large territory/map canvas is AspectLead's real differentiator. Leading the screen with space, coverage heat and routes reads as <b>territory intelligence</b>, not generic admin.</div>
+        <div class="dk">Glass, only where meaningful</div><div class="dv">Frosted overlays for spatial/command controls that sit <i>over</i> the map; solid surfaces everywhere reading matters (tables, gate, settings). Blur is controlled, never decorative.</div>
+        <div class="dk">Signal-led controls</div><div class="dv">Compact switches, segmented toggles and a legend — not a wall of KPI cards or pill badges. Controls express live state, not chrome.</div>
+        <div class="dk">One language, two themes</div><div class="dv">Light and dark are the same product with swapped tokens — identical layout and data — so the brand holds whichever a user runs.</div>
+        <div class="dk">Experience over tray</div><div class="dv">The screen should feel like a place you operate from, with map, live run and selection state — not a catalogue of components.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHY NOT GENERIC -->
+  <section>
+    <h2 style="font-size:18px;margin-bottom:8px">Why this does not smell like a generic dashboard</h2>
+    <div class="card" style="overflow:hidden">
+      <div style="display:grid">
+        <div class="p" style="border-bottom:1px solid var(--border)"><b>Instrument, not admin.</b> <span class="note">Compact telemetry density with mono figures and coordinate labels (UB1 · TQ128796 · A4020 CORRIDOR · RUN-0042) — it reads like a territory console, not a CRUD table with hero cards.</span></div>
+        <div class="p" style="border-bottom:1px solid var(--border)"><b>Perspective-cut facets.</b> <span class="note">Panels, signal tiles and lead rows carry sliced corners and skewed accent edges taken straight from the Route B wordmark — the logo language is literally built into the chrome, so nothing looks like a stock Tailwind card.</span></div>
+        <div class="p" style="border-bottom:1px solid var(--border)"><b>Signals, not KPIs.</b> <span class="note">Every tile has a micro-trend and a signal trace sparkline; leads show signal-strength bars and a territory sliver. The data feels <i>discovered</i>, not merely counted.</span></div>
+        <div class="p" style="border-bottom:1px solid var(--border)"><b>No pill spam, no beige alerts.</b> <span class="note">Status lives in a hairline state strip and mono labels; the export blocker is a hazard-railed release checkpoint (ISS-0003 · LOCKED), not a rounded amber banner.</span></div>
+        <div class="p" style="border-bottom:1px solid var(--border)"><b>Map DNA everywhere.</b> <span class="note">A contour + coordinate-grid Territory Lens, corridor codes on leads, and a mini territory sliver per row keep the geographic/territory idea present without a full map or any logistics/pin cues.</span></div>
+        <div class="p" style="border-bottom:1px solid var(--border)"><b>Action rails, not big buttons.</b> <span class="note">Row actions are compact stacked command rails (Assign / Route / Ignore) — dense and operational, not a scatter of large primary buttons.</span></div>
+        <div class="p" style="border-bottom:1px solid var(--border)"><b>Safe-view discipline.</b> <span class="note">Telesales shows only operational counts and rep queues with score/margin/financials explicitly redacted — the UI encodes the RLS safe-view rule, which a generic template never would.</span></div>
+        <div class="p"><b>One system, two honest themes.</b> <span class="note">Light uses platinum/white/carbon with text-safe blue/amber and cyan reserved for dots/borders; dark uses midnight/carbon with cyan/blue/violet for live signal and amber only for gates. Same geometry, different tokens — proven side by side.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CARRY INTO APP -->
+  <section>
+    <h2 style="font-size:18px;margin-bottom:8px">Design decisions to carry into the app</h2>
+    <div class="card" style="overflow:hidden;border-radius:6px">
+      <div class="decgrid">
+        <div class="dk">Theme system</div><div class="dv">Auto / Light / Dark selector in the command bar and Settings. <b>Auto</b> follows the OS; the user's override is remembered. Both themes are first-class — the app is never dark-only.</div>
+        <div class="dk">Identity</div><div class="dv"><b>Wordmark-led</b> — <span class="mono" style="font-weight:600"><span style="color:var(--blue)">Aspect</span>Lead</span> two-tone. No generic standalone “A” mark anywhere in the product.</div>
+        <div class="dk">Preferred logo</div><div class="dv"><b>Route B — Perspective Cut</b>: the skewed facet becomes the app's signature accent (panel header ticks, tile edges, sliced corners). See <span class="mono">docs/20</span> refinement brief.</div>
+        <div class="dk">Dark surfaces</div><div class="dv"><b>Command</b> chrome — rails, command bar, map canvas, live run/telemetry. Midnight/carbon; glow reserved strictly for live/signal elements.</div>
+        <div class="dk">Light surfaces</div><div class="dv"><b>Work</b> chrome — tables, forms, review, export. Platinum/white/carbon; cyan only as dots/borders/icons, never body text.</div>
+        <div class="dk">Map / territory</div><div class="dv">Territory Lens is a signature component: contour + coordinate grid, postcode/grid refs (<span class="mono">UB1 · TQ128796</span>), corridor codes (<span class="mono">A4020</span>). Abstract — never pins/vans/logistics cues.</div>
+        <div class="dk">Signal tiles</div><div class="dv">Compact telemetry — one label, mono figure, micro-trend, signal-trace sparkline, territory code. Never big soft KPI cards.</div>
+        <div class="dk">Export gate</div><div class="dv">A controlled release checkpoint: hazard-rail, issue code (<span class="mono">ISS-0003</span>), <b>LOCKED</b> state, manual-verify action. Never a rounded beige alert.</div>
+        <div class="dk">Safe telesales</div><div class="dv">Restricted <span class="mono">v_telesales</span> view: operational counts + rep queues only. Score, margin and financials explicitly redacted — the UI encodes the RLS safe-view rule.</div>
+      </div>
+    </div>
+    <p class="note" style="margin-top:10px">These are direction only — nothing here is implemented in the app, finalised, or legally cleared.</p>
   </section>
 
   <p class="note" style="margin:30px 0 10px">Draft brand board · not final · not legally cleared · app UI unchanged · mock content only.</p>
@@ -297,5 +590,210 @@
   }
   tg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>set(b.dataset.t)));
 </script>
+<script src="assets/aspectlead-map-data.js"></script>
+<script>
+(function(){
+  const trace=(pts,c)=>`<svg class="tc" viewBox="0 0 100 12" preserveAspectRatio="none"><polyline points="${pts}" fill="none" stroke="var(${c})" stroke-width="1.3"/></svg>`;
+  const bars=(on)=>`<div class="bars">${[6,10,13,16].map((h,i)=>`<i class="${i<on?'on':''}" style="height:${h}px"></i>`).join('')}</div>`;
+  const sliver=(c)=>`<svg class="sv" width="30" height="30" viewBox="0 0 30 30"><path d="M2 20 C 9 16,19 22,29 17" stroke="var(--ln2)" stroke-width="1.3" fill="none"/><path d="M2 12 C 11 9,17 14,29 10" stroke="var(--ln2)" stroke-width="1.3" fill="none"/><circle cx="18" cy="15" r="2.3" fill="var(${c})"/></svg>`;
+  const lead=(nm,pc,corr,trig,tc,acc,on,slab,sc)=>`<div class="lr"><span class="acc" style="background:var(${acc})"></span>${sliver(sc)}<div style="flex:1;min-width:0"><div class="nm">${nm}</div><div class="mt">${pc} · ${corr}</div><div class="tg" style="color:var(${tc})">${trig}</div></div><div style="text-align:center">${bars(on)}<div class="slab">${slab}</div></div><div class="arail"><button class="pri">Assign</button><button>Route</button><button>Ignore</button></div></div>`;
+
+  // ---- GB/UK-wide base map (main surface) — POC colour language ----
+  // Great Britain outline + Northern Ireland shown separately & hatched.
+  // Code-Point Open / OS Open Roads are GB-only: NI data source is unconfirmed.
+  // Real postcode-AREA locators; London/South-East focus frame. West London
+  // detail is the focused lens (see lensSVG, built from POC-derived geometry).
+  const GB="M150 22 L170 56 L166 92 L150 104 L168 114 L178 148 L190 186 L200 226 L212 258 L226 272 L214 294 L206 308 L218 322 L180 336 L150 341 L120 338 L92 326 L64 337 L44 343 L72 323 L100 315 L108 300 L95 282 L111 270 L101 246 L121 236 L108 214 L129 206 L119 188 L141 177 L127 157 L141 141 L120 133 L135 116 L117 96 L140 88 L125 67 L147 60 L138 42 Z";
+  const NI="M40 150 L52 140 L78 142 L86 162 L74 178 L50 180 L34 168 Z";
+  const LOC=[["G",128,120],["EH",158,150],["NE",184,188],["LS",172,232],["M",150,240],["L",132,240],["B",158,272],["NG",180,258],["NR",214,272],["BS",122,300],["CF",116,308],["SO",168,326]];
+  function gbBaseSVG(t){
+    const W=300,H=430;
+    const loc=LOC.map(([c,x,y])=>`<g class="loc"><circle cx="${x}" cy="${y}" r="2.3"/><text x="${x+4}" y="${y+3}">${c}</text></g>`).join('');
+    const fx=176,fy=290,fw=36,fh=28;
+    const focus=`<rect class="focus" x="${fx}" y="${fy}" width="${fw}" height="${fh}" rx="2"/>`+
+      `<circle class="mnode" cx="${fx+fw/2}" cy="${fy+fh/2}" r="3" fill="var(--terr)"/>`+
+      `<text class="focuslab" x="${fx+fw+5}" y="${fy+9}">West London</text>`+
+      `<text class="focuslab" x="${fx+fw+5}" y="${fy+20}" style="opacity:.7">UB · HA · TW · W · SL</text>`;
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <pattern id="nih-${t}" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="var(--mapland)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--fnt)" stroke-width="1" opacity=".45"/></pattern>
+        <pattern id="grd-${t}" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0 H0 V30" fill="none" stroke="var(--grid)" stroke-width="1"/></pattern>
+      </defs>
+      <rect x="0" y="0" width="${W}" height="${H}" fill="var(--mapsea)"/>
+      <rect x="0" y="0" width="${W}" height="${H}" fill="url(#grd-${t})"/>
+      <path class="land" d="${GB}"/>
+      <path class="ni" d="${NI}" style="fill:url(#nih-${t})"/>
+      <text class="mtick" x="30" y="150" style="opacity:.95">NI · BT</text>
+      <text class="mtick" x="22" y="196">data src TBC</text>
+      ${loc}${focus}
+      <text class="mtick" x="8" y="16" style="opacity:.95">GREAT BRITAIN · GB-wide base map impression</text>
+      <text class="mtick" x="8" y="418">POC-derived styling · not production geometry</text>
+    </svg>`;
+  }
+
+  // ---- Territory Lens: real POC-DERIVED West London detail (window.AL_MAP) ----
+  function lensSVG(){
+    const M=window.AL_MAP;
+    if(!M||!M.districts) return '<svg viewBox="0 0 320 270" preserveAspectRatio="xMidYMid meet"></svg>';
+    const covVars=['--cov1','--cov2','--cov3','--cov4','--cov5'];
+    let poly='';
+    M.districts.forEach(d=>{
+      let fill='transparent', extra='';
+      if(d.cat==='gap') fill='var(--gapfill)';
+      else if(d.cat==='expansion'){ extra=`<polygon points="${d.pts}" fill="none" stroke="var(--expln)" stroke-width="1.3" stroke-dasharray="4 2"/>`; }
+      else if(d.band>=1) fill='var('+covVars[Math.min(4,d.band-1)]+')';
+      poly+=`<polygon class="pcln" points="${d.pts}" fill="${fill}"/>`+extra;
+      if(d.sel) poly+=`<polygon points="${d.pts}" fill="none" stroke="var(--terr)" stroke-width="2"/>`;
+    });
+    let roads='';
+    M.roads.forEach(r=>{
+      roads+= r.cls==='m'
+        ? `<polyline class="roadm" points="${r.pts}" stroke-width="2.1"/>`
+        : `<polyline class="roada" points="${r.pts}" stroke-width="1" opacity=".85"/>`;
+    });
+    return `<svg viewBox="${M.lensViewBox}" preserveAspectRatio="xMidYMid meet"><g>${poly}${roads}</g></svg>`;
+  }
+  const lensLegend=`<div class="lens-legend">
+    <span><i style="background:var(--cov2)"></i>coverage</span>
+    <span><i style="background:var(--gapfill)"></i>gap</span>
+    <span><i style="background:none;border:2px solid var(--terr)"></i>territory</span>
+    <span><i style="background:none;border:2px dashed var(--expln)"></i>expansion</span>
+    <span><i style="background:var(--roadm)"></i>motorway</span>
+    <span><i style="background:var(--roada)"></i>A road</span>
+  </div>`;
+
+  function dash(theme){
+    const L = theme==='light';
+    const stages=`<div class="stages">
+      <div class="stg done"><div class="b"></div><div class="l">Discover</div></div>
+      <div class="stg done"><div class="b"></div><div class="l">Dedup</div></div>
+      <div class="stg now"><div class="b"></div><div class="l">Enrich</div></div>
+      <div class="stg"><div class="b"></div><div class="l">Score</div></div>
+      <div class="stg"><div class="b"></div><div class="l">Gate</div></div>
+    </div>`;
+    return `
+    <div class="bar">
+      <span class="wm"><span class="a">Aspect</span><span class="l">Lead</span></span>
+      <span class="tnt">Demo Company</span>
+      <span class="env">Prototype</span>
+      <div class="cmd">⌕ Search territories, leads, runs…<span class="kbd">⌘K</span></div>
+      <div class="tsel"><span>Auto</span><span class="${L?'on':''}">Light</span><span class="${L?'':'on'}">Dark</span></div>
+      <div class="runst"><span class="dot"></span>RUN-0042 · live</div>
+    </div>
+
+    <div class="cockpit">
+      <div class="mapcanvas">${gbBaseSVG(theme)}</div>
+
+      <div class="ov ctrl">
+        <div class="oh">Layers &amp; scope</div>
+        <div class="ob">
+          <div class="cap">Granularity</div>
+          <div class="seg"><span>Area</span><span class="on">District</span><span>Sector</span></div>
+          <div class="cap">Colour by</div>
+          <div class="seg"><span class="on">Runs</span><span>Leads</span><span>Export</span></div>
+          <div class="lay">Delivery area<span class="sw on"></span></div>
+          <div class="lay">Delivery gaps<span class="sw on"></span></div>
+          <div class="lay">Expansion areas<span class="sw on"></span></div>
+          <div class="cap">A-road display</div>
+          <div class="seg"><span class="on">Feeder</span><span>Primary</span><span>All</span></div>
+        </div>
+      </div>
+
+      <div class="ov run">
+        <div class="oh">Active Run Trace<span style="margin-left:auto;display:flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:10px;color:var(--cyanI)"><span class="dot"></span>live</span></div>
+        <div class="ob">
+          <div class="rrow"><span>RUN-0042</span><span>stage <b>Enrich</b></span></div>
+          <div class="meter"><i style="width:68%"></i></div>
+          <div class="msub">68% · 146 / 214 records · ETA ~40s</div>
+          ${stages}
+          <div class="rfoot"><span>compute 00:42</span><span>cost £—</span></div>
+        </div>
+      </div>
+
+      <div class="ov lens">
+        <div class="oh">Territory Lens · West London<span style="margin-left:auto;font-family:var(--font-mono);font-size:9px;color:var(--fnt)">UB1 focus</span></div>
+        <div class="ob">
+          <div class="lensmap">${lensSVG()}</div>
+          <div class="lensname" style="margin-top:8px">UB1 · Southall</div>
+          <div class="lenssub">district · corridor A4020 · derived from POC</div>
+          <div class="lensgrid">
+            <div class="lg"><div class="k">coverage</div><div class="v" style="color:var(--blueI)">63%</div></div>
+            <div class="lg"><div class="k">opportunity</div><div class="v" style="color:var(--cyanI)">A · 82</div></div>
+            <div class="lg"><div class="k">delivery gaps</div><div class="v" style="color:var(--amberI)">17</div></div>
+            <div class="lg"><div class="k">new leads</div><div class="v">146</div></div>
+          </div>
+          ${lensLegend}
+        </div>
+      </div>
+
+      <div class="ov detail">
+        <div class="oh">Selected · UB1</div>
+        <div class="ob">
+          <div class="dname">Southall territory</div>
+          <div class="dsub">outcode · corridor A4020 · Live run</div>
+          <div class="kv"><span class="k">coverage</span><span class="v" style="color:var(--blueI)">63%</span></div>
+          <div class="kv"><span class="k">gaps</span><span class="v" style="color:var(--amberI)">17</span></div>
+          <div class="kv"><span class="k">export-ready</span><span class="v">88</span></div>
+          <div class="kv" style="border-bottom:0"><span class="k">updated</span><span class="v">12s ago</span></div>
+          <div class="next"><span class="k">Next recommended action</span>Assign 17 delivery-gap leads to the UB1 telesales queue.</div>
+          <div class="audit">▹ run RUN-0042 enriching · 68%<br>▹ 3 duplicates auto-merged<br>▹ export gated — ISS-0003</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="work">
+      <div class="workcol">
+        <div class="pnl">
+          <div class="phd"><b>Lead Signal Stack</b><span class="code">5 of 146 · by signal</span></div>
+          <div class="pbd"><div class="lq">
+            ${lead('New Flame BBQ','HA0 1LT','A40 CORRIDOR','▲ new FSA registration','--cyanI','--cyan',4,'signal · high','--cyan')}
+            ${lead('Southall Sweet Centre','UB2 4BQ','A3005 CORRIDOR','▲ competitor churn signal','--cyanI','--cyan',4,'signal · high','--cyan')}
+            ${lead('Grand Sweet House','UB6 0AA','A312 CORRIDOR','▲ volume spike detected','--cyanI','--cyan',4,'signal · high','--cyan')}
+            ${lead('Punjab Karahi House','UB1 3EU','A4020 · in-territory','◆ delivery gap nearby','--amberI','--amber',3,'signal · med','--amber')}
+            ${lead('Ealing Tandoori Co','W5 2NU','A4020 CORRIDOR','◇ lapsed · reactivation','--violetI','--violet',2,'signal · med','--violet')}
+          </div></div>
+        </div>
+      </div>
+      <div class="workcol">
+        <div class="pnl">
+          <div class="phd"><b>Export Gate Console</b><span class="code">release checkpoint</span></div>
+          <div class="pbd">
+            <div class="gate3"><div class="rail"></div><div class="gb">
+              <div class="gh"><span class="t">Export Gate</span><span class="iss">ISS-0003</span><span class="lk">⬢ LOCKED</span></div>
+              <div class="gr">CRM field mapping required — telesales export is disabled until mappings are verified.</div>
+              <div class="gs"><span><b>STATUS</b> Locked</span><span><b>EXPORT</b> Disabled</span><span class="act">Verify mappings →</span></div>
+            </div></div>
+          </div>
+        </div>
+        <div class="pnl">
+          <div class="phd"><b>Telesales Safe Workload</b><span class="code">v_telesales · safe</span></div>
+          <div class="pbd">
+            <span class="safe">Safe view · restricted</span>
+            <div class="counts"><div class="cc"><div class="k">open</div><div class="v">34</div></div><div class="cc"><div class="k">in progress</div><div class="v">11</div></div><div class="cc"><div class="k">contacted</div><div class="v">27</div></div></div>
+            <div class="rep"><span class="av">JS</span>Jaspreet S · UB1<span class="qn">queue <b>12</b></span></div>
+            <div class="rep"><span class="av">RK</span>Raj K · HA0<span class="qn">queue <b>9</b></span></div>
+            <div class="rep"><span class="av">AM</span>Aisha M · W5<span class="qn">queue <b>13</b></span></div>
+            <div class="redact">▧ scores, margin &amp; financials hidden in safe view</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:0 12px 12px">
+      <div class="pnl plain">
+        <div class="phd"><b>Setup Readiness</b><span class="code">3 blockers open</span></div>
+        <div class="pbd"><div class="setup">
+          <div class="su"><span class="n">1</span><div><div class="iss">ISS-0001</div><div class="ds">Customer postcode import</div></div><span class="pend">PENDING</span></div>
+          <div class="su"><span class="n">2</span><div><div class="iss">ISS-0002</div><div class="ds">Delivery boundary list</div></div><span class="pend">PENDING</span></div>
+          <div class="su"><span class="n">3</span><div><div class="iss">ISS-0003</div><div class="ds">CRM / Sales Pro mapping</div></div><span class="pend">PENDING</span></div>
+        </div></div>
+      </div>
+    </div>`;
+  }
+  document.getElementById('dash-light').innerHTML = dash('light');
+  document.getElementById('dash-dark').innerHTML = dash('dark');
+})();
+</script>
+
 </body>
 </html>

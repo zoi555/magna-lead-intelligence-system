@@ -147,3 +147,14 @@ Taglines (draft — refine, do not lock):
 1. *Short premium:* **"Every angle. Every signal."**
 2. *Product-descriptive:* **"Territory lead intelligence for modern sales teams."**
 3. *Command-centre:* **"See the market. Command the territory."**
+
+## 14. Map visual direction (source of truth)
+
+All AspectLead map visuals follow the **accepted map POC** (`~/Projects/magna/lead-intelligence-map-poc`,
+frozen 2026-07-10) — MapLibre + OS open data, POC colour language (blue→purple coverage, amber gaps, orange
+territory, dashed-purple expansion, dark-blue motorways, green A roads). See `docs/18` §D for the full
+token list. The brand board frames the map **GB-wide** with local territory (`UB1`) only as a **focused
+lens**, using a **POC-derived static asset** (`docs/design-previews/assets/aspectlead-map-data.js`). **No
+fake blob maps.** UK-wide coverage must be verified before production; current POC data is **GB-only** and a
+**Northern Ireland source must be confirmed** (**ISS-0009**). The production app uses the real MapLibre POC
+implementation, not the static preview.

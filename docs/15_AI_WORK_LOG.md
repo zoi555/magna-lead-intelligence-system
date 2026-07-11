@@ -1,5 +1,18 @@
 # AI Work Log — Magna Lead Intelligence System
 
+## Session: 2026-07-11 — Brand board map replaced with POC-derived, GB-wide spatial preview (design only)
+
+Tool used: Claude Code
+Human request: The design preview's map was still a fake small-region blob. Replace it with the **accepted map POC** direction (`~/Projects/magna/lead-intelligence-map-poc`): MapLibre-style visual language, OS open-data direction, **GB/UK-wide framing** with local territory (UB1) only as a **focused lens**. Read the POC read-only; do not modify it, the app, or commit.
+What was done (design-only):
+- **Inspected the POC read-only.** Captured its exact visual system from `web/index.html` + docs: coverage ramp blue→purple `rgba(84,120,205,.32)…rgba(156,42,166,.82)` (no green), delivery fill `rgba(38,96,180,.10)` / outline `#2B6CB0`, gaps `rgba(232,150,25,.42)`, current/selected `#C85A00`, expansion dashed `#6A4A9A`, motorway `#123C66`, A road `#3A9E63`, thin grey postcode outlines `#9AA4AD`; controls granularity Area/District/Sector, colour-by Runs/Leads/Export, A-road modes (feeder/primary/all/custom), planning layers. **Data extent = Great Britain only** (OS Code-Point Open + OS Open Roads are GB; the rendered POC is clipped to West London — UB/HA/TW/W + SL expansion).
+- **Derived a real static map asset** `docs/design-previews/assets/aspectlead-map-data.js` from the POC data (36 West London districts incl. 7 gaps + 7 expansion, 66 road segments M4/M25/M40 + feeders), simplified/projected. Regenerate from the POC; not production geometry.
+- **Rebuilt the brand board map** (`docs/design-previews/aspectlead-brand-board.html`): main surface = **GB-wide base map impression** (GB silhouette, real postcode-AREA locators, London focus frame, **NI shown hatched + flagged**); **Territory Lens = real POC-derived West London detail** (UB1 focus) in POC colours. Removed the old fake jittered-tessellation map. Added a **"Map source direction"** section. Both light + dark themes.
+- **Fixed the Signal Command candidate** (`docs/design-previews/signal-command-preview.html`): replaced its fake "coverage tiles" grid with the same POC-derived West London map + POC legend + GB/NI note.
+Decisions/notes recorded: user **rejected fake map previews**; the **accepted map POC is the visual source of truth**; **full UK-wide map coverage is required** and must be verified before production; the static board map is **design-only**, not app integration; **current POC data is GB-focused — a Northern Ireland data source must be confirmed** (logged as an issue).
+Guardrails: POC repo **not modified** (git clean); app/`package.json`/`src` untouched; no npm/Supabase/SQL/migrations/Vercel; **not committed**; 0 "Magna" in the board.
+Next action: user visual review of the GB-wide map + lens; confirm NI data source before any production map work.
+
 ## Session: 2026-07-11 — Route B (Perspective Cut) carried forward + wordmark refinement brief (design only)
 
 Tool used: Claude Code

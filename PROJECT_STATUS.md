@@ -66,6 +66,12 @@ Route Stroke — no generic "A" icon), a new AspectLead palette, and a **dual da
   `docs/20_ASPECTLEAD_WORDMARK_REFINEMENT_BRIEF.md` (spec only — no vector artwork, no legal clearance).
 - **No app implementation has been done** — the running Next.js shell still uses the SaaS-neutral baseline
   tokens; nothing built, applied, or production-ready; no Supabase/real data.
+- **Map direction in the brand board** — the design preview now uses the **accepted map POC** as the visual
+  source of truth (blue→purple coverage, amber gaps, orange territory, dashed-purple expansion, dark-blue
+  motorways, green A roads). It shows a **GB-wide base map** with West London (`UB1`) only as a **focused
+  Territory Lens**, from a **POC-derived static asset** (`docs/design-previews/assets/aspectlead-map-data.js`).
+  Design-only — the production app must use the real MapLibre POC implementation. **Current POC data is GB-only;
+  a Northern Ireland source must be confirmed for UK-wide coverage (ISS-0009).** No fake blob maps.
 
 ## Branding: not locked — SaaS-neutral baseline + candidate directions
 
