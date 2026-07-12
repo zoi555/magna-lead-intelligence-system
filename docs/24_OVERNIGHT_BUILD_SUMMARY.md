@@ -45,6 +45,13 @@ scoring and existing-customer matching.
 - No phone (Google disabled); Companies House/Google/delivery unchecked → warnings only.
 - CRM export gated (ISS-0003). 42 leads missing coordinates.
 
+## Phase 5 — Source Registry & Settings — ✅ COMPLETE
+- `src/lib/sources/source-registry.ts` (9 sources + `summariseRegistry`),
+  `src/components/settings/SourceRegistryPanel.tsx`, rebuilt `/settings`, `docs/26`.
+- Source-control dashboard: summary cards, filter tabs, detail cards, delivery legal warning,
+  env var **names only** (presence resolved server-side, values never sent to the client),
+  "safe to run tonight?" + "blocks export?" per source. FSA is the only fully live source; none block export.
+
 ## Next recommended task
 **Phase 5** — Source Configuration Screen: create `src/lib/sources/source-registry.ts` and rebuild
 `/settings` to show all 9 sources (status/auth/env/cost/legal/pipeline-use/next-action/live-enabled),
