@@ -61,6 +61,14 @@ scoring and existing-customer matching.
   fake approval); `/telesales` uses `telesales-safe-view.ts` only; `test:telesales-safe` passes (466 rows, no leaks).
 - Docs: `docs/31`. No live API calls. Build + `test:scoring` + `test:telesales-safe` all pass.
 
+## Phase 12 — Final MVP validation — ✅ COMPLETE
+- Validation run completed on **RUN-20260712-170716** (live FSA only; no CH/Google/delivery calls).
+- Numbers: 1,200 fetched → 466 exportable · 333 manual-review · 799 final · 466 telesales-safe ·
+  757 mapped / 42 unmapped · grades A44/B415/C339/D1 · fit HIGH406/MANUAL238/LOW110/MED45.
+- `npm run build` **passes**; `test:scoring` **PASS**; `test:telesales-safe` **PASS** (466 rows, no leaks).
+- Final report: `docs/32_MVP_FINAL_VALIDATION_REPORT.md`. Branch `feature/mvp-vertical-slice-001`,
+  clean, ready for human app review. `data/`/`exports/` remain gitignored.
+
 ## Next recommended task
 **Phase 5** — Source Configuration Screen: create `src/lib/sources/source-registry.ts` and rebuild
 `/settings` to show all 9 sources (status/auth/env/cost/legal/pipeline-use/next-action/live-enabled),
