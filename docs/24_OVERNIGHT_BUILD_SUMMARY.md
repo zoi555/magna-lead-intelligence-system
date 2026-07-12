@@ -52,6 +52,15 @@ scoring and existing-customer matching.
   env var **names only** (presence resolved server-side, values never sent to the client),
   "safe to run tonight?" + "blocks export?" per source. FSA is the only fully live source; none block export.
 
+## Phases 9–11 — ✅ COMPLETE
+- **Phase 9** `/pipeline-runs`: latest-run summary, source-readiness strip, local export-file
+  availability, stage error-code summary. Both tabs + animation kept. Helper `run-report.ts`.
+- **Phase 10** `/coverage-map`: default road mode = Primary A roads, mapped/unmapped + roads-shown +
+  granularity/mode counts, legend overlay, richer territory + lead panels (no numeric score), missing-coords note.
+- **Phase 11** `/export-review` honest counts + source warnings + file paths + gate-locked reason (no
+  fake approval); `/telesales` uses `telesales-safe-view.ts` only; `test:telesales-safe` passes (466 rows, no leaks).
+- Docs: `docs/31`. No live API calls. Build + `test:scoring` + `test:telesales-safe` all pass.
+
 ## Next recommended task
 **Phase 5** — Source Configuration Screen: create `src/lib/sources/source-registry.ts` and rebuild
 `/settings` to show all 9 sources (status/auth/env/cost/legal/pipeline-use/next-action/live-enabled),

@@ -37,11 +37,13 @@ export default function CoverageMapPage() {
         color: GRADE_COLOR[l.grade] ?? "#94A3B8",
         label: l.business_name,
         meta: {
+          // Map lead panel is internal-but-safe: grade (coarse) only, no numeric score/reasons.
           grade: l.grade,
-          score: l.score,
+          category: l.business_type,
           territory: l.territory_code,
           trigger: l.trigger_reason,
-          delivery: `${l.platform_presence_status} (${l.delivery_risk_flag} risk)`,
+          platform: `${l.platform_presence_status} (${l.delivery_risk_flag} risk)`,
+          phone_present: "no",
           export_status: l.export_status,
         },
       } as MapPoint;

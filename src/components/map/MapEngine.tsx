@@ -65,7 +65,7 @@ const UK_BOX = { x0: 0, y0: 0, x1: VW, y1: VH };
 
 export function MapEngine({ points, runInfo }: { points: MapPoint[]; runInfo?: RunInfo }) {
   const [gran, setGran] = React.useState<Granularity>("districts");
-  const [roadMode, setRoadMode] = React.useState<RoadMode>("feeder");
+  const [roadMode, setRoadMode] = React.useState<RoadMode>("primary");
   const [custom, setCustom] = React.useState("");
   const [layers, setLayers] = React.useState<MapLayers>(DEFAULT_MAP_LAYERS);
   const [sensitivity, setSensitivity] = React.useState<Sensitivity>("normal");
@@ -150,7 +150,7 @@ export function MapEngine({ points, runInfo }: { points: MapPoint[]; runInfo?: R
       <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted">Granularity</label>
       <MapHierarchyToggle value={gran} onChange={(g) => { setGran(g); setSelection(null); }} />
       <div className="mt-2.5"><MapRoadModeToggle value={roadMode} onChange={setRoadMode} custom={custom} onCustomChange={setCustom} /></div>
-      <div className="mt-1.5 font-mono text-[11px] text-muted">Roads shown: {roads.length.toLocaleString("en-GB")}</div>
+      <div className="mt-1.5 font-mono text-[11px] text-muted">Roads shown: {roads.length.toLocaleString("en-GB")}{roadMode === "all" && <span className="text-[#b45309]"> ⚠ heavy</span>}</div>
       <label className="mb-1 mt-2.5 block text-[11px] font-semibold uppercase tracking-wide text-muted">Zoom sensitivity</label>
       <Segmented options={[["low", "Low"], ["normal", "Normal"], ["high", "High"]]} value={sensitivity} onChange={(v) => setSensitivity(v as Sensitivity)} />
       <label className="mb-1 mt-2.5 block text-[11px] font-semibold uppercase tracking-wide text-muted">Default view</label>
@@ -175,6 +175,24 @@ export function MapEngine({ points, runInfo }: { points: MapPoint[]; runInfo?: R
         <div className="rounded-card border border-bordergrey bg-white/92 p-2 shadow-soft backdrop-blur">
           <MapToolbar layers={layers} onToggleLayer={toggleLayer} onZoom={zoomStep} onReset={reset} expanded={expanded} onToggleExpand={() => setExpanded((e) => !e)} />
         </div>
+      </div>
+
+      {/* floating: legend (top-right, under toolbar) */}
+      <div className="absolute right-3 top-[68px] z-10 rounded-card border border-bordergrey bg-white/92 p-2.5 text-[11px] shadow-soft backdrop-blur">
+        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted">Legend</div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+          <LegRow sw={{ background: "rgba(84,120,205,.4)" }}>coverage</LegRow>
+          <LegRow sw={{ background: "url(#gap-hatch)", backgroundColor: "rgba(232,150,25,.35)" }}>gap</LegRow>
+          <LegRow sw={{ border: "2px dashed #6A4A9A" }}>expansion</LegRow>
+          <LegRow sw={{ border: "2px solid #C85A00" }}>selected</LegRow>
+          <LegRow sw={{ background: "#123C66" }}>motorway</LegRow>
+          <LegRow sw={{ background: "#3A9E63" }}>A road</LegRow>
+          <LegDot c="#16A34A">grade A</LegDot>
+          <LegDot c="#2563EB">grade B</LegDot>
+          <LegDot c="#F59E0B">grade C</LegDot>
+          <LegDot c="#94A3B8">grade D</LegDot>
+        </div>
+        <div className="mt-1.5 border-t border-bordergrey pt-1.5 text-[10px] text-muted">Presence: present / absent / unknown / manual review (dot ring = selected)</div>
       </div>
 
       {/* floating: GB inset (bottom-right) */}
@@ -208,13 +226,23 @@ export function MapEngine({ points, runInfo }: { points: MapPoint[]; runInfo?: R
   return (
     <div className={expanded ? "fixed inset-0 z-50 bg-white" : "space-y-3"}>
       {!expanded && runInfo && (
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-          <Info label="Run" value={runInfo.run_id} />
-          <Info label="Fetched" value={n(runInfo.fetched)} />
-          <Info label="In territory" value={n(runInfo.in_territory)} />
-          <Info label="Final leads" value={n(runInfo.final_leads)} good />
-          <Info label="Rejected" value={n(runInfo.rejected_total)} danger />
-        </div>
+        <>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
+            <Info label="Run" value={runInfo.run_id} />
+            <Info label="Final leads" value={n(runInfo.final_leads)} good />
+            <Info label="Mapped" value={n(points.length)} />
+            <Info label="Unmapped" value={n(Math.max(0, runInfo.final_leads - points.length))} danger />
+            <Info label="In territory" value={n(runInfo.in_territory)} />
+            <Info label="Rejected" value={n(runInfo.rejected_total)} />
+          </div>
+          <p className="text-[12px] text-muted">
+            Granularity: <b className="text-ink">{gran}</b> · Road mode: <b className="text-ink">{roadMode}</b> · Roads shown:{" "}
+            <b className="text-ink">{roads.length.toLocaleString("en-GB")}</b> · Mapped {points.length} of {runInfo.final_leads}.
+            {runInfo.final_leads - points.length > 0 && (
+              <span className="text-[#b45309]"> Some leads are not shown on the map because coordinates are missing ({runInfo.final_leads - points.length}).</span>
+            )}
+          </p>
+        </>
       )}
       {mapArea}
       {!expanded && (
@@ -238,6 +266,12 @@ function Segmented({ options, value, onChange }: { options: [string, string][]; 
       ))}
     </div>
   );
+}
+function LegRow({ sw, children }: { sw: React.CSSProperties; children: React.ReactNode }) {
+  return <div className="flex items-center gap-1.5 text-ink"><span style={{ width: 14, height: 10, borderRadius: 2, border: "1px solid #9AA4AD", display: "inline-block", ...sw }} />{children}</div>;
+}
+function LegDot({ c, children }: { c: string; children: React.ReactNode }) {
+  return <div className="flex items-center gap-1.5 text-ink"><span style={{ width: 9, height: 9, borderRadius: "50%", background: c, display: "inline-block" }} />{children}</div>;
 }
 function n(v: number) { return v.toLocaleString("en-GB"); }
 function Info({ label, value, good, danger }: { label: string; value: string; good?: boolean; danger?: boolean }) {
