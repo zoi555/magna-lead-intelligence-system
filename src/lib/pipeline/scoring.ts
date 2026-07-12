@@ -1,129 +1,107 @@
-// Explainable lead scoring — Vertical Slice 001.
-// Deterministic. Returns score 0..100 + grade A/B/C/D + reasons/warnings/disqualifiers.
+// Explainable lead scoring — Phase 3.
+// Deterministic. score 0..100 + grade A/B/C/D + reasons/warnings/disqualifiers/manual_review_flags.
 // The numeric score is INTERNAL and must never reach telesales.
 
 import type {
-  LeadCandidate,
-  CompaniesHouseEnrichment,
-  GooglePlacesEnrichment,
-  DeliveryPresenceResult,
-  ScoreResult,
-  Grade,
+  LeadCandidate, CompaniesHouseEnrichment, GooglePlacesEnrichment,
+  DeliveryPresenceResult, ScoreResult, Grade, CategoryInfo, CustomerMatchInfo,
 } from "./types";
 import { hasAnyDeliveryPresence } from "../sources/delivery-platforms";
 
+// Legacy helper kept for other callers/tests.
 const FOODSERVICE_RE = /takeaway|restaurant|cafe|canteen|caterer|sandwich|food|kitchen|grill|kebab|pizza|chicken|bakery/i;
-
-export function isFoodservice(businessType: string): boolean {
-  return FOODSERVICE_RE.test(businessType);
-}
+export function isFoodservice(businessType: string): boolean { return FOODSERVICE_RE.test(businessType); }
 
 function gradeFor(score: number): Grade {
-  if (score >= 75) return "A";
-  if (score >= 55) return "B";
-  if (score >= 35) return "C";
+  if (score >= 72) return "A";
+  if (score >= 52) return "B";
+  if (score >= 34) return "C";
   return "D";
 }
-
 function ratingAgeDays(ratingDate: string | null, refMs: number): number | null {
   if (!ratingDate) return null;
   const t = Date.parse(ratingDate);
-  if (Number.isNaN(t)) return null;
-  return Math.max(0, Math.round((refMs - t) / 86_400_000));
+  return Number.isNaN(t) ? null : Math.max(0, Math.round((refMs - t) / 86_400_000));
 }
 
 export interface ScoringInputs {
   candidate: LeadCandidate;
   ratingDate: string | null;
+  category?: CategoryInfo;
   companiesHouse: CompaniesHouseEnrichment;
   googlePlaces: GooglePlacesEnrichment;
   delivery: DeliveryPresenceResult;
+  customerMatch?: CustomerMatchInfo;
+  duplicateRisk?: boolean;
   inTerritory: boolean;
-  coverageGapWeight?: number; // 0..1 placeholder for distance/coverage-gap signal
   referenceDateMs: number;
 }
 
-/** Compute an explainable score. Pure. */
 export function scoreCandidate(inp: ScoringInputs): ScoreResult {
   const { candidate: c, companiesHouse: ch, googlePlaces: gp, delivery, inTerritory } = inp;
   const reasons: string[] = [];
   const warnings: string[] = [];
   const disqualifiers: string[] = [];
+  const manual: string[] = [];
   let score = 0;
-  const add = (points: number, reason: string) => {
-    score += points;
-    reasons.push(`${points >= 0 ? "+" : ""}${points} ${reason}`);
-  };
+  const add = (points: number, code: string) => { score += points; reasons.push(`${points >= 0 ? "+" : ""}${points} ${code}`); };
 
-  // 1) Business-type fit
-  if (isFoodservice(c.businessType)) add(22, `type fit (${c.businessType})`);
-  else {
-    add(3, `weak type fit (${c.businessType})`);
-    warnings.push("Business type is a weak foodservice match");
-  }
+  // 1) Category fit
+  const fit = inp.category?.fit ?? "MEDIUM";
+  if (fit === "HIGH") add(26, "STRONG_CATEGORY_FIT");
+  else if (fit === "MEDIUM") add(14, "CATEGORY_MEDIUM_FIT");
+  else if (fit === "LOW") { add(4, "CATEGORY_LOW_FIT"); warnings.push("Low category fit"); }
+  else if (fit === "MANUAL_REVIEW") { add(6, "CATEGORY_MANUAL_REVIEW"); manual.push("MANUAL_REVIEW_REQUIRED"); }
 
-  // 2) Postcode / territory fit
-  if (inTerritory) add(12, `in pilot territory (${c.territoryCode})`);
-  else {
-    warnings.push("Outside pilot territory");
-    disqualifiers.push("OUT_OF_TERRITORY");
-  }
+  // 2) Territory fit
+  if (inTerritory) add(12, "GOOD_TERRITORY_FIT");
+  else { warnings.push("Outside territory"); disqualifiers.push("OUT_OF_TERRITORY"); }
 
-  // 3) FSA rating + rating age
+  // 3) FSA rating
   const r = Number.parseInt(c.fsaRating, 10);
-  if (Number.isNaN(r)) {
-    add(8, `FSA rating pending/exempt (${c.fsaRating})`);
-    warnings.push("No numeric FSA rating yet");
-  } else if (r >= 5) add(28, "FSA rating 5");
-  else if (r >= 3) add(16, `FSA rating ${r}`);
-  else {
-    add(5, `FSA rating ${r} (low)`);
-    warnings.push("Low FSA hygiene rating");
-  }
+  if (Number.isNaN(r)) { add(8, "FSA_RATING_PENDING"); warnings.push("No numeric FSA rating"); }
+  else if (r >= 5) add(20, "HIGH_FSA_RATING");
+  else if (r >= 3) add(12, "FSA_RATING_OK");
+  else { add(3, "LOW_FSA_RATING"); warnings.push("Low FSA hygiene rating"); }
+
+  // 4) Rating recency + new signal
   const ageDays = ratingAgeDays(inp.ratingDate, inp.referenceDateMs);
-  if (ageDays != null && ageDays > 730) {
-    add(-4, `stale FSA rating (${ageDays}d)`);
-    warnings.push("FSA rating is over 2 years old");
-  }
+  if (ageDays != null && ageDays > 730) { add(-4, "OLD_RATING_DATE"); warnings.push("FSA rating >2y old"); }
+  if (c.fsaNewlyRegistered) add(14, "NEW_FSA_SIGNAL");
 
-  // 4) New/changed FSA signal (trigger)
-  if (c.fsaNewlyRegistered) add(20, "newly FSA-registered (trigger)");
+  // 5) Data completeness + coordinate quality
+  const hasGeo = c.latitude != null && c.longitude != null;
+  const completeness = (c.businessName ? 1 : 0) + (c.postcode ? 1 : 0) + (c.addressLine ? 1 : 0) + (hasGeo ? 1 : 0);
+  add(Math.min(6, completeness * 1.5), "DATA_COMPLETENESS");
+  if (hasGeo) add(2, "COORDINATE_QUALITY");
+  else { warnings.push("Missing coordinates"); manual.push("MISSING_COORDINATES"); }
 
-  // 5) Distance / coverage-gap placeholder
-  const gap = inp.coverageGapWeight ?? 0;
-  if (gap > 0) add(Math.round(gap * 8), "coverage-gap opportunity (placeholder)");
+  // 6) Phone (from Google — disabled) → always missing today
+  if (!gp.formattedPhone) warnings.push("MISSING_PHONE");
 
-  // 6) Companies House placeholder confidence
-  if (ch.status === "found" && ch.companyStatus === "active") add(18, "Companies House active");
-  else if (ch.status === "found" && ch.companyStatus === "dissolved") {
-    add(-30, "Companies House dissolved");
-    disqualifiers.push("COMPANY_DISSOLVED");
-  } else {
-    reasons.push("+0 Companies House not configured");
-    warnings.push("Companies House enrichment not configured");
-  }
+  // 7) Delivery-platform presence (collector; not a blocker)
+  if (hasAnyDeliveryPresence(delivery)) add(8, "DELIVERY_PRESENCE_CONFIRMED");
+  else warnings.push("PLATFORM_NOT_CHECKED");
 
-  // 7) Google Places placeholder confidence
-  if (gp.status === "found") add(Math.round(gp.confidence * 6), "Google Places matched");
-  else {
-    reasons.push("+0 Google Places not configured");
-    warnings.push("Google Places enrichment not configured");
-  }
+  // 8) Companies House
+  if (ch.status === "found" && ch.companyStatus === "active") add(8, "COMPANY_ACTIVE");
+  else if (ch.status === "found" && ch.companyStatus === "dissolved") { add(-30, "COMPANY_DISSOLVED"); disqualifiers.push("COMPANY_DISSOLVED"); }
+  else warnings.push("COMPANY_NOT_ENRICHED");
 
-  // 8) Delivery-platform presence (collector). Not a blocker — unchecked = warning only.
-  if (hasAnyDeliveryPresence(delivery)) add(8, "delivery-platform presence confirmed");
-  else warnings.push("DELIVERY_PLATFORM_NOT_CHECKED");
+  // 9) Google Places
+  if (gp.status === "found") add(Math.round(gp.confidence * 4), "GOOGLE_MATCHED");
+  else warnings.push("GOOGLE_NOT_ENRICHED");
 
-  // 9) Data completeness
-  const completeness =
-    (c.businessName ? 1 : 0) +
-    (c.postcode ? 1 : 0) +
-    (c.addressLine ? 1 : 0) +
-    (c.latitude != null && c.longitude != null ? 1 : 0);
-  add(completeness, `data completeness (${completeness}/4)`);
-  if (completeness < 3) warnings.push("Sparse record (missing address/geocode)");
+  // 10) Existing-customer signal (possible match = manual review, not auto-exclude)
+  if (inp.customerMatch?.status === "possible_existing_customer") { add(-6, "POSSIBLE_EXISTING_CUSTOMER"); manual.push("POSSIBLE_EXISTING_CUSTOMER"); }
+  if (inp.customerMatch?.status === "existing_customer_match") { disqualifiers.push("EXISTING_CUSTOMER_EXCLUDED"); }
+
+  // 11) Duplicate risk (chains / repeated names)
+  if (inp.duplicateRisk) { add(-3, "DUPLICATE_RISK"); manual.push("DUPLICATE_RISK"); warnings.push("Duplicate-looking record"); }
+
+  // 12) Manual-review roll-up
+  if (manual.length) reasons.push("+0 MANUAL_REVIEW_REQUIRED");
 
   score = Math.max(0, Math.min(100, Math.round(score)));
-  const grade = gradeFor(score);
-  return { score, grade, score_reasons: reasons, warnings, disqualifiers };
+  return { score, grade: gradeFor(score), score_reasons: reasons, warnings, disqualifiers, manual_review_flags: Array.from(new Set(manual)) };
 }

@@ -1,59 +1,39 @@
-// Existing-customers source — Vertical Slice 001 (PLACEHOLDER, import/manual).
-//
-// Stands in for the real customer master (NetSuite / Sales Pro). Data is mock;
-// the MATCH LOGIC is real (normalised name + postcode). No financials stored.
-// Later: replace with a server-side import + hashed matching against real data.
+// Existing-customers source — Phase 4. Import-ready adapter over the customer master.
+// Mock master today (mock-existing-customers.ts). Real import: server-side CSV per
+// templates/existing-customers-import-template.csv. No financials stored, no real data yet.
 
 import type { ExistingCustomerMatch } from "../pipeline/types";
+import { matchCustomer, type CustomerRecord, type MatchResult } from "../pipeline/customer-matching";
+import { MOCK_CUSTOMERS } from "../pipeline/mock-existing-customers";
 
-export interface ExistingCustomer {
-  name: string;
-  postcode: string;
-  status: "active" | "lapsed";
+export type { CustomerRecord } from "../pipeline/customer-matching";
+
+/** Returns the active customer master. Mock now; real import later. */
+export function getCustomerMaster(): CustomerRecord[] {
+  return MOCK_CUSTOMERS;
 }
 
-// Mock customer master (placeholder). Import source in production.
-export const MOCK_EXISTING_CUSTOMERS: ExistingCustomer[] = [
-  { name: "Southall Sweet Centre", postcode: "UB1 3EU", status: "active" },
-  { name: "Bench Cafe", postcode: "W5 5DA", status: "lapsed" },
-  { name: "Greenford Grill", postcode: "UB6 8AA", status: "active" },
-];
-
-function key(name: string, postcode: string): string {
-  const n = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-  const p = postcode.toUpperCase().replace(/\s+/g, "");
-  return `${n}|${p}`;
+/** Match a candidate (name + postcode, optional phone) against the master. */
+export function matchExistingCustomerRecord(name: string, postcode: string, phone?: string): MatchResult {
+  return matchCustomer(name, postcode, phone, getCustomerMaster());
 }
 
-const INDEX = new Map<string, ExistingCustomer>(MOCK_EXISTING_CUSTOMERS.map((c) => [key(c.name, c.postcode), c]));
-
-/** Match a business against the (mock) customer master. Returns an envelope. */
+/** Envelope wrapper (kept for adapter parity). */
 export function matchExistingCustomer(name: string, postcode: string, checkedAt: string | null = null): ExistingCustomerMatch {
-  const hit = INDEX.get(key(name, postcode));
-  if (!hit) {
-    return {
-      source: "existing_customers",
-      status: "not_found",
-      confidence: 0,
-      checked_at: checkedAt,
-      matched: false,
-      customerStatus: null,
-      notes: "No existing-customer match (mock import).",
-    };
-  }
+  const m = matchExistingCustomerRecord(name, postcode);
+  const status = m.status === "existing_customer_match" ? "found" : m.status === "possible_existing_customer" ? "manual_review" : "not_found";
   return {
     source: "existing_customers",
-    status: "found",
-    confidence: 0.95,
+    status,
+    confidence: m.confidence,
     checked_at: checkedAt,
-    matched: true,
-    customerStatus: hit.status,
-    notes: `Matched existing ${hit.status} customer (mock import).`,
+    matched: m.status === "existing_customer_match",
+    customerStatus: m.status === "existing_customer_match" ? "active" : null,
+    notes: m.reason,
   };
 }
 
-/** True if this business is an existing ACTIVE customer (suppress from new leads). */
+/** True only for a high-confidence existing match (used for hard suppression). */
 export function isExistingActiveCustomer(name: string, postcode: string): boolean {
-  const hit = INDEX.get(key(name, postcode));
-  return Boolean(hit && hit.status === "active");
+  return matchExistingCustomerRecord(name, postcode).status === "existing_customer_match";
 }

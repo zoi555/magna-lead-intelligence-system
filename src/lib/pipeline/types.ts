@@ -111,6 +111,16 @@ export interface ScoreResult {
   score_reasons: string[];
   warnings: string[];
   disqualifiers: string[];
+  manual_review_flags: string[];
+}
+
+export interface CategoryInfo { fit: string; reason: string; note: string }
+
+/** Existing-customer match outcome carried on a working record (Phase 4). */
+export interface CustomerMatchInfo {
+  status: "existing_customer_match" | "possible_existing_customer" | "no_match";
+  confidence: number;
+  reason: string;
 }
 
 export type LeadStatus = "Ready" | "Running" | "Warning" | "Blocked" | "Exported";
@@ -120,6 +130,9 @@ export interface WorkingRecord {
   fsa: FsaEstablishment;
   territoryCode?: string;
   candidate?: LeadCandidate;
+  category?: CategoryInfo;
+  customerMatch?: CustomerMatchInfo;
+  duplicateRisk?: boolean;
   companiesHouse?: CompaniesHouseEnrichment;
   googlePlaces?: GooglePlacesEnrichment;
   delivery?: DeliveryPresenceResult;
@@ -255,6 +268,8 @@ export interface FinalLeadRow {
   grade: Grade;
   score_reasons: string;
   warnings: string;
+  category_fit: string;
+  manual_review_flags: string;
   companies_house_status: EnrichmentStatus;
   google_places_status: EnrichmentStatus;
   platform_presence_status: PresenceStatus;

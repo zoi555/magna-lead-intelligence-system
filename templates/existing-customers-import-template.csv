@@ -1,0 +1,2 @@
+customer_code,customer_name,trading_name,postcode,address,phone,email,status,last_order_date,route,sales_rep,notes
+C-1001,Example Foods Ltd,Example Grill,UB1 2AA,"12 Broadway, Southall",020 8000 0000,orders@example.co.uk,active,2026-07-01,West A,Rep Name,Sample row — replace with real export

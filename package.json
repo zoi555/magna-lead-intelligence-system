@@ -10,7 +10,9 @@
     "lint": "next lint",
     "leads:first": "tsx scripts/run-first-fsa-leads.ts",
     "leads:resume": "tsx scripts/run-first-fsa-leads.ts --resume",
-    "leads:status": "tsx scripts/run-first-fsa-leads.ts --status"
+    "leads:status": "tsx scripts/run-first-fsa-leads.ts --status",
+    "leads:analyse": "tsx scripts/analyse-first-leads.ts",
+    "test:scoring": "tsx scripts/test-scoring-samples.ts"
   },
   "dependencies": {
     "next": "^16.2.10",

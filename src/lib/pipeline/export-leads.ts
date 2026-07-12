@@ -20,7 +20,8 @@ const WORKED: TelesalesSafeRow["worked_status"][] = ["Open", "In progress", "Con
 const FINAL_HEADERS: (keyof FinalLeadRow)[] = [
   "run_id", "lead_id", "business_name", "address", "postcode", "local_authority",
   "business_type", "fsa_rating", "rating_date", "fsa_business_id", "latitude", "longitude",
-  "territory_code", "trigger_reason", "score", "grade", "score_reasons", "warnings",
+  "territory_code", "trigger_reason", "score", "grade", "category_fit", "manual_review_flags",
+  "score_reasons", "warnings",
   "companies_house_status", "google_places_status", "platform_presence_status",
   "delivery_source_method", "delivery_risk_flag", "delivery_evidence_url", "export_status",
 ];
@@ -73,6 +74,8 @@ export function buildFinalRows(records: WorkingRecord[], runId: string): FinalLe
         trigger_reason: r.trigger_reason ?? "",
         score: s.score,
         grade: s.grade,
+        category_fit: r.category?.fit ?? "",
+        manual_review_flags: s.manual_review_flags.join("; "),
         score_reasons: s.score_reasons.join("; "),
         warnings: s.warnings.join("; "),
         companies_house_status: r.companiesHouse?.status ?? "not_configured",

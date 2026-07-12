@@ -18,8 +18,9 @@ import { getFsaEstablishments, getFsaEstablishmentsMock } from "../sources/fsa";
 import { enrichCompaniesHouse } from "../sources/companies-house";
 import { enrichGooglePlaces } from "../sources/google-places";
 import { collectDeliveryPresence, summarisePresence } from "../sources/delivery-platforms";
-import { matchExistingCustomer } from "../sources/existing-customers";
-import { scoreCandidate, isFoodservice } from "./scoring";
+import { matchExistingCustomerRecord } from "../sources/existing-customers";
+import { scoreCandidate } from "./scoring";
+import { classifyCategory, isCandidateFit } from "./category-rules";
 import { writeExports } from "./export-leads";
 
 export interface StageContext {
@@ -195,15 +196,20 @@ export const STAGE_DEFS: StageDef[] = [
     handler: (input) => {
       const kept: WorkingRecord[] = [];
       const errors: PipelineError[] = [];
+      const tiers: Record<string, number> = { HIGH: 0, MEDIUM: 0, LOW: 0, MANUAL_REVIEW: 0, EXCLUDED: 0 };
       let rejected = 0;
       for (const r of input) {
-        if (isFoodservice(r.fsa.businessType)) kept.push(r);
-        else {
+        const cat = classifyCategory(r.fsa.businessType, r.fsa.businessName);
+        tiers[cat.fit] = (tiers[cat.fit] ?? 0) + 1;
+        if (!isCandidateFit(cat.fit)) {
           rejected++;
-          pushCapped(errors, err("CATEGORY_EXCLUDED", "category_filter", "info", `${r.fsa.businessName}: type "${r.fsa.businessType}" not foodservice`, false, "Adjust category rules if needed", r.fsa.fhrsId));
+          pushCapped(errors, err("CATEGORY_EXCLUDED", "category_filter", "info", `${r.fsa.businessName}: excluded (${cat.note})`, false, "Refine category-rules.ts if wrong", r.fsa.fhrsId));
+          continue;
         }
+        kept.push({ ...r, category: { fit: cat.fit, reason: cat.reason, note: cat.note } });
       }
-      return { records: kept, rejected, errors, notes: `${kept.length} foodservice` };
+      const metrics = { input_count: input.length, high: tiers.HIGH, medium: tiers.MEDIUM, low: tiers.LOW, manual_review: tiers.MANUAL_REVIEW, excluded: tiers.EXCLUDED };
+      return { records: kept, rejected, errors, notes: `HIGH ${tiers.HIGH} · MED ${tiers.MEDIUM} · LOW ${tiers.LOW} · MANUAL ${tiers.MANUAL_REVIEW} · excluded ${tiers.EXCLUDED}`, metrics };
     },
   },
   {
@@ -237,20 +243,22 @@ export const STAGE_DEFS: StageDef[] = [
   {
     id: "exclude_existing_customers",
     label: "Exclude existing customers",
-    handler: (input, ctx) => {
+    handler: (input) => {
       const kept: WorkingRecord[] = [];
       const errors: PipelineError[] = [];
-      let rejected = 0;
+      let rejected = 0, possible = 0;
       for (const r of input) {
-        const m = matchExistingCustomer(r.fsa.businessName, r.fsa.postcode, ctx.checkedAt);
-        if (m.matched && m.customerStatus === "active") {
+        const m = matchExistingCustomerRecord(r.fsa.businessName, r.fsa.postcode);
+        if (m.status === "existing_customer_match") {
           rejected++;
-          pushCapped(errors, err("EXISTING_CUSTOMER_MATCH", "exclude_existing_customers", "info", `${r.fsa.businessName} is an existing active customer`, false, "Suppress from new leads", r.fsa.fhrsId));
+          pushCapped(errors, err("EXISTING_CUSTOMER_MATCH", "exclude_existing_customers", "info", `${r.fsa.businessName} — ${m.reason} (${m.matched_code})`, false, "Suppress from new leads", r.fsa.fhrsId));
           continue;
         }
-        kept.push(r);
+        if (m.status === "possible_existing_customer") possible++;
+        kept.push({ ...r, customerMatch: { status: m.status, confidence: m.confidence, reason: m.reason } });
       }
-      return { records: kept, rejected, errors, notes: `${kept.length} after existing-customer exclusion` };
+      const metrics = { input_count: input.length, excluded: rejected, possible_manual_review: possible, kept: kept.length };
+      return { records: kept, rejected, errors, notes: `excluded ${rejected} exact · ${possible} possible (manual review) · kept ${kept.length}`, metrics };
     },
   },
   {
@@ -320,26 +328,39 @@ export const STAGE_DEFS: StageDef[] = [
       const records: WorkingRecord[] = [];
       const errors: PipelineError[] = [];
       let rejected = 0;
+      // duplicate-looking = same normalised name across 2+ records (chains / repeats)
+      const nameFreq = new Map<string, number>();
+      for (const r of input) {
+        const k = r.fsa.businessName.toLowerCase().replace(/[^a-z0-9]/g, "");
+        nameFreq.set(k, (nameFreq.get(k) ?? 0) + 1);
+      }
+      let manualCount = 0;
       for (const r of input) {
         try {
           const candidate = toCandidate(r);
+          const dupKey = r.fsa.businessName.toLowerCase().replace(/[^a-z0-9]/g, "");
+          const duplicateRisk = (nameFreq.get(dupKey) ?? 1) > 1;
           const score = scoreCandidate({
             candidate,
             ratingDate: r.fsa.ratingDate,
+            category: r.category,
             companiesHouse: r.companiesHouse!,
             googlePlaces: r.googlePlaces!,
             delivery: r.delivery!,
+            customerMatch: r.customerMatch,
+            duplicateRisk,
             inTerritory: true,
-            coverageGapWeight: 0,
             referenceDateMs: ctx.referenceDateMs,
           });
-          records.push({ ...r, candidate, score, trigger_reason: deriveTrigger(r, score) });
+          if (score.manual_review_flags.length) manualCount++;
+          records.push({ ...r, candidate, duplicateRisk, score, trigger_reason: deriveTrigger(r, score) });
         } catch (e) {
           rejected++;
           pushCapped(errors, err("SCORING_FAILED", "score_candidates", "error", `Scoring failed for ${r.fsa.businessName}: ${msg(e)}`, true, "Inspect the record and retry", r.fsa.fhrsId));
         }
       }
-      return { records, rejected, errors, notes: `scored ${records.length}` };
+      const metrics = { input_count: input.length, scored: records.length, manual_review: manualCount };
+      return { records, rejected, errors, notes: `scored ${records.length} · manual-review ${manualCount}`, metrics };
     },
   },
   {
@@ -351,17 +372,22 @@ export const STAGE_DEFS: StageDef[] = [
       ];
       let rejected = 0;
       let deliveryUnchecked = 0;
+      let manualHeld = 0;
       const records = input.map((r) => {
         const s = r.score!;
-        const eligible = s.disqualifiers.length === 0 && s.grade !== "D";
+        // Any manual-review flag (institutional, missing coords, possible customer, duplicate) → manual review, not auto-export.
+        const manualNeeded = s.manual_review_flags.length > 0;
+        const eligible = s.disqualifiers.length === 0 && s.grade !== "D" && !manualNeeded;
         if (!eligible) rejected++;
-        // Delivery presence is NOT a blocker — unchecked leads still export with a warning.
+        if (manualNeeded) manualHeld++;
         if (!r.delivery || summarisePresence(r.delivery) !== "present") deliveryUnchecked++;
-        return { ...r, export_status: eligible ? "ready_for_review" : "held_review" };
+        const status = manualNeeded ? "manual_review" : eligible ? "ready_for_review" : "held_review";
+        return { ...r, export_status: status };
       });
       if (deliveryUnchecked > 0)
         errors.push(err("DELIVERY_PLATFORM_NOT_CHECKED", "export_review_gate", "warning", `${deliveryUnchecked} leads export without a confirmed delivery-platform presence (allowed — not a blocker)`, false, "Optionally collect/import presence before outreach"));
-      return { records, rejected, errors, notes: `${records.length - rejected} export-eligible, ${rejected} held` };
+      const metrics = { input_count: input.length, export_eligible: records.length - rejected, held: rejected, manual_review: manualHeld };
+      return { records, rejected, errors, notes: `${records.length - rejected} export-eligible · ${rejected} held · ${manualHeld} manual-review`, metrics };
     },
   },
   {

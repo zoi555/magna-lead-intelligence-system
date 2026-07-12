@@ -57,3 +57,7 @@ venv/
 # Misc
 *.zip
 *.tar.gz
+
+# local run state & generated exports (never commit)
+data/
+exports/
