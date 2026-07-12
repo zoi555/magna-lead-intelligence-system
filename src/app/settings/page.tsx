@@ -2,6 +2,9 @@ import React from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { SourceRegistryPanel } from "@/components/settings/SourceRegistryPanel";
 import { SOURCE_REGISTRY, summariseRegistry } from "@/lib/sources/source-registry";
+import { getCompaniesHouseConfig } from "@/lib/sources/companies-house";
+import { getGooglePlacesConfig } from "@/lib/sources/google-places";
+import { getDeliveryPlatformConfig } from "@/lib/sources/delivery-platforms";
 import { APP_FULL_NAME, TENANT_NAME } from "@/lib/app-config";
 
 // Source-control / readiness dashboard. Env var presence only — never values.
@@ -14,6 +17,12 @@ export default function SettingsPage() {
     if (s.envVar) envPresent[s.envVar] = Boolean(process.env[s.envVar]);
   }
   const summary = summariseRegistry(envPresent);
+
+  // Adapter config (server-side; booleans/limits only — no key values).
+  const ch = getCompaniesHouseConfig();
+  const gp = getGooglePlacesConfig();
+  const dp = getDeliveryPlatformConfig();
+  const yn = (b: boolean) => (b ? "yes" : "no");
 
   return (
     <div className="space-y-6">
@@ -41,6 +50,15 @@ export default function SettingsPage() {
       </div>
 
       <SourceRegistryPanel sources={SOURCE_REGISTRY} summary={summary} envPresent={envPresent} />
+
+      <div className="rounded-card border border-bordergrey bg-card p-4 shadow-soft">
+        <h2 className="mb-2 text-[15px] font-semibold text-ink">Adapter configuration <span className="text-[12px] font-normal text-muted">(server-side — values never shown)</span></h2>
+        <div className="grid grid-cols-1 gap-x-8 gap-y-1 text-[13px] md:grid-cols-3">
+          <p className="text-ink"><span className="text-muted">Companies House: </span>key {yn(ch.apiKeyPresent)} · enabled {yn(ch.enabled)} · max/run {ch.maxCallsPerRun}</p>
+          <p className="text-ink"><span className="text-muted">Google Places: </span>key {yn(gp.apiKeyPresent)} · enabled {yn(gp.enabled)} · max/run {gp.maxCallsPerRun} · field-mask yes</p>
+          <p className="text-ink"><span className="text-muted">Delivery presence: </span>mode {dp.mode} · scraping disabled {yn(dp.scrapingDisabled)} · live {yn(dp.liveEnabled)}</p>
+        </div>
+      </div>
     </div>
   );
 }
