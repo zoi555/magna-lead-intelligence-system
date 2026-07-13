@@ -124,6 +124,20 @@ export function loadTargetOutcodes(mode: TerritoryMode): PostcodeSourceResult {
     return pilotResult("pilot", "THIS RUN IS PILOT ONLY — NOT NATIONAL / NOT VP COVERAGE", "Pilot MVP test outcodes.");
   }
 
+  if (mode === "manual_outcodes") {
+    // Explicitly selected outcodes via env MANUAL_OUTCODES (comma/space separated).
+    const raw = (process.env.MANUAL_OUTCODES ?? "").split(/[,\s]+/).map((s) => normaliseOutcode(s)).filter(Boolean);
+    const outcodes = [...new Set(raw)];
+    if (!outcodes.length) {
+      return { mode, label: TERRITORY_LABELS.manual_outcodes, loaded: false, sourceFile: null, rawRows: 0, outcodes: [], targets: [], isPilotOnly: false, warning: "manual_outcodes selected but MANUAL_OUTCODES env is empty — no run.", note: "No manual outcodes provided." };
+    }
+    return {
+      mode, label: TERRITORY_LABELS.manual_outcodes, loaded: true, sourceFile: "env:MANUAL_OUTCODES",
+      rawRows: raw.length, outcodes, targets: outcodes.map((o) => ({ outcode: o })), isPilotOnly: false, warning: null,
+      note: `${outcodes.length} manually-selected outcodes (postcode district / outcode level).`,
+    };
+  }
+
   if (mode === "vp_coverage" || mode === "custom_upload") {
     const paths = mode === "vp_coverage" ? VP_COVERAGE_PATHS : CUSTOM_UPLOAD_PATHS;
     const file = firstExisting(paths);

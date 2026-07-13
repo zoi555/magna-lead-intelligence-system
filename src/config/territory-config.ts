@@ -3,7 +3,7 @@
 // the pipeline searches. Default is `pilot` (a temporary MVP test set) so behaviour
 // never silently expands to national. Set TERRITORY_MODE in .env.local to change.
 
-export type TerritoryMode = "pilot" | "vp_coverage" | "full_uk_outcodes" | "custom_upload";
+export type TerritoryMode = "pilot" | "manual_outcodes" | "vp_coverage" | "full_uk_outcodes" | "custom_upload";
 
 /** Temporary MVP test outcodes — West London pilot. NOT national, NOT VP coverage. */
 export const PILOT_OUTCODES = ["UB1", "UB2", "UB6", "HA0", "HA9", "W5"] as const;
@@ -31,12 +31,13 @@ export const FULL_UK_PATHS = [
 
 export const TERRITORY_LABELS: Record<TerritoryMode, string> = {
   pilot: "West London pilot (PILOT ONLY)",
+  manual_outcodes: "manual_outcodes (postcode district / outcode)",
   vp_coverage: "VP / Magna coverage",
   full_uk_outcodes: "Full UK outcodes (national)",
   custom_upload: "Custom uploaded postcode list",
 };
 
-const VALID: TerritoryMode[] = ["pilot", "vp_coverage", "full_uk_outcodes", "custom_upload"];
+const VALID: TerritoryMode[] = ["pilot", "manual_outcodes", "vp_coverage", "full_uk_outcodes", "custom_upload"];
 
 /** Resolve the territory mode from env; defaults to `pilot`. */
 export function getTerritoryMode(): TerritoryMode {

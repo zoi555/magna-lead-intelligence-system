@@ -119,6 +119,7 @@ export async function runPlatformDiscovery(
   const summaryJson = path.join(EXPORTS_DIR, "platform-public-evidence-summary.json");
   const failuresCsv = path.join(EXPORTS_DIR, "platform-collection-failures.csv");
 
+  const fieldAvailabilityCsv = path.join(EXPORTS_DIR, "platform-field-availability-report.csv");
   try {
     fs.writeFileSync(evidenceCsv, recordsToCsv(records));
     fs.writeFileSync(
@@ -126,6 +127,7 @@ export async function runPlatformDiscovery(
       JSON.stringify({ runId, summary, failures_count: failures.length }, null, 2)
     );
     fs.writeFileSync(failuresCsv, failuresToCsv(failures));
+    fs.writeFileSync(fieldAvailabilityCsv, fieldAvailabilityToCsv(records, failures));
   } catch {
     // Non-fatal: exports are a convenience; records are still returned in-memory.
   }
@@ -142,4 +144,53 @@ export async function runPlatformDiscovery(
       stagedNormalised,
     },
   };
+}
+
+/**
+ * Phase 5 field-availability audit — for each platform + collector method, report
+ * which business-level fields actually came back (evidence-based, no guessing).
+ */
+function fieldAvailabilityToCsv(records: PlatformRecord[], failures: CollectorFailure[]): string {
+  const esc = (v: unknown) => { const s = v == null ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const headers = [
+    "platform", "method", "business_name_available", "address_available", "postcode_available",
+    "phone_available", "website_available", "rating_available", "review_count_available",
+    "cuisine_available", "platform_url_available", "opening_status_available",
+    "delivery_collection_available", "mapped_to_normalised_output", "reason_if_missing",
+  ];
+  // Group records by platform + collector_method.
+  const groups = new Map<string, PlatformRecord[]>();
+  for (const r of records) {
+    const key = `${r.platform}|${r.collector_method}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(r);
+  }
+  // Ensure blocked/evidence-only platforms with no records still appear via failures.
+  const failurePlatforms = new Set(failures.map((f) => `${(f as { platform?: string }).platform ?? "unknown"}|blocked`));
+  for (const key of failurePlatforms) if (!groups.has(key)) groups.set(key, []);
+
+  const any = (rows: PlatformRecord[], pick: (r: PlatformRecord) => unknown) => rows.some((r) => { const v = pick(r); return Array.isArray(v) ? v.length > 0 : v != null && v !== ""; });
+  const yn = (b: boolean) => (b ? "yes" : "no");
+
+  const lines = [headers.join(",")];
+  for (const [key, rows] of groups) {
+    const [platform, method] = key.split("|");
+    const hasName = any(rows, (r) => r.business_name);
+    const hasPhone = any(rows, (r) => r.phone_number);
+    const hasWebsite = any(rows, (r) => r.website);
+    const hasRating = any(rows, (r) => r.rating);
+    const hasReview = any(rows, (r) => r.review_count);
+    let reason = "";
+    if (!rows.length) reason = "platform anti-bot protected — public page not fetched (evidence-only; import CSV to populate)";
+    else if (platform.toLowerCase().includes("just") && (!hasPhone || !hasWebsite)) reason = "Just Eat bypostcode endpoint does not return phone/website (use Google Places fallback)";
+    else if (!hasName) reason = "no business-level fields available for this method";
+    lines.push([
+      platform, method, yn(hasName), yn(any(rows, (r) => r.address_text)), yn(any(rows, (r) => r.postcode)),
+      yn(hasPhone), yn(hasWebsite), yn(hasRating), yn(hasReview),
+      yn(any(rows, (r) => r.cuisine_categories)), yn(any(rows, (r) => r.platform_url)),
+      yn(any(rows, (r) => r.opening_status)), yn(any(rows, (r) => r.delivery_available != null || r.collection_available != null)),
+      "yes", reason,
+    ].map(esc).join(","));
+  }
+  return lines.join("\n") + "\n";
 }

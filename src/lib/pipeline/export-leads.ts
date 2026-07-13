@@ -170,15 +170,17 @@ export function buildFinalRows(records: WorkingRecord[], runId: string): FinalLe
       just_eat_territory_class: r.justEat?.territoryClass ?? "",
       platform_rating: r.justEat?.ratingAverage != null ? String(r.justEat.ratingAverage) : "",
       platform_review_count: r.justEat?.ratingCount != null ? String(r.justEat.ratingCount) : "",
-      google_rating: "",
-      google_review_count: "",
+      google_rating: r.googleContact?.rating != null ? String(r.googleContact.rating) : "",
+      google_review_count: r.googleContact?.reviewCount != null ? String(r.googleContact.reviewCount) : "",
       data_completeness_score: r.completeness?.score ?? 0,
       data_completeness_band: r.completeness?.band ?? "poor",
       data_missing_fields: (r.completeness?.missing ?? []).join("; "),
       platform_presence_summary: r.platform?.summary ?? "not checked",
       platform_presence_confidence: r.platform?.confidence ?? 0,
       platform_presence_warnings: (r.platform?.warnings ?? []).join("; "),
-      phone: r.googlePlaces?.formattedPhone ? maskPhone(r.googlePlaces.formattedPhone) : "",
+      // Real (callable) phone for Magna's internal sales list. The telesales-safe
+      // export (buildTelesalesSafe) masks independently.
+      phone: r.googlePlaces?.formattedPhone ?? "",
       website: r.googlePlaces?.website ?? "",
       delivery_source_method: r.platform?.warnings?.length && present ? "import" : "manual",
       delivery_risk_flag: "medium",
@@ -297,6 +299,46 @@ function toSalesRow(r: FinalLeadRow) {
   };
 }
 
+// Google Places enrichment exports (contact + aggregate rating/review only — no review text).
+export function writeGoogleEnrichmentExports(runId: string, records: WorkingRecord[]): string[] {
+  fs.mkdirSync(EXPORTS_DIR, { recursive: true });
+  const rel = (p: string) => path.relative(process.cwd(), p);
+  const w = (name: string, content: string) => { const p = path.join(EXPORTS_DIR, name); fs.writeFileSync(p, content); return rel(p); };
+  const files: string[] = [];
+  const withGoogle = records.filter((r) => r.googleContact);
+
+  const summaryRows = withGoogle.filter((r) => r.googleContact!.matched).map((r) => {
+    const g = r.googleContact!;
+    return {
+      business_name: r.fsa.businessName, postcode: r.fsa.postcode,
+      google_place_id: g.placeId ?? "", google_maps_url: g.mapsUrl ?? "", google_business_name: g.businessName ?? "",
+      google_formatted_address: g.formattedAddress ?? "", google_postcode: g.postcode ?? "", google_phone: g.phone ?? "",
+      google_website: g.website ?? "", google_business_status: g.businessStatus ?? "", google_rating: g.rating ?? "",
+      google_review_count: g.reviewCount ?? "", google_types: g.types.join(" | "), match_confidence: g.matchConfidence,
+    };
+  });
+  files.push(w("google-places-enrichment-summary.csv", toCsv(["business_name", "postcode", "google_place_id", "google_maps_url", "google_business_name", "google_formatted_address", "google_postcode", "google_phone", "google_website", "google_business_status", "google_rating", "google_review_count", "google_types", "match_confidence"] as any, summaryRows as any)));
+
+  const debugRows = withGoogle.map((r) => {
+    const g = r.googleContact!;
+    return {
+      business_name: r.fsa.businessName, fsa_address: r.fsa.addressLine, fsa_postcode: r.fsa.postcode,
+      google_business_name: g.businessName ?? "", google_address: g.formattedAddress ?? "", google_postcode: g.postcode ?? "",
+      matched: g.matched, match_confidence: g.matchConfidence, match_reason: g.matchReason, status: g.status,
+      warnings: g.warnings.join("; "),
+    };
+  });
+  files.push(w("google-places-match-debug.csv", toCsv(["business_name", "fsa_address", "fsa_postcode", "google_business_name", "google_address", "google_postcode", "matched", "match_confidence", "match_reason", "status", "warnings"] as any, debugRows as any)));
+
+  const missing = records.filter((r) => !r.googlePlaces?.formattedPhone).map((r) => ({
+    business_name: r.fsa.businessName, postcode: r.fsa.postcode, customer_status: r.customerMatch?.status ?? "",
+    google_checked: r.googleContact ? "yes" : "no", google_status: r.googleContact?.status ?? "not_checked",
+    recommended_action: "Research phone before calling",
+  }));
+  files.push(w("missing-phone-list.csv", toCsv(["business_name", "postcode", "customer_status", "google_checked", "google_status", "recommended_action"] as any, missing as any)));
+  return files;
+}
+
 // Internal financial exports (raw values, ratios, health — NEVER in the sales list).
 export function writeFinancialExports(runId: string, records: WorkingRecord[]): string[] {
   fs.mkdirSync(EXPORTS_DIR, { recursive: true });
@@ -368,6 +410,13 @@ export function writeTomorrowSalesExports(runId: string, allRecords: WorkingReco
   files.push(w("tomorrow-sales-list.csv", `# ${guaranteeNote}\n` + toCsv(SALES_HEADERS as any, salesRows as any)));
   files.push(w("tomorrow-sales-list.json", JSON.stringify({ run_id: runId, guarantee: guaranteeNote, count: salesRows.length, leads: salesRows }, null, 2)));
   files.push(w("tomorrow-sales-list-for-upload.csv", toCsv(["business_name", "address", "postcode", "phone", "website", "suggested_sales_action", "run_id"] as any, salesRows as any)));
+
+  // Split the sales list: ready-to-call (has a phone) vs research-phone (no phone yet).
+  // Both are export-eligible New Prospect Candidates — held/excluded records are never here.
+  const readyToCall = sales.filter((r) => r.phone && String(r.phone).trim());
+  const researchPhone = sales.filter((r) => !r.phone || !String(r.phone).trim());
+  files.push(w("tomorrow-sales-list-ready-to-call.csv", `# ${guaranteeNote} — READY TO CALL (has phone)\n` + toCsv(SALES_HEADERS as any, readyToCall.map(toSalesRow) as any)));
+  files.push(w("tomorrow-sales-list-research-phone.csv", `# ${guaranteeNote} — RESEARCH PHONE FIRST (no phone found)\n` + toCsv(SALES_HEADERS as any, researchPhone.map(toSalesRow) as any)));
 
   // manual-review hold list
   const holdRows = hold.map((r) => ({

@@ -220,6 +220,29 @@ export interface ExistingCustomerMatch extends EnrichmentEnvelope {
   customerStatus: "active" | "lapsed" | null;
 }
 
+/** Google Places contact enrichment carried on a working record. Aggregate only — never review text. */
+export interface GoogleContactSnapshot {
+  status: string; // found | not_found | disabled | error | cap_reached
+  matched: boolean;
+  placeId: string | null;
+  mapsUrl: string | null;
+  businessName: string | null;
+  formattedAddress: string | null;
+  postcode: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  phone: string | null;
+  internationalPhone: string | null;
+  website: string | null;
+  businessStatus: string | null;
+  types: string[];
+  rating: number | null;
+  reviewCount: number | null;
+  matchConfidence: number;
+  matchReason: string;
+  warnings: string[];
+}
+
 /** Serialisable Just Eat snapshot carried on a working record after fan-in. */
 export interface JustEatSnapshot {
   matched: boolean;
@@ -322,6 +345,7 @@ export interface WorkingRecord {
   delivery?: DeliveryPresenceResult;
   platform?: LeadPlatformPresence;
   justEat?: JustEatSnapshot;
+  googleContact?: GoogleContactSnapshot;
   fsaLegitimacy?: FsaLegitimacy;
   directors?: DirectorsEnrichment;
   financials?: FinancialInfo;

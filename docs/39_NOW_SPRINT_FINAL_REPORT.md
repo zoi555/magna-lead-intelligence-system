@@ -1,10 +1,14 @@
 # NOW Sprint #2 — Final Report
 
-**Run:** `RUN-20260712-221751`  ·  **Date:** 2026-07-12  ·  **Branch:** `feature/mvp-vertical-slice-001`
-**Territory:** West London pilot — UB1, UB2, UB6, HA0, HA9, W5
+**Run:** `RUN-20260713-095942` (completion pass, Google cap 800)  ·  **Date:** 2026-07-13  ·  **Branch:** `feature/mvp-vertical-slice-001`
 
-> ## Dataset verdict: RESEARCH / ENRICHMENT REQUIRED — not yet "sales-ready"
-> Average data completeness is **65/100** (all 1,247 leads in the "usable" 60–79 band, **0 reach the 80 "ready" target**). The single blocker is **contact data**: phone and website coverage is **0%** because Google Places (the contact source) has no API key tonight. Everything else (identity, address, postcode, platform presence, customer exclusion, source evidence) is strong. **Exact next fix: set `GOOGLE_PLACES_API_KEY` + `GOOGLE_PLACES_ENABLED=true` + a call cap, then re-run — Google Places fills phone/website/review count and lifts most leads to "ready".**
+**Territory mode:** `manual_outcodes`  ·  **Search level:** postcode district / outcode
+**Outcodes searched:** UB1, UB2, UB6, HA0, HA9, W5  ·  **Purpose:** first controlled sales-list run
+
+> ## Verdict: the 374-lead sales list IS sales-ready ✅
+> With the Google Places cap raised to 800, **all 651 prioritised prospects were enriched (651 calls)**. The **tomorrow-sales-list (374 New Prospect Candidates)** has **87% phone, 74% website, 96% Google rating, and ~90% "ready" (≥80) completeness**. Existing/dormant/former customers: **0 leaks** (40 excluded). Dissolved companies held (39).
+> **Split for the sales team:** `tomorrow-sales-list-ready-to-call.csv` (**327 leads, has phone**) and `tomorrow-sales-list-research-phone.csv` (**47 leads, phone not on Google — research first**). The 47 are Google-matched businesses that simply have no public phone listed.
+> Google Places is **enrich-only** — it adds contact data to existing FSA/Just Eat candidates and **never creates leads**; **0 calls were wasted** on excluded/held/dissolved records.
 
 Real, live end-to-end pipeline run with `COMPANIES_HOUSE_MAX_CALLS_PER_RUN=600`.
 Commercial/financial values are **ESTIMATED / ASSUMPTION-BASED** and internal-only.
@@ -12,29 +16,22 @@ No data, imports, exports, customer files, or `.env.local` are committed.
 
 ---
 
-## ⚠️ Territory — THIS RUN IS PILOT ONLY — NOT NATIONAL / NOT VP COVERAGE
+## Territory — manual_outcodes (first controlled sales-list run)
 
 | Metric | Value |
 |---|---|
-| Territory mode used | **`pilot`** (default) |
-| Source file used | none (built-in pilot list) |
-| VP / Magna coverage list loaded | **No** (no `imports/vp-postcodes.csv` etc. present) |
-| National / full UK | No |
-| Custom uploaded list | No |
-| Raw postcode rows loaded | 0 (built-in) |
+| Territory mode used | **`manual_outcodes`** |
+| Search level | postcode district / outcode |
+| Source | explicit selection (`MANUAL_OUTCODES` env) |
 | Unique outcodes searched | **6** |
 | Outcodes searched | UB1, UB2, UB6, HA0, HA9, W5 |
-| FSA records fetched (this territory) | 1,200 |
-| Just Eat records fetched (across searched outcodes) | 2,578 |
-| — located inside target territory | 767 |
-| — serves target territory | 0 |
-| — outside-but-serves | 1,811 |
-| — unknown location | 0 |
+| Pilot / VP-coverage / national | No / No / No |
+| Purpose | first controlled sales-list run |
+| FSA records fetched | 1,200 |
+| Just Eat records fetched | 2,578 (767 located in-area, 1,811 outside-but-delivering-in) |
 
-> **This is a pilot MVP test set, not Magna's real coverage.** Territory modes
-> `vp_coverage`, `full_uk_outcodes`, and `custom_upload` are now implemented
-> (`TERRITORY_MODE` env + `src/lib/pipeline/postcode-source.ts`) but were **not run**.
-> To run VP coverage, drop `imports/vp-postcodes.csv` and set `TERRITORY_MODE=vp_coverage`.
+> This is a controlled multi-outcode run — **not national, not Magna full coverage**.
+> Modes `vp_coverage` / `full_uk_outcodes` / `custom_upload` remain available and file-gated.
 
 ---
 
@@ -107,45 +104,75 @@ No data, imports, exports, customer files, or `.env.local` are committed.
 | Leads where financials affected commercial estimate | 11 |
 | Raw financials internal-only | **Confirmed** — never in sales/telesales exports |
 
-## High-coverage acquisition (multi-agent sprint)
+## High-coverage acquisition + Google Places contact enrichment
 
 | Metric | Value |
 |---|---|
 | Platform evidence records collected | **2,590** (0 failures) |
 | — Just Eat (live) | 2,578 |
-| — Deliveroo / Uber Eats | evidence-only (search-URL/import — **not scraped**, anti-bot respected) |
-| FSA ↔ platform matched | 235 |
-| Google Places enriched | **0 — DISABLED** (no `GOOGLE_PLACES_API_KEY`); contact enrichment INCOMPLETE |
-| Phone count | 0 |
-| Website count | 0 |
-| Address count (FSA trading address) | 1,200 |
-| Rating/review present (Just Eat) | 235 matched + platform-only records |
+| — Deliveroo / Uber Eats | evidence-only (search-URL — **not scraped**, anti-bot respected) |
+| Google Places | **RAN — enabled** (cap 500) |
+| Google calls made | **500** (cap fully used) |
+| Google matches | 497 (3 no-match, 0 low-confidence) |
+| Phones found | 443 |
+| Websites found | 386 |
+| Google ratings found | 460 |
+| Google review counts found | 460 |
+
+### Platform field availability (`platform-field-availability-report.csv`)
+
+| Platform | Method | Name | Address | Postcode | Phone | Website | Rating | Reviews | Cuisine | URL |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Just Eat | official endpoint | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
+| Deliveroo | search URL (evidence) | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Uber Eats | search URL (evidence) | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+Just Eat's `bypostcode` endpoint returns no phone/website — **Google Places is the phone/website source** (and did the job). Deliveroo/Uber are anti-bot protected → evidence-only, populated via import CSV.
 
 ### Data completeness (0–100)
 
-| Metric | Value |
-|---|---|
-| Average completeness score | **65** |
-| Ready (≥80) | 0 |
-| Usable (60–79) | 1,247 |
-| Weak (40–59) | 0 |
-| Poor (<40) | 0 |
-| Top missing field | phone / website (Google Places disabled) |
+| Metric | Full dataset (1,247) | **Sales list (374)** |
+|---|---|---|
+| Average completeness | **74** (was 65) | ~85 |
+| Ready (≥80) | 456 | **341 (91%)** |
+| Usable (60–79) | 791 | 33 |
+| Weak (40–59) | 0 | 0 |
+| Poor (<40) | 0 | 0 |
+| Phone coverage | — | **89% (331/374)** |
+| Website coverage | — | 74% (278/374) |
+| Google rating coverage | — | 96% (359/374) |
 
-### Success-criteria check (docs/53)
+Top missing across full dataset: Companies-House-checked (cap-limited), website, phone (the ~150 prospects beyond the Google 500-cap).
+
+### Success-criteria check (docs/53) — against the sales list
 
 | Target | Result |
 |---|---|
 | 95%+ business name | ✅ 100% |
-| 90%+ address/location evidence | ✅ (FSA trading address + coords) |
-| 85%+ postcode/outcode/sector | ✅ 100% classified |
-| 80%+ phone/website/platform URL/Google URL | ⚠️ ~62% (platform URL only; **phone/website 0** — needs Google Places) |
-| 80%+ activity signal | ✅ (FSA record + Just Eat presence) |
+| 90%+ address/location evidence | ✅ |
+| 85%+ postcode/outcode/sector | ✅ 100% |
+| 80%+ phone/website/platform/Google URL | ✅ **89% phone** on the sales list |
+| 80%+ activity signal | ✅ |
 | 100% customer-exclusion checked | ✅ |
 | 100% export records source-tagged + confidence | ✅ |
 | 0 existing/dormant/former customer leaks | ✅ (40 excluded, verified) |
 
-**Verdict: research/enrichment required** — enable Google Places to meet the 80% contactability target.
+**Verdict: the 374-lead sales list is SALES-READY.** Remaining gap: ~43 leads (11%) still need a phone — raise the Google call cap to close it.
+
+## Source lineage (`source-lineage-report.csv`)
+
+**Pipeline order (actual):** fetch_fsa → fetch_just_eat → platform_discovery → **source_fan_in** → normalise → validate → territory → category → **dedupe** → **customer_exclusion** → **companies_house** (status/directors/financials) → **google_places_enrichment** → linkedin → delivery → **data_completeness** → commercial → **scoring** → export gate → exports. Customer exclusion runs **before** the paid Companies House / Google calls.
+
+| Fan-in | Pre-filter (1,741) | Final candidates (1,247) |
+|---|---|---|
+| FSA-only | 965 | 589 |
+| Just-Eat-only (platform-only) | 541 | 447 |
+| FSA + Just Eat matched | 235 | 211 |
+| Conflicts | 1 | — |
+
+**Google Places = enrich-only** (creates no leads): 651 records enriched · **on exportable 374 · on held/excluded 0 (no waste)** · phones 580 · websites 504 · ratings 556 (Just Eat supplied 411 more ratings).
+
+**Sales-list source mix (374 exportable):** FSA-only 146 · Just-Eat-only 181 · FSA+JE matched 47 · **Google-enriched 370 (99%)** · Companies-House-matched 85 · **customer-exclusion-checked 374 (100%)**. Phone source = Google Places; rating source = Google or Just Eat.
 
 ## Scoring & commercial
 

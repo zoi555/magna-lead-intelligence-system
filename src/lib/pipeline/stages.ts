@@ -26,7 +26,8 @@ import { enrichDirectors } from "./companies-house-directors-stage";
 import { enrichFinancials } from "./companies-house-financials-stage";
 import { buildLinkedInQueues } from "./linkedin-research-queue";
 import { runPlatformDiscovery } from "./platform-discovery-stage";
-import { runGooglePlacesEnrichment } from "./google-places-enrichment-stage";
+import { GooglePlacesRunner, isGooglePlacesEnabled, getGooglePlacesConfig } from "../sources/google-places";
+import { postcodeScore } from "./address-matching";
 import { scoreCompleteness } from "./data-completeness";
 import { computeFsaLegitimacy } from "./fsa-legitimacy";
 import { computeCommercial, computeOpportunityForGrade } from "./commercial-calculation";
@@ -36,7 +37,7 @@ import { classifyCategory, isCandidateFit } from "./category-rules";
 import { loadCustomerList } from "../sources/customer-list-import";
 import { classifyCustomer, buildCustomerIndex } from "./customer-exclusion";
 import { loadDeliveryEvidence, buildDeliveryPresence, STAGE_PLATFORMS } from "./delivery-platform-stage";
-import { writeExports, writeTomorrowSalesExports, writeResearchExports } from "./export-leads";
+import { writeExports, writeTomorrowSalesExports, writeResearchExports, writeGoogleEnrichmentExports } from "./export-leads";
 
 // Loaded once at module init (server-side; absent files are handled, no throw).
 const CUSTOMER_LIST = loadCustomerList();
@@ -480,28 +481,92 @@ export const STAGE_DEFS: StageDef[] = [
   {
     id: "google_places_enrichment",
     label: "Google Places enrichment",
-    handler: async (input) => {
+    handler: async (input, ctx) => {
       // Fills phone/website/rating/review_count when enabled (paid, capped). Prioritises
-      // exportable/new prospects. Disabled → no-op; the final report flags incomplete contact data.
-      const leads = input.map((r) => ({
-        businessName: r.fsa.businessName,
-        postcode: r.fsa.postcode,
-        address: r.fsa.addressLine,
-        isNewProspect: r.customerMatch?.status === "New Prospect Candidate",
-        existingPhone: r.googlePlaces?.formattedPhone ?? null,
-      }));
-      const res = await runGooglePlacesEnrichment(leads);
+      // real prospects; skips excluded customers, holds and dissolved companies to save budget.
+      const runner = new GooglePlacesRunner();
+      const enabled = isGooglePlacesEnabled();
+      const cfg = getGooglePlacesConfig();
+      const EXISTING = ["Active Account", "Dormant Account", "Former / Closed Account", "Unknown Existing Account", "Possible Existing Account"];
+      const worthEnriching = (r: WorkingRecord): boolean => {
+        const cs = r.customerMatch?.status;
+        if (cs && EXISTING.includes(cs)) return false; // don't spend paid calls on excluded/held customers
+        if (r.companiesHouse?.holdReason) return false; // dissolved/insolvent hold
+        return true;
+      };
+      // Priority: new prospect → HIGH category → FSA+Just Eat matched → the rest.
+      const catRank: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2, MANUAL_REVIEW: 3, EXCLUDED: 4 };
+      const order = input.map((_, i) => i).filter((i) => worthEnriching(input[i])).sort((a, b) => {
+        const ra = input[a], rb = input[b];
+        const pa = ra.customerMatch?.status === "New Prospect Candidate" ? 0 : 1;
+        const pb = rb.customerMatch?.status === "New Prospect Candidate" ? 0 : 1;
+        if (pa !== pb) return pa - pb;
+        const cr = (catRank[ra.category?.fit ?? "MEDIUM"] ?? 1) - (catRank[rb.category?.fit ?? "MEDIUM"] ?? 1);
+        if (cr !== 0) return cr;
+        return (rb.justEat?.matched ? 1 : 0) - (ra.justEat?.matched ? 1 : 0);
+      });
+
+      const snapshots = new Map<number, WorkingRecord["googleContact"]>();
+      let enriched = 0, phones = 0, websites = 0, ratings = 0, noMatch = 0, lowConf = 0;
+      if (enabled) {
+        for (const i of order) {
+          if (runner.capRemaining <= 0) break;
+          const r = input[i];
+          const g = await runner.enrich({ businessName: r.fsa.businessName, postcode: r.fsa.postcode, address: r.fsa.addressLine });
+          if (g.status === "cap_reached") break;
+          const gPc = (g.formattedAddress ?? "").toUpperCase().match(/[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2}/)?.[0]?.replace(/\s+/g, "") ?? "";
+          // Google search is by "name postcode", so a hit is already name-aligned;
+          // postcode agreement is the strong confirmation signal (address-first).
+          const conf = g.matched ? Math.min(0.97, 0.5 + 0.45 * postcodeScore(r.fsa.postcode, gPc)) : 0;
+          if (g.matched && conf < 0.45) lowConf++;
+          if (!g.matched) noMatch++;
+          const snap: WorkingRecord["googleContact"] = {
+            status: g.status, matched: g.matched, placeId: g.placeId, mapsUrl: g.googleMapsUri,
+            businessName: null, formattedAddress: g.formattedAddress, postcode: gPc || null,
+            latitude: g.latitude, longitude: g.longitude, phone: g.formattedPhone, internationalPhone: null,
+            website: g.website, businessStatus: g.businessStatus, types: g.types ?? [], rating: g.rating, reviewCount: g.reviewCount,
+            matchConfidence: Number(conf.toFixed(2)), matchReason: g.matched ? `postcode+name conf ${(conf * 100) | 0}%` : "no Google match", warnings: g.warning ? [g.warning] : [],
+          };
+          snapshots.set(i, snap);
+          if (g.matched && conf >= 0.45) {
+            enriched++;
+            if (g.formattedPhone) phones++;
+            if (g.website) websites++;
+            if (g.rating != null) ratings++;
+          }
+        }
+      }
+
+      const records = input.map((r, i) => {
+        const snap = snapshots.get(i);
+        if (!snap || !snap.matched || snap.matchConfidence < 0.45) return { ...r, googleContact: snap };
+        // Map contact back so scoring/completeness/exports pick it up.
+        const gp = { ...(r.googlePlaces ?? { source: "google_places" as const, status: "not_configured" as const, confidence: 0, checked_at: ctx.checkedAt, placeId: null, formattedPhone: null, website: null, businessStatus: null }) };
+        gp.status = "found";
+        gp.placeId = snap.placeId;
+        gp.formattedPhone = snap.phone ?? gp.formattedPhone;
+        gp.website = snap.website ?? gp.website;
+        gp.businessStatus = snap.businessStatus;
+        gp.confidence = snap.matchConfidence;
+        gp.checked_at = ctx.checkedAt;
+        return { ...r, googleContact: snap, googlePlaces: gp };
+      });
+
+      let files: string[] = [];
+      try { files = writeGoogleEnrichmentExports(ctx.config.run_id, records); } catch { /* non-fatal */ }
+
       const errors: PipelineError[] = [
-        res.disabled
-          ? err("ENRICHMENT_NOT_CONFIGURED", "google_places_enrichment", "warning", "Google Places DISABLED — contact enrichment INCOMPLETE (no phone/website source). Set GOOGLE_PLACES_API_KEY + GOOGLE_PLACES_ENABLED=true + a call cap.", false, "Enable Google Places to fill phone/website/reviews")
-          : err("ENRICHMENT_NOT_CONFIGURED", "google_places_enrichment", "info", `Google Places enriched ${res.enriched} leads · phones ${res.phoneCount} · websites ${res.websiteCount} (${res.callsUsed} calls).`, false, "—"),
+        !enabled
+          ? err("ENRICHMENT_NOT_CONFIGURED", "google_places_enrichment", "warning", "Google Places DISABLED — contact enrichment INCOMPLETE. Set GOOGLE_PLACES_API_KEY + GOOGLE_PLACES_ENABLED=true + a call cap.", false, "Enable Google Places")
+          : err("ENRICHMENT_NOT_CONFIGURED", "google_places_enrichment", "info", `Google Places: enriched ${enriched} · phones ${phones} · websites ${websites} · ${runner.callsMade} calls.`, false, "—"),
       ];
       return {
-        records: input, rejected: 0, errors,
-        notes: res.disabled ? "disabled — contact enrichment incomplete" : `enriched ${res.enriched} · phones ${res.phoneCount} · websites ${res.websiteCount}`,
-        source: res.disabled ? "Google Places (disabled)" : "Google Places (live)",
-        apiCalls: res.callsUsed, apiCapRemaining: res.capRemaining,
-        metrics: { input_count: input.length, enabled: res.disabled ? 0 : 1, enriched: res.enriched, phones: res.phoneCount, websites: res.websiteCount },
+        records, rejected: 0, errors,
+        notes: enabled ? `enriched ${enriched} · phones ${phones} · websites ${websites} · no-match ${noMatch}` : "disabled — contact enrichment incomplete",
+        source: enabled ? "Google Places (live)" : "Google Places (disabled)",
+        apiCalls: runner.callsMade, apiCapRemaining: runner.capRemaining,
+        outputFiles: files,
+        metrics: { input_count: input.length, enabled: enabled ? 1 : 0, prioritised: order.length, enriched, phones, websites, ratings, no_match: noMatch, low_confidence: lowConf, calls: runner.callsMade, cap: cfg.maxCallsPerRun },
       };
     },
   },
