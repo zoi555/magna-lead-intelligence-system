@@ -1,0 +1,5 @@
+postcode,outcode,postcode_district,area,region,route,sales_rep,priority,enabled,notes
+UB1 2AA,,,Southall,London,R01,Jaspreet S,high,yes,Full postcode supplied — outcode derived (UB1)
+,HA0,,Wembley,London,R02,Raj K,high,yes,Outcode supplied directly
+,,W5,Ealing,London,R01,Aisha M,medium,yes,Postcode district supplied
+,SL1,,Slough,South East,R05,,low,no,Disabled row — ignored on import

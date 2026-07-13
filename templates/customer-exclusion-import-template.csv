@@ -1,0 +1,4 @@
+account_code,business_name,postcode,phone,account_status
+C-1001,Example Grill Ltd,UB1 2AA,020 8000 0000,Active Account
+C-1002,Example Cafe,UB2 4BB,020 8000 0001,Dormant Account
+C-1003,Old Chippy,UB3 5CC,020 8000 0002,Former / Closed Account

@@ -1,28 +1,15 @@
-// Explainable lead scoring — Phase 3.
-// Deterministic. score 0..100 + grade A/B/C/D + reasons/warnings/disqualifiers/manual_review_flags.
+// Explainable lead scoring — NOW SPRINT #2 (delegates to the weighted breakdown).
+// score 0..100 + grade A/B/C/D + reasons/warnings/disqualifiers/manual_review_flags.
 // The numeric score is INTERNAL and must never reach telesales.
 
 import type {
   LeadCandidate, CompaniesHouseEnrichment, GooglePlacesEnrichment,
-  DeliveryPresenceResult, ScoreResult, Grade, CategoryInfo, CustomerMatchInfo,
+  ScoreResult, CategoryInfo, CustomerMatchInfo, FsaLegitimacy, JustEatSnapshot,
 } from "./types";
-import { hasAnyDeliveryPresence } from "../sources/delivery-platforms";
+import { computeBreakdown, type BreakdownInput } from "./score-breakdown";
 
-// Legacy helper kept for other callers/tests.
 const FOODSERVICE_RE = /takeaway|restaurant|cafe|canteen|caterer|sandwich|food|kitchen|grill|kebab|pizza|chicken|bakery/i;
 export function isFoodservice(businessType: string): boolean { return FOODSERVICE_RE.test(businessType); }
-
-function gradeFor(score: number): Grade {
-  if (score >= 72) return "A";
-  if (score >= 52) return "B";
-  if (score >= 34) return "C";
-  return "D";
-}
-function ratingAgeDays(ratingDate: string | null, refMs: number): number | null {
-  if (!ratingDate) return null;
-  const t = Date.parse(ratingDate);
-  return Number.isNaN(t) ? null : Math.max(0, Math.round((refMs - t) / 86_400_000));
-}
 
 export interface ScoringInputs {
   candidate: LeadCandidate;
@@ -30,78 +17,69 @@ export interface ScoringInputs {
   category?: CategoryInfo;
   companiesHouse: CompaniesHouseEnrichment;
   googlePlaces: GooglePlacesEnrichment;
-  delivery: DeliveryPresenceResult;
+  deliveryPresent: boolean;
   customerMatch?: CustomerMatchInfo;
   duplicateRisk?: boolean;
   inTerritory: boolean;
   referenceDateMs: number;
+  // NOW SPRINT #2 optional signals
+  fsaLegitimacy?: FsaLegitimacy;
+  justEat?: JustEatSnapshot;
+  platformOnly?: boolean;
+  platformChecked?: boolean;
+  companiesHouseHold?: boolean;
+  customerListLoaded?: boolean;
+  financialRiskScore?: number; // 0..10
+  financialAvailable?: boolean;
+  phone?: string;
+  website?: string;
+  email?: string;
+  addressConflict?: boolean;
+  sourceNames?: string[];
 }
 
 export function scoreCandidate(inp: ScoringInputs): ScoreResult {
-  const { candidate: c, companiesHouse: ch, googlePlaces: gp, delivery, inTerritory } = inp;
-  const reasons: string[] = [];
-  const warnings: string[] = [];
-  const disqualifiers: string[] = [];
-  const manual: string[] = [];
-  let score = 0;
-  const add = (points: number, code: string) => { score += points; reasons.push(`${points >= 0 ? "+" : ""}${points} ${code}`); };
+  const c = inp.candidate;
+  const input: BreakdownInput = {
+    categoryFit: inp.category?.fit,
+    territoryClass: inp.justEat?.territoryClass ?? null,
+    inTerritory: inp.inTerritory,
+    platformOnly: !!inp.platformOnly,
+    fsaLegitimacy: inp.fsaLegitimacy,
+    fsaLocalAuthority: c.localAuthority,
+    fsaRatingValue: c.fsaRating,
+    justEat: inp.justEat,
+    deliveryPresent: inp.deliveryPresent,
+    platformChecked: inp.platformChecked ?? (inp.justEat != null),
+    phone: inp.phone ?? inp.googlePlaces.formattedPhone ?? undefined,
+    website: inp.website ?? inp.googlePlaces.website ?? undefined,
+    email: inp.email,
+    hasAddress: !!c.addressLine,
+    companiesHouse: inp.companiesHouse,
+    financialRiskScore: inp.financialRiskScore ?? 5,
+    financialAvailable: !!inp.financialAvailable,
+    customerMatch: inp.customerMatch,
+    companiesHouseHold: !!inp.companiesHouseHold,
+    sourceNames: inp.sourceNames,
+    addressConflict: !!inp.addressConflict || !!inp.fsaLegitimacy?.addressConflict,
+  };
 
-  // 1) Category fit
-  const fit = inp.category?.fit ?? "MEDIUM";
-  if (fit === "HIGH") add(26, "STRONG_CATEGORY_FIT");
-  else if (fit === "MEDIUM") add(14, "CATEGORY_MEDIUM_FIT");
-  else if (fit === "LOW") { add(4, "CATEGORY_LOW_FIT"); warnings.push("Low category fit"); }
-  else if (fit === "MANUAL_REVIEW") { add(6, "CATEGORY_MANUAL_REVIEW"); manual.push("MANUAL_REVIEW_REQUIRED"); }
+  const { breakdown, reasons, warnings, disqualifiers, manualFlags } = computeBreakdown(input);
 
-  // 2) Territory fit
-  if (inTerritory) add(12, "GOOD_TERRITORY_FIT");
-  else { warnings.push("Outside territory"); disqualifiers.push("OUT_OF_TERRITORY"); }
+  // Extra flags that don't affect the weighted score.
+  if (inp.duplicateRisk) { manualFlags.push("DUPLICATE_RISK"); warnings.push("Duplicate-looking record"); reasons.push("DUPLICATE_RISK"); }
+  if (!inp.fsaLegitimacy?.coordinatesPresent && c.latitude == null) manualFlags.push("MISSING_COORDINATES");
+  if (inp.customerListLoaded === false) warnings.push("CUSTOMER_LIST_NOT_LOADED_RISK");
+  else if (inp.customerListLoaded === true) reasons.push("STRICT_CUSTOMER_EXCLUSION_APPLIED");
+  for (const rc of inp.companiesHouse.reasonCodes ?? []) if (!reasons.includes(rc)) reasons.push(rc);
 
-  // 3) FSA rating
-  const r = Number.parseInt(c.fsaRating, 10);
-  if (Number.isNaN(r)) { add(8, "FSA_RATING_PENDING"); warnings.push("No numeric FSA rating"); }
-  else if (r >= 5) add(20, "HIGH_FSA_RATING");
-  else if (r >= 3) add(12, "FSA_RATING_OK");
-  else { add(3, "LOW_FSA_RATING"); warnings.push("Low FSA hygiene rating"); }
-
-  // 4) Rating recency + new signal
-  const ageDays = ratingAgeDays(inp.ratingDate, inp.referenceDateMs);
-  if (ageDays != null && ageDays > 730) { add(-4, "OLD_RATING_DATE"); warnings.push("FSA rating >2y old"); }
-  if (c.fsaNewlyRegistered) add(14, "NEW_FSA_SIGNAL");
-
-  // 5) Data completeness + coordinate quality
-  const hasGeo = c.latitude != null && c.longitude != null;
-  const completeness = (c.businessName ? 1 : 0) + (c.postcode ? 1 : 0) + (c.addressLine ? 1 : 0) + (hasGeo ? 1 : 0);
-  add(Math.min(6, completeness * 1.5), "DATA_COMPLETENESS");
-  if (hasGeo) add(2, "COORDINATE_QUALITY");
-  else { warnings.push("Missing coordinates"); manual.push("MISSING_COORDINATES"); }
-
-  // 6) Phone (from Google — disabled) → always missing today
-  if (!gp.formattedPhone) warnings.push("MISSING_PHONE");
-
-  // 7) Delivery-platform presence (collector; not a blocker)
-  if (hasAnyDeliveryPresence(delivery)) add(8, "DELIVERY_PRESENCE_CONFIRMED");
-  else warnings.push("PLATFORM_NOT_CHECKED");
-
-  // 8) Companies House
-  if (ch.status === "found" && ch.companyStatus === "active") add(8, "COMPANY_ACTIVE");
-  else if (ch.status === "found" && ch.companyStatus === "dissolved") { add(-30, "COMPANY_DISSOLVED"); disqualifiers.push("COMPANY_DISSOLVED"); }
-  else warnings.push("COMPANY_NOT_ENRICHED");
-
-  // 9) Google Places
-  if (gp.status === "found") add(Math.round(gp.confidence * 4), "GOOGLE_MATCHED");
-  else warnings.push("GOOGLE_NOT_ENRICHED");
-
-  // 10) Existing-customer signal (possible match = manual review, not auto-exclude)
-  if (inp.customerMatch?.status === "possible_existing_customer") { add(-6, "POSSIBLE_EXISTING_CUSTOMER"); manual.push("POSSIBLE_EXISTING_CUSTOMER"); }
-  if (inp.customerMatch?.status === "existing_customer_match") { disqualifiers.push("EXISTING_CUSTOMER_EXCLUDED"); }
-
-  // 11) Duplicate risk (chains / repeated names)
-  if (inp.duplicateRisk) { add(-3, "DUPLICATE_RISK"); manual.push("DUPLICATE_RISK"); warnings.push("Duplicate-looking record"); }
-
-  // 12) Manual-review roll-up
-  if (manual.length) reasons.push("+0 MANUAL_REVIEW_REQUIRED");
-
-  score = Math.max(0, Math.min(100, Math.round(score)));
-  return { score, grade: gradeFor(score), score_reasons: reasons, warnings, disqualifiers, manual_review_flags: Array.from(new Set(manual)) };
+  return {
+    score: breakdown.total,
+    grade: breakdown.grade,
+    score_reasons: reasons,
+    warnings,
+    disqualifiers,
+    manual_review_flags: Array.from(new Set(manualFlags)),
+    breakdown,
+  };
 }

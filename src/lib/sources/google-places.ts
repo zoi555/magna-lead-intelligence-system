@@ -154,3 +154,234 @@ export function enrichGooglePlaces(_businessName: string, _postcode: string, che
 }
 
 export const GOOGLE_PLACES_FIELD_MASK = DEFAULT_FIELD_MASK; // back-compat export
+
+// ---------------------------------------------------------------------------
+// Contact-enrichment runner (stateful, cap-aware). SERVER-SIDE ONLY.
+//
+// Uses the Places API (New) Text Search endpoint with a tight X-Goog-FieldMask
+// so we only pay for the fields we need. Aggregate rating + userRatingCount are
+// collected (these are NOT review text — full reviews are never requested).
+// The runner reads config lazily (at construction) so env may be set after
+// module import. It never throws: every failure maps to a safe result.
+// ---------------------------------------------------------------------------
+
+/** Richer, still-tight field mask used by the contact-enrichment runner. */
+export const CONTACT_FIELD_MASK = [
+  "places.id",
+  "places.displayName",
+  "places.formattedAddress",
+  "places.location",
+  "places.nationalPhoneNumber",
+  "places.internationalPhoneNumber",
+  "places.websiteUri",
+  "places.businessStatus",
+  "places.types",
+  "places.rating",
+  "places.userRatingCount",
+  "places.googleMapsUri",
+].join(",");
+
+export type GooglePlacesResultStatus =
+  | "found"
+  | "not_found"
+  | "disabled"
+  | "error"
+  | "cap_reached";
+
+/** Self-contained lead shape the runner needs. Any extra fields are ignored. */
+export interface GooglePlacesLead {
+  businessName: string;
+  postcode: string;
+  address?: string;
+}
+
+/** Flat, serialisable enrichment result. Any unavailable field is null. */
+export interface GooglePlacesResult {
+  matched: boolean;
+  status: GooglePlacesResultStatus;
+  placeId: string | null;
+  formattedPhone: string | null; // national preferred, else international
+  website: string | null;
+  formattedAddress: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  businessStatus: string | null;
+  types: string[];
+  rating: number | null;
+  reviewCount: number | null; // aggregate userRatingCount — never review text
+  googleMapsUri: string | null;
+  fieldsCollected: string[]; // names of the fields that came back populated
+  warning: string | null;
+}
+
+const emptyResult = (
+  status: GooglePlacesResultStatus,
+  warning: string | null
+): GooglePlacesResult => ({
+  matched: false,
+  status,
+  placeId: null,
+  formattedPhone: null,
+  website: null,
+  formattedAddress: null,
+  latitude: null,
+  longitude: null,
+  businessStatus: null,
+  types: [],
+  rating: null,
+  reviewCount: null,
+  googleMapsUri: null,
+  fieldsCollected: [],
+  warning,
+});
+
+interface RetryableError extends Error {
+  transient: boolean;
+}
+
+function isTransientError(e: unknown): boolean {
+  if (e && typeof e === "object" && "transient" in e) {
+    return Boolean((e as RetryableError).transient);
+  }
+  // Network-level failures (fetch rejects) are treated as transient.
+  return true;
+}
+
+/**
+ * Stateful, cap-aware Google Places contact-enrichment runner.
+ * Construct one per pipeline run, then call `enrich` per lead.
+ */
+export class GooglePlacesRunner {
+  readonly enabled: boolean;
+
+  private readonly maxCalls: number;
+  private readonly fieldMask: string;
+  private readonly baseUrl: string;
+  private readonly apiKey: string | undefined;
+  private _callsMade = 0;
+
+  constructor() {
+    // Read config lazily at construction — env may have been set after import.
+    const c = getGooglePlacesConfig();
+    this.enabled = isGooglePlacesEnabled();
+    this.maxCalls = c.maxCallsPerRun;
+    this.baseUrl = c.baseUrl;
+    this.apiKey = process.env[GOOGLE_PLACES_API_KEY_ENV];
+    // Contact runs need phone/types/location/rating — use the contact mask
+    // unless an explicit override is supplied via env.
+    this.fieldMask = process.env.GOOGLE_PLACES_FIELD_MASK || CONTACT_FIELD_MASK;
+  }
+
+  /** Number of billable Text Search calls reserved so far this run. */
+  get callsMade(): number {
+    return this._callsMade;
+  }
+
+  /** Remaining per-run call budget (never negative). */
+  get capRemaining(): number {
+    return Math.max(0, this.maxCalls - this._callsMade);
+  }
+
+  /** One Text Search POST with the field mask. Throws a tagged error on failure. */
+  private async searchText(textQuery: string): Promise<unknown> {
+    const res = await fetch(`${this.baseUrl}/places:searchText`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": this.apiKey as string,
+        "X-Goog-FieldMask": this.fieldMask, // cost control — only pay for these
+      },
+      body: JSON.stringify({ textQuery, maxResultCount: 1 }),
+    });
+    if (!res.ok) {
+      // 429 (rate limit) and 5xx are transient → eligible for one retry.
+      const transient = res.status === 429 || res.status >= 500;
+      const err = new Error(`Google Places HTTP ${res.status}`) as RetryableError;
+      err.transient = transient;
+      throw err;
+    }
+    return res.json();
+  }
+
+  /**
+   * Enrich a single lead. Never throws. Reserves one call from the per-run
+   * budget before the request (the single retry does not consume extra budget).
+   */
+  async enrich(lead: GooglePlacesLead): Promise<GooglePlacesResult> {
+    if (!this.enabled) {
+      return emptyResult("disabled", "Google Places disabled — contact enrichment skipped.");
+    }
+    if (this.capRemaining <= 0) {
+      return emptyResult("cap_reached", "Per-run Google Places call cap reached — lead not enriched.");
+    }
+
+    const textQuery = [lead.businessName, lead.address, lead.postcode]
+      .map((s) => (s ?? "").trim())
+      .filter(Boolean)
+      .join(" ");
+
+    // Reserve budget up front so a caller iterating leads cannot overshoot.
+    this._callsMade += 1;
+
+    let data: unknown;
+    try {
+      data = await this.searchText(textQuery);
+    } catch (e) {
+      if (isTransientError(e)) {
+        try {
+          data = await this.searchText(textQuery); // retry once
+        } catch (e2) {
+          const msg = e2 instanceof Error ? e2.message : String(e2);
+          return emptyResult("error", `Google Places call failed after retry: ${msg}`);
+        }
+      } else {
+        const msg = e instanceof Error ? e.message : String(e);
+        return emptyResult("error", `Google Places call failed: ${msg}`);
+      }
+    }
+
+    const places = (data as { places?: unknown[] } | null)?.places;
+    const place = Array.isArray(places) && places.length > 0 ? (places[0] as Record<string, any>) : null;
+    if (!place) {
+      return emptyResult("not_found", "No matching place returned.");
+    }
+
+    const formattedPhone: string | null =
+      place.nationalPhoneNumber ?? place.internationalPhoneNumber ?? null;
+    const loc = place.location as { latitude?: number; longitude?: number } | undefined;
+
+    const result: GooglePlacesResult = {
+      matched: true,
+      status: "found",
+      placeId: place.id ?? null,
+      formattedPhone,
+      website: place.websiteUri ?? null,
+      formattedAddress: place.formattedAddress ?? null,
+      latitude: typeof loc?.latitude === "number" ? loc.latitude : null,
+      longitude: typeof loc?.longitude === "number" ? loc.longitude : null,
+      businessStatus: place.businessStatus ?? null,
+      types: Array.isArray(place.types) ? (place.types as string[]) : [],
+      rating: typeof place.rating === "number" ? place.rating : null,
+      reviewCount: typeof place.userRatingCount === "number" ? place.userRatingCount : null,
+      googleMapsUri: place.googleMapsUri ?? null,
+      fieldsCollected: [],
+      warning: null,
+    };
+
+    // Record which fields actually came back populated (audit + reporting).
+    const collected: string[] = [];
+    if (result.placeId) collected.push("placeId");
+    if (result.formattedPhone) collected.push("formattedPhone");
+    if (result.website) collected.push("website");
+    if (result.formattedAddress) collected.push("formattedAddress");
+    if (result.latitude !== null && result.longitude !== null) collected.push("location");
+    if (result.businessStatus) collected.push("businessStatus");
+    if (result.types.length > 0) collected.push("types");
+    if (result.rating !== null) collected.push("rating");
+    if (result.reviewCount !== null) collected.push("reviewCount");
+    if (result.googleMapsUri) collected.push("googleMapsUri");
+    result.fieldsCollected = collected;
+
+    return result;
+  }
+}

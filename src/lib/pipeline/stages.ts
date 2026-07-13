@@ -1,6 +1,7 @@
-// Pipeline stage definitions + handlers — Vertical Slice 001.
-// 14 stages, each returns output records + rejected count + typed errors + notes.
-// Pure-ish; only fetch_fsa touches the network and generate_final_exports writes files.
+// Pipeline stage definitions + handlers — NOW SPRINT #2 (19 stages).
+// Each returns output records + rejected count + typed errors + notes + optional
+// accounting (held/warning/source/api calls). Network stages: fetch_fsa,
+// fetch_just_eat, companies_house_status_gate, companies_house_directors_enrichment.
 
 import type {
   WorkingRecord,
@@ -13,15 +14,43 @@ import type {
   ScoreResult,
   FinalLeadRow,
   TelesalesSafeRow,
+  GooglePlacesEnrichment,
+  CompaniesHouseEnrichment,
 } from "./types";
 import { getFsaEstablishments, getFsaEstablishmentsMock } from "../sources/fsa";
-import { enrichCompaniesHouse } from "../sources/companies-house";
-import { enrichGooglePlaces } from "../sources/google-places";
-import { collectDeliveryPresence, summarisePresence } from "../sources/delivery-platforms";
-import { matchExistingCustomerRecord } from "../sources/existing-customers";
+import { pullJustEatForOutcodes, getJustEatConfig } from "../sources/just-eat";
+import { loadJustEatPool, saveJustEatPool, fanInJustEat } from "./source-fan-in";
+import { CompaniesHouseRunner, getCompaniesHouseConfig, explainCompaniesHouseStatus } from "../sources/companies-house";
+import { gateCompaniesHouse, compareAddresses } from "./companies-house-status-gate";
+import { enrichDirectors } from "./companies-house-directors-stage";
+import { enrichFinancials } from "./companies-house-financials-stage";
+import { buildLinkedInQueues } from "./linkedin-research-queue";
+import { runPlatformDiscovery } from "./platform-discovery-stage";
+import { runGooglePlacesEnrichment } from "./google-places-enrichment-stage";
+import { scoreCompleteness } from "./data-completeness";
+import { computeFsaLegitimacy } from "./fsa-legitimacy";
+import { computeCommercial, computeOpportunityForGrade } from "./commercial-calculation";
+import { monthlyValueBand, opportunityValueBand } from "@/config/commercial-assumptions";
 import { scoreCandidate } from "./scoring";
 import { classifyCategory, isCandidateFit } from "./category-rules";
-import { writeExports } from "./export-leads";
+import { loadCustomerList } from "../sources/customer-list-import";
+import { classifyCustomer, buildCustomerIndex } from "./customer-exclusion";
+import { loadDeliveryEvidence, buildDeliveryPresence, STAGE_PLATFORMS } from "./delivery-platform-stage";
+import { writeExports, writeTomorrowSalesExports, writeResearchExports } from "./export-leads";
+
+// Loaded once at module init (server-side; absent files are handled, no throw).
+const CUSTOMER_LIST = loadCustomerList();
+const CUSTOMER_INDEX = buildCustomerIndex(CUSTOMER_LIST.customers);
+const DELIVERY_EVIDENCE = loadDeliveryEvidence();
+// One Companies House runner per process — carries the shared per-run call cap.
+const CH_RUNNER = new CompaniesHouseRunner();
+export const CUSTOMER_LIST_META = { loaded: CUSTOMER_LIST.loaded, path: CUSTOMER_LIST.path, rows: CUSTOMER_LIST.rowsLoaded };
+export const DELIVERY_EVIDENCE_META = { loaded: DELIVERY_EVIDENCE.loaded, path: DELIVERY_EVIDENCE.path, rows: DELIVERY_EVIDENCE.rows.length };
+
+const DEFAULT_GP: GooglePlacesEnrichment = {
+  source: "google_places", status: "not_configured", confidence: 0, checked_at: null,
+  placeId: null, formattedPhone: null, website: null, businessStatus: null,
+};
 
 export interface StageContext {
   config: RunConfig;
@@ -35,6 +64,11 @@ export interface StageOutput {
   errors: PipelineError[];
   notes: string;
   metrics?: Record<string, number>;
+  held?: number;
+  warnings?: number;
+  source?: string;
+  apiCalls?: number;
+  apiCapRemaining?: number;
   outputFiles?: string[];
   exportRows?: { finalRows: FinalLeadRow[]; eligibleRows: FinalLeadRow[]; telesalesSafe: TelesalesSafeRow[] };
 }
@@ -47,7 +81,7 @@ export interface StageDef {
   handler: StageHandler;
 }
 
-const ERROR_CAP = 100; // avoid unbounded error arrays in the run JSON
+const ERROR_CAP = 100;
 
 function err(
   error_code: ErrorCode,
@@ -99,7 +133,9 @@ function toCandidate(r: WorkingRecord): LeadCandidate {
 }
 
 function deriveTrigger(r: WorkingRecord, _score: ScoreResult): string {
+  if (r.justEat?.isPlatformOnly) return "Active on Just Eat (platform-only)";
   if (r.fsa.newlyRegistered) return "New FSA registration";
+  if (r.justEat?.matched) return "FSA + live Just Eat presence";
   if (Number.parseInt(r.fsa.ratingValue, 10) >= 5) return "Top hygiene rating";
   return "Territory match";
 }
@@ -113,6 +149,7 @@ export const STAGE_DEFS: StageDef[] = [
       rejected: 0,
       errors: [],
       notes: `territory=[${ctx.config.postcode_prefixes.join(", ")}] mode=${ctx.config.mode} fsaPageSize=${ctx.config.fsa_page_size}`,
+      source: "config",
     }),
   },
   {
@@ -127,16 +164,94 @@ export const STAGE_DEFS: StageDef[] = [
           pageSize: ctx.config.fsa_page_size,
           referenceDateMs: ctx.referenceDateMs,
         });
-        records = est.map((f) => ({ fsa: f }));
+        records = est.map((f) => ({ fsa: f, sourceNames: ["FSA"] }));
         notes = `pulled ${records.length} FSA establishments (${ctx.config.mode})`;
         if (records.length === 0)
           errors.push(err("FSA_EMPTY_RESULT", "fetch_fsa", "warning", "FSA returned no establishments for the territory", false, "Widen the territory or verify FSA availability"));
       } catch (e) {
         errors.push(err("FSA_FETCH_FAILED", "fetch_fsa", "error", `Live FSA pull failed: ${msg(e)} — fell back to mock fixtures`, true, "Retry with `npm run leads:resume`, or check network/FSA status"));
-        records = getFsaEstablishmentsMock(ctx.config.postcode_prefixes).map((f) => ({ fsa: f }));
+        records = getFsaEstablishmentsMock(ctx.config.postcode_prefixes).map((f) => ({ fsa: f, sourceNames: ["FSA"] }));
         notes = `LIVE PULL FAILED — fell back to ${records.length} mock establishments`;
       }
-      return { records, rejected: 0, errors, notes };
+      return { records, rejected: 0, errors, notes, source: "FSA (api.ratings.food.gov.uk)" };
+    },
+  },
+  {
+    id: "fetch_just_eat",
+    label: "Fetch Just Eat (platform)",
+    handler: async (input, ctx) => {
+      const cfg = getJustEatConfig();
+      const errors: PipelineError[] = [];
+      if (!cfg.enabled) {
+        // Disabled — clear any stale pool so fan-in adds nothing, and pass FSA through.
+        saveJustEatPool([]);
+        errors.push(err("PLATFORM_NOT_CONFIGURED", "fetch_just_eat", "info", "Just Eat disabled (JUST_EAT_ENABLED not 'true') — pipeline continues on FSA only.", false, "Set JUST_EAT_ENABLED=true in .env.local to enable the live pull"));
+        return { records: input, rejected: 0, errors, notes: "Just Eat disabled — no platform pull", source: "Just Eat (disabled)", apiCalls: 0, apiCapRemaining: cfg.maxCallsPerRun, metrics: { enabled: 0, calls_made: 0, just_eat_records: 0, in_area: 0, outside_but_serves: 0, failures: 0 } };
+      }
+      try {
+        const { restaurants, perOutcode, callsMade, capped } = await pullJustEatForOutcodes(ctx.config.postcode_prefixes);
+        saveJustEatPool(restaurants);
+        const failures = perOutcode.filter((p) => !p.ok);
+        for (const f of failures) errors.push(err("PLATFORM_PRESENCE_UNKNOWN", "fetch_just_eat", "warning", `Just Eat outcode ${f.outcode} failed (${f.httpStatus ?? f.error}) — continuing.`, true, "Retry later; FSA still covers this area"));
+        if (capped) errors.push(err("PLATFORM_PRESENCE_UNKNOWN", "fetch_just_eat", "info", "Just Eat call cap reached before all outcodes fetched.", false, "Raise JUST_EAT_MAX_CALLS_PER_RUN if needed"));
+        const byClass = restaurants.reduce<Record<string, number>>((a, r) => { a[r.territoryClass] = (a[r.territoryClass] ?? 0) + 1; return a; }, {});
+        return {
+          records: input,
+          rejected: 0,
+          errors,
+          notes: `Just Eat: ${restaurants.length} unique · calls ${callsMade}${capped ? " (capped)" : ""} · in-area ${byClass.located_in_target_territory ?? 0}`,
+          source: "Just Eat (uk.api.just-eat.io)",
+          apiCalls: callsMade,
+          apiCapRemaining: Math.max(0, cfg.maxCallsPerRun - callsMade),
+          warnings: failures.length,
+          metrics: { enabled: 1, calls_made: callsMade, just_eat_records: restaurants.length, in_area: byClass.located_in_target_territory ?? 0, outside_but_serves: byClass.outside_target_but_serves ?? 0, failures: failures.length },
+        };
+      } catch (e) {
+        saveJustEatPool([]);
+        errors.push(err("PLATFORM_PRESENCE_UNKNOWN", "fetch_just_eat", "warning", `Just Eat live source blocked/unavailable: ${msg(e)} — continuing on FSA.`, true, "Retry later"));
+        return { records: input, rejected: 0, errors, notes: "Just Eat pull failed — continuing on FSA", source: "Just Eat (error)", apiCalls: 0 };
+      }
+    },
+  },
+  {
+    id: "platform_discovery",
+    label: "Platform public evidence",
+    handler: async (input, ctx) => {
+      // Collect public business-level platform evidence (Just Eat live; Deliveroo /
+      // Uber Eats = compliant search-URL evidence or imported CSV — no scraping).
+      const errors: PipelineError[] = [];
+      try {
+        const res = await runPlatformDiscovery(ctx.config.run_id, ctx.config.postcode_prefixes);
+        if (res.failures.length) errors.push(err("PLATFORM_PRESENCE_UNKNOWN", "platform_discovery", "info", `${res.failures.length} platform-area evidence gaps (Deliveroo/Uber are evidence-only — no scraping).`, false, "Import platform evidence CSV to fill Deliveroo/Uber"));
+        return {
+          records: input, rejected: 0, errors,
+          notes: `platform evidence: ${res.records.length} records · ${res.failures.length} gaps`,
+          source: "Just Eat (live) + Deliveroo/Uber (evidence)",
+          outputFiles: [res.outputs.evidenceCsv, res.outputs.summaryJson, res.outputs.failuresCsv].map((p) => p.replace(process.cwd() + "/", "")),
+          metrics: { input_count: input.length, platform_records: res.records.length, failures: res.failures.length, just_eat: res.summary.just_eat_records },
+        };
+      } catch (e) {
+        errors.push(err("PLATFORM_PRESENCE_UNKNOWN", "platform_discovery", "warning", `Platform discovery non-fatal error: ${msg(e)} — continuing.`, true, "Check platform collector"));
+        return { records: input, rejected: 0, errors, notes: "platform discovery skipped (non-fatal)", source: "platform collector" };
+      }
+    },
+  },
+  {
+    id: "source_fan_in",
+    label: "Source fan-in (FSA + Just Eat)",
+    handler: (input, ctx) => {
+      const pool = loadJustEatPool();
+      const { records, stats } = fanInJustEat(input, pool, ctx.config.postcode_prefixes);
+      const errors: PipelineError[] = [];
+      if (stats.conflicts > 0) errors.push(err("PLATFORM_PRESENCE_UNKNOWN", "source_fan_in", "info", `${stats.conflicts} weak FSA↔Just Eat name-only matches flagged for review.`, false, "Review fuzzy matches"));
+      return {
+        records,
+        rejected: 0,
+        errors,
+        notes: `FSA ${stats.fsa_count} · JE pool ${stats.just_eat_pool} · matched ${stats.fsa_matched_to_je} · platform-only added ${stats.platform_only_added}`,
+        source: "FSA + Just Eat",
+        metrics: { fsa_count: stats.fsa_count, just_eat_pool: stats.just_eat_pool, matched: stats.fsa_matched_to_je, platform_only_added: stats.platform_only_added, conflicts: stats.conflicts, fsa_only: stats.fsa_only },
+      };
     },
   },
   {
@@ -241,84 +356,265 @@ export const STAGE_DEFS: StageDef[] = [
     },
   },
   {
-    id: "exclude_existing_customers",
-    label: "Exclude existing customers",
+    id: "customer_exclusion",
+    label: "Customer exclusion",
     handler: (input) => {
-      const kept: WorkingRecord[] = [];
       const errors: PipelineError[] = [];
-      let rejected = 0, possible = 0;
-      for (const r of input) {
-        const m = matchExistingCustomerRecord(r.fsa.businessName, r.fsa.postcode);
-        if (m.status === "existing_customer_match") {
-          rejected++;
-          pushCapped(errors, err("EXISTING_CUSTOMER_MATCH", "exclude_existing_customers", "info", `${r.fsa.businessName} — ${m.reason} (${m.matched_code})`, false, "Suppress from new leads", r.fsa.fhrsId));
-          continue;
-        }
-        if (m.status === "possible_existing_customer") possible++;
-        kept.push({ ...r, customerMatch: { status: m.status, confidence: m.confidence, reason: m.reason } });
-      }
-      const metrics = { input_count: input.length, excluded: rejected, possible_manual_review: possible, kept: kept.length };
-      return { records: kept, rejected, errors, notes: `excluded ${rejected} exact · ${possible} possible (manual review) · kept ${kept.length}`, metrics };
+      let excluded = 0, held = 0;
+      const byStatus: Record<string, number> = {};
+      const records = input.map((r) => {
+        const { match, decision } = classifyCustomer({ businessName: r.fsa.businessName, postcode: r.fsa.postcode, fsaCode: r.fsa.fhrsId }, CUSTOMER_INDEX);
+        byStatus[match.status] = (byStatus[match.status] ?? 0) + 1;
+        if (decision === "exclude") excluded++;
+        else if (decision === "hold") held++;
+        return { ...r, customerMatch: match };
+      });
+      if (!CUSTOMER_LIST.loaded) errors.push(err("EXISTING_CUSTOMER_MATCH", "customer_exclusion", "warning", "No customer list loaded — exclusion NOT guaranteed. Provide imports/customer-list.csv.", false, "Import the real customer list", undefined));
+      const metrics = {
+        input_count: input.length,
+        customer_list_loaded: CUSTOMER_LIST.loaded ? 1 : 0,
+        customer_rows: CUSTOMER_LIST.rowsLoaded,
+        excluded,
+        possible_hold: held,
+        new_prospect: byStatus["New Prospect Candidate"] ?? 0,
+      };
+      return { records, rejected: 0, held: excluded + held, errors, notes: `list ${CUSTOMER_LIST.loaded ? "loaded(" + CUSTOMER_LIST.rowsLoaded + ")" : "NOT loaded"} · exclude ${excluded} · possible-hold ${held} · prospect ${metrics.new_prospect}`, metrics, source: CUSTOMER_LIST.loaded ? CUSTOMER_LIST.path ?? "customer-list" : "none" };
     },
   },
   {
-    id: "companies_house_enrichment_placeholder",
-    label: "Companies House (placeholder)",
-    handler: (input, ctx) => ({
-      records: input.map((r) => ({ ...r, companiesHouse: enrichCompaniesHouse(r.fsa.businessName, ctx.checkedAt) })),
-      rejected: 0,
-      errors: [err("ENRICHMENT_NOT_CONFIGURED", "companies_house_enrichment_placeholder", "info", "Companies House enrichment disabled (key-ready, no live call)", true, "Set CH_ENRICHMENT_ENABLED=1 + COMPANIES_HOUSE_API_KEY to enable")],
-      notes: `attached CH placeholder to ${input.length}`,
-    }),
+    id: "companies_house_status_gate",
+    label: "Companies House status gate",
+    handler: async (input, ctx) => {
+      const ex = explainCompaniesHouseStatus();
+      const cfg = getCompaniesHouseConfig();
+      const errors: PipelineError[] = [];
+      let matchedActive = 0, dissolvedHold = 0, lowConf = 0, noMatch = 0, held = 0, warnings = 0, capReached = 0;
+      const EXISTING = ["Active Account", "Dormant Account", "Former / Closed Account", "Unknown Existing Account"];
+      const skipEnvelope = () => ({ source: "companies_house" as const, status: "not_configured" as const, confidence: 0, checked_at: ctx.checkedAt, matched: false, companyNumber: null, companyStatus: null, incorporationDate: null, checked: false, reasonCodes: ["CH_SKIPPED_EXISTING_CUSTOMER"], notes: "skipped — existing customer" });
+      const capEnvelope = () => ({ source: "companies_house" as const, status: "not_configured" as const, confidence: 0, checked_at: ctx.checkedAt, matched: false, companyNumber: null, companyStatus: null, incorporationDate: null, checked: false, reasonCodes: ["CH_CALL_CAP_REACHED"], notes: "not checked — status-gate budget reached" });
+
+      // Reserve part of the cap so directors + financials (later stages) get budget too.
+      const statusBudget = CH_RUNNER.enabled ? Math.max(1, Math.floor(cfg.maxCallsPerRun * 0.6)) : 0;
+      const catRank: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2, MANUAL_REVIEW: 3, EXCLUDED: 4 };
+      // Priority: New Prospect Candidates first (highest export value), then holds; better category first.
+      const order = input.map((r, i) => i).sort((a, b) => {
+        const ra = input[a], rb = input[b];
+        const pa = ra.customerMatch?.status === "New Prospect Candidate" ? 0 : 1;
+        const pb = rb.customerMatch?.status === "New Prospect Candidate" ? 0 : 1;
+        if (pa !== pb) return pa - pb;
+        return (catRank[ra.category?.fit ?? "MEDIUM"] ?? 1) - (catRank[rb.category?.fit ?? "MEDIUM"] ?? 1);
+      });
+
+      const envById = new Map<number, CompaniesHouseEnrichment>();
+      for (const i of order) {
+        const r = input[i];
+        if (r.customerMatch && EXISTING.includes(r.customerMatch.status)) { envById.set(i, skipEnvelope()); continue; }
+        // Stop matching once the reserved status budget is spent — leave calls for directors/financials.
+        if (!CH_RUNNER.enabled || CH_RUNNER.callsMade >= statusBudget || CH_RUNNER.capRemaining <= 0) { envById.set(i, capEnvelope()); if (CH_RUNNER.enabled) capReached++; continue; }
+        const match = await CH_RUNNER.matchCompany({ businessName: r.fsa.businessName, postcode: r.fsa.postcode });
+        const { envelope, decision } = gateCompaniesHouse(match, ctx.checkedAt);
+        if (match.matched) {
+          const am = compareAddresses(r.fsa.postcode, r.fsa.addressLine, envelope.registeredOfficeAddress ?? null);
+          envelope.registeredOfficePostcode = am.registeredOfficePostcode;
+          envelope.addressMatchStatus = am.status;
+          envelope.addressMatchConfidence = am.confidence;
+          if (am.status === "exact_match" || am.status === "postcode_match") envelope.matchConfidence = Math.min(0.99, (envelope.matchConfidence ?? 0) + 0.05);
+          else if (am.differs) (envelope.warnings ??= []).push("CH_REGISTERED_OFFICE_DIFFERS_FROM_FSA_TRADING_ADDRESS");
+        }
+        if (envelope.reasonCodes?.includes("CH_ACTIVE_COMPANY_MATCH")) matchedActive++;
+        if (envelope.reasonCodes?.includes("CH_DISSOLVED_COMPANY_HOLD")) dissolvedHold++;
+        if (envelope.reasonCodes?.includes("CH_LOW_CONFIDENCE_MATCH")) lowConf++;
+        if (envelope.reasonCodes?.includes("CH_NO_MATCH")) noMatch++;
+        if (decision === "hold") held++;
+        if ((envelope.warnings?.length ?? 0) > 0) warnings++;
+        envById.set(i, envelope);
+      }
+      // Emit in original order.
+      const records: WorkingRecord[] = input.map((r, i) => ({ ...r, companiesHouse: envById.get(i)! }));
+      if (!CH_RUNNER.enabled) errors.push(err("ENRICHMENT_NOT_CONFIGURED", "companies_house_status_gate", "info", ex.message + " — every lead continues (nothing excluded).", true, "Set COMPANIES_HOUSE_API_KEY + COMPANIES_HOUSE_ENABLED=true + a call cap"));
+      if (capReached > 0) errors.push(err("ENRICHMENT_NOT_CONFIGURED", "companies_house_status_gate", "info", `${capReached} leads not status-checked — reserved status budget (~60% of ${cfg.maxCallsPerRun}) spent; remaining calls reserved for directors/financials.`, false, "Raise COMPANIES_HOUSE_MAX_CALLS_PER_RUN to check more"));
+      const metrics = { input_count: input.length, enabled: CH_RUNNER.enabled ? 1 : 0, active_match: matchedActive, dissolved_hold: dissolvedHold, low_confidence: lowConf, no_match: noMatch, held, cap_reached: capReached };
+      return { records, rejected: 0, held, warnings, errors, notes: `${CH_RUNNER.enabled ? "live" : "disabled"} · active ${matchedActive} · dissolved-hold ${dissolvedHold} · no-match ${noMatch}`, source: CH_RUNNER.enabled ? "Companies House (live)" : "Companies House (disabled)", apiCalls: CH_RUNNER.callsMade, apiCapRemaining: CH_RUNNER.capRemaining, metrics };
+    },
   },
   {
-    id: "google_places_enrichment_placeholder",
-    label: "Google Places (placeholder)",
-    handler: (input, ctx) => ({
-      records: input.map((r) => ({ ...r, googlePlaces: enrichGooglePlaces(r.fsa.businessName, r.fsa.postcode, ctx.checkedAt) })),
-      rejected: 0,
-      errors: [err("ENRICHMENT_NOT_CONFIGURED", "google_places_enrichment_placeholder", "info", "Google Places is PAID — disabled by default (field-mask + cap required to enable)", true, "Set GOOGLE_PLACES_ENABLED=1 + GOOGLE_PLACES_API_KEY + a per-run cap to enable")],
-      notes: `attached Google Places placeholder to ${input.length}`,
-    }),
+    id: "companies_house_directors_enrichment",
+    label: "Companies House directors",
+    handler: async (input, ctx) => {
+      const errors: PipelineError[] = [];
+      let withDirectors = 0, officersTotal = 0;
+      const records: WorkingRecord[] = [];
+      for (const r of input) {
+        const directors = await enrichDirectors(r.companiesHouse, CH_RUNNER, ctx.checkedAt);
+        if (directors.officers.length) { withDirectors++; officersTotal += directors.officers.length; }
+        records.push({ ...r, directors });
+      }
+      if (!CH_RUNNER.enabled) errors.push(err("ENRICHMENT_NOT_CONFIGURED", "companies_house_directors_enrichment", "info", "Companies House disabled — no directors fetched (internal research only when enabled).", true, "Enable Companies House to fetch officers"));
+      const metrics = { input_count: input.length, leads_with_directors: withDirectors, officers_total: officersTotal };
+      return { records, rejected: 0, errors, notes: `${withDirectors} leads with directors · ${officersTotal} officers (internal only)`, source: CH_RUNNER.enabled ? "Companies House officers" : "disabled", apiCalls: CH_RUNNER.callsMade, apiCapRemaining: CH_RUNNER.capRemaining, metrics };
+    },
   },
   {
-    id: "delivery_platform_presence",
-    label: "Delivery platform presence",
+    id: "companies_house_financials_stage",
+    label: "Companies House financials",
+    handler: async (input, ctx) => {
+      const errors: PipelineError[] = [];
+      let structured = 0, pdfOnly = 0, unavailable = 0, ratiosCalc = 0;
+      const bandDist: Record<string, number> = { strong: 0, acceptable: 0, weak: 0, high_risk: 0, unknown: 0 };
+      const records: WorkingRecord[] = [];
+      for (const r of input) {
+        const financials = await enrichFinancials(r.companiesHouse, CH_RUNNER, ctx.referenceDateMs);
+        if (financials.available) structured++;
+        else if (financials.status === "pdf_only_manual_review") pdfOnly++;
+        else unavailable++;
+        if (financials.analysis && Object.values(financials.analysis.ratios).some((v) => v != null)) ratiosCalc++;
+        bandDist[financials.analysis?.healthBand ?? "unknown"] = (bandDist[financials.analysis?.healthBand ?? "unknown"] ?? 0) + 1;
+        records.push({ ...r, financials });
+      }
+      if (!CH_RUNNER.enabled) errors.push(err("ENRICHMENT_NOT_CONFIGURED", "companies_house_financials_stage", "info", "Companies House disabled — no financials discovered (internal risk inputs only when enabled).", true, "Enable Companies House"));
+      errors.push(err("ENRICHMENT_NOT_CONFIGURED", "companies_house_financials_stage", "info", "Financial values are raw Companies House data used only for risk/confidence — never treated as spend, never in telesales export.", false, "See docs/46"));
+      const metrics = { input_count: input.length, structured_financials: structured, pdf_only: pdfOnly, unavailable, ratios_calculated: ratiosCalc, health_strong: bandDist.strong, health_acceptable: bandDist.acceptable, health_weak: bandDist.weak, health_high_risk: bandDist.high_risk, health_unknown: bandDist.unknown };
+      return { records, rejected: 0, errors, notes: `structured ${structured} · pdf-only ${pdfOnly} · unavailable ${unavailable} · ratios ${ratiosCalc}`, source: CH_RUNNER.enabled ? "Companies House accounts + documents" : "disabled", apiCalls: CH_RUNNER.callsMade, apiCapRemaining: CH_RUNNER.capRemaining, metrics };
+    },
+  },
+  {
+    id: "google_places_enrichment",
+    label: "Google Places enrichment",
+    handler: async (input) => {
+      // Fills phone/website/rating/review_count when enabled (paid, capped). Prioritises
+      // exportable/new prospects. Disabled → no-op; the final report flags incomplete contact data.
+      const leads = input.map((r) => ({
+        businessName: r.fsa.businessName,
+        postcode: r.fsa.postcode,
+        address: r.fsa.addressLine,
+        isNewProspect: r.customerMatch?.status === "New Prospect Candidate",
+        existingPhone: r.googlePlaces?.formattedPhone ?? null,
+      }));
+      const res = await runGooglePlacesEnrichment(leads);
+      const errors: PipelineError[] = [
+        res.disabled
+          ? err("ENRICHMENT_NOT_CONFIGURED", "google_places_enrichment", "warning", "Google Places DISABLED — contact enrichment INCOMPLETE (no phone/website source). Set GOOGLE_PLACES_API_KEY + GOOGLE_PLACES_ENABLED=true + a call cap.", false, "Enable Google Places to fill phone/website/reviews")
+          : err("ENRICHMENT_NOT_CONFIGURED", "google_places_enrichment", "info", `Google Places enriched ${res.enriched} leads · phones ${res.phoneCount} · websites ${res.websiteCount} (${res.callsUsed} calls).`, false, "—"),
+      ];
+      return {
+        records: input, rejected: 0, errors,
+        notes: res.disabled ? "disabled — contact enrichment incomplete" : `enriched ${res.enriched} · phones ${res.phoneCount} · websites ${res.websiteCount}`,
+        source: res.disabled ? "Google Places (disabled)" : "Google Places (live)",
+        apiCalls: res.callsUsed, apiCapRemaining: res.capRemaining,
+        metrics: { input_count: input.length, enabled: res.disabled ? 0 : 1, enriched: res.enriched, phones: res.phoneCount, websites: res.websiteCount },
+      };
+    },
+  },
+  {
+    id: "linkedin_research_queue_generation",
+    label: "LinkedIn research queue",
     handler: (input, ctx) => {
-      let present = 0, manual = 0, unknown = 0, absent = 0, checked = 0, evidenceMissing = 0;
+      // Public search URLs only — NO scraping, login, cookies, or automation.
+      const { directorRows, businessRows } = buildLinkedInQueues(input);
+      let files: string[] = [];
+      try {
+        files = writeResearchExports(ctx.config.run_id, input, directorRows, businessRows);
+      } catch (e) {
+        return { records: input, rejected: 0, errors: [err("EXPORT_WRITE_FAILED", "linkedin_research_queue_generation", "warning", `Research queue write failed: ${msg(e)}`, true, "Check exports/ permissions")], notes: "research queue write failed" };
+      }
+      const records = input.map((r) => ({
+        ...r,
+        linkedin: {
+          directorResearchStatus: (r.directors?.officers.length ?? 0) > 0 ? "pending_manual_review" : "none",
+          businessResearchStatus: "pending_manual_review",
+          businessSearchQuery: `"${r.fsa.businessName}" "${r.fsa.postcode}" LinkedIn`,
+          businessSearchUrl: `https://www.google.com/search?q=${encodeURIComponent(`"${r.fsa.businessName}" "${r.fsa.postcode}" site:linkedin.com`)}`,
+          businessGoogleUrl: `https://www.google.com/search?q=${encodeURIComponent(`"${r.fsa.businessName}" "${r.fsa.postcode}" LinkedIn`)}`,
+          directorRows: r.directors?.officers.filter((o) => o.active).length ?? 0,
+        },
+      }));
+      const metrics = { input_count: input.length, director_rows: directorRows.length, business_rows: businessRows.length };
+      return { records, rejected: 0, errors: [], notes: `director rows ${directorRows.length} · business rows ${businessRows.length} (manual research, not scraped)`, source: "public search URLs", outputFiles: files, metrics };
+    },
+  },
+  {
+    id: "delivery_platform_presence_summary",
+    label: "Delivery platform presence",
+    handler: (input) => {
+      let present = 0, manual = 0, notChecked = 0, absent = 0, checked = 0;
+      const evidence = DELIVERY_EVIDENCE.rows;
       const records = input.map((r) => {
-        const res = collectDeliveryPresence(r.fsa.businessName, r.fsa.postcode, ctx.checkedAt);
-        const sum = summarisePresence(res);
-        if (sum === "present") { present++; checked++; }
-        else if (sum === "absent") { absent++; checked++; }
-        else if (sum === "manual_review") manual++;
-        else unknown++;
-        if ((sum === "present" || sum === "absent") && !res.platforms.some((p) => p.evidence_url)) evidenceMissing++;
-        return { ...r, delivery: res };
+        const pres = buildDeliveryPresence({ businessName: r.fsa.businessName, postcode: r.fsa.postcode }, evidence);
+        // Overlay REAL Just Eat presence from the fan-in over the generated search URL.
+        if (r.justEat?.matched && r.justEat.url) {
+          pres.perPlatform.just_eat = { status: "present", evidence_url: r.justEat.url, confidence: r.justEat.matchConfidence };
+          if (!pres.summary.includes("Just Eat")) pres.summary = `Just Eat present. ${pres.summary}`;
+        } else if (r.justEat && !r.justEat.matched && !r.justEat.isPlatformOnly) {
+          // Checked Just Eat, no listing found → absent (real signal).
+          pres.perPlatform.just_eat = { status: "absent", evidence_url: pres.perPlatform.just_eat?.evidence_url ?? "", confidence: 0.5 };
+        }
+        const statuses = STAGE_PLATFORMS.map((p) => pres.perPlatform[p].status);
+        if (statuses.includes("present")) { present++; checked++; }
+        else if (statuses.every((s) => s === "absent")) { absent++; checked++; }
+        else if (statuses.includes("manual_review_required")) manual++;
+        else notChecked++;
+        return { ...r, platform: pres };
       });
       const errors: PipelineError[] = [
-        err("PLATFORM_NOT_CONFIGURED", "delivery_platform_presence", "info", "No automated collector configured — presence defaults to manual_review (public/evidence-based only)", true, "Configure an approved public collector, or use manual/import"),
-        err("PLATFORM_CHECK_MANUAL_REQUIRED", "delivery_platform_presence", "info", `${manual} businesses need a manual delivery-presence check`, false, "Assign manual checks or import public evidence URLs"),
-        err("PLATFORM_TERMS_RISK", "delivery_platform_presence", "warning", "Uber Eats / Deliveroo / Just Eat automated access carries ToS + anti-bot risk — collect only public/manual/evidence-based data", false, "Use an approved provider or manual entry; never scrape, log in, or bypass anti-bot"),
+        err("PLATFORM_TERMS_RISK", "delivery_platform_presence_summary", "info", "Just Eat presence is from the approved public discovery endpoint; Uber Eats / Deliveroo remain manual/import evidence — no scraping, login, captcha bypass, proxies, or bulk copying.", false, "Use approved public methods or import evidence"),
       ];
-      if (unknown > 0) errors.push(err("PLATFORM_PRESENCE_UNKNOWN", "delivery_platform_presence", "info", `${unknown} businesses have unknown platform presence`, false, "Collect or import presence"));
-      if (evidenceMissing > 0) errors.push(err("PLATFORM_EVIDENCE_URL_MISSING", "delivery_platform_presence", "warning", `${evidenceMissing} present/absent records are missing an evidence URL`, false, "Attach a public evidence URL"));
-      const metrics = {
-        input_count: input.length,
-        checked_count: checked,
-        present_count: present,
-        absent_count: absent,
-        unknown_count: unknown,
-        manual_review_count: manual,
-        error_count: errors.length,
-      };
-      return {
-        records,
-        rejected: 0,
-        errors,
-        notes: `present ${present} · manual-review ${manual} · unknown ${unknown} · methods: manual / import / approved_public_collector`,
-        metrics,
-      };
+      if (manual > 0) errors.push(err("PLATFORM_CHECK_MANUAL_REQUIRED", "delivery_platform_presence_summary", "info", `${manual} businesses need a manual delivery-presence check`, false, "Assign manual checks"));
+      const metrics = { input_count: input.length, checked_count: checked, present_count: present, absent_count: absent, not_checked_count: notChecked, manual_review_count: manual };
+      return { records, rejected: 0, warnings: manual, errors, notes: `present ${present} · absent ${absent} · manual ${manual} · not-checked ${notChecked}`, source: "Just Eat (live) + delivery evidence", metrics };
+    },
+  },
+  {
+    id: "data_completeness",
+    label: "Data completeness scoring",
+    handler: (input) => {
+      const bands: Record<string, number> = { ready: 0, usable: 0, weak: 0, poor: 0 };
+      let total = 0;
+      const records = input.map((r) => {
+        const present = (r.platform?.perPlatform ?? {});
+        const platformUrl = r.justEat?.url ?? Object.values(present).find((c) => c.evidence_url)?.evidence_url ?? null;
+        const c = scoreCompleteness({
+          businessName: r.fsa.businessName,
+          tradingAddress: r.fsa.addressLine,
+          postcode: r.fsa.postcode,
+          phone: r.googlePlaces?.formattedPhone ?? null,
+          website: r.googlePlaces?.website ?? null,
+          platformUrl,
+          fsaRecord: !r.justEat?.isPlatformOnly, // platform-only records have no FSA registration
+          googlePlace: r.googlePlaces?.status === "found",
+          ratingOrReviewCount: (r.justEat?.ratingCount ?? 0) > 0 || r.justEat?.ratingAverage != null,
+          customerExclusionChecked: !!r.customerMatch,
+          companiesHouseChecked: !!r.companiesHouse?.checked,
+          sourceEvidenceUrl: platformUrl,
+          coordinates: r.fsa.latitude != null && r.fsa.longitude != null,
+        });
+        bands[c.completeness_band] = (bands[c.completeness_band] ?? 0) + 1;
+        total += c.data_completeness_score;
+        return { ...r, completeness: { score: c.data_completeness_score, band: c.completeness_band, missing: c.missing_fields, enrichmentNeeded: c.enrichment_needed } };
+      });
+      const avg = input.length ? Math.round(total / input.length) : 0;
+      const errors: PipelineError[] = [];
+      if (bands.ready / Math.max(1, input.length) < 0.8) errors.push(err("ENRICHMENT_NOT_CONFIGURED", "data_completeness", "info", `Average completeness ${avg}/100 · only ${bands.ready} leads ≥80%. Below the 80% sales-ready target — enable Google Places (phone/website) to close the gap.`, false, "Enable Google Places contact enrichment"));
+      return { records, rejected: 0, errors, notes: `avg ${avg} · ready ${bands.ready} · usable ${bands.usable} · weak ${bands.weak} · poor ${bands.poor}`, source: "computed", metrics: { input_count: input.length, average_score: avg, ready: bands.ready, usable: bands.usable, weak: bands.weak, poor: bands.poor } };
+    },
+  },
+  {
+    id: "commercial_calculation",
+    label: "Commercial calculation",
+    handler: (input, ctx) => {
+      // FSA legitimacy is finalised here (needs Just Eat + Companies House for the conflict check).
+      const bands: Record<string, number> = {};
+      const records = input.map((r) => {
+        const fsaLegitimacy = computeFsaLegitimacy(r, ctx.referenceDateMs);
+        const withLeg = { ...r, fsaLegitimacy };
+        const commercial = computeCommercial(withLeg);
+        bands[commercial.monthlyValueBand] = (bands[commercial.monthlyValueBand] ?? 0) + 1;
+        return { ...withLeg, commercial };
+      });
+      const errors: PipelineError[] = [
+        err("ENRICHMENT_NOT_CONFIGURED", "commercial_calculation", "info", "Commercial values are ESTIMATED / ASSUMPTION-BASED (placeholders) — internal prioritisation only, not quotes.", false, "Replace src/config/commercial-assumptions.ts with finance-approved figures"),
+      ];
+      const metrics = { input_count: input.length, band_very_high: bands.VERY_HIGH ?? 0, band_high: bands.HIGH ?? 0, band_medium: bands.MEDIUM ?? 0, band_low: bands.LOW ?? 0 };
+      return { records, rejected: 0, errors, notes: `estimated value bands — VeryHigh ${metrics.band_very_high} · High ${metrics.band_high} · Med ${metrics.band_medium} · Low ${metrics.band_low}`, source: "assumptions", metrics };
     },
   },
   {
@@ -328,7 +624,6 @@ export const STAGE_DEFS: StageDef[] = [
       const records: WorkingRecord[] = [];
       const errors: PipelineError[] = [];
       let rejected = 0;
-      // duplicate-looking = same normalised name across 2+ records (chains / repeats)
       const nameFreq = new Map<string, number>();
       for (const r of input) {
         const k = r.fsa.businessName.toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -340,20 +635,34 @@ export const STAGE_DEFS: StageDef[] = [
           const candidate = toCandidate(r);
           const dupKey = r.fsa.businessName.toLowerCase().replace(/[^a-z0-9]/g, "");
           const duplicateRisk = (nameFreq.get(dupKey) ?? 1) > 1;
+          const deliveryPresent = !!r.justEat?.matched || STAGE_PLATFORMS.some((p) => r.platform?.perPlatform[p]?.status === "present");
+          const platformOnly = !!r.justEat?.isPlatformOnly;
+          const companiesHouseHold = !!r.companiesHouse?.holdReason;
           const score = scoreCandidate({
             candidate,
             ratingDate: r.fsa.ratingDate,
             category: r.category,
             companiesHouse: r.companiesHouse!,
-            googlePlaces: r.googlePlaces!,
-            delivery: r.delivery!,
+            googlePlaces: r.googlePlaces ?? DEFAULT_GP,
+            deliveryPresent,
             customerMatch: r.customerMatch,
             duplicateRisk,
             inTerritory: true,
             referenceDateMs: ctx.referenceDateMs,
+            fsaLegitimacy: r.fsaLegitimacy,
+            justEat: r.justEat,
+            platformOnly,
+            platformChecked: r.platform != null,
+            companiesHouseHold,
+            customerListLoaded: CUSTOMER_LIST.loaded,
+            financialRiskScore: r.financials?.scoreComponent,
+            financialAvailable: r.financials?.available,
+            sourceNames: r.sourceNames,
           });
           if (score.manual_review_flags.length) manualCount++;
-          records.push({ ...r, candidate, duplicateRisk, score, trigger_reason: deriveTrigger(r, score) });
+          // Refresh commercial opportunity now that the real grade is known.
+          const commercial = r.commercial ? computeOpportunityForGrade(r.commercial, score.grade) : r.commercial;
+          records.push({ ...r, candidate, duplicateRisk, score, commercial, trigger_reason: deriveTrigger(r, score) });
         } catch (e) {
           rejected++;
           pushCapped(errors, err("SCORING_FAILED", "score_candidates", "error", `Scoring failed for ${r.fsa.businessName}: ${msg(e)}`, true, "Inspect the record and retry", r.fsa.fhrsId));
@@ -370,24 +679,21 @@ export const STAGE_DEFS: StageDef[] = [
       const errors: PipelineError[] = [
         err("EXPORT_GATE_LOCKED", "export_review_gate", "warning", "CRM export locked until CRM field mapping is verified (ISS-0003) — the review CSV/JSON are still generated", false, "Complete ISS-0003 CRM field mapping to unlock CRM push"),
       ];
-      let rejected = 0;
-      let deliveryUnchecked = 0;
-      let manualHeld = 0;
+      const EXCLUDED_ACCOUNTS = ["Active Account", "Dormant Account", "Former / Closed Account", "Unknown Existing Account"];
+      let eligibleCount = 0, manualHeld = 0, held = 0, excludedCustomers = 0;
       const records = input.map((r) => {
         const s = r.score!;
-        // Any manual-review flag (institutional, missing coords, possible customer, duplicate) → manual review, not auto-export.
-        const manualNeeded = s.manual_review_flags.length > 0;
-        const eligible = s.disqualifiers.length === 0 && s.grade !== "D" && !manualNeeded;
-        if (!eligible) rejected++;
-        if (manualNeeded) manualHeld++;
-        if (!r.delivery || summarisePresence(r.delivery) !== "present") deliveryUnchecked++;
-        const status = manualNeeded ? "manual_review" : eligible ? "ready_for_review" : "held_review";
+        const cstatus = r.customerMatch?.status ?? "New Prospect Candidate";
+        const manualNeeded = s.manual_review_flags.length > 0 || cstatus === "Possible Existing Account";
+        let status: string;
+        if (EXCLUDED_ACCOUNTS.includes(cstatus)) { status = "excluded_customer"; excludedCustomers++; }
+        else if (s.disqualifiers.length > 0 || s.grade === "D") { status = "held_review"; held++; }
+        else if (manualNeeded) { status = "manual_review"; manualHeld++; }
+        else { status = "ready_for_review"; eligibleCount++; }
         return { ...r, export_status: status };
       });
-      if (deliveryUnchecked > 0)
-        errors.push(err("DELIVERY_PLATFORM_NOT_CHECKED", "export_review_gate", "warning", `${deliveryUnchecked} leads export without a confirmed delivery-platform presence (allowed — not a blocker)`, false, "Optionally collect/import presence before outreach"));
-      const metrics = { input_count: input.length, export_eligible: records.length - rejected, held: rejected, manual_review: manualHeld };
-      return { records, rejected, errors, notes: `${records.length - rejected} export-eligible · ${rejected} held · ${manualHeld} manual-review`, metrics };
+      const metrics = { input_count: input.length, export_eligible: eligibleCount, manual_review: manualHeld, held, excluded_customer: excludedCustomers };
+      return { records, rejected: input.length - eligibleCount, held: held + manualHeld + excludedCustomers, errors, notes: `${eligibleCount} sales-eligible · ${manualHeld} manual · ${held} held · ${excludedCustomers} existing-customer`, metrics };
     },
   },
   {
@@ -412,6 +718,25 @@ export const STAGE_DEFS: StageDef[] = [
           errors: [err("EXPORT_WRITE_FAILED", "generate_final_exports", "fatal", `Export write failed: ${msg(e)}`, true, "Check exports/ directory permissions")],
           notes: "export write failed",
         };
+      }
+    },
+  },
+  {
+    id: "generate_tomorrow_sales_exports",
+    label: "Generate tomorrow sales exports",
+    handler: (input, ctx) => {
+      try {
+        const w = writeTomorrowSalesExports(ctx.config.run_id, input, CUSTOMER_LIST.loaded);
+        return {
+          records: input,
+          rejected: 0,
+          errors: CUSTOMER_LIST.loaded ? [] : [err("EXISTING_CUSTOMER_MATCH", "generate_tomorrow_sales_exports", "warning", "Sales list NOT GUARANTEED AGAINST EXISTING CUSTOMERS — no customer list loaded.", false, "Import the real customer list and re-run")],
+          notes: `wrote ${w.files.length} sales/audit files · ${w.salesCount} sales-eligible · ${w.holdCount} hold · ${w.excludedCount} excluded`,
+          outputFiles: w.files,
+          metrics: { input_count: input.length, sales_eligible: w.salesCount, manual_hold: w.holdCount, excluded_customer: w.excludedCount, customer_list_loaded: CUSTOMER_LIST.loaded ? 1 : 0 },
+        };
+      } catch (e) {
+        return { records: input, rejected: 0, errors: [err("EXPORT_WRITE_FAILED", "generate_tomorrow_sales_exports", "fatal", `Sales export write failed: ${msg(e)}`, true, "Check exports/ directory permissions")], notes: "sales export write failed" };
       }
     },
   },

@@ -13,7 +13,8 @@
     "leads:status": "tsx scripts/run-first-fsa-leads.ts --status",
     "leads:analyse": "tsx scripts/analyse-first-leads.ts",
     "test:scoring": "tsx scripts/test-scoring-samples.ts",
-    "test:telesales-safe": "tsx scripts/test-telesales-safe-view.ts"
+    "test:telesales-safe": "tsx scripts/test-telesales-safe-view.ts",
+    "leads:just-eat": "tsx scripts/fetch-just-eat.ts"
   },
   "dependencies": {
     "next": "^16.2.10",

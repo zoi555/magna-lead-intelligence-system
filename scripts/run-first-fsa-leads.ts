@@ -3,6 +3,23 @@
 //   npm run leads:resume    resume the latest paused/failed run
 //   npm run leads:status    print the latest run monitor (no execution)
 
+import { promises as fsp } from "node:fs";
+import path from "node:path";
+
+// Load .env.local / .env so source flags (JUST_EAT_ENABLED, COMPANIES_HOUSE_*) apply
+// without exporting them into the shell. Placeholder-safe; never logs values.
+async function loadDotEnv() {
+  for (const f of [".env.local", ".env"]) {
+    try {
+      const txt = await fsp.readFile(path.resolve(process.cwd(), f), "utf8");
+      for (const line of txt.split(/\r?\n/)) {
+        const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+        if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+      }
+    } catch { /* absent — fine */ }
+  }
+}
+
 import { makeRunConfig, startRun, resumeRun } from "../src/lib/pipeline/run-discovery";
 import { listRunIds, loadRunState, loadResult, loadLatestRunState } from "../src/lib/pipeline/run-store";
 import type { RunState, RunResultBundle } from "../src/lib/pipeline/types";
@@ -48,6 +65,7 @@ function printTop20(bundle: RunResultBundle | null) {
 }
 
 async function main() {
+  await loadDotEnv();
   const args = process.argv.slice(2);
   const wantStatus = args.includes("--status");
   const wantResume = args.includes("--resume");

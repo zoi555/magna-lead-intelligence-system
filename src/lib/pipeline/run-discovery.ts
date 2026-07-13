@@ -17,6 +17,10 @@ import {
   findStage,
 } from "./run-store";
 
+import { getTerritoryMode } from "@/config/territory-config";
+import { loadTargetOutcodes } from "./postcode-source";
+
+// Re-exported for existing callers (UI); the canonical list lives in territory-config.
 export const PILOT_PREFIXES = ["UB1", "UB2", "UB6", "HA0", "HA9", "W5"];
 
 function pad(n: number): string {
@@ -30,10 +34,14 @@ export function genRunId(): string {
 }
 
 export function makeRunConfig(overrides: Partial<RunConfig> = {}): RunConfig {
+  // Resolve territory from TERRITORY_MODE (default `pilot`). Never expands silently:
+  // vp_coverage/custom need an import file, full_uk needs an explicit national file.
+  const territory = loadTargetOutcodes(getTerritoryMode());
+  if (territory.warning) console.log(`[territory] ${territory.warning}`);
   return {
     run_id: overrides.run_id ?? genRunId(),
-    territory_label: overrides.territory_label ?? "West London pilot",
-    postcode_prefixes: overrides.postcode_prefixes ?? PILOT_PREFIXES,
+    territory_label: overrides.territory_label ?? territory.label,
+    postcode_prefixes: overrides.postcode_prefixes ?? territory.outcodes,
     mode: overrides.mode ?? "live",
     fsa_page_size: overrides.fsa_page_size ?? 200,
     created_from: overrides.created_from ?? "cli",
@@ -49,9 +57,10 @@ function applyCounters(state: RunState, id: StageId, st: StageState) {
     case "territory_filter": c.in_territory = st.output_count; break;
     case "category_filter": c.food_category = st.output_count; break;
     case "dedupe_candidates": c.deduped = st.output_count; break;
-    case "exclude_existing_customers": c.after_existing_exclusion = st.output_count; break;
+    case "customer_exclusion": c.after_existing_exclusion = st.output_count; break;
+    case "source_fan_in": c.normalised = st.output_count; break;
     case "score_candidates": c.scored = st.output_count; break;
-    case "export_review_gate": c.export_ready = st.output_count - st.rejected_count; break;
+    case "export_review_gate": c.export_ready = (st.metrics?.export_eligible ?? (st.output_count - st.rejected_count)); break;
     case "generate_final_exports": /* exported set from bundle */ break;
     default: break;
   }
@@ -132,6 +141,11 @@ export async function executeRun(state: RunState, startIndex: number): Promise<R
     st.output_count = records.length;
     st.rejected_count = out.rejected;
     if (out.metrics) st.metrics = out.metrics;
+    if (out.held != null) st.held_count = out.held;
+    if (out.warnings != null) st.warning_count = out.warnings;
+    if (out.source != null) st.source = out.source;
+    if (out.apiCalls != null) st.api_calls = out.apiCalls;
+    if (out.apiCapRemaining != null) st.api_cap_remaining = out.apiCapRemaining;
     st.errors.push(...out.errors);
     st.error_count = st.errors.length;
     st.notes = out.notes;
