@@ -1,4 +1,6 @@
 import React from "react";
+import fs from "node:fs";
+import path from "node:path";
 import { PageHeader } from "@/components/PageHeader";
 import { DataTable } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
@@ -8,7 +10,13 @@ import { summariseRun, exportFilesStatus, countWarning } from "@/lib/pipeline/ru
 // Export gate + honest export status from the latest run.
 export const dynamic = "force-dynamic";
 
+// Read the TW independent review-workflow summary if present (sales-safe counts only).
+function loadTwWorkflow(): Record<string, number> | null {
+  try { return JSON.parse(fs.readFileSync(path.join(process.cwd(), "exports/tw-independent-review-workflow-summary.json"), "utf8")); } catch { return null; }
+}
+
 export default function ExportReviewPage() {
+  const tw = loadTwWorkflow();
   const result = loadLatestResult();
   const state = loadLatestRunState();
   const eligible = result?.exportEligible ?? [];
@@ -38,6 +46,26 @@ export default function ExportReviewPage() {
         generated locally; nothing is sent to a CRM. <b>Approval workflow is not yet implemented</b> — local
         exports are produced by the pipeline (`npm run leads:first`).
       </div>
+
+      {tw && (
+        <div className="rounded-card border border-bordergrey bg-card p-3 shadow-soft">
+          <div className="mb-2 flex items-center justify-between">
+            <b className="text-[14px] text-ink">TW independent review workflow</b>
+            <a href="/coverage-map" className="text-[12px] text-actionblue">open coverage map →</a>
+          </div>
+          <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
+            <Stat label="Clean ready-to-call" value={tw.clean_independent_count} good />
+            <Stat label="Manual review" value={tw.manual_review_master_count} warn />
+            <Stat label="Excluded (audit)" value={tw.excluded_count} />
+            <Stat label="Research-phone" value={tw.review_research_phone_count} />
+            <Stat label="Company-status review" value={tw.review_company_status_count} warn />
+            <Stat label="Chain/category review" value={tw.review_chain_category_ambiguity_count} />
+          </div>
+          <p className="mt-2 text-[11.5px] text-muted">
+            Clean → <code>exports/tw-independent-ready-to-call.csv</code> (sales) · Manual review → <code>exports/tw-independent-manual-review-master.csv</code> (management/admin) · Excluded → <code>exports/tw-independent-excluded-brands-and-non-targets.csv</code> (audit). Files are local, gitignored.
+          </p>
+        </div>
+      )}
 
       {!result ? (
         <div className="rounded-card border border-bordergrey bg-card p-4 shadow-soft">

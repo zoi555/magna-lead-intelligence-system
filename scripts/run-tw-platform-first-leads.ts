@@ -290,7 +290,7 @@ async function main() {
     return ["Just Eat", c.fsaMatched && "FSA-validated", c.googleMatched && "Google-enriched", c.chMatched && "CH-checked"].filter(Boolean).join(" + ");
   }
   const FINAL_HEADERS = [
-    "business_name","trading_name","address","postcode","postcode_area","postcode_district","town_locality","phone","website",
+    "business_name","trading_name","address","postcode","postcode_area","postcode_district","latitude","longitude","town_locality","phone","website",
     "platform_primary","platform_url","just_eat","deliveroo","uber_eats","fsa_matched","fsa_rating","fsa_rating_date",
     "google_rating","google_review_count","google_maps_url","halal_signal","halal_signal_source","category_focus","cuisine",
     "location_proof_source","location_proof_postcode","location_confidence",
@@ -298,7 +298,8 @@ async function main() {
   ];
   const finalRow = (c: Candidate) => ({
     business_name: c.je.businessName, trading_name: c.je.brandName && c.je.brandName !== c.je.businessName ? c.je.brandName : "",
-    address: c.je.addressLine, postcode: c.je.postcode, postcode_area: "TW", postcode_district: c.outcode, town_locality: c.je.city,
+    address: c.je.addressLine, postcode: c.je.postcode, postcode_area: "TW", postcode_district: c.outcode,
+    latitude: c.googleLat ?? c.je.latitude ?? "", longitude: c.googleLng ?? c.je.longitude ?? "", town_locality: c.je.city,
     phone: c.googlePhone, website: c.googleWebsite, platform_primary: "Just Eat", platform_url: c.je.url,
     just_eat: "yes", deliveroo: "no", uber_eats: "no", fsa_matched: c.fsaMatched ? "yes" : "no", fsa_rating: c.fsaRating, fsa_rating_date: c.fsaRatingDate,
     google_rating: c.googleRating, google_review_count: c.googleReviewCount, google_maps_url: c.googleMapsUrl,

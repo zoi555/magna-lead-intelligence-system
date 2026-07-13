@@ -63,3 +63,5 @@ data/
 exports/
 imports/
 data/imports/
+/public/vendor/
+/public/map/
