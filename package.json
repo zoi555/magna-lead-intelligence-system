@@ -14,7 +14,8 @@
     "leads:analyse": "tsx scripts/analyse-first-leads.ts",
     "test:scoring": "tsx scripts/test-scoring-samples.ts",
     "test:telesales-safe": "tsx scripts/test-telesales-safe-view.ts",
-    "leads:just-eat": "tsx scripts/fetch-just-eat.ts"
+    "leads:just-eat": "tsx scripts/fetch-just-eat.ts",
+    "leads:tw-platform-first": "tsx scripts/run-tw-platform-first-leads.ts"
   },
   "dependencies": {
     "next": "^16.2.10",
