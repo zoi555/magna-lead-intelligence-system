@@ -1,6 +1,68 @@
 # Project Status — Magna Lead Intelligence System
 
-## Current state
+## Current state — 2026-07-14 (AspectLead / Lead Discovery module)
+
+Active build on branch `feature/mvp-vertical-slice-001`. The Lead Discovery pipeline (FSA + live
+Just Eat + Companies House + Google Places + customer exclusion) and the TW platform-first
+independent workflow are operational and exported locally. Current focus: the **Discovery Run
+Builder** first screen and its **national geospatial foundation**.
+
+### Work completed
+- Lead discovery pipeline (platform-first Just Eat, FSA validation, Companies House status/directors/financials, Google Places enrichment, customer exclusion, data completeness, commercial calc, export gate).
+- TW independent review workflow (clean / manual-review / excluded) + `/coverage-map` MapLibre map (regional OS geometry) + `/export-review` showing the single current TW run.
+- Geospatial-foundation Milestone 1: honest source manifest (`src/lib/geo/geospatial-source-manifest.ts`), locked map-layer/road/zoom/label/feeder architecture (`src/lib/geo/map-layer-config.ts`), road-coverage validation, `npm run test:geo`, and documentation (architecture / source register / ADR / run-builder spec).
+
+### Work in progress
+- Discovery Run Builder Step 1 (Territory) screen at `/run-setup` (interactive territory entry + detection + policies + draft persistence).
+
+### Datasets present — NATIONAL (Great Britain), imported + verified 2026-07-14
+- **Imported + tiled to PMTiles** (served from `~/Data/aspectlead-geospatial/tiles`, symlinked into gitignored `public/map/tiles/`, never committed): OS Open Zoomstack national basemap (2.5GB, 18 layers), OS Open Roads national (322MB, 3,961,077 links, ALL classes), Code-Point Open (38MB, 1,747,841 postcode points), OS Open Greenspace (81MB), OS Open Rivers (126MB), Boundary-Line (331MB).
+- **GB coverage verified** at geographic extremes (Shetland→Cornwall, Wales, East Anglia); evidence in `manifests/coverage-verification.json`. Checksums in `manifests/{checksums,tiles-checksums}.sha256`.
+- Toolchain installed (gdal/tippecanoe/pmtiles); reproducible pipeline in `scripts/geo/`; `pmtiles@4.4.1` added to render tiles. National map at `/national-map`.
+- The regional POC (`public/map/*.geojson`, A Road + Motorway only) is **superseded** as the production dataset.
+
+### Datasets held but not yet tiled / still missing
+- **Downloaded, not tiled** (Zoomstack already covers their map role nationally): OS Open Names (214MB — needed only for the place-search gazetteer), OS OpenMap Local (3.5GB — detailed buildings/functional sites).
+- **Not acquired**: ONS Postcode Directory (ONS portal — for national area→district→sector expansion). **Licence-gated**: full-postcode-unit polygons (paid; points only from Code-Point). **Genuine gap**: Northern Ireland (OS Open* is GB-only; verified absent at Belfast).
+
+### National map EXPERIENCE — complete + visually verified (2026-07-14)
+- **Zoom-dependent labels** (glyphs generated via fontnik → gitignored `public/map/fonts`): cities/towns/villages/localities (Zoomstack `names` by type), motorway/A/B road numbers, road/street names, railway stations, and postcode area/district/sector labels (derived centroids from 1.75M Code-Point points → `public/map/postcode_labels.geojson`, **independent of leads**), full postcode on hover.
+- **Full road hierarchy** styled by `road_function`: motorways (locked on), primary/all A, B (zoom+toggle), minor/local/local-access/restricted/secondary. Private roads/tracks **honestly marked unavailable** (not in free OS data).
+- **Close-zoom detail**: OS OpenMap Local `functional_site` tiled (`funcsite.pmtiles`); Zoomstack buildings (15.2M national OpenMap Local buildings deferred as too heavy — Zoomstack covers them).
+- **Controls drawer** with all sections (Roads, Places & labels, Postcodes, Transport, Environment) + honest availability; **feeder-road system** (model `src/lib/geo/feeder-roads.ts` + UI: org defaults empty, manual add, suggest-from-view accept/reject, priority, reason; highlights in orange — verified with A316). **National browsing** — run territory never restricts the map (chip + verified GB→street navigation).
+- **Visually verified** in headless Chromium (Playwright, `scripts/geo/visual-test.mjs`) at all 7 zoom levels (GB → region → city → town → PC district → PC sector → street); screenshots in `~/Data/aspectlead-geospatial/screenshots`; **no console errors**.
+
+### Discovery Run Builder first screen — COMPLETE + QA-passed (`/run-builder`)
+Run identity (generated default name + last-saved) · pipeline navigator · territory · embedded national map (shared component, no iframe) · full taxonomies · exclusions · configurable large-chain registry · custom include/exclude terms · 23-field requested-data catalogue · result tags · live configuration summary · validation · draft recovery + restore-recommended-defaults · **DB-ready draft (schemaVersion 2)**. Default **Independent Foodservice** profile pre-selected. Discovery Sources step intentionally NOT built.
+- **Final four items completed (2026-07-14):**
+  1. **Business-taxonomy search** — case-insensitive partial-match, grouped filtering, empty groups hidden, clear restores, selections preserved (`searchBusinessTypes`).
+  2. **Run-specific custom business types** — add (auto-selected), duplicate-prevented (case-insensitive vs standard + custom, diacritics folded), stable key, remove, persisted (`custom-config.ts`, `BusinessTypeOption`).
+  3. **Advanced custom requested fields** — label, validated internal key (auto-suggested), data type, requirement, intended source (+ note when "Other"), visibility, export permission, notes; inline expandable editor; field-level + summary validation; committed fields only enter the draft (`CustomRequestedField`).
+  4. **Accessible live status** — `aria-live="polite"` for save/restore/added; `role="alert"` for blocking errors (duplicate rejected, field validation) and the validation summary. No `window.alert()`.
+- **Draft schema v2 + migration:** `migrateDraft()` upgrades v1 drafts (adds `customBusinessTypes`; upgrades `customFields` {id,label}→full `CustomRequestedField` with safe defaults) with no data loss; unknown/garbage input returns null (no crash).
+- **QA (headless Chromium, blank draft):** search chicken → only Quick service/Chicken shop; toggle/clear work; custom type add + duplicate rejection; custom field with metadata + live key validation; **save→reload restores custom type AND custom field**; restore-defaults clears them; live summary shows Custom business types + Custom fields counts; **no console errors**; responsive clean at 1440/1024/768px. Tests: `test:custom-config` (33 assertions).
+
+### Portable geospatial-map package — complete + verified (2026-07-14)
+- **`packages/geospatial-map/` (`@geospatial/map`)** — reusable, application-independent map. Public API: `GeospatialMap`, `MapControlDrawer`, `FeatureInspector`, `MapSearch`, `MapStatus`, profile fns, road/label rules, feeder engine, adapters, full types. Boundary-tested: imports only react/react-dom/pmtiles (`test:map-boundary`).
+- **iframe removed.** `/national-map` (workbench), `/run-builder` (embeds the component directly), `/coverage-map` (component + AspectLead coverage overlays via `src/features/geospatial/`), and `/map-component-demo` (package + generic config only) all render the **same** shared component. Old duplicated map libs (`national-map.ts`, `map-layer-config.ts`, `feeder-roads.ts`) deleted.
+- **Generic overlay system** (`MapOverlayDefinition` + add/remove/setVisibility) — no hardcoded `addLeads()`/`addCustomers()`; AspectLead builds overlays in an adapter outside the package.
+- **Serialisable `MapProfile`** (create/validate/merge/serialise/deserialise); locked invariants (motorways + motorway numbers) forced true; malformed profiles recovered.
+- **Production glyphs**: Open Sans (SIL OFL 1.1) via `@expo-google-fonts/open-sans`, generated by `npm run geo:glyphs` — reproducible from a clean checkout; licence (`docs/data-sources/OFL-OpenSans.txt`), metadata + TTF checksums (`font-glyph-metadata.json`) recorded; glyph PBFs gitignored/deployed via asset pipeline.
+- **Env-configurable assets**: `NEXT_PUBLIC_MAP_ASSET_BASE_URL` (no hardcoded localhost).
+- **Supplemental-road policy** documented (`docs/data-sources/supplemental-road-sources.md`): OSM (ODbL) is the only open source with private/service/tracks — licence review required before merge; private/tracks honestly marked **unavailable** meanwhile.
+
+### Build status
+`npm run build` passes (`/national-map`, `/run-builder`, `/coverage-map`, `/map-component-demo`). Tests: `test:map-boundary`, `test:map` (16 invariants), `test:geo`, `test:feeders`, `test:run-draft`, `test:scoring`, `test:telesales-safe` — **all pass**. All four routes visually verified in headless Chromium (no iframe, canvas renders, no console errors; screenshots in `~/Data/aspectlead-geospatial/screenshots`).
+
+### Next exact task
+(Not started — do not proceed without direction, and do NOT begin Discovery Sources.) Optional: OSM supplemental private-road/track pipeline (after licence review); OS Open Names place-search gazetteer; ONSPD national postcode expansion; wire run-draft + map profile to Supabase persistence.
+
+### Known limitations
+National map is **Great Britain only** — Northern Ireland is an explicit, honest gap. Private roads/tracks are not in free OS data (marked unavailable; OSM pending licence review). Production tile/glyph hosting must be pointed at object storage via `NEXT_PUBLIC_MAP_ASSET_BASE_URL`. Visual verification used headless Playwright (the Claude Chrome extension was not connectable). **Run-builder is desktop/tablet-first: below ~640px the global AppShell sidebar (fixed ~260px, non-collapsing) causes horizontal overflow — a shell-wide behaviour, not a run-builder defect; not fixed here to avoid redesigning the app shell.** The four remaining first-screen items (taxonomy search, custom business types, advanced custom fields, accessible status) are now **built and QA-passed**. First screen is functionally complete; only Discovery Sources (the next pipeline step) remains, intentionally not started. Nothing has been staged, committed or pushed.
+
+---
+
+## (Historical) Current state
 
 Planning / documentation prepared. No code should be built yet.
 

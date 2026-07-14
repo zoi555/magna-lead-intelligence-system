@@ -1,0 +1,3 @@
+/* Minimal styles for the portable geospatial map. Host provides MapLibre's own CSS. */
+.geospatial-map-root { position: relative; width: 100%; height: 100%; }
+.geospatial-map-root canvas { outline: none; }

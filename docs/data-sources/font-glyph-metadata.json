@@ -1,0 +1,22 @@
+{
+  "font": "Open Sans",
+  "licence": "SIL Open Font License 1.1",
+  "source": "@expo-google-fonts/open-sans",
+  "generatedRanges": 6,
+  "stacks": [
+    "Open Sans Regular",
+    "Open Sans Bold"
+  ],
+  "files": [
+    {
+      "stack": "Open Sans Regular",
+      "ttf": "node_modules/@expo-google-fonts/open-sans/400Regular/OpenSans_400Regular.ttf",
+      "sha256": "33e93bec67d91c396876db50694213802a39e43a911bb5c22322f0dbdf4d5e43"
+    },
+    {
+      "stack": "Open Sans Bold",
+      "ttf": "node_modules/@expo-google-fonts/open-sans/700Bold/OpenSans_700Bold.ttf",
+      "sha256": "5f4c6f0c6beae94863a099a7a538059c480f91587f1abffc06552e9fa3a44f40"
+    }
+  ]
+}

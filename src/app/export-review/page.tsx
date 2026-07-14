@@ -50,16 +50,17 @@ export default function ExportReviewPage() {
       {tw && (
         <div className="rounded-card border border-bordergrey bg-card p-3 shadow-soft">
           <div className="mb-2 flex items-center justify-between">
-            <b className="text-[14px] text-ink">TW independent review workflow</b>
+            <b className="text-[14px] text-ink">Current run — TW Independent Platform-First Run</b>
             <a href="/coverage-map" className="text-[12px] text-actionblue">open coverage map →</a>
           </div>
+          <p className="mb-2 text-[12px] text-muted">Discovery strategy: <b className="text-ink">Platform-first</b> · Territory: <b className="text-ink">TW postcode area</b>. Selected platforms create candidates; FSA validates; Google Places enriches; Companies House checks/enriches; customer matching excludes or holds.</p>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
-            <Stat label="Clean ready-to-call" value={tw.clean_independent_count} good />
+            <Stat label="Total candidates" value={tw.total_rows_considered} />
+            <Stat label="Ready to call" value={tw.clean_independent_count} good />
             <Stat label="Manual review" value={tw.manual_review_master_count} warn />
-            <Stat label="Excluded (audit)" value={tw.excluded_count} />
+            <Stat label="Excluded / audit" value={tw.excluded_count} />
             <Stat label="Research-phone" value={tw.review_research_phone_count} />
             <Stat label="Company-status review" value={tw.review_company_status_count} warn />
-            <Stat label="Chain/category review" value={tw.review_chain_category_ambiguity_count} />
           </div>
           <p className="mt-2 text-[11.5px] text-muted">
             Clean → <code>exports/tw-independent-ready-to-call.csv</code> (sales) · Manual review → <code>exports/tw-independent-manual-review-master.csv</code> (management/admin) · Excluded → <code>exports/tw-independent-excluded-brands-and-non-targets.csv</code> (audit). Files are local, gitignored.
@@ -67,7 +68,8 @@ export default function ExportReviewPage() {
         </div>
       )}
 
-      {!result ? (
+      {/* Older FSA-first run-store view is shown only when no current TW run exists. */}
+      {tw ? null : !result ? (
         <div className="rounded-card border border-bordergrey bg-card p-4 shadow-soft">
           <EmptyState title="No export batch yet" hint="Run the pipeline: npm run leads:first" />
         </div>
