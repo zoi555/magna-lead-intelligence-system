@@ -28,12 +28,13 @@
   "dependencies": {
     "@expo-google-fonts/open-sans": "^0.4.2",
     "@fontsource/open-sans": "^5.2.7",
+    "@geospatial/map": "git+https://github.com/zoi555/geospatial-platform.git#v0.1.1",
     "fontnik": "^0.7.7",
+    "maplibre-gl": "^5.24.0",
     "next": "^16.2.10",
     "pmtiles": "^4.4.1",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "@geospatial/map": "git+https://github.com/zoi555/geospatial-platform.git#v0.1.0"
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@types/node": "20.14.12",
