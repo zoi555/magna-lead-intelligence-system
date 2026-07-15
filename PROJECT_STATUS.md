@@ -12,6 +12,17 @@ Builder** first screen and its **national geospatial foundation**.
 - TW independent review workflow (clean / manual-review / excluded) + `/coverage-map` MapLibre map (regional OS geometry) + `/export-review` showing the single current TW run.
 - Geospatial-foundation Milestone 1: honest source manifest (`src/lib/geo/geospatial-source-manifest.ts`), locked map-layer/road/zoom/label/feeder architecture (`src/lib/geo/map-layer-config.ts`), road-coverage validation, `npm run test:geo`, and documentation (architecture / source register / ADR / run-builder spec).
 
+### Map interaction functional pass — 2026-07-15 (`@geospatial/map` v0.1.2)
+- Solid A roads (casing+fill, primary/other split); road labels coupled to road toggles;
+  single postcode **study mode** (point-based, no fabricated polygons); hover vs persistent
+  **blue** selection (Escape clears); territory stays **orange**.
+- AspectLead: `ExpandableMap` (same-instance Expand, 620→760px), run-territory outline from
+  local district polygons, delivery-coverage overlay (labelled **mock** — no canonical source
+  yet, ISS-0009), sticky Run Builder layout.
+- Verified: package + app typecheck/tests/build green, routes 200, no 404s. In-browser pixel
+  verification pending (ISS-0011). Docs: `docs/56_MAP_INTERACTION_FUNCTIONAL_PASS.md`.
+- **Next task: Discovery Sources engine** (not started here).
+
 ### Work in progress
 - Discovery Run Builder Step 1 (Territory) screen at `/run-setup` (interactive territory entry + detection + policies + draft persistence).
 

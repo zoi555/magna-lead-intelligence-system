@@ -17,6 +17,40 @@ Use the documentation-first Project Operating System v2 before implementation.
 
 Lost project history and undocumented decisions are a major risk.
 
+## ADR-0013 — Map interaction: single postcode study mode, point-based interaction, app-side territory/coverage overlays
+
+Date: 2026-07-15
+Status: Accepted
+
+### Context
+
+The embedded map's controls did not accurately drive the visible map: A roads rendered as
+fuzzy hairlines, road labels ignored road toggles, four independent postcode toggles fought
+each other (sector had no visible effect), and selection was indistinguishable from the run
+territory. The production map source carries postcode centroid **points only** — no boundary
+polygons.
+
+### Decision
+
+1. **Roads** render as solids with casing layers; primary vs other A split by `primary_route`;
+   hierarchy preserved (`@geospatial/map` v0.1.2).
+2. **Road labels are coupled** to road-geometry visibility (motorway numbers excepted/locked).
+3. **One postcode study mode** (`postcodes.mode` = off/area/district/sector/full); only the
+   active level shows labels + interaction. Interaction is **point-based** (centroid hit
+   circles) because no boundary polygons exist — polygons are **not fabricated**.
+4. **Hover ≠ selection**: hover = temporary highlight; click = persistent **blue** selection;
+   Escape clears. Territory stays **orange**; three distinct visual states.
+5. **App-specific overlays stay in AspectLead**, not the package: run-territory outline (from
+   the local Code-Point district feasibility polygons) via `selectedTerritories`; delivery
+   coverage via `MapOverlayDefinition` (currently a labelled **mock** — no canonical source).
+6. **Expand** reuses the same map instance (CSS swap + `resize()`), no second map.
+
+### Reason
+
+Every visible control must map to a real, testable change; honesty about missing geometry
+(points-only, mock delivery area) beats fabricated polygons; the generic/app boundary keeps
+`@geospatial/map` portable. See `docs/56_MAP_INTERACTION_FUNCTIONAL_PASS.md`.
+
 ## ADR-0002 — Platform-first discovery, Google fallback
 
 Date: 2026-07-09  

@@ -124,3 +124,48 @@ Architecture references Claude Code cloud routine for scheduling/orchestration. 
 ### Next action
 
 Verify whether Claude Code can reliably run scheduled cloud routines for this use case, or replace with AWS EventBridge/GitHub Actions/n8n.
+
+## ISS-0009 — No canonical delivery-coverage geometry
+
+Date: 2026-07-15
+Severity: Medium
+Owner: Zoeb
+Status: Open — contract wired, source missing
+
+### Problem
+
+Part 7 delivery-coverage overlay is wired, but the only geometry available
+(`public/map/delivery_boundary.geojson`) self-describes as an *illustrative mock*. The map
+labels it "Current delivery coverage (mock)" and `DELIVERY_COVERAGE_SOURCE_STATUS` records
+the gap. A confirmed operational delivery boundary (routing/depot coverage export) is needed
+to replace the mock.
+
+## ISS-0010 — No postcode boundary polygons in the production map source
+
+Date: 2026-07-15
+Severity: Medium
+Owner: Zoeb
+Status: Open — honest point-based interaction shipped
+
+### Problem
+
+`assets.geospatmap.com` carries postcode **centroid points only** — no area/district/sector
+boundary polygons. Postcode study-mode hover/selection is therefore point-based. The drawer
+states "Boundary polygons unavailable" per level; polygons are not fabricated. A licensed
+boundary source (e.g. ONS/OS postcode polygons) would enable polygon interaction. (The local
+`pc_districts.geojson` feasibility layer is used only for the run-territory outline, not the
+package map source.)
+
+## ISS-0011 — In-browser pixel verification of the map not run
+
+Date: 2026-07-15
+Severity: Low
+Owner: Zoeb
+Status: Open
+
+### Problem
+
+The v0.1.2 map pass was verified headlessly (build, typecheck, tests, routes 200, no 404s)
+but the Chrome automation extension was unavailable, so on-screen checks (solid A roads
+rendered, live hover/selection, expand behaviour) were not performed. Recommend a manual pass
+on `/run-builder`, `/coverage-map`, `/national-map` before relying on it in production.

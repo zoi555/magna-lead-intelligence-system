@@ -1,5 +1,42 @@
 # AI Work Log — Magna Lead Intelligence System
 
+## Session: 2026-07-15 — Map interaction functional pass + `@geospatial/map` v0.1.2
+
+Tool used: Claude Code
+Human request: One final **functional** map-interaction pass across `/run-builder` and
+`/coverage-map` — fix controls that don't accurately control the visible map. Do NOT start
+Discovery Sources, do NOT redesign the app, do NOT move AspectLead business logic into the
+generic map package.
+Package (`@geospatial/map`, independent repo) changes → released as **v0.1.2**:
+- Solid A-road rendering (width bump + casing/solid layer pairs; primary vs other A split by
+  `primary_route`); hierarchy preserved (`roadRules.ts`, `createMapStyle.ts`).
+- Road labels coupled to road-geometry visibility (`layerRegistry.ts`).
+- Single postcode **study mode** (`postcodes.mode`) replacing four independent toggles; only
+  the active level shows labels + point interaction (`types.ts`, `createMapStyle.ts`,
+  `layerRegistry.ts`, `defaultMapProfile.ts`).
+- Honest postcode audit: production carries **centroid points only, no polygons** → point-based
+  hover/selection; drawer states "Boundary polygons unavailable".
+- Hover=light temp highlight; click=persistent **blue** selection (distinct from orange
+  territory); new selection replaces previous; **Escape** clears (`GeospatialMap.tsx`).
+- README documents study modes, boundary availability, label/road coupling, hover/selection.
+- New tests: study-mode + label/road coupling invariants. Typecheck + tests green.
+AspectLead (this repo) changes:
+- Pinned `@geospatial/map` to **v0.1.2**.
+- `ExpandableMap.tsx` — Expand control reusing the **same** GeospatialMap instance (CSS swap +
+  `map.resize()`); embedded height 620→760px responsive.
+- `aspectlead-territory.ts` — run outcodes → district polygons (local Code-Point feasibility
+  layer) → `selectedTerritories` orange outline; recomputed from territory input only.
+- `deliveryCoverageOverlay()` — teal operational overlay from the *mock* delivery boundary,
+  labelled a mock; `DELIVERY_COVERAGE_SOURCE_STATUS` records the missing canonical source.
+- `run-builder` layout: sticky pipeline stepper, sticky right rail, persistent Save Draft.
+- `coverage-map`: grouped overlay panel (Operational / Lead coverage) + honest mock notice.
+- `docs/56_MAP_INTERACTION_FUNCTIONAL_PASS.md` (new, Part 14 documentation).
+Bugs fixed: 4 (see `10_BUGS_AND_FIXES.md`). Issues opened: ISS-0009/0010/0011.
+Tests run: package typecheck+test ✓; AspectLead typecheck ✓, run-draft/custom-config/scoring/
+telesales-safe/geo ✓, `npm run build` ✓, routes 200, no 404s.
+Not verified: in-browser pixel checks (Chrome extension unavailable) — ISS-0011.
+Next action: **Discovery Sources engine** (deliberately not started here).
+
 ## Session: 2026-07-11 — Route B (Perspective Cut) carried forward + wordmark refinement brief (design only)
 
 Tool used: Claude Code

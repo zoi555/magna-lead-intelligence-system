@@ -26,9 +26,10 @@ import {
 import {
   ChainEntry, loadChainRegistry, saveChainRegistry, addChain, setChainEnabled,
 } from "@/lib/discovery/chain-registry";
-import { GeospatialMap } from "@geospatial/map";
-import type { FeederRoadEntry, MapViewState } from "@geospatial/map";
+import type { FeederRoadEntry, MapViewState, TerritoryGeometry } from "@geospatial/map";
+import { ExpandableMap } from "@/features/geospatial/ExpandableMap";
 import { aspectleadSourceConfig, NATIONAL_INITIAL_VIEW } from "@/features/geospatial/aspectlead-map-config";
+import { runTerritoryGeometry } from "@/features/geospatial/aspectlead-territory";
 
 const PIPELINE = ["Run Builder", "Discovery Sources", "Validation", "Enrichment", "Exclusions", "Review Rules", "Export Mapping", "Run Summary"];
 
@@ -42,6 +43,7 @@ export default function RunBuilderPage() {
   const [newChain, setNewChain] = React.useState("");
   const [mapFeeders, setMapFeeders] = React.useState<FeederRoadEntry[]>([]);
   const [mapView, setMapView] = React.useState<MapViewState | null>(null);
+  const [territoryGeom, setTerritoryGeom] = React.useState<TerritoryGeometry[]>([]);
   const [savedAt, setSavedAt] = React.useState<string | null>(null);
   const [alertMsg, setAlertMsg] = React.useState<string | null>(null);  // role=alert (assertive, blocking)
   const [bizSearch, setBizSearch] = React.useState("");
@@ -63,6 +65,14 @@ export default function RunBuilderPage() {
   // autosave (also stamps the last-saved time)
   React.useEffect(() => { if (draft) { saveRunDraft(draft); setSavedAt(new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })); } }, [draft]);
 
+  // Territory outline overlay: recompute from the run's outcodes only (NOT from browsing).
+  const territoryInput = draft?.territory.input ?? "";
+  React.useEffect(() => {
+    let live = true;
+    runTerritoryGeometry(territoryInput).then((g) => { if (live) setTerritoryGeom(g); });
+    return () => { live = false; };
+  }, [territoryInput]);
+
   if (!draft) return <div className="p-8 text-sm text-gray-500">Loading run builder…</div>;
 
   const p = draft.profile;
@@ -79,8 +89,8 @@ export default function RunBuilderPage() {
     <div>
       <PageHeader title="Discovery Run Builder" subtitle="Configure a lead discovery run. Independent Foodservice profile by default." />
 
-      {/* pipeline navigator */}
-      <nav className="flex flex-wrap gap-1.5 px-6 pt-3" aria-label="Run pipeline">
+      {/* pipeline navigator — sticky so the current step stays visible while scrolling */}
+      <nav className="sticky top-0 z-20 flex flex-wrap gap-1.5 px-6 py-2.5 bg-white/95 backdrop-blur border-b border-gray-100" aria-label="Run pipeline">
         {PIPELINE.map((s, i) => (
           <span key={s} className={`text-xs px-2.5 py-1 rounded-full border ${i === 0 ? "bg-blue-600 text-white border-blue-600" : "bg-white text-gray-500 border-gray-200"}`}>{i + 1}. {s}</span>
         ))}
@@ -126,18 +136,24 @@ export default function RunBuilderPage() {
 
           {/* national map — shared portable component (no iframe) */}
           <Card title="National map & feeder roads">
-            <p className="text-xs text-gray-500 mb-2">Shared Great Britain map (OS OpenData) via the portable geospatial component. Browse anywhere; configure feeder roads and layers here. <b>Map browsing does not change the run territory</b> — the territory is set only in the Territory section above.</p>
-            <div className="rounded-lg border border-gray-200 overflow-hidden" style={{ height: 420, position: "relative" }}>
-              <GeospatialMap
-                sources={aspectleadSourceConfig()}
-                initialView={NATIONAL_INITIAL_VIEW}
-                feederRoads={mapFeeders}
-                onFeederRoadsChange={setMapFeeders}
-                onViewChange={setMapView}
-                controls={{ layerDrawer: true, search: true, featureInspector: true, roads: true, feederRoads: true, placesAndLabels: true, postcodes: true, transport: true, environment: true, nationalView: true }}
-              />
-            </div>
-            {mapView && <p className="text-[11px] text-gray-400 mt-1">Viewing {mapView.latitude.toFixed(2)}, {mapView.longitude.toFixed(2)} @ z{mapView.zoom.toFixed(1)} — run territory unchanged ({draft.territory.input || "—"}).</p>}
+            <p className="text-xs text-gray-500 mb-2">Shared Great Britain map (OS OpenData) via the portable geospatial component. Browse anywhere; configure feeder roads and layers here. <b>Map browsing does not change the run territory</b> — the territory is set only in the Territory section above. The saved territory shows as an orange outline; use Expand for a full-screen view.</p>
+            <ExpandableMap
+              sources={aspectleadSourceConfig()}
+              initialView={NATIONAL_INITIAL_VIEW}
+              feederRoads={mapFeeders}
+              onFeederRoadsChange={setMapFeeders}
+              onViewChange={setMapView}
+              selectedTerritories={territoryGeom}
+              controls={{ layerDrawer: true, search: true, featureInspector: true, roads: true, feederRoads: true, placesAndLabels: true, postcodes: true, transport: true, environment: true, nationalView: true }}
+            />
+            <p className="text-[11px] text-gray-400 mt-1">
+              {territoryGeom.length > 0
+                ? `Territory outline: ${territoryGeom.length} district${territoryGeom.length === 1 ? "" : "s"} (${draft.territory.input}).`
+                : draft.territory.input
+                  ? `No district polygons matched “${draft.territory.input}”. Outlines are drawn from the Code-Point district feasibility layer.`
+                  : "Enter outcodes in the Territory section to outline the run territory."}
+              {mapView && ` Viewing ${mapView.latitude.toFixed(2)}, ${mapView.longitude.toFixed(2)} @ z${mapView.zoom.toFixed(1)} — territory unchanged.`}
+            </p>
             <a href="/national-map" target="_blank" className="text-xs text-blue-600 underline mt-1 inline-block">Open the full National Map Workbench ↗</a>
           </Card>
 
@@ -232,7 +248,7 @@ export default function RunBuilderPage() {
         </div>
 
         {/* right rail: live summary + validation */}
-        <aside className="space-y-4 xl:sticky xl:top-4 self-start">
+        <aside className="space-y-4 xl:sticky xl:top-16 self-start">
           <Card title="Live configuration">
             <dl className="text-xs space-y-1">
               {summariseRunDraft(draft).map((s) => (

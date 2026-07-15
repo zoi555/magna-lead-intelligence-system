@@ -65,3 +65,6 @@ imports/
 data/imports/
 /public/vendor/
 /public/map/
+
+# TypeScript incremental build info
+*.tsbuildinfo
