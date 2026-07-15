@@ -3,7 +3,7 @@
 // MapOverlayDefinition objects the portable map can render. The map package never
 // imports this file — coverage is application-specific.
 
-import type { MapOverlayDefinition } from "@geospatial-map";
+import type { MapOverlayDefinition } from "@geospatial/map";
 
 interface Lead { id: string; lat?: number; lng?: number; has_coordinates?: boolean; halal_signal?: string }
 

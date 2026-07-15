@@ -5,8 +5,8 @@
 // lead-independent; only the coverage points come from the current TW run via an adapter.
 
 import React from "react";
-import { GeospatialMap } from "@geospatial-map";
-import type { MapOverlayDefinition, MapInstanceReference, MapFeatureSelection } from "@geospatial-map";
+import { GeospatialMap } from "@geospatial/map";
+import type { MapOverlayDefinition, MapInstanceReference, MapFeatureSelection } from "@geospatial/map";
 import { aspectleadSourceConfig } from "@/features/geospatial/aspectlead-map-config";
 import { loadCoverageOverlays } from "@/features/geospatial/aspectlead-coverage-overlays";
 

@@ -26,8 +26,8 @@ import {
 import {
   ChainEntry, loadChainRegistry, saveChainRegistry, addChain, setChainEnabled,
 } from "@/lib/discovery/chain-registry";
-import { GeospatialMap } from "@geospatial-map";
-import type { FeederRoadEntry, MapViewState } from "@geospatial-map";
+import { GeospatialMap } from "@geospatial/map";
+import type { FeederRoadEntry, MapViewState } from "@geospatial/map";
 import { aspectleadSourceConfig, NATIONAL_INITIAL_VIEW } from "@/features/geospatial/aspectlead-map-config";
 
 const PIPELINE = ["Run Builder", "Discovery Sources", "Validation", "Enrichment", "Exclusions", "Review Rules", "Export Mapping", "Run Summary"];

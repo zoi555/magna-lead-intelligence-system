@@ -5,8 +5,8 @@
 // Feeder-road state is owned by this app and persisted locally.
 
 import React from "react";
-import { GeospatialMap } from "@geospatial-map";
-import type { FeederRoadEntry } from "@geospatial-map";
+import { GeospatialMap } from "@geospatial/map";
+import type { FeederRoadEntry } from "@geospatial/map";
 import { aspectleadSourceConfig, NATIONAL_INITIAL_VIEW } from "@/features/geospatial/aspectlead-map-config";
 
 const LS_KEY = "aspectlead.national-map.feeders";

@@ -17,15 +17,12 @@
     "leads:just-eat": "tsx scripts/fetch-just-eat.ts",
     "leads:tw-platform-first": "tsx scripts/run-tw-platform-first-leads.ts",
     "test:geo": "tsx scripts/test-geo-foundation.ts",
-    "test:feeders": "tsx scripts/test-feeder-roads.ts",
     "geo:glyphs": "node scripts/geo/gen-glyphs.js",
     "geo:install": "bash scripts/geo/00-install-tools.sh",
     "geo:acquire": "bash scripts/geo/10-acquire-national-geo.sh",
     "geo:convert": "bash scripts/geo/20-convert-national-geo.sh",
     "geo:link": "mkdir -p public/map/tiles && for f in \"$HOME\"/Data/aspectlead-geospatial/tiles/*.pmtiles; do ln -sf \"$f\" \"public/map/tiles/$(basename \"$f\")\"; done && ls -la public/map/tiles",
     "test:run-draft": "tsx scripts/test-run-draft.ts",
-    "test:map": "tsx scripts/test-map-package.ts",
-    "test:map-boundary": "tsx scripts/test-map-boundary.ts",
     "test:custom-config": "tsx scripts/test-custom-config.ts"
   },
   "dependencies": {
@@ -35,7 +32,8 @@
     "next": "^16.2.10",
     "pmtiles": "^4.4.1",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "@geospatial/map": "git+https://github.com/zoi555/geospatial-platform.git#v0.1.0"
   },
   "devDependencies": {
     "@types/node": "20.14.12",

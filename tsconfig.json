@@ -25,12 +25,6 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ],
-      "@geospatial-map": [
-        "./packages/geospatial-map/src/index.ts"
-      ],
-      "@geospatial-map/*": [
-        "./packages/geospatial-map/src/*"
       ]
     }
   },
