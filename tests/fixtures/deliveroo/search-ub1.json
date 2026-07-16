@@ -1,0 +1,8 @@
+{
+  "area": "UB1",
+  "restaurants": [
+    { "id": "dl-200", "name": "Test Spice House", "brand": null, "address": { "address1": "1 Example Road", "postcode": "UB1 1AA" }, "location": { "lat": 51.5081, "lon": -0.3762 }, "url": "https://deliveroo.co.uk/menu/london/southall/test-spice-house", "phone": "020 7946 0111", "rating": 4.6, "numberOfReviews": 180, "cuisines": ["Indian", "Curry"], "deliverable": true, "collection": false, "deliveryFee": 199, "minimumOrderValue": 1200, "prepTime": 28, "promoted": false, "halal": true, "image": "https://example-cdn.test/dl-200.jpg" },
+    { "id": "dl-201", "name": "Deliveroo Only Pizza", "brand": null, "address": { "address1": "3 Unique Lane", "postcode": "UB1 4YY" }, "location": { "lat": 51.5060, "lon": -0.3800 }, "url": "https://deliveroo.co.uk/menu/london/southall/deliveroo-only-pizza", "phone": null, "rating": 4.1, "numberOfReviews": 60, "cuisines": ["Pizza"], "deliverable": true, "collection": true, "deliveryFee": 249, "minimumOrderValue": 1000, "prepTime": 30, "promoted": false, "halal": false, "image": "https://example-cdn.test/dl-201.jpg" },
+    { "id": "dl-202", "name": "Conflict Cafe", "brand": null, "address": { "address1": "7 Dispute Way", "postcode": "UB1 6BB" }, "location": { "lat": 51.5300, "lon": -0.3900 }, "url": "https://deliveroo.co.uk/menu/london/southall/conflict-cafe", "phone": "020 1111 2222", "rating": 3.5, "numberOfReviews": 22, "cuisines": ["Cafe"], "deliverable": true, "collection": false, "deliveryFee": 299, "minimumOrderValue": 800, "prepTime": 35, "promoted": false, "halal": false, "image": "https://example-cdn.test/dl-202.jpg" }
+  ]
+}

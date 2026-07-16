@@ -271,3 +271,32 @@ Decisions made: Docs-first, platform-first, deterministic pipeline, manual CRM u
 Tests run: ZIP creation and file-count verification.  
 Remaining issues: See `docs/11_ISSUES_LOG.md`.  
 Next action: Set up local folder and GitHub repo, then resolve blockers before build.
+
+## Session: 2026-07-16/17 — Multi-source discovery foundation (Parts 1, 6-9)
+
+Tool used: Claude Code
+Human request: Complete the discovery foundation — push geography work; finish national
+geography; complete Just Eat; implement Uber Eats + Deliveroo; consolidate; comparison report.
+Do not fabricate, bypass anti-bot/ToS, or silently purchase.
+Done this session:
+- Part 1: pushed @geospatial/map v0.2.0 (already on origin) + AspectLead d11d6c8; de-duplicated
+  generic geography (aspectlead-territory → package classifier; legacy postcode-hierarchy/
+  postcode-index marked SUPERSEDED). Pushed (374801f).
+- Lawful acquisition AUDIT (web-researched): Uber Eats + Deliveroo have NO lawful open discovery
+  API — official APIs are partner/own-store only; consumer sites anti-bot+ToS. Provider options
+  + costs documented (docs/61); nothing purchased.
+- Uber Eats + Deliveroo adapters (generic PlatformAdapter contract) — fixture/provider-driven,
+  liveExecution:false, validation fails without a provider (no fake live). Sanitised fixtures +
+  parsers → source-neutral SourceOutlet.
+- Consolidation (Part 8): evidence-based cross-source matching (phone/URL/postcode+name/coords),
+  never name-alone; confirmed/probable/ambiguous/separate_branch/source_conflict; retains all
+  observations. Comparison + completeness report (Part 9): coverage, overlap, unique-per-source,
+  honest per-candidate completeness (phone/menu = enrichment_required).
+- Tests: test:multi-source green; all retained + JE + geography tests + build green.
+NOT done (blocked/scope, see final report): live Uber/Deliveroo (needs authorised provider —
+approval + cost); national data ingestion (OS Open Names + ONSPD, ISS-0017); stable UUID entity
+identity (Part 3); Run Builder full selection-type UI + live Vercel browser QA (deployment
+blocker); Just Eat 96-field parser extension + fresh live run + historical-duplicate marking
+(Part 5); DB persistence of consolidation + multi-source worker (Part 10); Vercel deploy (Part 13).
+Next action: get approval on a Uber/Deliveroo provider (cost) OR proceed to validation/dedup;
+acquire OS Open Names + ONSPD; persist consolidation; extend JE parser.
