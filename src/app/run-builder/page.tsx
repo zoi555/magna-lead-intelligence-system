@@ -120,7 +120,7 @@ export default function RunBuilderPage() {
             <div className="grid sm:grid-cols-2 gap-3">
               <Field label="Territory mode">
                 <select className={inp} value={draft.territory.mode} onChange={(e) => update((d) => { d.territory.mode = e.target.value as any; })}>
-                  {["pilot", "manual_outcodes", "vp_coverage", "full_uk", "custom"].map((m) => <option key={m} value={m}>{m}</option>)}
+                  {([["pilot", "Pilot"], ["manual_outcodes", "Manual postcode districts"], ["vp_coverage", "VP coverage"], ["full_uk", "Full UK"], ["custom", "Custom"]] as const).map(([m, label]) => <option key={m} value={m}>{label}</option>)}
                 </select>
               </Field>
               <Field label="Location rule">
@@ -130,7 +130,7 @@ export default function RunBuilderPage() {
                   <option value="off">Off</option>
                 </select>
               </Field>
-              <Field label="Postcodes / outcodes" wide><textarea className={inp} rows={2} value={draft.territory.input} onChange={(e) => update((d) => { d.territory.input = e.target.value; })} placeholder="TW   or   TW3, TW4   (comma or new line)" /></Field>
+              <Field label="Postcode districts, areas or places" wide><textarea className={inp} rows={2} value={draft.territory.input} onChange={(e) => update((d) => { d.territory.input = e.target.value; })} placeholder="TW   or   TW3, TW4   (comma or new line)" /></Field>
             </div>
             <p className="text-xs text-gray-500 mt-2">The run territory is an operational overlay. It never restricts national map browsing.</p>
           </Card>
@@ -152,7 +152,7 @@ export default function RunBuilderPage() {
                 ? `Territory outline: ${territoryGeom.length} district${territoryGeom.length === 1 ? "" : "s"} (${draft.territory.input}).`
                 : draft.territory.input
                   ? `No district polygons matched “${draft.territory.input}”. Outlines are drawn from the Code-Point district feasibility layer.`
-                  : "Enter outcodes in the Territory section to outline the run territory."}
+                  : "Enter postcode districts in the Territory section to outline the run territory."}
               {mapView && ` Viewing ${mapView.latitude.toFixed(2)}, ${mapView.longitude.toFixed(2)} @ z${mapView.zoom.toFixed(1)} — territory unchanged.`}
             </p>
             <a href="/national-map" target="_blank" className="text-xs text-blue-600 underline mt-1 inline-block">Open the full National Map Workbench ↗</a>

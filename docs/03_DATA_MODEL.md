@@ -281,3 +281,16 @@ the hosted `aspectlead-platform` Supabase project. Version-controlled in
 - `je_execution_quality` — data-quality report per execution.
 
 See `docs/58_JUST_EAT_STAGE1.md` for the full model and lifecycle.
+
+---
+
+## Addendum — Geography Standard v1.0 tables (2026-07-16, IMPLEMENTED, migrations 0012-0014)
+
+- `postcode_reference` — area/district/sector + centroid + unit_count + source/version (**seeded 13,864**, national).
+- `postcode_alias` — empty (schema ready).
+- `place`, `place_postcode_link`, `admin_area` — EMPTY, `capability_status='pending_data'` (await OS Open Names / ONSPD). place<->postcode is explicit M:N, never inferred.
+- `sales_region`, `sales_territory`, `delivery_coverage` + `territory_postcode` / `coverage_postcode` (M:N) — business hierarchy (tenant-scoped).
+- `discovery_selection`, `query_unit` — selection provenance + executed query units (unique per run+source).
+- `discovery_runs.derived_outcodes` renamed to `derived_query_units`.
+
+Generic geography logic is in `@geospatial/map` v0.2.0. See `docs/60_GEOGRAPHY_STANDARD.md`.

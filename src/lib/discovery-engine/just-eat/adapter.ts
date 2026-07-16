@@ -32,7 +32,7 @@ export class JustEatAdapter implements SourceAdapter {
   validateConfiguration(cfg: AdapterConfig): { ok: boolean; errors: string[] } {
     const errors: string[] = [];
     if (!cfg.enabled) errors.push("Just Eat source is disabled (JUST_EAT_ENABLED=false)");
-    if (!cfg.outcodes || cfg.outcodes.length === 0) errors.push("No outcodes to query (territory produced none)");
+    if (!cfg.outcodes || cfg.outcodes.length === 0) errors.push("No postcode districts to query (territory produced none)");
     if (cfg.maxCallsPerRun <= 0) errors.push("maxCallsPerRun must be positive");
     return { ok: errors.length === 0, errors };
   }

@@ -253,3 +253,27 @@ categories/items/prices, description and extra reviews are therefore **not obtai
 Just Eat** without prohibited circumvention or a commercial partner feed. Recommendation:
 fill phone/menu via later lawful enrichment (Google Places / Companies House / websites),
 not Just Eat detail (option B). See `docs/59_JUST_EAT_DETAIL_CAPABILITY_AUDIT.md`.
+
+## ISS-0017 — Place & administrative geography data pending (Geography Standard v1.0)
+
+Date: 2026-07-16
+Severity: Medium
+Owner: Zoeb
+Status: Open — schema built, capability = pending_data
+
+### Problem
+
+Geography Standard v1.0 builds the place (`place`), place↔postcode (`place_postcode_link`)
+and admin (`admin_area`) tables, but there is **no data to populate them** in-repo. So
+city/town/locality/village discovery expansion is **disabled and reports `pending_data`**
+(never guessed), and postcode→region/LA/ward is unavailable. Postcode area/district/sector
+expansion works now from the seeded national enumeration. National postcode **boundary
+polygons** are also absent (only 6 West-London areas), so map-polygon selection is
+centroid-based.
+
+### Next action
+
+Acquire lawful national datasets — **OS Open Names** (place gazetteer) and **ONSPD**
+(postcode→place/LA/region) — ingest into `place` / `place_postcode_link` / `admin_area`
+with `source` + `source_version`, then flip the capability from `pending_data` to
+`available` and enable place expansion.

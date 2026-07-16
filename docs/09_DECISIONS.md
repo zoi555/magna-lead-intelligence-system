@@ -17,6 +17,41 @@ Use the documentation-first Project Operating System v2 before implementation.
 
 Lost project history and undocumented decisions are a major risk.
 
+## ADR-0015 — Geography Standard v1.0 (generic geography in the package; honest data gaps)
+
+Date: 2026-07-16
+Status: Accepted
+
+### Context
+
+Geography terminology and expansion were divergent (three territory-mode enums, two models)
+and area tokens were silently dropped from Just Eat queries. A platform-wide standard was
+needed, with honest handling of missing data.
+
+### Decision
+
+1. **Generic geography logic lives in `@geospatial/map` (v0.2.0)** — canonical terminology,
+   postcode classification/expansion, place models, capability, planner. AspectLead keeps
+   only business geography (sales region/territory/delivery coverage), run selections and
+   source-planning adapters.
+2. **Deterministic postcode expansion from real data** (`postcode_reference`, seeded from
+   the national Code-Point-derived enumeration): area→district→sector. No fabrication.
+3. **Place/admin geography is `pending_data`** — schema built, rows empty, expansion
+   DISABLED and fails honestly (never guesses) until OS Open Names + ONSPD are ingested.
+   place↔postcode is an explicit many-to-many, never "towns ≈ districts".
+4. **Map-polygon selection is centroid-based** (real centroids, point-in-polygon), labelled
+   as such — national boundary polygons are absent.
+5. **"outcode" → "Postcode District"** in all user-facing surfaces; kept only inside adapter
+   internals where an external API dictates it. DB column `derived_outcodes` →
+   `derived_query_units`.
+6. **Selection provenance** (`discovery_selection` + `query_unit`) preserves original
+   selection, resolved entity, expansion, source+version, and executed query units.
+
+### Reason
+
+Real-data expansion + honest gap reporting beats guessing; the package/app split keeps
+generic geography reusable. See `docs/60_GEOGRAPHY_STANDARD.md`.
+
 ## ADR-0014 — Hosted Supabase Postgres as canonical persistence; Just Eat Stage 1 engine
 
 Date: 2026-07-16

@@ -1,5 +1,34 @@
 # AI Work Log — Magna Lead Intelligence System
 
+## Session: 2026-07-16 (later still) — Geography Standard v1.0 (platform-wide)
+
+Tool used: Claude Code
+Human request: Establish a platform-wide Geography Standard v1.0 — canonical terminology/models
+for 16 entities, postal + business hierarchies, explicit place↔postcode M:N, version-controlled
+migrations, deterministic expansion, per-adapter geography levels + a planner, selection
+provenance, rename "outcode"→"Postcode District", UI geography search/selection, tests + docs.
+Do NOT fabricate boundaries. Decision (user): build full place schema now, populate later from
+verified datasets; generic geography logic → the geospatial-platform package; AspectLead keeps
+sales region/territory/coverage + run selections + planning adapters.
+Audit: postcode_labels.geojson is a genuine NATIONAL enumeration (120/2,872/10,872) → area→
+district→sector expansion is real; place data / ONSPD / national boundary polygons are NOT in
+repo (honest gaps).
+Package (`@geospatial/map` → **v0.2.0**, released+tagged+pushed): `src/geography/` — terminology,
+postcode classify/expand over an injected reference, place + PlacePostcodeLink models + capability
+(pending_data), resolveSelection/planSelections/planForSource, centroidsInPolygon. `test:geography`.
+AspectLead: migrations 0012–0014 (postcode_reference seeded 13,864; place/admin empty pending_data;
+business hierarchy + M:N; discovery_selection + query_unit; rename derived_outcodes→derived_query_units);
+`seed-postcode-reference.ts`; DB-backed reference loader; planner (Just Eat district-only) wired into
+run-service/API so areas EXPAND; `/api/geography/resolve`; GeographySelector UI (preview/type/count/
+children/exclusions); user-facing "outcode"→"Postcode District" sweep; `test:geography-standard` (11
+categories). Honest: place/admin expansion fails as pending_data (never guessed); map-polygon is
+centroid-based; no fabricated boundaries.
+Verified: package typecheck + full test suite green; AspectLead typecheck + all JE/retained/geography
+tests green; `npm run build` green; migrations applied + advisors clean (2 accepted).
+Docs: `docs/60_GEOGRAPHY_STANDARD.md`; ADR-0015; PROJECT_STATUS; ISS-0017.
+Next action: acquire OS Open Names + ONSPD to populate place/admin + place↔postcode, then flip those
+capabilities from pending_data to available.
+
 ## Session: 2026-07-16 (later) — JE Stage 1 progress-counter fix + outlet-detail capability audit
 
 Tool used: Claude Code

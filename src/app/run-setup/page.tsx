@@ -11,7 +11,7 @@ const DRAFT_KEY = "li_run_setup_territory_v1";
 
 type Level = "area" | "district" | "sector" | "unit" | "invalid" | "empty";
 const LEVEL_LABEL: Record<Level, string> = {
-  area: "Postcode area", district: "Postcode district / outcode", sector: "Postcode sector",
+  area: "Postcode area", district: "Postcode District", sector: "Postcode sector",
   unit: "Full postcode / postcode unit", invalid: "Invalid / needs review", empty: "—",
 };
 const areaOf = (outcode: string) => (outcode.match(/^[A-Z]{1,2}/)?.[0] ?? outcode);
@@ -45,7 +45,7 @@ const LOCATION_RULE = [
   { id: "exclude_unproven", label: "Exclude unproven location" },
 ];
 const MODES = [
-  { id: "auto", label: "Auto-detect" }, { id: "area", label: "Postcode area" }, { id: "district", label: "District / outcode" },
+  { id: "auto", label: "Auto-detect" }, { id: "area", label: "Postcode area" }, { id: "district", label: "Postcode District" },
   { id: "sector", label: "Sector" }, { id: "unit", label: "Full postcode" }, { id: "upload", label: "Upload CSV" },
 ];
 
@@ -69,7 +69,7 @@ export default function RunSetupPage() {
 
   function expansionPreview(d: Detected): string {
     if (d.level === "area") return `${d.area} postcode area will expand to all ${d.area} districts${d.area === "TW" ? " (TW1–TW20)" : ""}.`;
-    if (d.level === "district") return `${d.value} postcode district / outcode selected.`;
+    if (d.level === "district") return `${d.value} Postcode District selected.`;
     if (d.level === "sector") return `${d.value} postcode sector selected.`;
     if (d.level === "unit") return "Full postcode selected.";
     return "Invalid entry — please check the postcode format.";

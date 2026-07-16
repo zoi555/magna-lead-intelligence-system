@@ -18,7 +18,7 @@ export interface RunInput {
   objective?: string | null;
   territory_mode?: string | null;
   territory_input?: string | null;
-  derived_outcodes: string[];
+  derived_query_units: string[];   // planned postcode query units (districts/sectors), source-compatible
   search_terms: string[];
   target_filters: Record<string, unknown>;
   requested_fields: string[];

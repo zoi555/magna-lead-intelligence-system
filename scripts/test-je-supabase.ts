@@ -44,9 +44,11 @@ async function main() {
     ? { ok: true, httpStatus: 200, headers: {} as Record<string, string>, raw: FIXTURE }
     : { ok: false, httpStatus: 429, headers: {} as Record<string, string>, raw: null, error: "HTTP 429" };
 
+  const { loadPostcodeReference } = await import("../src/lib/discovery-engine/geography/reference");
   const repo = new SupabaseRepository();
   const tenantId = await resolveDefaultTenantId();
-  const { run } = await saveRun(repo, { tenant_id: tenantId, name: "integration-selftest", territory_input: "UB1" });
+  const geoRef = await loadPostcodeReference();
+  const { run } = await saveRun(repo, { tenant_id: tenantId, name: "integration-selftest", territory_input: "UB1" }, geoRef);
   let runId = run.id;
   try {
     const exec = await queueJustEatExecution(repo, runId);

@@ -26,12 +26,14 @@
     "test:custom-config": "tsx scripts/test-custom-config.ts",
     "test:je-stage1": "tsx scripts/test-je-stage1.ts",
     "test:je-supabase": "tsx scripts/test-je-supabase.ts",
-    "je:worker": "tsx scripts/je-worker.ts"
+    "je:worker": "tsx scripts/je-worker.ts",
+    "seed:postcode-reference": "tsx scripts/seed-postcode-reference.ts",
+    "test:geography-standard": "tsx scripts/test-geography-standard.ts"
   },
   "dependencies": {
     "@expo-google-fonts/open-sans": "^0.4.2",
     "@fontsource/open-sans": "^5.2.7",
-    "@geospatial/map": "github:zoi555/geospatial-platform#v0.1.2",
+    "@geospatial/map": "github:zoi555/geospatial-platform#v0.2.0",
     "@supabase/supabase-js": "^2.110.6",
     "fontnik": "^0.7.7",
     "maplibre-gl": "^5.24.0",

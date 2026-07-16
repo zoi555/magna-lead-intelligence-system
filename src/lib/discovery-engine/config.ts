@@ -18,7 +18,9 @@ export function deriveQueryOutcodes(territoryInput: string): { outcodes: string[
   return { outcodes, unexpandableAreas: units.areas };
 }
 
-export function buildAdapterConfig(derivedOutcodes: string[]): AdapterConfig {
+// The adapter's `outcodes` field maps to the Just Eat API path segment (bypostcode/{code});
+// it is fed the run's planned postcode-district query units.
+export function buildAdapterConfig(queryUnits: string[]): AdapterConfig {
   const je = getJustEatConfig();
-  return { enabled: je.enabled, maxCallsPerRun: je.maxCallsPerRun, requestDelayMs: je.requestDelayMs, outcodes: derivedOutcodes };
+  return { enabled: je.enabled, maxCallsPerRun: je.maxCallsPerRun, requestDelayMs: je.requestDelayMs, outcodes: queryUnits };
 }

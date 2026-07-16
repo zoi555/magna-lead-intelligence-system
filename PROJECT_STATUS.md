@@ -34,6 +34,14 @@ Builder** first screen and its **national geospatial foundation**.
 - **Fixes 2026-07-16 (migrations 0009–0011):** worker UUID crash on empty queue (claim RPC → `SETOF`); observation-delete FK `ON DELETE SET NULL`; execution progress counter (`completed_queries` written authoritatively + intra-query heartbeat + ownership-guarded finish → no more 0/1, no lease-expiry double-processing). **11 migrations total.**
 - **Detail audit (docs/59):** Just Eat outlet detail is Cloudflare-blocked (403) with no public detail/menu endpoint (404) — phone/menu/opening-hours not lawfully retrievable; **recommend option B** (enrich phone/menu later via Google Places/Companies House/websites, not JE detail). ISS-0015 (718 duplicate observations from the pre-fix double-claim) awaits a prune decision.
 
+### Geography Standard v1.0 — 2026-07-16 (platform-wide)
+- **Generic geography → `@geospatial/map` v0.2.0** (`src/geography/`): canonical terminology (16 entities), postcode classify/expand, place models, capability, planner. AspectLead keeps business geography + run selections + source-planning adapters.
+- **Migrations 0012–0014**: `postcode_reference` (**seeded 13,864** from the national Code-Point-derived enumeration), `postcode_alias`, `place`/`place_postcode_link`/`admin_area` (empty, **`pending_data`**), business hierarchy (`sales_region`/`sales_territory`/`delivery_coverage` + territory/coverage↔postcode M:N), `discovery_selection` + `query_unit` (provenance). Renamed `derived_outcodes → derived_query_units`. Seed: `npm run seed:postcode-reference`.
+- **Deterministic expansion** area→district→sector from real data (UB→12 districts; UB1→4 sectors); **area tokens now expand** (were dropped). Just Eat declares district-only support; sectors/units reduce to district; no duplicate query units.
+- **Honest gaps** (objective 14): place/admin expansion DISABLED (`pending_data`, never guessed) pending OS Open Names + ONSPD; map-polygon is **centroid-based** (national boundary polygons absent); NI out of scope. place↔postcode is explicit M:N, never inferred.
+- **"outcode" → "Postcode District"** in all user-facing surfaces (kept only in adapter internals for the JE API path). UI geography selector: preview, result type, expansion count, inspect children, exclusions.
+- Verified: package `test:geography` + AspectLead `test:geography-standard` (11 categories) green; retained + JE tests green; `npm run build` green; migrations applied + advisors clean. Docs: `docs/60_GEOGRAPHY_STANDARD.md`.
+
 ### Work in progress
 - Discovery Run Builder Step 1 (Territory) screen at `/run-setup` (interactive territory entry + detection + policies + draft persistence).
 

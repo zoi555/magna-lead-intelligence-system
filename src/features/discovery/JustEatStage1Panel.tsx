@@ -6,6 +6,7 @@
 // (`npm run je:worker`); this panel just queues and observes.
 
 import React from "react";
+import { GeographySelector } from "./GeographySelector";
 
 export interface JeRunPayload {
   name: string;
@@ -31,6 +32,7 @@ export function JustEatStage1Panel({ payload, canQueue }: { payload: JeRunPayloa
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [note, setNote] = React.useState<string | null>(null);
+  const [exclusions, setExclusions] = React.useState<string[]>([]);
 
   // poll status while an execution is active
   React.useEffect(() => {
@@ -54,13 +56,14 @@ export function JustEatStage1Panel({ payload, canQueue }: { payload: JeRunPayloa
   async function saveAndQueue() {
     setBusy(true); setError(null); setNote(null);
     try {
-      const res = await fetch("/api/discovery/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+      const res = await fetch("/api/discovery/runs", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payload, exclusions }) });
       const j = await res.json();
       if (!j.ok) throw new Error(j.error || "Failed to save run");
       setRunId(j.run.id);
-      if (Array.isArray(j.unexpandableAreas) && j.unexpandableAreas.length) {
-        setNote(`Area-only tokens can't be queried directly (need districts): ${j.unexpandableAreas.join(", ")}.`);
-      }
+      const bits: string[] = [];
+      if (typeof j.expansionCount === "number") bits.push(`${j.expansionCount} postcode district${j.expansionCount === 1 ? "" : "s"} planned`);
+      if (Array.isArray(j.unresolved) && j.unresolved.length) bits.push(`unresolved (no guess): ${j.unresolved.map((u: { value: string }) => u.value).join(", ")}`);
+      if (bits.length) setNote(bits.join(" · "));
       const q = await fetch(`/api/discovery/runs/${j.run.id}/queue`, { method: "POST" });
       const qj = await q.json();
       if (!qj.ok) throw new Error(qj.error || "Failed to queue execution");
@@ -93,6 +96,8 @@ export function JustEatStage1Panel({ payload, canQueue }: { payload: JeRunPayloa
         )}
       </div>
 
+      {!runId && <GeographySelector input={payload.territory_input} onExclusionsChange={setExclusions} />}
+
       {note && <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 mt-2">{note}</p>}
       {error && <p role="alert" className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1 mt-2">{error}</p>}
 
@@ -102,7 +107,7 @@ export function JustEatStage1Panel({ payload, canQueue }: { payload: JeRunPayloa
             <div className="text-xs">
               <span className="text-gray-500">Execution</span>{" "}
               <span className={`font-semibold ${statusColour(exec.status)}`}>{exec.status.replace(/_/g, " ")}</span>
-              <span className="text-gray-400"> · {exec.completed_queries}/{exec.planned_queries} outcodes</span>
+              <span className="text-gray-400"> · {exec.completed_queries}/{exec.planned_queries} postcode districts</span>
             </div>
             {active && <button onClick={cancel} disabled={busy} className="text-xs px-2 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50">Cancel</button>}
           </div>

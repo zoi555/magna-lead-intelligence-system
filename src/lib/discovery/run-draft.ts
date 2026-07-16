@@ -61,7 +61,7 @@ export function validateRunDraft(d: RunDraft): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   if (!d.name.trim()) errors.push("Run name is required.");
-  if (!d.territory.input.trim() && d.territory.mode !== "full_uk") errors.push("Territory: enter at least one postcode area/outcode, or choose Full UK.");
+  if (!d.territory.input.trim() && d.territory.mode !== "full_uk") errors.push("Territory: enter at least one postcode area, district or place, or choose Full UK.");
   if (!d.profile.businessTypes.length) errors.push("Target profile: select at least one business type.");
   if (!d.profile.dataFields.length) errors.push("Requested data: select at least one field to collect.");
   if (!d.profile.serviceModels.length) warnings.push("No service models selected — all will be included.");

@@ -26,8 +26,8 @@ export async function runWorkerOnce(repo: DiscoveryRepository, opts: WorkerOptio
     const run = await repo.getRun(execution.run_id);
     if (!run) { await repo.finishExecution(execution.id, "failed", { error: { message: "run not found" } }); continue; }
 
-    const cfg = buildAdapterConfig(run.derived_outcodes);
-    log(`Claimed execution ${execution.id} for run "${run.name}" — ${cfg.outcodes.length} outcode(s)`);
+    const cfg = buildAdapterConfig(run.derived_query_units);
+    log(`Claimed execution ${execution.id} for run "${run.name}" — ${cfg.outcodes.length} postcode district(s)`);
 
     // Guard: refuse to run a disabled/empty source honestly rather than silently no-op.
     if (!cfg.enabled) {

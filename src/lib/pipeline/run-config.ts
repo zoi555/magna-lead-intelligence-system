@@ -35,12 +35,12 @@ export const SCOPE_TYPES: ScopeType[] = [
 /** Short human labels for each scope type. */
 export const SCOPE_TYPE_LABELS: Record<ScopeType, string> = {
   postcode_area: "Postcode area (e.g. UB) — needs expansion",
-  postcode_district: "Postcode district / outcode (e.g. UB1)",
+  postcode_district: "Postcode District (e.g. UB1)",
   postcode_sector: "Postcode sector (e.g. UB1 1)",
   full_postcode: "Full postcode / unit (e.g. UB1 1AA)",
   uploaded_list: "Uploaded postcode list (CSV)",
   custom_territory: "Custom saved territory (mixed levels)",
-  full_uk_outcodes: "Full UK outcodes (national) — guarded",
+  full_uk_outcodes: "Full UK postcode districts (national) — guarded",
 };
 
 /** Plain-English description of what each scope type means for a run. */
@@ -48,17 +48,17 @@ export const SCOPE_TYPE_DESCRIPTIONS: Record<ScopeType, string> = {
   postcode_area:
     "The leading letters only. Broadest selection. Cannot be searched directly — each area must be expanded into its districts using the geo postcode index first (flagged with a trailing '*').",
   postcode_district:
-    "A single outward code. The pipeline's natural search unit — resolves straight to one outcode.",
+    "A single outward code. The pipeline's natural search unit — resolves straight to one postcode district.",
   postcode_sector:
-    "An outcode plus the first inward digit. Narrows a district to roughly a few streets; resolves to its parent outcode for searching.",
+    "A postcode district plus the first inward digit. Narrows a district to roughly a few streets; resolves to its parent postcode district for searching.",
   full_postcode:
-    "A complete postcode down to the delivery point. Most precise; resolves to its outcode and sector.",
+    "A complete postcode down to the delivery point. Most precise; resolves to its postcode district and sector.",
   uploaded_list:
     "A CSV of postcodes at any mix of levels. Each row is classified and bucketed; disabled rows are ignored upstream.",
   custom_territory:
     "A saved, reusable set that can mix areas, districts, sectors and full postcodes.",
   full_uk_outcodes:
-    "Every UK outcode — a national scan. GUARDED: only runs when FULL_UK_SCAN_CONFIRMED=true, to protect API caps and cost.",
+    "Every UK postcode district — a national scan. GUARDED: only runs when FULL_UK_SCAN_CONFIRMED=true, to protect API caps and cost.",
 };
 
 /** The concrete, auditable scope a run executes against. */

@@ -31,9 +31,9 @@ export const FULL_UK_PATHS = [
 
 export const TERRITORY_LABELS: Record<TerritoryMode, string> = {
   pilot: "West London pilot (PILOT ONLY)",
-  manual_outcodes: "manual_outcodes (postcode district / outcode)",
+  manual_outcodes: "Manual postcode districts",
   vp_coverage: "VP / Magna coverage",
-  full_uk_outcodes: "Full UK outcodes (national)",
+  full_uk_outcodes: "Full UK postcode districts (national)",
   custom_upload: "Custom uploaded postcode list",
 };
 
