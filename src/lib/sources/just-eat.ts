@@ -40,10 +40,47 @@ function clampInt(raw: string | undefined, dflt: number, min: number, max: numbe
 
 export const JUST_EAT_BASE = "https://uk.api.just-eat.io/restaurants/bypostcode";
 // A descriptive UA is polite and honest about who is calling; not evasion.
-const JUST_EAT_HEADERS = {
+export const JUST_EAT_HEADERS = {
   accept: "application/json",
   "user-agent": "AspectLead/1.0 (Magna Food Service lead-intelligence; server-side)",
 } as const;
+
+// Response headers that are safe to retain for audit (never auth/cookies).
+const SAFE_HEADER_KEYS = ["date", "content-type", "cache-control", "x-ratelimit-remaining", "x-ratelimit-limit", "retry-after"];
+
+/**
+ * Fetch ONE outcode's raw search payload and retain it for immutable observation
+ * storage. Same lawful endpoint/headers as fetchJustEatRestaurantsByOutcode, retry-once,
+ * fail-safe. Returns the RAW payload plus safe response metadata — the Stage-1 engine
+ * needs the untouched payload, which the normalise-only path above discards.
+ */
+export async function fetchJustEatSearchRaw(
+  outcode: string
+): Promise<{ ok: boolean; httpStatus: number | null; headers: Record<string, string>; raw: unknown; error?: string }> {
+  const oc = outcode.toUpperCase().replace(/\s+/g, "");
+  const url = `${JUST_EAT_BASE}/${encodeURIComponent(oc)}`;
+  let lastStatus: number | null = null;
+  let lastErr = "";
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, { headers: JUST_EAT_HEADERS });
+      lastStatus = res.status;
+      const headers: Record<string, string> = {};
+      for (const k of SAFE_HEADER_KEYS) { const v = res.headers.get(k); if (v) headers[k] = v; }
+      if (res.status === 403 || res.status === 429 || res.status >= 500) {
+        lastErr = `HTTP ${res.status} ${res.statusText}`;
+        if (attempt === 0) { await sleep(750); continue; }
+        return { ok: false, httpStatus: res.status, headers, raw: null, error: lastErr };
+      }
+      if (!res.ok) return { ok: false, httpStatus: res.status, headers, raw: null, error: `HTTP ${res.status}` };
+      return { ok: true, httpStatus: res.status, headers, raw: await res.json() };
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e);
+      if (attempt === 0) { await sleep(750); continue; }
+    }
+  }
+  return { ok: false, httpStatus: lastStatus, headers: {}, raw: null, error: lastErr || "network error" };
+}
 
 // ---------- normalised record ----------
 export type JustEatTerritoryClass =
@@ -100,7 +137,7 @@ function num(v: any): number | null {
 }
 
 /** Classify a JE record's location relative to the pilot outcodes. */
-function classifyTerritory(
+export function classifyTerritory(
   restaurantOutcode: string,
   queriedOutcode: string,
   pilotOutcodes: string[]

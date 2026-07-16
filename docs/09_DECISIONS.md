@@ -17,6 +17,41 @@ Use the documentation-first Project Operating System v2 before implementation.
 
 Lost project history and undocumented decisions are a major risk.
 
+## ADR-0014 — Hosted Supabase Postgres as canonical persistence; Just Eat Stage 1 engine
+
+Date: 2026-07-16
+Status: Accepted
+
+### Context
+
+Discovery Sources needed canonical, relational, immutable persistence with tenant
+isolation. The app previously had NO database (local JSON files + localStorage; draft SQL
+only). Just Eat Stage 1 is the first vertical slice.
+
+### Decision
+
+1. **New service: hosted Supabase Postgres** (project `aspectlead-platform`, org Magna
+   Foodservice, region eu-west-2, **$10/month**, explicitly approved). Canonical store for
+   runs, executions, immutable raw observations, normalised outlets, rating history,
+   provenance and data-quality reports. Version-controlled migrations in
+   `supabase/migrations/` (0001–0008), applied via the Supabase MCP.
+2. **Tenant-aware RLS from the start.** Service-role key server-side only (worker); anon
+   has no access to discovery tables; `authenticated` read-only except runs/cancel; raw
+   payloads column-restricted. localStorage stays browser-recovery only.
+3. **Repository abstraction** (`DiscoveryRepository`) with a Supabase impl (production) and
+   an in-memory impl (predictable tests, no network).
+4. **Just Eat only**, one lawful listing endpoint reused from `src/lib/sources/just-eat.ts`
+   (no new connector). Detail/menu marked conditional; phone/menu/reviews honestly
+   unavailable. No Deliveroo/Uber Eats.
+5. **Locally-runnable worker** with a production-safe claim/heartbeat/lease contract
+   (`FOR UPDATE SKIP LOCKED`). No paid worker infrastructure deployed.
+
+### Reason
+
+Canonical relational persistence + RLS is what the slice required; Supabase is the real
+target and matches the existing draft model (not a second model). Honest capability
+reporting beats fabricated fields. See `docs/58_JUST_EAT_STAGE1.md`, `docs/57_JUST_EAT_FIELD_CATALOGUE.md`.
+
 ## ADR-0013 — Map interaction: single postcode study mode, point-based interaction, app-side territory/coverage overlays
 
 Date: 2026-07-15

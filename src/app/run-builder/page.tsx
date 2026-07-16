@@ -30,6 +30,7 @@ import type { FeederRoadEntry, MapViewState, TerritoryGeometry } from "@geospati
 import { ExpandableMap } from "@/features/geospatial/ExpandableMap";
 import { aspectleadSourceConfig, NATIONAL_INITIAL_VIEW } from "@/features/geospatial/aspectlead-map-config";
 import { runTerritoryGeometry } from "@/features/geospatial/aspectlead-territory";
+import { JustEatStage1Panel } from "@/features/discovery/JustEatStage1Panel";
 
 const PIPELINE = ["Run Builder", "Discovery Sources", "Validation", "Enrichment", "Exclusions", "Review Rules", "Export Mapping", "Run Summary"];
 
@@ -245,6 +246,27 @@ export default function RunBuilderPage() {
 
           {/* result tags */}
           <Card title="Result tags"><ChipMulti items={RESULT_TAGS} selected={p.tags} onToggle={(id) => update((d) => { d.profile.tags = toggle(d.profile.tags, id); })} /></Card>
+
+          {/* discovery — Just Eat Stage 1 (canonical persistence + queue) */}
+          <Card title="Discovery — Just Eat (Stage 1)">
+            <JustEatStage1Panel
+              canQueue={validation.ok}
+              payload={{
+                name: draft.name,
+                reference: draft.reference,
+                objective: draft.objective,
+                territory_mode: draft.territory.mode,
+                territory_input: draft.territory.input,
+                search_terms: p.includeTerms,
+                target_filters: {
+                  businessTypes: p.businessTypes, cuisines: p.cuisines, serviceModels: p.serviceModels,
+                  ownership: p.ownership, exclusions: p.exclusions, excludeTerms: p.excludeTerms,
+                },
+                requested_fields: p.dataFields,
+                config_snapshot: draft as unknown as Record<string, unknown>,
+              }}
+            />
+          </Card>
         </div>
 
         {/* right rail: live summary + validation */}

@@ -169,3 +169,46 @@ The v0.1.2 map pass was verified headlessly (build, typecheck, tests, routes 200
 but the Chrome automation extension was unavailable, so on-screen checks (solid A roads
 rendered, live hover/selection, expand behaviour) were not performed. Recommend a manual pass
 on `/run-builder`, `/coverage-map`, `/national-map` before relying on it in production.
+
+## ISS-0012 — Supabase service-role key not yet in .env.local
+
+Date: 2026-07-16
+Severity: Medium (blocks live JE runs, not the build)
+Owner: Zoeb
+Status: Open — action on user
+
+### Problem
+
+The `aspectlead-platform` Supabase project is live and migrated, but the SECRET
+`SUPABASE_SERVICE_ROLE_KEY` cannot be retrieved via tooling (by design). Until it is pasted
+into `.env.local` (Project Settings → API), the worker and discovery API routes cannot write
+to the DB, and `test:je-supabase` skips. URL + anon key are already set. Also set
+`JUST_EAT_ENABLED=true` to run live discovery.
+
+## ISS-0013 — Just Eat worker is local-only (deployment boundary)
+
+Date: 2026-07-16
+Severity: Low
+Owner: Zoeb
+Status: Open — by design for Stage 1
+
+### Problem
+
+The worker runs as a local Node process (`npm run je:worker`). Vercel request handlers can
+queue executions but cannot run long discovery. The claim/heartbeat/lease contract is
+production-safe, so moving to a deployed queue/cron later changes only the launcher — but no
+paid worker infra is deployed yet (per instruction).
+
+## ISS-0014 — Accepted Supabase security advisories (by design)
+
+Date: 2026-07-16
+Severity: Low
+Owner: Zoeb
+Status: Accepted
+
+### Problem
+
+Two `authenticated_security_definer_function_executable` advisories remain on
+`app_current_tenant_ids` / `app_is_tenant_member`. They are required for RLS policy
+evaluation and only ever return the caller's own tenant membership (no cross-tenant leak).
+Documented as accepted rather than remediated.

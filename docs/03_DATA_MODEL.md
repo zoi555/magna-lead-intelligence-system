@@ -259,3 +259,25 @@ MVP set and Phase 2 items are enumerated in the accepted proposal; overlays for 
 - Which fields must be management-only?
 - What exact CRM import/export format is required?
 - What retention period applies to ignored leads and rejected prospects?
+
+---
+
+## Addendum — Just Eat Discovery Stage 1 tables (2026-07-16, IMPLEMENTED)
+
+Unlike the rest of this document (design-only), these tables are **built and migrated** in
+the hosted `aspectlead-platform` Supabase project. Version-controlled in
+`supabase/migrations/0001-0008`. All tenant-scoped with RLS.
+
+- `tenants`, `tenant_members` — tenancy + RLS helper functions.
+- `discovery_runs` — canonical run persistence (config snapshot + structured columns).
+- `je_executions` — per-execution status + claim/heartbeat/lease (+ `claim_je_execution`,
+  `heartbeat_je_execution` RPCs, service-role only).
+- `je_raw_observations` — APPEND-ONLY raw payloads + content hash (raw_payload column
+  withheld from browser roles; sanitised `je_observation_summary` view).
+- `je_outlets` — normalised outlet (structured columns + `source_extra` JSONB), upsert by
+  `(tenant_id, je_outlet_id)`.
+- `je_rating_history` — rating observations over time.
+- `je_field_provenance` — per-field provenance.
+- `je_execution_quality` — data-quality report per execution.
+
+See `docs/58_JUST_EAT_STAGE1.md` for the full model and lifecycle.

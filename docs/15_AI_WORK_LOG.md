@@ -1,5 +1,36 @@
 # AI Work Log — Magna Lead Intelligence System
 
+## Session: 2026-07-16 — Just Eat Discovery Stage 1 (first discovery-engine vertical slice)
+
+Tool used: Claude Code
+Human request: Build Just Eat Discovery — Stage 1. Persist a run canonically; execute Just
+Eat discovery; retain immutable raw observations; normalise the maximum lawful data; expose
+data-quality metrics; assess whether Just Eat alone gives sufficient coverage. Just Eat only;
+no fake connector; no bypassing auth/CAPTCHA/anti-bot/rate-limits. Provision hosted Supabase.
+Audit first. Do NOT start Deliveroo/Uber Eats/customer comparison/Companies House/FSA/Google.
+Audit findings: no DB existed (local JSON + localStorage; draft SQL only); existing lawful JE
+method = one public listing endpoint (listing-level only, no phone/menu/reviews).
+Decisions (user-approved mid-session): provision hosted Supabase ($10/mo, eu-west-2); allow
+capped live calls to build the field catalogue.
+Work:
+- **Field audit** from 6 capped live calls (4,904 records, 96 fields) → `docs/57`.
+- **Supabase** `aspectlead-platform` created + 8 version-controlled migrations applied
+  (tenancy+RLS, runs, executions+claim/heartbeat RPCs, immutable raw observations, outlets,
+  rating history, provenance, quality; grant hardening). DB-level immutability/dedupe/cascade/
+  claim/anon-isolation/raw-column-restriction verified via MCP; advisors clean bar 2 accepted.
+- **Engine** (`src/lib/discovery-engine/`): catalogue, parser, UK phone normaliser, adapter
+  (reuses the one lawful endpoint; `fetchJustEatSearchRaw` added to `src/lib/sources/just-eat.ts`),
+  repository (Supabase + in-memory), config/run-service, worker (claim/heartbeat/lease), quality.
+- **APIs**: runs / queue / status / cancel. **UI**: "Just Eat — Stage 1" Run Builder panel.
+- **Worker CLI**: `npm run je:worker`. **Tests**: `test:je-stage1` (40+, green), `test:je-supabase`
+  (integration, skips until service key). Fixtures sanitised; no raw committed.
+Verified: typecheck clean; all retained + new tests green; `npm run build` green.
+Not done (deliberate): Deliveroo, Uber Eats, customer comparison, Companies House, FSA, Google.
+Pending on user: paste `SUPABASE_SERVICE_ROLE_KEY`, set `JUST_EAT_ENABLED=true` (ISS-0012).
+Docs: `docs/57`, `docs/58`; decisions ADR-0014; issues ISS-0012/0013/0014.
+Next action: run a live JE pull, read the data-quality report, then choose the Stage-1 gate
+(A add platform / B validation+dedup / C improve connector).
+
 ## Session: 2026-07-15 — Map interaction functional pass + `@geospatial/map` v0.1.2
 
 Tool used: Claude Code

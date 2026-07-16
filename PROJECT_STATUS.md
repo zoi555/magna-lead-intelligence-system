@@ -23,6 +23,15 @@ Builder** first screen and its **national geospatial foundation**.
   verification pending (ISS-0011). Docs: `docs/56_MAP_INTERACTION_FUNCTIONAL_PASS.md`.
 - **Next task: Discovery Sources engine** (not started here).
 
+### Just Eat Discovery — Stage 1 — 2026-07-16 (first discovery-engine vertical slice)
+- **New canonical database**: hosted Supabase Postgres `aspectlead-platform` (eu-west-2, $10/mo, approved). 8 version-controlled migrations applied (`supabase/migrations/0001–0008`): tenancy + RLS, discovery_runs, je_executions (+claim/heartbeat RPCs), immutable je_raw_observations, je_outlets, je_rating_history, je_field_provenance, je_execution_quality. Tenant-aware RLS; raw payloads column-restricted; anon has no access; service-role server-only.
+- **Just Eat engine** (`src/lib/discovery-engine/`): field catalogue (verified from 4,904 live records), parser, UK phone normaliser, adapter (reuses the one lawful listing endpoint), repository (Supabase + in-memory), locally-runnable worker (`npm run je:worker`) with production-safe claim/heartbeat/lease contract, data-quality report.
+- **APIs + UI**: `/api/discovery/runs` (save), `/queue`, `/status`, `/executions/[id]/cancel`; Run Builder "Just Eat — Stage 1" panel (save+queue+live coverage+cancel).
+- **Verified**: typecheck clean; `test:je-stage1` (40+ assertions) green; DB-level immutability/dedupe/cascade/claim verified via MCP; retained tests + `npm run build` green. Integration test (`test:je-supabase`) skips until the service-role key is pasted.
+- **Honesty**: phone/menu/reviews reported 0% (not supplied by the listing endpoint), never fabricated. Decision gate after Stage 1: A add another platform · B validation/dedup/customer comparison · C improve the JE connector.
+- **Pending from user**: paste `SUPABASE_SERVICE_ROLE_KEY` into `.env.local` (ISS-0012); set `JUST_EAT_ENABLED=true` to run live. Docs: `docs/57`, `docs/58`.
+- Deliveroo/Uber Eats/customer comparison/Companies House/FSA/Google **not started** (deliberate).
+
 ### Work in progress
 - Discovery Run Builder Step 1 (Territory) screen at `/run-setup` (interactive territory entry + detection + policies + draft persistence).
 
