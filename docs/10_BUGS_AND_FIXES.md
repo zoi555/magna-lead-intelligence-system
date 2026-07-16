@@ -63,3 +63,25 @@ These are design corrections, not app bug fixes:
   `test:je-supabase` (FK, empty-claim, immutability, RLS, no-orphan cleanup) green;
   retained tests + `npm run build` green; worker reruns cleanly ("No queued executions.
   Exiting.") with no UUID error.
+
+## 2026-07-16 — Execution progress counter (0/1) + lease-expiry double-processing
+
+- **BUG:** a completed single-outcode execution showed **0/1 outcodes**. Two causes:
+  (1) `finishExecution` never wrote the `completed_queries` **column** (only `metrics`), so
+  the counter relied entirely on heartbeats; (2) the inner 718-outlet loop sent **no
+  heartbeat**, so the 60 s lease expired mid-query and the execution was **re-claimed**
+  (`attempts=2`); the original worker's end-of-loop heartbeat then no-oped on the
+  `claimed_by` guard, leaving the column at 0. **Fix:** `finishExecution` now writes
+  `completed_queries`/`planned_queries` authoritatively (ownership-guarded); the worker
+  heartbeats every 25 outlets during a query; `completed_queries` counts **successful**
+  queries only (failures tracked separately), incremented once per query and resumable
+  without double-counting; migration `0011` makes `heartbeat_je_execution` return
+  `(owned, cancel_requested)` so a worker that lost its lease **aborts** instead of
+  clobbering. Tests: 1/1, 0/1-failure, cancellation, retry/resume, ownership guard.
+- **DATA finding (not fixed — real run data):** the pre-fix double-claim left the UB1
+  execution with **1,436 observations = 718 real + 718 duplicates** (`duplicate_of` linked).
+  Outlets (718) and the fix are unaffected; logged as ISS-0015 for the user to decide on
+  pruning. The new heartbeat/lease behaviour prevents recurrence.
+- **Detail audit (docs/59):** Just Eat outlet **detail** pages are Cloudflare anti-bot
+  protected (403) and no public detail/menu endpoint exists (404) — detail-level fields
+  (phone, menu, opening hours, description) are **not lawfully retrievable**. Not integrated.

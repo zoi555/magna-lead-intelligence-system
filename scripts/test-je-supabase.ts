@@ -56,6 +56,9 @@ async function main() {
     assert(res.uniqueOutlets === 5, "5 outlets persisted");
     assert((await repo.countObservations(exec.id)) === 5, "5 immutable observations persisted");
     assert((await repo.getQualityReport(exec.id)) !== null, "data-quality report saved");
+    const finished = await repo.getExecution(exec.id);
+    assert(finished?.completed_queries === 1 && finished?.planned_queries === 1 && finished?.status === "completed",
+      "execution row shows 1/1 completed — counter written authoritatively at finish (real DB)");
 
     // foreign-key enforcement: an execution with a non-existent run_id is rejected
     const svc0 = createServiceClient();

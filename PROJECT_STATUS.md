@@ -31,6 +31,8 @@ Builder** first screen and its **national geospatial foundation**.
 - **Honesty**: phone/menu/reviews reported 0% (not supplied by the listing endpoint), never fabricated. Decision gate after Stage 1: A add another platform · B validation/dedup/customer comparison · C improve the JE connector.
 - **Pending from user**: paste `SUPABASE_SERVICE_ROLE_KEY` into `.env.local` (ISS-0012); set `JUST_EAT_ENABLED=true` to run live. Docs: `docs/57`, `docs/58`.
 - Deliveroo/Uber Eats/customer comparison/Companies House/FSA/Google **not started** (deliberate).
+- **Fixes 2026-07-16 (migrations 0009–0011):** worker UUID crash on empty queue (claim RPC → `SETOF`); observation-delete FK `ON DELETE SET NULL`; execution progress counter (`completed_queries` written authoritatively + intra-query heartbeat + ownership-guarded finish → no more 0/1, no lease-expiry double-processing). **11 migrations total.**
+- **Detail audit (docs/59):** Just Eat outlet detail is Cloudflare-blocked (403) with no public detail/menu endpoint (404) — phone/menu/opening-hours not lawfully retrievable; **recommend option B** (enrich phone/menu later via Google Places/Companies House/websites, not JE detail). ISS-0015 (718 duplicate observations from the pre-fix double-claim) awaits a prune decision.
 
 ### Work in progress
 - Discovery Run Builder Step 1 (Territory) screen at `/run-setup` (interactive territory entry + detection + policies + draft persistence).

@@ -212,3 +212,44 @@ Two `authenticated_security_definer_function_executable` advisories remain on
 `app_current_tenant_ids` / `app_is_tenant_member`. They are required for RLS policy
 evaluation and only ever return the caller's own tenant membership (no cross-tenant leak).
 Documented as accepted rather than remediated.
+
+## ISS-0015 — UB1 execution has 718 duplicate observations (pre-fix double-claim)
+
+Date: 2026-07-16
+Severity: Low–Medium (data hygiene; outlets unaffected)
+Owner: Zoeb
+Status: Open — decision needed (do not auto-delete real run data)
+
+### Problem
+
+Before the progress/heartbeat fix, the single UB1 execution's 60 s lease expired during the
+7-minute 718-outlet inner loop and was re-claimed (`attempts=2`), so it was processed twice.
+The DB holds **1,436 raw observations = 718 real + 718 duplicates** (each duplicate correctly
+linked via `duplicate_of`). The 718 **outlets** are correct (upserted/deduped). The stored
+data-quality report (computed from one worker pass) shows 718/0-duplicates and therefore
+undercounts. The fix (intra-query heartbeat + ownership-guarded finish, migration 0011)
+prevents recurrence.
+
+### Next action
+
+Decide whether to prune the 718 duplicate observations (`delete from je_raw_observations
+where duplicate_of is not null` for that execution — safe now that migration 0010 sets the
+referencing FKs to ON DELETE SET NULL) and recompute the quality report, OR retain them as an
+immutable record and just note the duplicate count. Not actioned without approval — this is
+real run data, not test data.
+
+## ISS-0016 — Just Eat outlet detail not lawfully retrievable
+
+Date: 2026-07-16
+Severity: Medium (limits enrichment source options)
+Owner: Zoeb
+Status: Open — recommendation made (docs/59)
+
+### Problem
+
+A capped 10-outlet audit found the public restaurant page is Cloudflare anti-bot protected
+(HTTP 403) and no public detail/menu JSON endpoint exists (404). Phone, opening hours, menu
+categories/items/prices, description and extra reviews are therefore **not obtainable from
+Just Eat** without prohibited circumvention or a commercial partner feed. Recommendation:
+fill phone/menu via later lawful enrichment (Google Places / Companies House / websites),
+not Just Eat detail (option B). See `docs/59_JUST_EAT_DETAIL_CAPABILITY_AUDIT.md`.

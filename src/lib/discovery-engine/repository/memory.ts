@@ -4,7 +4,7 @@
 // reads mirror RLS. NOT for production — Supabase is the canonical store.
 
 import { randomUUID } from "node:crypto";
-import type { DiscoveryRepository } from "./repository";
+import type { DiscoveryRepository, HeartbeatResult, FinishExecutionPatch } from "./repository";
 import type {
   RunInput, RunRecord, RunStatus, ExecutionRecord, ExecutionStatus,
   RawObservationInput, RawObservationRecord, OutletUpsert, OutletRecord,
@@ -65,26 +65,29 @@ export class MemoryRepository implements DiscoveryRepository {
     return { ...e };
   }
 
-  async heartbeat(executionId: string, worker: string, completedQueries: number, metrics: Record<string, unknown>, leaseSeconds: number): Promise<boolean> {
+  async heartbeat(executionId: string, worker: string, completedQueries: number, metrics: Record<string, unknown>, leaseSeconds: number): Promise<HeartbeatResult> {
     const e = this.executions.get(executionId);
-    if (!e || e.claimed_by !== worker) return false;
+    if (!e || e.claimed_by !== worker) return { owned: false, cancelRequested: false };  // lost the lease
     e.heartbeat_at = now();
     e.lease_expires_at = new Date(Date.now() + leaseSeconds * 1000).toISOString();
     e.completed_queries = completedQueries;
     e.metrics = metrics;
-    return e.cancel_requested;
+    return { owned: true, cancelRequested: e.cancel_requested };
   }
   async requestCancel(executionId: string) {
     const e = this.executions.get(executionId);
     if (e) { e.cancel_requested = true; if (e.status === "running" || e.status === "queued") e.status = "cancelling"; }
   }
-  async finishExecution(id: string, status: ExecutionStatus, patch: { metrics?: Record<string, unknown>; warnings?: unknown[]; error?: unknown | null }) {
+  async finishExecution(id: string, status: ExecutionStatus, patch: FinishExecutionPatch) {
     const e = this.executions.get(id);
     if (!e) return;
+    if (patch.claimedBy && e.claimed_by !== patch.claimedBy) return;   // ownership guard
     e.status = status; e.finished_at = now();
     if (patch.metrics) e.metrics = patch.metrics;
     if (patch.warnings) e.warnings = patch.warnings;
     if (patch.error !== undefined) e.error = patch.error;
+    if (patch.completedQueries !== undefined) e.completed_queries = patch.completedQueries;  // authoritative
+    if (patch.plannedQueries !== undefined) e.planned_queries = patch.plannedQueries;
   }
 
   async findObservationByHash(tenantId: string, contentHash: string) {

@@ -43,10 +43,14 @@ export async function runWorkerOnce(repo: DiscoveryRepository, opts: WorkerOptio
         onProgress: (p) => log(`  ${run.name}: ${p.completed}/${p.planned} outcodes, ${p.outlets} outlets`),
       });
       results.push(res);
-      log(`Execution ${execution.id} ${res.status}: ${res.uniqueOutlets} outlets, ${res.totalObservations} observations, ${res.failedQueries} failed queries`);
+      if (res.abortedNotOwned) {
+        log(`Execution ${execution.id} aborted — lease lost to another worker (no changes finished)`);
+      } else {
+        log(`Execution ${execution.id} ${res.status}: ${res.completedQueries}/${res.plannedQueries} outcodes, ${res.uniqueOutlets} outlets, ${res.totalObservations} observations, ${res.failedQueries} failed queries`);
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      await repo.finishExecution(execution.id, "failed", { error: { message } });
+      await repo.finishExecution(execution.id, "failed", { error: { message }, claimedBy: opts.workerId });
       await repo.setRunStatus(run.id, "failed");
       log(`Execution ${execution.id} failed: ${message}`);
     }

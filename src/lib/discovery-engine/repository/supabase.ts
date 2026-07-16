@@ -5,7 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "../supabase-client";
 import { NORMALISATION_VERSION } from "../version";
-import type { DiscoveryRepository } from "./repository";
+import type { DiscoveryRepository, HeartbeatResult, FinishExecutionPatch } from "./repository";
 import type {
   RunInput, RunRecord, RunStatus, ExecutionRecord, ExecutionStatus,
   RawObservationInput, RawObservationRecord, OutletUpsert, OutletRecord,
@@ -83,23 +83,28 @@ export class SupabaseRepository implements DiscoveryRepository {
     if (r.error) throw new Error(`claimNextExecution: ${JSON.stringify(r.error)}`);
     return normaliseClaimedRow(r.data);   // rejects the phantom all-NULL composite row
   }
-  async heartbeat(executionId: string, worker: string, completedQueries: number, metrics: Record<string, unknown>, leaseSeconds: number): Promise<boolean> {
+  async heartbeat(executionId: string, worker: string, completedQueries: number, metrics: Record<string, unknown>, leaseSeconds: number): Promise<HeartbeatResult> {
     const r = await this.db.rpc("heartbeat_je_execution", {
       p_id: executionId, p_worker: worker, p_completed: completedQueries, p_metrics: metrics, p_lease_seconds: leaseSeconds,
     });
     if (r.error) throw new Error(`heartbeat: ${JSON.stringify(r.error)}`);
-    return Boolean(r.data);
+    const row = Array.isArray(r.data) ? r.data[0] : r.data;
+    return { owned: !!row?.owned, cancelRequested: !!row?.cancel_requested };
   }
   async requestCancel(executionId: string) {
     const r = await this.db.from("je_executions").update({ cancel_requested: true, status: "cancelling" }).eq("id", executionId);
     if (r.error) throw new Error(`requestCancel: ${JSON.stringify(r.error)}`);
   }
-  async finishExecution(id: string, status: ExecutionStatus, patch: { metrics?: Record<string, unknown>; warnings?: unknown[]; error?: unknown | null }) {
+  async finishExecution(id: string, status: ExecutionStatus, patch: FinishExecutionPatch) {
     const update: Record<string, unknown> = { status, finished_at: new Date().toISOString() };
     if (patch.metrics) update.metrics = patch.metrics;
     if (patch.warnings) update.warnings = patch.warnings;
     if (patch.error !== undefined) update.error = patch.error;
-    const r = await this.db.from("je_executions").update(update).eq("id", id);
+    if (patch.completedQueries !== undefined) update.completed_queries = patch.completedQueries;  // authoritative
+    if (patch.plannedQueries !== undefined) update.planned_queries = patch.plannedQueries;
+    let q = this.db.from("je_executions").update(update).eq("id", id);
+    if (patch.claimedBy) q = q.eq("claimed_by", patch.claimedBy);   // ownership guard
+    const r = await q;
     if (r.error) throw new Error(`finishExecution: ${JSON.stringify(r.error)}`);
   }
 

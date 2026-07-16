@@ -11,6 +11,19 @@ import type {
 
 export interface ClaimResult { execution: ExecutionRecord | null }
 
+/** Heartbeat outcome: `owned` is false if this worker no longer holds the execution
+ *  (its lease expired and another worker re-claimed it) — the caller must then abort. */
+export interface HeartbeatResult { owned: boolean; cancelRequested: boolean }
+
+export interface FinishExecutionPatch {
+  metrics?: Record<string, unknown>;
+  warnings?: unknown[];
+  error?: unknown | null;
+  completedQueries?: number;   // authoritative final count written to the column
+  plannedQueries?: number;
+  claimedBy?: string;          // ownership guard — only finish if still owned
+}
+
 export interface DiscoveryRepository {
   // runs
   createRun(input: RunInput): Promise<RunRecord>;
@@ -24,9 +37,9 @@ export interface DiscoveryRepository {
   getExecution(id: string): Promise<ExecutionRecord | null>;
   listExecutionsForRun(runId: string): Promise<ExecutionRecord[]>;
   claimNextExecution(worker: string, leaseSeconds: number): Promise<ExecutionRecord | null>;
-  heartbeat(executionId: string, worker: string, completedQueries: number, metrics: Record<string, unknown>, leaseSeconds: number): Promise<boolean>; // returns cancelRequested
+  heartbeat(executionId: string, worker: string, completedQueries: number, metrics: Record<string, unknown>, leaseSeconds: number): Promise<HeartbeatResult>;
   requestCancel(executionId: string): Promise<void>;
-  finishExecution(id: string, status: ExecutionStatus, patch: { metrics?: Record<string, unknown>; warnings?: unknown[]; error?: unknown | null }): Promise<void>;
+  finishExecution(id: string, status: ExecutionStatus, patch: FinishExecutionPatch): Promise<void>;
 
   // raw observations (append-only)
   findObservationByHash(tenantId: string, contentHash: string): Promise<{ id: string } | null>;

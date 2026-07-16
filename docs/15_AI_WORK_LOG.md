@@ -1,5 +1,29 @@
 # AI Work Log — Magna Lead Intelligence System
 
+## Session: 2026-07-16 (later) — JE Stage 1 progress-counter fix + outlet-detail capability audit
+
+Tool used: Claude Code
+Human request: (1) Fix the execution-progress defect (completed run shows 0/1); ensure
+completed_queries increments once per successful query; represent failed/cancelled correctly;
+prevent retry double-increment; add tests. (2) Capped ≤10-outlet Just Eat outlet-DETAIL
+capability audit (lawful public routes only, no bypass); report field availability + recommend;
+do NOT integrate. Verify UB1 execution intact. No Deliveroo/Uber/customer comparison/FSA/Google/CH.
+Objective 1 — root cause: `claim` re-claim on lease expiry (no heartbeat during the 718-outlet
+inner loop) + `finishExecution` never writing the `completed_queries` column. Fix: authoritative
++ ownership-guarded finish; intra-query heartbeat (every 25 outlets); migration `0011`
+`heartbeat_je_execution` returns `(owned, cancel_requested)` so a lease-lost worker aborts;
+counters count successful queries, resume-safe. Tests: 1/1, 0/1-failure, cancellation, retry,
+ownership guard (test:je-stage1 now 61+ assertions; test:je-supabase asserts 1/1 on real DB).
+Objective 2 — audited 10 real UB1 outlets: public restaurant pages are Cloudflare-blocked (403),
+no public detail/menu endpoint (404) → detail (phone/menu/hours/description) NOT lawfully
+retrievable. Recommendation: **option B** (later lawful enrichment for phone/menu, not JE detail).
+Raw responses kept outside git; no fixtures committed (all responses were blocks/404).
+Finding: UB1 execution intact (718 outlets, now 1/1) but DB holds 1,436 observations = 718 real
++ 718 duplicates from the pre-fix double-claim (ISS-0015; not deleted — real data, awaiting decision).
+Verified: typecheck clean; all JE + retained tests green; `npm run build` green.
+Docs: `docs/59`; `10_BUGS_AND_FIXES`, `11_ISSUES_LOG` (ISS-0015/0016), `PROJECT_STATUS`.
+Next action: decide on pruning the 718 duplicate observations; then proceed per option B.
+
 ## Session: 2026-07-16 — Just Eat Discovery Stage 1 (first discovery-engine vertical slice)
 
 Tool used: Claude Code

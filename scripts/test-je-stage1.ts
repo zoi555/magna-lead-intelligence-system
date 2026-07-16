@@ -170,6 +170,51 @@ async function main() {
   const drained = await runWorkerOnce(emptyRepo, { workerId: "w", onLog: () => {} });
   assert(Array.isArray(drained) && drained.length === 0, "worker on an empty queue exits cleanly (no crash, nothing claimed)");
 
+  // ---- execution progress counter (the 0/1 defect) ----
+  const cfg1 = (outcodes: string[]): AdapterConfig => ({ enabled: true, maxCallsPerRun: 50, requestDelayMs: 0, outcodes });
+  const rep = new MemoryRepository();
+
+  // 1/1: a successful single query ends with completed_queries === 1 (was showing 0/1)
+  const { run: rOk } = await saveRun(rep, { tenant_id: "t", name: "ok", territory_input: "UB1" });
+  const eOk = await queueJustEatExecution(rep, rOk.id);
+  const cOk = await rep.claimNextExecution("w1", 60);
+  const rOkRes = await executeJustEatRun(rep, rOk, cOk!, { adapter: adapter(), config: cfg1(["UB1"]), workerId: "w1" });
+  const execOk = await rep.getExecution(eOk.id);
+  assert(rOkRes.status === "completed" && rOkRes.completedQueries === 1, "successful query → completedQueries 1");
+  assert(execOk!.completed_queries === 1 && execOk!.planned_queries === 1, "completed execution row shows 1/1 (0/1 defect fixed)");
+
+  // 0/1: a failed query is NOT counted completed; failure represented; completed_with_warnings
+  const { run: rFail } = await saveRun(rep, { tenant_id: "t", name: "fail", territory_input: "UB2" });
+  await queueJustEatExecution(rep, rFail.id);
+  const cFail = await rep.claimNextExecution("w1", 60);
+  const rFailRes = await executeJustEatRun(rep, rFail, cFail!, { adapter: adapter(), config: cfg1(["UB2"]), workerId: "w1" });
+  const execFail = await rep.getExecution(cFail!.id);
+  assert(rFailRes.failedQueries === 1 && rFailRes.completedQueries === 0, "failed query → 0 completed, 1 failed");
+  assert(execFail!.completed_queries === 0 && execFail!.status === "completed_with_warnings", "failed single query row shows 0/1 with warnings status");
+
+  // cancellation: completed reflects work done before cancel; status cancelled
+  const { run: rCan } = await saveRun(rep, { tenant_id: "t", name: "cancel", territory_input: "UB1" });
+  const eCan = await queueJustEatExecution(rep, rCan.id);
+  const cCan = await rep.claimNextExecution("w1", 60);
+  await rep.requestCancel(eCan.id);
+  const rCanRes = await executeJustEatRun(rep, rCan, cCan!, { adapter: adapter(), config: cfg1(["UB1"]), workerId: "w1" });
+  assert(rCanRes.cancelled && rCanRes.status === "cancelled" && rCanRes.completedQueries === 0, "cancel before the query → cancelled, 0 completed");
+
+  // retry/idempotency: a resumed attempt skips the already-completed query (no double increment)
+  const { run: rRetry } = await saveRun(rep, { tenant_id: "t", name: "retry", territory_input: "UB1" });
+  const eRetry = await queueJustEatExecution(rep, rRetry.id);
+  const cRetry = await rep.claimNextExecution("w1", 60);
+  const rRetryRes = await executeJustEatRun(rep, rRetry, { ...cRetry!, completed_queries: 1 }, { adapter: adapter(), config: cfg1(["UB1"]), workerId: "w1" });
+  assert(rRetryRes.completedQueries === 1 && (await rep.getExecution(eRetry.id))!.completed_queries === 1, "resume skips the completed query — completedQueries stays 1 (no double increment)");
+
+  // lease loss / ownership guard
+  const hbLost = await rep.heartbeat(eRetry.id, "not-the-owner", 5, {}, 60);
+  assert(hbLost.owned === false, "heartbeat by a non-owner reports lease lost (owned=false)");
+  const statusBefore = (await rep.getExecution(eRetry.id))!.status;
+  await rep.finishExecution(eRetry.id, "failed", { claimedBy: "not-the-owner", completedQueries: 99 });
+  const afterGuard = await rep.getExecution(eRetry.id);
+  assert(afterGuard!.status === statusBefore && afterGuard!.completed_queries !== 99, "finishExecution ownership guard blocks a non-owner");
+
   console.log(fails === 0 ? "\nAll Just Eat Stage 1 assertions passed ✓" : `\n${fails} FAILED`);
   process.exit(fails === 0 ? 0 : 1);
 }
