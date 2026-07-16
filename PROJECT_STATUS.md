@@ -216,3 +216,10 @@ Territory selection is a **flexible per-run configuration** (ADR-0009), not a fi
 Date: 2026-07-09  
 Verified by: ChatGPT file generation process  
 Evidence: starter pack created and ZIP contents checked. This does not verify the app because the app has not been built.
+
+### Discovery foundation continuation — 2026-07-17
+- **@geospatial/map v0.3.0** (released): stable geography **UUIDs** (deterministic v5) + full named API (classifyGeographyInput, searchGeography, resolveGeographySelection, expandPostcodeArea/District, resolvePlaceToPostcodes, resolvePolygonToPostcodes, planSourceQueryUnits, getGeographyEntity/Children/Parents/Relationships). AspectLead pinned to v0.3.0.
+- **Uber Eats + Deliveroo authorised-access audit + costed decision pack** (`docs/62`): neither has a lawful open discovery API; recommended **Apify pay-per-result** (Uber ~$3/1k, Deliveroo ~$5/1k) on Apify Scale $199/mo — exact costs per district/area/London/national; provider seam ready (`providers/apify-fetcher.ts`). **Nothing purchased.**
+- **Consolidation persistence** (migration 0015): 9 tables (consolidated_candidates, candidate_source_links, candidate_field_values/provenance, match_evidence, conflicts, merge_decisions, completeness, source_comparison_snapshots), tenant RLS; `persistConsolidation()`; schema verified (insert/cascade/clean).
+- Verified: typecheck; all tests + build green; migrations 0001–0015 applied.
+- **Remaining (see docs/62 + final report):** national data ingestion (OS Open Names + ONSPD, A1); Just Eat 96-field parser + fresh run + duplicate marking (A4); Run Builder city/town search + live Vercel browser QA (A3); wire consolidation into the run/worker; live Uber/Deliveroo (awaiting provider approval + budget). Customer comparison NOT started.
