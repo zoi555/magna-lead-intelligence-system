@@ -8,7 +8,10 @@
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { MemoryRepository } from "../src/lib/discovery-engine/repository/memory";
+import { isUuid, normaliseClaimedRow } from "../src/lib/discovery-engine/repository/supabase";
+import { runWorkerOnce } from "../src/lib/discovery-engine/worker/loop";
 import { JustEatAdapter } from "../src/lib/discovery-engine/just-eat/adapter";
 import { executeJustEatRun } from "../src/lib/discovery-engine/worker/execute";
 import { parseSearchResponse, parseSearchRestaurant } from "../src/lib/discovery-engine/just-eat/parse";
@@ -145,6 +148,27 @@ async function main() {
 
   // ---- tenant scoping ----
   assert((await repo.listRuns("tenant-A")).length >= 3 && (await repo.listRuns("tenant-B")).length === 0, "runs are tenant-scoped (tenant-B sees none)");
+
+  // ---- claim-result normalisation (root-cause guard for the worker UUID bug) ----
+  const U = randomUUID();
+  assert(isUuid(U) && !isUuid("null") && !isUuid(null) && !isUuid(undefined), "isUuid accepts real UUIDs, rejects 'null'/nullish");
+  assert(normaliseClaimedRow(null) === null, "empty RPC result (null) → null");
+  assert(normaliseClaimedRow([]) === null, "empty RPC result ([]) → null");
+  // the PostgREST phantom all-NULL composite row must be rejected
+  assert(normaliseClaimedRow({ id: null, run_id: null, status: null }) === null, "phantom all-NULL composite row → null (root cause)");
+  assert(normaliseClaimedRow([{ id: null, run_id: null }]) === null, "phantom all-NULL row in array → null");
+  assert(normaliseClaimedRow({ id: U, run_id: null }) === null, "valid id but null run_id → rejected");
+  assert(normaliseClaimedRow({ id: "not-a-uuid", run_id: U }) === null, "non-UUID id → rejected");
+  const good = normaliseClaimedRow({ id: U, run_id: randomUUID(), status: "running" });
+  assert(good !== null && isUuid(good!.run_id), "valid claimed row → returned with a UUID run_id");
+
+  // ---- queue creation always writes a valid run_id; worker drains empty queue cleanly ----
+  const { run: run4 } = await saveRun(repo, { tenant_id: "tenant-A", name: "queue run", territory_input: "UB1" });
+  const e4 = await queueJustEatExecution(repo, run4.id);
+  assert(isUuid(e4.run_id) && e4.run_id === run4.id, "queue creation writes a valid run_id (= run.id)");
+  const emptyRepo = new MemoryRepository();
+  const drained = await runWorkerOnce(emptyRepo, { workerId: "w", onLog: () => {} });
+  assert(Array.isArray(drained) && drained.length === 0, "worker on an empty queue exits cleanly (no crash, nothing claimed)");
 
   console.log(fails === 0 ? "\nAll Just Eat Stage 1 assertions passed ✓" : `\n${fails} FAILED`);
   process.exit(fails === 0 ? 0 : 1);

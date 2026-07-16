@@ -41,3 +41,25 @@ These are design corrections, not app bug fixes:
   three visually distinct states. Escape clears the selection.
 - Verified: package typecheck + tests green; AspectLead typecheck + retained tests + build
   green; routes 200; no asset 404s (`docs/56_MAP_INTERACTION_FUNCTIONAL_PASS.md`).
+
+## 2026-07-16 — Just Eat worker first-execution bugs
+
+- **BUG (root cause):** worker crashed with `invalid input syntax for type uuid: "null"`
+  (22P02) on an empty queue. `claim_je_execution` was `RETURNS je_executions` (single
+  composite); returning NULL made PostgREST materialise a **phantom row of all-NULL
+  columns**. The mapper treated it as a claimed execution with `run_id = null`, the
+  worker's `if (!execution)` guard missed it, and `getRun(null)` sent `id=eq.null` to a
+  uuid column. **Fix:** migration `0009` changes the RPC to `RETURNS SETOF je_executions`
+  (empty ⇒ zero rows); repository adds `isUuid` + `normaliseClaimedRow` (rejects the
+  phantom/malformed row) and guards `getRun`/`getExecution` against non-UUIDs. No bad rows
+  existed in the DB — `run_id` was already NOT NULL + FK.
+- **BUG (found while fixing):** deleting a run's observations was blocked by NO-ACTION FKs
+  from tenant-scoped outlets/history/provenance (would also block retention pruning).
+  **Fix:** migration `0010` sets those references `ON DELETE SET NULL` (outlets are tenant
+  assets that outlive any single observation).
+- **Cleanup:** 1 run + 5 synthetic outlets + observations/history/provenance left by a
+  failed integration test were removed after verification; DB confirmed empty (0 rows).
+- Verified: `test:je-stage1` (61 assertions incl. claim-normalisation + empty-worker),
+  `test:je-supabase` (FK, empty-claim, immutability, RLS, no-orphan cleanup) green;
+  retained tests + `npm run build` green; worker reruns cleanly ("No queued executions.
+  Exiting.") with no UUID error.

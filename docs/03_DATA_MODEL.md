@@ -266,7 +266,7 @@ MVP set and Phase 2 items are enumerated in the accepted proposal; overlays for 
 
 Unlike the rest of this document (design-only), these tables are **built and migrated** in
 the hosted `aspectlead-platform` Supabase project. Version-controlled in
-`supabase/migrations/0001-0008`. All tenant-scoped with RLS.
+`supabase/migrations/0001-0010`. All tenant-scoped with RLS.
 
 - `tenants`, `tenant_members` — tenancy + RLS helper functions.
 - `discovery_runs` — canonical run persistence (config snapshot + structured columns).

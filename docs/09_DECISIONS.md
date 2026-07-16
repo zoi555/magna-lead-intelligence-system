@@ -34,7 +34,7 @@ only). Just Eat Stage 1 is the first vertical slice.
    Foodservice, region eu-west-2, **$10/month**, explicitly approved). Canonical store for
    runs, executions, immutable raw observations, normalised outlets, rating history,
    provenance and data-quality reports. Version-controlled migrations in
-   `supabase/migrations/` (0001–0008), applied via the Supabase MCP.
+   `supabase/migrations/` (0001–0010), applied via the Supabase MCP.
 2. **Tenant-aware RLS from the start.** Service-role key server-side only (worker); anon
    has no access to discovery tables; `authenticated` read-only except runs/cancel; raw
    payloads column-restricted. localStorage stays browser-recovery only.

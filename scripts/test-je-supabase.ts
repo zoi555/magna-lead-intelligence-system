@@ -57,6 +57,15 @@ async function main() {
     assert((await repo.countObservations(exec.id)) === 5, "5 immutable observations persisted");
     assert((await repo.getQualityReport(exec.id)) !== null, "data-quality report saved");
 
+    // foreign-key enforcement: an execution with a non-existent run_id is rejected
+    const svc0 = createServiceClient();
+    const badFk = await svc0.from("je_executions").insert({ tenant_id: tenantId, run_id: "00000000-0000-0000-0000-000000000000" });
+    assert(badFk.error !== null, "FK enforced: execution with a non-existent run_id is rejected");
+
+    // empty queue claims cleanly (this execution is finished, none queued) — no phantom row
+    const emptyClaim = await repo.claimNextExecution("it-worker-empty", 60);
+    assert(emptyClaim === null, "claim on an empty queue returns null (no phantom all-NULL row)");
+
     // immutability at the DB level
     const svc = createServiceClient();
     const one = await svc.from("je_raw_observations").select("id").eq("execution_id", exec.id).limit(1).single();
@@ -70,9 +79,16 @@ async function main() {
     const anonRaw = await anon.from("je_raw_observations").select("raw_payload").limit(1);
     assert((anonRaw.data?.length ?? 0) === 0, "anon client cannot read raw payloads");
   } finally {
+    // Outlets are tenant-scoped (not run-cascade-deleted by design), so remove the test
+    // outlets explicitly — this cascades their rating history + provenance — then the run.
+    const svc = createServiceClient();
+    const testOutletIds = ["900001", "900002", "900003", "900004", "900005"];
+    await svc.from("je_outlets").delete().eq("tenant_id", tenantId).in("je_outlet_id", testOutletIds);
     await repo.deleteRunCascade(runId);
     const gone = await repo.getRun(runId);
     assert(gone === null, "test data cleaned up (run cascade-deleted)");
+    const leftover = await svc.from("je_outlets").select("id").eq("tenant_id", tenantId).in("je_outlet_id", testOutletIds);
+    assert((leftover.data?.length ?? 0) === 0, "no orphan test outlets remain after cleanup");
   }
 
   console.log(fails === 0 ? "\nAll Supabase integration assertions passed ✓" : `\n${fails} FAILED`);

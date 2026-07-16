@@ -18,6 +18,23 @@ function must<T>(res: { data: T | null; error: unknown }, what: string): T {
   return res.data;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export function isUuid(v: unknown): v is string { return typeof v === "string" && UUID_RE.test(v); }
+
+/**
+ * Normalise a `claim_je_execution()` RPC result into a valid execution or null.
+ * A function that RETURNS a composite and returns NULL is materialised by PostgREST as a
+ * single all-NULL row; this rejects that phantom row (and any row missing a valid
+ * id/run_id) so the worker never claims a bogus execution. Exported for tests.
+ */
+export function normaliseClaimedRow(data: unknown): ExecutionRecord | null {
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row || typeof row !== "object") return null;
+  const r = row as Partial<ExecutionRecord>;
+  if (!isUuid(r.id) || !isUuid(r.run_id)) return null;   // reject all-NULL / malformed rows
+  return r as ExecutionRecord;
+}
+
 export class SupabaseRepository implements DiscoveryRepository {
   private db: SupabaseClient;
   constructor(client?: SupabaseClient) { this.db = client ?? createServiceClient(); }
@@ -27,6 +44,7 @@ export class SupabaseRepository implements DiscoveryRepository {
     return must(r, "createRun") as RunRecord;
   }
   async getRun(id: string) {
+    if (!isUuid(id)) return null;   // never send a non-UUID (e.g. "null") to a uuid column
     const r = await this.db.from("discovery_runs").select("*").eq("id", id).maybeSingle();
     if (r.error) throw new Error(`getRun: ${JSON.stringify(r.error)}`);
     return (r.data as RunRecord) ?? null;
@@ -51,6 +69,7 @@ export class SupabaseRepository implements DiscoveryRepository {
     if (r.error) throw new Error(`setExecutionPlan: ${JSON.stringify(r.error)}`);
   }
   async getExecution(id: string) {
+    if (!isUuid(id)) return null;
     const r = await this.db.from("je_executions").select("*").eq("id", id).maybeSingle();
     if (r.error) throw new Error(`getExecution: ${JSON.stringify(r.error)}`);
     return (r.data as ExecutionRecord) ?? null;
@@ -62,8 +81,7 @@ export class SupabaseRepository implements DiscoveryRepository {
   async claimNextExecution(worker: string, leaseSeconds: number): Promise<ExecutionRecord | null> {
     const r = await this.db.rpc("claim_je_execution", { p_worker: worker, p_lease_seconds: leaseSeconds });
     if (r.error) throw new Error(`claimNextExecution: ${JSON.stringify(r.error)}`);
-    const row = Array.isArray(r.data) ? r.data[0] : r.data;
-    return (row as ExecutionRecord) ?? null;
+    return normaliseClaimedRow(r.data);   // rejects the phantom all-NULL composite row
   }
   async heartbeat(executionId: string, worker: string, completedQueries: number, metrics: Record<string, unknown>, leaseSeconds: number): Promise<boolean> {
     const r = await this.db.rpc("heartbeat_je_execution", {
