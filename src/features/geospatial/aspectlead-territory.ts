@@ -6,7 +6,7 @@
 // asset, NOT the package's production map source — the package CDN carries postcode
 // CENTROID POINTS only. The map package never imports this file.
 
-import type { TerritoryGeometry } from "@geospatial/map";
+import { classifyPostcode, areaOf, type TerritoryGeometry } from "@geospatial/map";
 
 interface DistrictFeature { type: "Feature"; properties: { code?: string }; geometry: unknown }
 let districtCache: Promise<DistrictFeature[]> | null = null;
@@ -21,24 +21,22 @@ async function loadDistricts(): Promise<DistrictFeature[]> {
   return districtCache;
 }
 
-const AREA = /^[A-Z]{1,2}$/;               // e.g. TW
-const DISTRICT = /^[A-Z]{1,2}\d[A-Z\d]?$/; // e.g. TW3, EC1A
-
-/** Parse comma/space/newline-separated outcodes into normalised area/district tokens. */
+/** Parse a mixed geography input into area/district tokens using the CANONICAL package
+ *  classifier (no duplicated regex). Sectors/units contribute their district. */
 export function parseOutcodes(input: string): { areas: string[]; districts: string[] } {
-  const toks = (input || "").toUpperCase().split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean);
+  const toks = (input || "").split(/[\s,;]+/).map((t) => t.trim()).filter(Boolean);
   const areas = new Set<string>(); const districts = new Set<string>();
   for (const t of toks) {
-    if (DISTRICT.test(t)) districts.add(t);
-    else if (AREA.test(t)) areas.add(t);
+    const c = classifyPostcode(t);
+    if (c.level === "area") areas.add(c.area);
+    else if (c.district) districts.add(c.district);   // district/sector/unit → its district
   }
   return { areas: [...areas], districts: [...districts] };
 }
 
 /** True when a district code belongs to a requested area (e.g. "TW3" ∈ area "TW"). */
 function districtInArea(code: string, area: string): boolean {
-  const m = code.match(/^([A-Z]{1,2})\d/);
-  return !!m && m[1] === area;
+  return areaOf(code) === area;
 }
 
 /**

@@ -1,3 +1,7 @@
+// SUPERSEDED by the canonical Geography Standard in the @geospatial/map package (classifyPostcode /
+// buildPostcodeReference / expand*). Retained ONLY for the pre-standard FSA/pipeline code
+// paths (run-config, run-discovery, stages, platform-normalisation). New discovery-engine
+// geography goes through the package + the planner; do not add new callers here.
 // In-memory postcode index built from Code-Point Open and/or ONSPD/NSPL records.
 //
 // The map engine and territory logic look postcodes up by full unit, by outcode

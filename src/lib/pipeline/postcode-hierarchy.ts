@@ -1,3 +1,7 @@
+// SUPERSEDED by the canonical Geography Standard in the @geospatial/map package (classifyPostcode /
+// buildPostcodeReference / expand*). Retained ONLY for the pre-standard FSA/pipeline code
+// paths (run-config, run-discovery, stages, platform-normalisation). New discovery-engine
+// geography goes through the package + the planner; do not add new callers here.
 // Postcode hierarchy — richer UK postcode level model (NEW, additive).
 //
 // UK postcodes nest into four levels:
