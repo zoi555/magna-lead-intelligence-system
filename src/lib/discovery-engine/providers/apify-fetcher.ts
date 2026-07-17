@@ -38,10 +38,16 @@ export function createApifyFetcher(opts: ApifyFetcherOptions): ProviderFetcher {
   };
 }
 
-/** Convenience presets (fill actorId/token from config once a provider is approved). */
-export function uberEatsApifyFetcher(actorId: string, token: string): ProviderFetcher {
-  return createApifyFetcher({ actorId, token, wrapKey: "stores", buildInput: (code) => ({ search: code, country: "GB", maxItems: 1000 }) });
+/** Uber Eats via sourabhbgp/ubereats-scraper (address-based `discover`, GB). maxResults is a
+ *  HARD cap on records → cost; the pilot uses a very small value. Reviews off by default. */
+export function uberEatsApifyFetcher(actorId: string, token: string, opts?: { maxResults?: number; includeReviews?: boolean }): ProviderFetcher {
+  const maxResults = opts?.maxResults ?? 250;
+  return createApifyFetcher({
+    actorId, token, wrapKey: "stores",
+    buildInput: (code) => ({ mode: "discover", country: "GB", address: `${code}, United Kingdom`, maxResults, includeReviews: opts?.includeReviews ?? false }),
+  });
 }
-export function deliverooApifyFetcher(actorId: string, token: string): ProviderFetcher {
-  return createApifyFetcher({ actorId, token, wrapKey: "restaurants", buildInput: (code) => ({ location: code, country: "GB", maxItems: 1000 }) });
+export function deliverooApifyFetcher(actorId: string, token: string, opts?: { maxResults?: number }): ProviderFetcher {
+  const maxResults = opts?.maxResults ?? 250;
+  return createApifyFetcher({ actorId, token, wrapKey: "restaurants", buildInput: (code) => ({ location: `${code}, United Kingdom`, country: "GB", maxResults }) });
 }
