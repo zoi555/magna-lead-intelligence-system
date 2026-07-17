@@ -128,6 +128,9 @@ async function main() {
 
   // ---- data-quality report ----
   const q = repo.quality.get(claimed!.id)!;
+  assert(q.total_raw_observations === 5 && q.canonical_observations === 5 && q.duplicate_observations === 0, "clean first pass: canonical == total (no duplicates)");
+  const q2 = repo.quality.get(claimed2!.id)!;
+  assert(q2.duplicate_observations === 5 && q2.canonical_observations === q2.total_raw_observations - q2.duplicate_observations, "re-run: canonical observations = total − duplicates (historical duplicates excluded from operational count)");
   assert(near(q.pct_phone, 0), "phone coverage honestly 0%");
   assert(near(q.pct_menu_data, 0), "menu coverage honestly 0%");
   assert(near(q.pct_coordinates, 1), "coordinate coverage 100%");

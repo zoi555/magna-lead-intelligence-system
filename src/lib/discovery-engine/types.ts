@@ -122,7 +122,8 @@ export interface ProvenanceInput extends ParsedProvenance {
 }
 
 export interface QualityReport {
-  total_raw_observations: number;
+  total_raw_observations: number;      // ALL raw rows (incl. historical duplicates)
+  canonical_observations: number;      // operational count (duplicate_of IS NULL)
   unique_outlets: number;
   duplicate_observations: number;
   duplicate_rate: number;

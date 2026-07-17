@@ -40,6 +40,7 @@ export function computeQualityReport(input: QualityInput): QualityReport {
 
   return {
     total_raw_observations: input.totalObservations,
+    canonical_observations: input.totalObservations - input.duplicateObservations,
     unique_outlets: n,
     duplicate_observations: input.duplicateObservations,
     duplicate_rate: ratio(input.duplicateObservations, input.totalObservations),

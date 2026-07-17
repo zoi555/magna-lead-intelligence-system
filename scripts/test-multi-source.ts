@@ -77,6 +77,13 @@ async function main() {
   assert(candidateCompleteness(conflict) === "conflicting", "conflict candidate flagged conflicting");
   assert(report.completenessCounts.enrichment_required >= 6, "single-source outlets need enrichment (no phone/menu) — never falsely 'complete'");
 
+  // ---- provider seam (pilot readiness): no token → honest failure, no fake live ----
+  const { uberEatsApifyFetcher, deliverooApifyFetcher } = await import("../src/lib/discovery-engine/providers/apify-fetcher");
+  const uf = await uberEatsApifyFetcher("some/actor", "")("UB1");
+  const df = await deliverooApifyFetcher("some/actor", "")("UB1");
+  assert(uf.ok === false && /token/i.test(uf.error ?? ""), "Uber provider fetcher without a token fails honestly (no fake live)");
+  assert(df.ok === false && /token/i.test(df.error ?? ""), "Deliveroo provider fetcher without a token fails honestly (no fake live)");
+
   console.log(fails === 0 ? "\nAll multi-source assertions passed ✓" : `\n${fails} FAILED`);
   process.exit(fails === 0 ? 0 : 1);
 }

@@ -13,6 +13,7 @@ import type { DiscoveryRepository } from "../repository/repository";
 import type { ExecutionRecord, RunRecord, ParsedOutlet } from "../types";
 import type { SourceAdapter, AdapterConfig } from "../adapter";
 import { JustEatAdapter } from "../just-eat/adapter";
+import { extractResponseMeta } from "../just-eat/parse";
 import { contentHash } from "../hash";
 import { PARSER_VERSION, ADAPTER_VERSION, SCHEMA_VERSION, NORMALISATION_VERSION } from "../version";
 import { computeQualityReport } from "../quality/data-quality";
@@ -59,11 +60,14 @@ export async function executeJustEatRun(
   let failed = Number((execution.metrics as Record<string, unknown> | undefined)?.failed_queries ?? 0);
   let cancelled = false;
   let lostOwnership = false;
+  let responseMeta: Record<string, unknown> = {};   // response-level metadata (RestaurantSets/CuisineSets/Dishes/…)
 
   const metricsSnapshot = () => ({
     unique_outlets: outletsByJeId.size, total_observations: totalObservations,
     duplicate_observations: duplicateObservations, parse_warnings: parseWarnings,
     failed_queries: failed, planned_queries: planned, completed_queries: succeeded,
+    canonical_observations: totalObservations - duplicateObservations,   // operational count excludes duplicates
+    response_meta: responseMeta,
     normalisation_version: NORMALISATION_VERSION,
   });
   // heartbeat helper: returns false if the worker should stop (lost lease or cancelled)
@@ -89,6 +93,7 @@ export async function executeJustEatRun(
       continue;
     }
 
+    responseMeta = { ...responseMeta, ...extractResponseMeta(result.raw) };   // capture response-level fields
     let n = 0;
     for (const rec of result.parsed) {
       if (!rec.outlet.je_outlet_id) continue;

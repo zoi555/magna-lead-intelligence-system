@@ -104,6 +104,40 @@ function normPostcode(pc: string | null): string | null {
 
 const HALAL_RE = /\bhalal\b/i;
 
+// Remaining USEFUL per-outlet fields captured into controlled source_extra JSONB (the ~40
+// searchable fields are structured columns above). Only present/non-empty values are kept.
+const SOURCE_EXTRA_KEYS = [
+  "Description", "RatingStars", "IsPremier", "IsNew", "NewnessDate", "SponsoredPosition",
+  "SecondDateRank", "SecondDateRanking", "DeliveryChargeBands", "DeliveryTime", "DeliveryTimeMinutes",
+  "DeliveryWorkingTimeMinutes", "DeliveryStartTime", "DeliveryOpeningTimeLocal", "DriveDistance",
+  "DriveInfoCalculated", "ServiceableAreas", "CuisineTypes", "CollectionMenuId", "DeliveryMenuId",
+  "LastUpdated", "Score", "ScoreMetaData", "ShowSmiley", "SmileyResult", "SmileyElite", "SmileyUrl",
+  "HygieneRating", "IsCloseBy", "IsTemporaryBoost", "SendsOnItsWayNotifications", "IsFreeDelivery",
+];
+function buildSourceExtra(raw: any): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const k of SOURCE_EXTRA_KEYS) {
+    const v = raw?.[k];
+    if (v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0)) out[k] = v;
+  }
+  return out;
+}
+
+/** Response-LEVEL metadata (not per-outlet): RestaurantSets / CuisineSets / Dishes /
+ *  promotedPlacement / deliveryFees / MetaData. Captured per query for the occurrence report. */
+export function extractResponseMeta(rawResponse: any): Record<string, unknown> {
+  const meta: Record<string, unknown> = {};
+  const arrLen = (k: string) => (Array.isArray(rawResponse?.[k]) ? rawResponse[k].length : undefined);
+  const rs = arrLen("RestaurantSets"); if (rs !== undefined) meta.RestaurantSets = rs;
+  const cs = arrLen("CuisineSets"); if (cs !== undefined) meta.CuisineSets = cs;
+  const dishes = arrLen("Dishes"); if (dishes !== undefined) meta.Dishes = dishes;
+  if (rawResponse?.promotedPlacement !== undefined) meta.promotedPlacement = rawResponse.promotedPlacement;
+  if (rawResponse?.deliveryFees !== undefined && rawResponse?.deliveryFees !== null) meta.deliveryFees = true;
+  if (rawResponse?.MetaData !== undefined) meta.MetaData = true;
+  if (rawResponse?.ShortResultText) meta.ShortResultText = rawResponse.ShortResultText;
+  return meta;
+}
+
 /** True if a raw restaurant object is a Just Eat test record (never persisted). */
 export function isTestRestaurant(raw: any): boolean { return Boolean(raw?.IsTestRestaurant); }
 
@@ -194,7 +228,7 @@ export function parseSearchRestaurant(raw: any, queriedOutcode: string, pilotOut
     territory_class: territoryClass,
     territory_confidence: territoryConfidence,
     source_url: s(raw?.Url) ?? (raw?.UniqueName ? `https://www.just-eat.co.uk/restaurants-${raw.UniqueName}` : null),
-    source_extra: {},
+    source_extra: buildSourceExtra(raw),
   };
 
   if (!outlet.je_outlet_id) warnings.push("missing Id/UniqueName");
@@ -215,6 +249,15 @@ export function parseSearchRestaurant(raw: any, queriedOutcode: string, pilotOut
   P("service_models", outlet.service_models, { IsDelivery: raw?.IsDelivery, IsCollection: raw?.IsCollection }, "IsDelivery/IsCollection", true, 0.9, "from-flags");
   P("opening_status", { is_open_now: outlet.is_open_now, offline: outlet.is_temporarily_offline }, { IsOpenNow: raw?.IsOpenNow, IsTemporarilyOffline: raw?.IsTemporarilyOffline }, "IsOpenNow/IsTemporarilyOffline", false, 0.9, "flags");
   P("halal_evidence", outlet.halal_evidence, { IsHalal: raw?.IsHalal }, "IsHalal/Description/Tags", true, halalConfidence, "conservative-evidence");
+  P("brand", outlet.brand_name, raw?.BrandName, "BrandName/IsBrand", false, outlet.is_brand ? 0.9 : 0, "trim");
+  P("description", s(raw?.Description), raw?.Description, "Description", false, desc ? 0.9 : 0, "trim");
+  P("delivery_economics", { cost: outlet.delivery_cost, minimum: outlet.minimum_delivery_value, eta: [outlet.delivery_eta_lower, outlet.delivery_eta_upper] }, { DeliveryCost: raw?.DeliveryCost, MinimumDeliveryValue: raw?.MinimumDeliveryValue }, "DeliveryCost/MinimumDeliveryValue/DeliveryEtaMinutes", false, 0.9, "numbers");
+  P("promotions", { deals: outlet.deals.length, offers: outlet.offers.length, offer_percent: outlet.offer_percent, sponsored: outlet.is_sponsored }, { Deals: raw?.Deals, Offers: raw?.Offers }, "Deals/Offers/OfferPercent/IsSponsored", false, 0.8, "arrays+flags");
+  P("media", outlet.logo_url, raw?.LogoUrl ?? raw?.Logo, "LogoUrl/Logo", false, outlet.logo_url ? 0.8 : 0, "url");
+  P("ranking", { default_rank: outlet.default_display_rank, sponsored_position: raw?.SponsoredPosition ?? null }, { DefaultDisplayRank: raw?.DefaultDisplayRank }, "DefaultDisplayRank/SponsoredPosition", false, 0.8, "int");
+  P("phone", null, null, null, false, null, "unavailable-from-source");
+  P("opening_hours", null, null, null, false, null, "unavailable-from-source");
+  P("menu", null, null, null, false, null, "unavailable-from-source");
 
   const parsedRating: ParsedRating = {
     score: outlet.rating_average,
