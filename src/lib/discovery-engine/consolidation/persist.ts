@@ -11,12 +11,14 @@ const PROV_FIELDS = ["name", "rating", "review_count", "cuisines", "phone", "pos
 export async function persistConsolidation(
   db: SupabaseClient, tenantId: string, runId: string | null, candidates: ConsolidatedCandidate[], report?: ComparisonReport
 ): Promise<{ candidateIds: string[] }> {
+  // Only geography-valid outlets reach consolidation (see provider-geography-gate), so every
+  // persisted candidate is operationally in-scope. Stamped explicitly for auditability.
   const candidateIds: string[] = [];
   for (const c of candidates) {
     const ins = await db.from("consolidated_candidates").insert({
       tenant_id: tenantId, run_id: runId, name: c.name, brand: c.brand, postcode: c.postcode, phone: c.phone,
       latitude: c.latitude, longitude: c.longitude, match_status: c.matchStatus, confidence: c.confidence,
-      first_seen: c.firstSeen, last_seen: c.lastSeen,
+      first_seen: c.firstSeen, last_seen: c.lastSeen, geography_status: "valid_geography",
     }).select("id").single();
     if (ins.error) throw new Error(`persist candidate: ${JSON.stringify(ins.error)}`);
     const cid = (ins.data as { id: string }).id;

@@ -295,3 +295,27 @@ and the pilot prints a country distribution + `⚠ WARNING` when 0 valid UK post
 Product-owner decision (no actor change per instruction): supply the actor a UK-resolving input
 (UK lat/lng or a recognised UK city anchor) or a different input mode, then re-validate one UK
 district. Do not scale until a run returns valid UK geography. See docs/64.
+
+### ISS-0018 update — root cause found + contained (2026-07-18)
+
+**Root cause (provider input):** the actor `sourabhbgp/ubereats-scraper` requires a `urls` field
+(default `["https://www.ubereats.com/near-me"]`, which resolves to a US location). The pilot fetcher
+**omitted `urls`**, so the actor ignored the GB `address` and returned its US near-me default (San
+Francisco). Confirmed against the actor's published input schema (fields: urls, country, address,
+mode, maxResults, includeReviews, proxyConfiguration — no lat/lng).
+
+**Audit of both runs:** each returned 10 distinct US records → **10 distinct candidates (clean 1:1,
+NOT candidates=1)**. Consolidation did not over-merge (distinct phones/URLs, US ZIPs fail the UK
+full-postcode test, no coordinates → zero evidence links). The earlier "candidates=1" premise did
+not match the recorded database result.
+
+**Containment (this session):** added a provider-neutral geography-validation gate (docs/65) that
+classifies every observation `valid_geography` / `out_of_scope_geography` / `unverifiable_geography`
+between capture and consolidation. Wrong-geography records are retained as immutable evidence but
+excluded from consolidation, exports, and coverage. The two historical runs' 20 US candidates were
+quarantined (`consolidated_candidates.geography_status='out_of_scope_geography'`), with per-observation
+verdicts in `provider_geography_validations` and invalidation records in `candidate_merge_decisions`.
+Run-level business status `provider_succeeded_validation_failed` now HALTS before further paid sources.
+
+**Still open (needs approval):** one supported-input diagnostic prepared (verified dry via
+`npm run uber:diagnostic-plan`) using `urls:["pizza"]` + a full public UB1 address. NOT executed.

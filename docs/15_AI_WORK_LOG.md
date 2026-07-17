@@ -316,3 +316,21 @@ acquire OS Open Names + ONSPD; persist consolidation; extend JE parser.
 - Docs: added docs/64 (calibration + geography finding); logged BUG (fixed), ISS-0018 (open —
   discover geography), ADR (UK-gating + no-migration `source_extra`).
 - Not changing actor; not upgrading plan; not scaling; no customer comparison (per instruction).
+
+## Session — Contain provider geography mismatch (ISS-0018)
+- Audited both Uber pilot runs (DB authoritative): each returned 10 distinct US records → **10
+  distinct candidates (1:1, NOT candidates=1)**; consolidation did not over-merge. The "candidates=1"
+  premise did not match the recorded result — surfaced honestly with a per-UUID table.
+- Root cause found: the actor's required `urls` field was omitted → actor used its US near-me default
+  and ignored the GB address (confirmed vs the published input schema; no lat/lng fields exist).
+- Built a provider-neutral geography-validation gate (`provider-geography-gate.ts`): classifies each
+  observation valid/out_of_scope/unverifiable; only valid records reach consolidation/coverage/exports;
+  run-level `provider_succeeded_validation_failed` HALTS before further paid sources (docs/65).
+- Migrations 0018 (append-only `provider_geography_validations`) + 0019 (`consolidated_candidates.
+  geography_status`); advisor-clean (fixed function search_path). Backfilled/quarantined the 2×10
+  historical US candidates via geography_status + validations + candidate_merge_decisions; raw
+  observations untouched (append-only). 1,623 JE candidates unaffected.
+- Prepared (NOT run) the supported-input diagnostic: fetcher/pilot now send `urls` + full UB1 address;
+  `npm run uber:diagnostic-plan` verifies the exact request dry (9/9), ~$0.02 < $0.25 cap.
+- Tests: `test:geography-gate` (10 required proofs) + `test:uber-parse` + `test:multi-source` green;
+  typecheck + build + `git diff --check` clean.

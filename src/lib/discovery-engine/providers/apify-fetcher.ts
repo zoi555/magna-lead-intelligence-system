@@ -38,14 +38,38 @@ export function createApifyFetcher(opts: ApifyFetcherOptions): ProviderFetcher {
   };
 }
 
-/** Uber Eats via sourabhbgp/ubereats-scraper (address-based `discover`, GB). maxResults is a
- *  HARD cap on records → cost; the pilot uses a very small value. Reviews off by default. */
-export function uberEatsApifyFetcher(actorId: string, token: string, opts?: { maxResults?: number; includeReviews?: boolean }): ProviderFetcher {
-  const maxResults = opts?.maxResults ?? 250;
-  return createApifyFetcher({
-    actorId, token, wrapKey: "stores",
-    buildInput: (code) => ({ mode: "discover", country: "GB", address: `${code}, United Kingdom`, maxResults, includeReviews: opts?.includeReviews ?? false }),
-  });
+export interface UberEatsInputOptions {
+  maxResults?: number;
+  includeReviews?: boolean;
+  /** Documented actor field (REQUIRED by the actor; default is `["https://www.ubereats.com/near-me"]`
+   *  which resolves to a US location — ISS-0018). Pass cuisine keywords or store URLs to anchor the
+   *  search, e.g. ["pizza"]. Omitting this lets the actor fall back to its US near-me default. */
+  urls?: string[];
+  /** Full discover address (used only in discover mode); defaults to "<code>, United Kingdom". */
+  address?: string;
+  mode?: "auto" | "discover" | "store";
+}
+
+/** Build the EXACT actor input from a postcode district. Uses ONLY documented actor fields
+ *  (urls, country, address, mode, maxResults, includeReviews) — no invented latitude/longitude.
+ *  Shared by the fetcher and the diagnostic-plan verifier so what is checked == what is sent. */
+export function buildUberEatsInput(code: string, opts?: UberEatsInputOptions): Record<string, unknown> {
+  const input: Record<string, unknown> = {
+    mode: opts?.mode ?? "discover",
+    country: "GB",
+    address: opts?.address ?? `${code}, United Kingdom`,
+    maxResults: opts?.maxResults ?? 250,
+    includeReviews: opts?.includeReviews ?? false,
+  };
+  if (opts?.urls && opts.urls.length) input.urls = opts.urls;   // anchor search; avoids the US near-me default
+  return input;
+}
+
+/** Uber Eats via sourabhbgp/ubereats-scraper (`discover`, GB). maxResults is a HARD cap on records
+ *  → cost; the pilot uses a very small value. Reviews off by default. Pass `urls` to avoid the
+ *  actor's US near-me default (ISS-0018). */
+export function uberEatsApifyFetcher(actorId: string, token: string, opts?: UberEatsInputOptions): ProviderFetcher {
+  return createApifyFetcher({ actorId, token, wrapKey: "stores", buildInput: (code) => buildUberEatsInput(code, opts) });
 }
 export function deliverooApifyFetcher(actorId: string, token: string, opts?: { maxResults?: number }): ProviderFetcher {
   const maxResults = opts?.maxResults ?? 250;

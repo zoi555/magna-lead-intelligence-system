@@ -73,3 +73,10 @@ coverage. Postcode coverage uses the UK full-postcode regex, so US ZIPs correctl
 rating, ratingCount, deliveryFee, serviceFee, eta*, hours, menu, supportedDiningModes, promotion,
 logoImage — all null/empty via the `ld_json_fallback` path. These are actor/mode limitations, not
 parser gaps (the UK-rich fixture proves they map when present).
+
+## 6. Root cause of the wrong geography + supported-input diagnostic (2026-07-18)
+The actor's `urls` field is **required** (default `["https://www.ubereats.com/near-me"]` → US). The
+fetcher omitted it, so the actor ignored the GB `address` and returned San Francisco. Fix: the
+fetcher/pilot now always send `urls` (documented field; no lat/lng invented). The next diagnostic
+(prepared, **not run**) uses `urls:["pizza"]` + a full public UB1 address; verify dry with
+`npm run uber:diagnostic-plan`. Wrong-geography results are now quarantined by the gate (docs/65).

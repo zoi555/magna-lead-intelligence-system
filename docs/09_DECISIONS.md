@@ -344,3 +344,16 @@ Design only. Nothing here is built, migrated, deployed, or verified. Dedup-depen
   **No DB migration** was added: the full raw provider record is already stored immutably on the
   observation (`je_raw_observations.raw_payload`), which is the durable controlled-JSONB store.
   If consolidated-link-level extras are needed later, that is a separate additive-column decision.
+
+## ADR — Provider-result geography validation (quarantine, not trust)
+- Every provider observation is validated for geography BETWEEN immutable capture and operational
+  normalisation/consolidation (docs/65). Statuses: valid_geography / out_of_scope_geography /
+  unverifiable_geography. Only valid records enter consolidation, exports and coverage; wrong-
+  geography records are retained as immutable evidence and excluded from operational use.
+- Actor technical status, parser success, geography-validation success and operational discovery
+  success are treated as FOUR separate things. A run that returns records for the wrong place is
+  `provider_succeeded_validation_failed`, not a successful discovery run, and HALTS before further
+  paid sources.
+- Persistence: append-only `provider_geography_validations` (0018) + `consolidated_candidates.
+  geography_status` (0019) + invalidations via existing `candidate_merge_decisions`. No raw
+  observation is ever mutated.
