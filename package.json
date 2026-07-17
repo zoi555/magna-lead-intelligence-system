@@ -29,7 +29,8 @@
     "je:worker": "tsx scripts/je-worker.ts",
     "seed:postcode-reference": "tsx scripts/seed-postcode-reference.ts",
     "test:geography-standard": "tsx scripts/test-geography-standard.ts",
-    "test:multi-source": "tsx scripts/test-multi-source.ts"
+    "test:multi-source": "tsx scripts/test-multi-source.ts",
+    "ingest:os-open-names": "tsx scripts/ingest-os-open-names.ts"
   },
   "dependencies": {
     "@expo-google-fonts/open-sans": "^0.4.2",

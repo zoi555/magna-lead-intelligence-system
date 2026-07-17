@@ -11,11 +11,15 @@ interface SelectionView {
   original: string; type: string; status: string; method: string;
   expansionCount: number; queryUnits: string[]; children: string[]; reason: string | null;
 }
+interface PlaceResolution { token: string; name: string; kind: string; localAuthority: string | null; region: string | null; districts: string[] }
+interface AmbiguousPlace { token: string; choices: { placeId: string; name: string; kind: string; localAuthority: string | null; region: string | null; districts: string[] }[] }
 interface ResolveResult {
   ok: boolean; error?: string;
   selections: SelectionView[];
   queryUnits: string[]; expansionCount: number;
   excluded: string[];
+  placeResolutions?: PlaceResolution[];
+  ambiguousPlaces?: AmbiguousPlace[];
   unresolved: { value: string; status: string; reason: string | null }[];
 }
 
@@ -95,9 +99,23 @@ export function GeographySelector({ input, onExclusionsChange }: { input: string
             </div>
           ))}
 
+          {data.placeResolutions && data.placeResolutions.length > 0 && (
+            <div className="text-[11px] text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1">
+              Places (OS Open Names): {data.placeResolutions.map((p) => `${p.name} (${p.kind}) → ${p.districts.join("/") || "no district"}`).join("; ")}.
+            </div>
+          )}
+          {data.ambiguousPlaces && data.ambiguousPlaces.length > 0 && (
+            <div className="text-[11px] text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1">
+              {data.ambiguousPlaces.map((a) => (
+                <div key={a.token} className="mb-0.5">
+                  <b>{a.token}</b> is ambiguous — {a.choices.length} places (choose one): {a.choices.slice(0, 6).map((c) => `${c.name}${c.region ? ` (${c.region})` : ""}→${c.districts.join("/")}`).join("; ")}{a.choices.length > 6 ? "…" : ""}
+                </div>
+              ))}
+            </div>
+          )}
           {data.unresolved.length > 0 && (
             <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-              Not expandable (honest — no guess): {data.unresolved.map((u) => u.value).join(", ")}. Place/administrative geography needs a gazetteer/ONSPD (pending data).
+              Not expandable (honest — no guess): {data.unresolved.map((u) => u.value).join(", ")}. Administrative geography needs ONSPD (pending data).
             </div>
           )}
         </div>

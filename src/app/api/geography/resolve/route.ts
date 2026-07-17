@@ -5,7 +5,9 @@
 import { NextResponse } from "next/server";
 import { expandArea, expandDistrict } from "@geospatial/map";
 import { loadPostcodeReference } from "@/lib/discovery-engine/geography/reference";
-import { planTerritory, JUST_EAT_GEOGRAPHY_SUPPORT } from "@/lib/discovery-engine/geography/planner";
+import { JUST_EAT_GEOGRAPHY_SUPPORT } from "@/lib/discovery-engine/geography/planner";
+import { planTerritoryWithPlaces } from "@/lib/discovery-engine/geography/plan-with-places";
+import { createServiceClient } from "@/lib/discovery-engine/supabase-client";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,7 +20,7 @@ export async function POST(req: Request) {
     if (!input) return NextResponse.json({ ok: false, error: "Enter a postcode area / district / sector, a place, or a mixed list" }, { status: 400 });
 
     const ref = await loadPostcodeReference();
-    const plan = planTerritory(input, ref, JUST_EAT_GEOGRAPHY_SUPPORT, exclusions);
+    const plan = await planTerritoryWithPlaces(createServiceClient(), input, ref, JUST_EAT_GEOGRAPHY_SUPPORT, exclusions);
 
     // per-selection view with children to inspect (areas → districts, districts → sectors)
     const selections = plan.resolved.map((r) => {
@@ -39,13 +41,21 @@ export async function POST(req: Request) {
       };
     });
 
+    // place tokens that resolved (uniquely or ambiguously) are no longer "unresolved"
+    const resolvedTokens = new Set([...plan.placeResolutions.map((p) => p.token), ...plan.ambiguousPlaces.map((p) => p.token)]);
+    const unresolved = plan.unresolved
+      .filter((u) => !resolvedTokens.has(u.original.value))
+      .map((u) => ({ value: u.original.value, status: u.status, reason: u.reason }));
+
     return NextResponse.json({
       ok: true,
       selections,
       queryUnits: plan.queryUnits,
       expansionCount: plan.queryUnits.length,
       excluded: plan.excluded,
-      unresolved: plan.unresolved.map((u) => ({ value: u.original.value, status: u.status, reason: u.reason })),
+      placeResolutions: plan.placeResolutions.map((p) => ({ token: p.token, name: p.candidate.name, kind: p.candidate.kind, localAuthority: p.candidate.localAuthority, region: p.candidate.region, districts: p.candidate.districts })),
+      ambiguousPlaces: plan.ambiguousPlaces.map((a) => ({ token: a.token, choices: a.candidates.map((c) => ({ placeId: c.placeId, name: c.name, kind: c.kind, localAuthority: c.localAuthority, region: c.region, districts: c.districts })) })),
+      unresolved,
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String((e as Error)?.message ?? e) }, { status: 500 });

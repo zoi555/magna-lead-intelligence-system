@@ -56,6 +56,12 @@ export async function saveRun(
   return { run, plan };
 }
 
+/** Save a run from a precomputed plan (e.g. the place-aware plan). */
+export async function saveRunFromPlan(repo: DiscoveryRepository, p: CreateRunParams, plan: TerritoryPlan): Promise<{ run: RunRecord; plan: TerritoryPlan }> {
+  const run = await repo.createRun(buildRunInput(p, plan));
+  return { run, plan };
+}
+
 /** Persist geography provenance (objective 7): one discovery_selection per original
  *  selection + the query units actually planned. Server-side (service client). */
 export async function persistGeographyProvenance(db: SupabaseClient, run: RunRecord, plan: TerritoryPlan, source = "just_eat"): Promise<void> {
