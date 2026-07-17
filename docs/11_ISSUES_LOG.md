@@ -277,3 +277,21 @@ Acquire lawful national datasets — **OS Open Names** (place gazetteer) and **O
 (postcode→place/LA/region) — ingest into `place` / `place_postcode_link` / `admin_area`
 with `source` + `source_version`, then flip the capability from `pending_data` to
 `available` and enable place expansion.
+
+## ISS-0018 — Uber Eats `discover` mode returns US (not UK) geography for a UK district
+
+The authorised Apify actor `sourabhbgp/ubereats-scraper` in `discover` mode, given
+`address: "UB1, United Kingdom"`, returned **10/10 San Francisco, US** stores (all
+`address.country: "US"`, US ZIPs) via a sparse `scrapedFrom: "ld_json_fallback"` path — it did
+**not** geolocate the UK postcode district. Confirmed on two runs (first pilot + calibrated
+rerun), both ~$0.02, under the $0.25 cap.
+
+Impact: UB1-by-name via this actor does not represent UK UB1 coverage. The parser handles it
+honestly (US ZIPs/phones → not mapped to UK fields, retained in `source_extra`; no fabrication)
+and the pilot prints a country distribution + `⚠ WARNING` when 0 valid UK postcodes are returned.
+
+### Next action
+
+Product-owner decision (no actor change per instruction): supply the actor a UK-resolving input
+(UK lat/lng or a recognised UK city anchor) or a different input mode, then re-validate one UK
+district. Do not scale until a run returns valid UK geography. See docs/64.

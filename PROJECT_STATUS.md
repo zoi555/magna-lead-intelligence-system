@@ -237,3 +237,10 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
 - **ONSPD pipeline** prepared (geospatial-platform, no download). **Uber/Deliveroo pilot readiness** (`docs/63`): Apify Free plan, ~$2.75 one-district pilot, exact actors/limits — **not executed/purchased**.
 - Verified: typecheck; all tests + build green; migrations 0001–0017 applied.
 - **Blocked/remaining**: live Vercel browser QA (production URL not in repo/MCP metadata — need URL); ONSPD download+ingest (go-ahead); Uber/Deliveroo pilot (approve ~$2.75 + APIFY_TOKEN). Customer comparison NOT started.
+
+### Uber Eats pilot executed + parser calibrated — 2026-07-17
+- **Executed the approved 10-result UB1 Apify pilot** (`sourabhbgp/ubereats-scraper`, ~$0.02, under the $0.25 cap; `APIFY_TOKEN` server-side only, never printed/committed). Ran twice (initial + calibrated rerun), both ~$0.02.
+- **Parser calibrated → `uber-eats-parse-1.1.0`** (`docs/64`): mapped the real actor shape (`address.*`, `cuisineList`, numeric `rating`/`ratingCount`, `phoneNumber`, `{ url }` images, `supportedDiningModes`), backward-compatible with the old fixture, **UK-only postcode/phone gating** (US ZIPs/phones retained in `source_extra`, never coerced), HTML-entity decoding, controlled `source_extra` JSONB for all unmapped fields. Coverage calc now `source_extra`-aware (menu/hours/promotion/media/delivery_fee/eta). No DB migration (raw already immutable on the observation).
+- **Finding (ISS-0018):** `discover` for `"UB1, United Kingdom"` returned **10/10 San Francisco, US** stores via a sparse `ld_json_fallback` path — the actor did **not** geolocate the UK district. Handled honestly (no fabrication); pilot prints a country distribution + `⚠ WARNING` on 0 UK postcodes. Product-owner decision needed on a UK-resolving input (no actor change per instruction).
+- Tests: `test:uber-parse` (40 assertions, sanitised real-shape fixture) + `test:multi-source` green; typecheck + build green.
+- **Not** done (per instruction): no actor change, no plan upgrade, no scaling, no customer comparison.

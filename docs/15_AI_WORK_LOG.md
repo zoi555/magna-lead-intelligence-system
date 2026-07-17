@@ -300,3 +300,19 @@ blocker); Just Eat 96-field parser extension + fresh live run + historical-dupli
 (Part 5); DB persistence of consolidation + multi-source worker (Part 10); Vercel deploy (Part 13).
 Next action: get approval on a Uber/Deliveroo provider (cost) OR proceed to validation/dedup;
 acquire OS Open Names + ONSPD; persist consolidation; extend JE parser.
+
+## Session — Uber Eats parser calibration (real Apify output)
+
+- Executed the approved 10-result UB1 Uber pilot (`sourabhbgp/ubereats-scraper`, ~$0.02, under
+  the $0.25 cap; APIFY_TOKEN server-side only, never printed/committed). Two findings: (A) parser
+  read wrong field paths; (B) `discover` returned US (San Francisco) stores for "UB1", not UK.
+- Recalibrated parser → `uber-eats-parse-1.1.0`: real actor shape (`address.*`, `cuisineList`,
+  numeric `rating`/`ratingCount`, `phoneNumber`, `{ url }` images, `supportedDiningModes`),
+  backward-compatible with the old fixture, UK-only postcode/phone gating, HTML-entity decoding,
+  controlled `source_extra` retention (no fabrication). Coverage calc made `source_extra`-aware
+  (menu/hours/promotion/media/delivery_fee/eta). Pilot now prints a geography audit + warning.
+- Added `test:uber-parse` (40 assertions, sanitised real-shape fixture: US-fallback + UK-rich).
+  `test:multi-source` unchanged/green; typecheck + build green. Live rerun confirmed calibration.
+- Docs: added docs/64 (calibration + geography finding); logged BUG (fixed), ISS-0018 (open —
+  discover geography), ADR (UK-gating + no-migration `source_extra`).
+- Not changing actor; not upgrading plan; not scaling; no customer comparison (per instruction).

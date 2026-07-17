@@ -45,7 +45,7 @@ async function main() {
   const { persistConsolidation } = await import("../src/lib/discovery-engine/consolidation/persist");
   const { buildComparisonReport } = await import("../src/lib/discovery-engine/reports/comparison");
   const { contentHash } = await import("../src/lib/discovery-engine/hash");
-  const { SCHEMA_VERSION, ADAPTER_VERSION } = await import("../src/lib/discovery-engine/version");
+  const { SCHEMA_VERSION, ADAPTER_VERSION, UBER_PARSER_VERSION } = await import("../src/lib/discovery-engine/version");
   const { resolveDefaultTenantId } = await import("../src/lib/discovery-engine/server");
   const { SupabaseRepository } = await import("../src/lib/discovery-engine/repository/supabase");
 
@@ -82,7 +82,7 @@ async function main() {
     await repo.insertRawObservation({
       tenant_id: tenantId, execution_id: exec.id, run_id: run.id, source: "uber_eats", response_type: "search",
       source_record_id: o.source_outlet_id, query_context: { district: DISTRICT, provider: ACTOR },
-      http_status: 200, raw_payload: rawRec, content_hash: hash, parser_version: "uber-eats-parse-1.0.0",
+      http_status: 200, raw_payload: rawRec, content_hash: hash, parser_version: UBER_PARSER_VERSION,
       adapter_version: ADAPTER_VERSION, schema_version: SCHEMA_VERSION, parse_status: "parsed", parse_warnings: [], attempt: 1,
       duplicate_of: dup?.id ?? null,
     });
@@ -95,10 +95,28 @@ async function main() {
   await persistConsolidation(db, tenantId, run.id, candidates, report);
 
   const cov = report.sources.find((s) => s.source === "uber_eats")!.coverage;
-  console.log(`\n--- Uber pilot result (UB1) ---`);
+  const pct = (v: number | undefined) => `${Math.round((v ?? 0) * 100)}%`;
+
+  // Geography audit: the actor's `discover` mode has been observed to resolve a UK address to a
+  // US default location — surface the actual country/postcode distribution so a wrong-geography
+  // run is never mistaken for UK UB1 coverage.
+  const countries: Record<string, number> = {};
+  let ukPostcodes = 0, sourcePostcodes = 0;
+  for (const o of outlets) {
+    const c = String((o.source_extra as any)?.address_country ?? "?"); countries[c] = (countries[c] ?? 0) + 1;
+    if ((o.source_extra as any)?.source_postcode) sourcePostcodes++;
+    if (o.postcode) ukPostcodes++;
+  }
+  const scrapedFrom = [...new Set(outlets.map((o) => String((o.source_extra as any)?.scraped_from ?? "?")))];
+
+  console.log(`\n--- Uber pilot result (UB1) — parser ${UBER_PARSER_VERSION} ---`);
   console.log(`observations=${obsCount} outlets=${outlets.length} candidates=${candidates.length}`);
-  console.log(`coverage: postcode=${cov.full_postcode} coords=${cov.coordinates} rating=${cov.review_score} cuisine=${cov.cuisine} delivery=${cov.delivery} phone=${cov.phone}`);
-  console.log(`Estimated cost: ~$${(outlets.length * 2 / 1000).toFixed(3)} (${outlets.length} × $2/1k).`);
+  console.log(`geography: country distribution=${JSON.stringify(countries)} scrapedFrom=${JSON.stringify(scrapedFrom)}`);
+  console.log(`postcodes: raw supplied=${sourcePostcodes}/${outlets.length}, valid UK=${ukPostcodes}/${outlets.length}`);
+  console.log(`coverage: postcode(UK)=${pct(cov.full_postcode)} coords=${pct(cov.coordinates)} rating=${pct(cov.review_score)} ratingCount=${pct(cov.review_count)} cuisine=${pct(cov.cuisine)}`);
+  console.log(`          delivery=${pct(cov.delivery)} deliveryFee=${pct(cov.delivery_fee)} eta=${pct(cov.eta)} phone(UK)=${pct(cov.phone)} hours=${pct(cov.opening_hours)} menu=${pct(cov.menu)} promotion=${pct(cov.promotion)} media=${pct(cov.media)}`);
+  if (ukPostcodes === 0 && outlets.length > 0) console.log(`⚠ WARNING: 0 valid UK postcodes — the actor's discover mode did NOT return UK geography for "UB1". This run does not represent UK UB1 coverage; see docs/64.`);
+  console.log(`Estimated cost: ~$${(outlets.length * 2 / 1000).toFixed(3)} (${outlets.length} × $2/1k) — cap $0.25.`);
   process.exit(0);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

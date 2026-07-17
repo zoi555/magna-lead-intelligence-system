@@ -27,6 +27,9 @@ export interface SourceOutlet {
   halal_flag: boolean | null;
   logo_url: string | null;
   observed_at: string;
+  /** Controlled bag of source-specific fields not mapped to the neutral columns above (JSONB).
+   *  Never fabricated; the full raw provider record is also retained on the observation. */
+  source_extra?: Record<string, unknown>;
 }
 
 export type MatchStatus =

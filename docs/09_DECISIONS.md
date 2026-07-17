@@ -332,3 +332,15 @@ RLS-first keeps sensitive lead/customer/audit data protected by default; a restr
 ### Status note
 
 Design only. Nothing here is built, migrated, deployed, or verified. Dedup-dependent and export-dependent tables remain blocked by ISS-0001, ISS-0002, ISS-0003.
+
+## ADR — Uber Eats normalisation: UK-only gating + controlled `source_extra` (no migration)
+
+- `SourceOutlet.postcode` is populated **only** for a recognised UK postcode (classifyPostcode
+  `level !== "invalid"`); `phone` only for a valid UK number. Non-UK values (US ZIPs/phones from
+  the actor's mis-geolocated `discover` output) are **retained raw** in `source_extra`, never
+  coerced into the UK fields. Rationale: keeps consolidation matching and coverage honest for a
+  UK lead system; no fabrication.
+- Unmapped provider fields are retained in an **in-memory `source_extra` JSONB** on `SourceOutlet`.
+  **No DB migration** was added: the full raw provider record is already stored immutably on the
+  observation (`je_raw_observations.raw_payload`), which is the durable controlled-JSONB store.
+  If consolidated-link-level extras are needed later, that is a separate additive-column decision.

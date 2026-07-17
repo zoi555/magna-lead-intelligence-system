@@ -85,3 +85,15 @@ These are design corrections, not app bug fixes:
 - **Detail audit (docs/59):** Just Eat outlet **detail** pages are Cloudflare anti-bot
   protected (403) and no public detail/menu endpoint exists (404) — detail-level fields
   (phone, menu, opening hours, description) are **not lawfully retrievable**. Not integrated.
+- **Uber Eats parser field-path mismatch (fixed — `uber-eats-parse-1.1.0`).** The first
+  approved Apify pilot (`sourabhbgp/ubereats-scraper`, UB1, 10 results, ~$0.02) showed
+  postcode/coords/rating coverage = 0. Root cause was **wrong field paths**, not missing
+  data: the parser read `raw.location.*` / `raw.categories` / `raw.rating.score` and treated
+  images as strings, but the real actor nests under `raw.address.*` and supplies `cuisineList`,
+  numeric `rating` + `ratingCount`, a `phoneNumber` string, and `{ url }` image objects.
+  **Fix:** recalibrated mapping (kept backward-compatible with the old fixture), UK-only
+  postcode/phone gating (US ZIPs/phones retained in `source_extra`, never coerced), HTML-entity
+  title decoding, `supportedDiningModes`→delivery/collection, and a controlled `source_extra`
+  JSONB for all unmapped fields. Coverage calc now credits menu/hours/promotion/media from
+  `source_extra`. Tests: `test:uber-parse` (40 assertions) + `test:multi-source` green; live
+  rerun confirmed. See docs/64.

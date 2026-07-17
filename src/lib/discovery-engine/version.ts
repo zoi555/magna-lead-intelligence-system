@@ -5,3 +5,4 @@ export const SCHEMA_VERSION = 1;                 // matches the migrations' sche
 export const PARSER_VERSION = "je-search-1.1.0"; // Just Eat search-response parser (96-field coverage)
 export const ADAPTER_VERSION = "je-adapter-1.0.0";
 export const NORMALISATION_VERSION = "je-normalise-1.0.0";
+export const UBER_PARSER_VERSION = "uber-eats-parse-1.1.0"; // calibrated to sourabhbgp/ubereats-scraper real output

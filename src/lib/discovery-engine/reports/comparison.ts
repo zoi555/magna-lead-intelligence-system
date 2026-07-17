@@ -26,6 +26,9 @@ export interface ComparisonReport {
   fieldsUnavailableAllSources: string[];   // honestly confirmed unavailable
 }
 
+const ex = (o: SourceOutlet) => (o.source_extra ?? {}) as Record<string, unknown>;
+const exNum = (v: unknown): number | null => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+
 function sourceReport(source: SourceName, outlets: SourceOutlet[]): SourceReport {
   const n = outlets.length;
   const has = (p: (o: SourceOutlet) => boolean) => frac(outlets.filter(p).length, n);
@@ -39,12 +42,17 @@ function sourceReport(source: SourceName, outlets: SourceOutlet[]): SourceReport
       cuisine: has((o) => o.cuisines.length > 0),
       delivery: has((o) => o.is_delivery === true),
       collection: has((o) => o.is_collection === true),
+      delivery_fee: has((o) => o.delivery_cost != null),
+      eta: has((o) => o.eta_minutes != null),
       halal_evidence: has((o) => o.halal_flag === true),
       website: has((o) => !!o.source_url),
-      promotion: has((o) => o.is_sponsored === true),
-      phone: has((o) => !!o.phone),        // typically 0 — not supplied
-      menu: has(() => false),              // 0 — not collected from any source
-      opening_hours: has(() => false),     // 0 — not supplied
+      // promotion / menu / opening_hours / media are checked against first-class fields AND the
+      // controlled source_extra bag, so a source that supplies them via extras is credited honestly.
+      promotion: has((o) => o.is_sponsored === true || ex(o).promotion != null),
+      phone: has((o) => !!o.phone),
+      menu: has((o) => (exNum(ex(o).menu_item_count) ?? 0) > 0),
+      opening_hours: has((o) => (Array.isArray(ex(o).hours) && (ex(o).hours as unknown[]).length > 0) || !!ex(o).working_hours_tagline),
+      media: has((o) => !!o.logo_url || !!ex(o).hero_image),
     },
   };
 }
