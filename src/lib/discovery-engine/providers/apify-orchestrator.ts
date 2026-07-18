@@ -26,7 +26,7 @@ export interface ProviderExecutionStore {
   insertRunning(row: {
     actorId: string; actorRunId: string; datasetId: string | null; buildId: string | null; buildTag: string | null;
     origin: string | null; inputFingerprint: string; maxRequestedResults: number; estimatedCostUsd: number;
-    pricingModel: string | null; actorStatus: string; providerRunRef: string;
+    pricingModel: string | null; actorStatus: string; providerRunRef: string; startedAt: string | null;
   }): Promise<{ id: string }>;
   /** Update provenance (status transitions, costs, counts, failure reason). */
   update(id: string, patch: Record<string, unknown>): Promise<void>;
@@ -87,6 +87,7 @@ export async function runApifyProvider(args: RunApifyArgs): Promise<RunApifyResu
       actorId, actorRunId: created.runId, datasetId: created.datasetId, buildId: created.buildId, buildTag: created.buildTag,
       origin: created.origin, inputFingerprint, maxRequestedResults: args.maxRequestedResults, estimatedCostUsd: args.estimatedCostUsd,
       pricingModel: args.pricingModel ?? created.pricingModel ?? null, actorStatus: created.status, providerRunRef: apifyRunRef(created.runId),
+      startedAt: created.startedAt,
     });
     provenanceId = ins.id; runId = created.runId;
   }

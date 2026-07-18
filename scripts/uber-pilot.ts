@@ -68,9 +68,23 @@ async function main() {
   const repo = new SupabaseRepository();
   const tenantId = await resolveDefaultTenantId();
 
-  // Internal run + execution FIRST, so provenance links to them.
-  const run = await repo.createRun({ tenant_id: tenantId, name: `uber-pilot: ${DISTRICT}`, territory_input: DISTRICT, derived_query_units: [DISTRICT], search_terms: [], target_filters: {}, requested_fields: [], source_config: { source: "uber_eats", provider: ACTOR, pilot: true }, config_snapshot: { input } });
-  const exec = await repo.createExecution(run.id, tenantId, 1);
+  // Resume-safe: if a paid run for this EXACT input is already in flight, reuse its internal
+  // run/execution (the orchestrator then resumes the SAME actor run — no new charge). Otherwise a
+  // fresh internal run + execution, so provenance links to them.
+  const inflightRow = await db.from("provider_executions")
+    .select("run_id, execution_id, actor_run_id")
+    .eq("tenant_id", tenantId).eq("actor_id", ACTOR).eq("input_fingerprint", inputFingerprint)
+    .in("actor_status", ["READY", "RUNNING", "UNKNOWN"]).not("actor_run_id", "is", null)
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  let run: { id: string }, exec: { id: string };
+  if (inflightRow.data?.run_id && inflightRow.data?.execution_id) {
+    run = { id: inflightRow.data.run_id as string }; exec = { id: inflightRow.data.execution_id as string };
+    console.log(`↻ Resuming in-flight provider run ${inflightRow.data.actor_run_id} — reusing internal run ${run.id}/exec ${exec.id} (NO new paid run).`);
+  } else {
+    const created = await repo.createRun({ tenant_id: tenantId, name: `uber-pilot: ${DISTRICT}`, territory_input: DISTRICT, derived_query_units: [DISTRICT], search_terms: [], target_filters: {}, requested_fields: [], source_config: { source: "uber_eats", provider: ACTOR, pilot: true }, config_snapshot: { input } });
+    const execRec = await repo.createExecution(created.id, tenantId, 1);
+    run = { id: created.id }; exec = { id: execRec.id };
+  }
 
   // --- Provider execution with permanent provenance (idempotent; run id stored the instant it exists). ---
   const store = createProviderExecutionStore(db, { tenantId, runId: run.id, executionId: exec.id, provider: "apify" });

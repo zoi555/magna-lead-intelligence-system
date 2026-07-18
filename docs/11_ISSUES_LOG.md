@@ -319,3 +319,25 @@ Run-level business status `provider_succeeded_validation_failed` now HALTS befor
 
 **Still open (needs approval):** one supported-input diagnostic prepared (verified dry via
 `npm run uber:diagnostic-plan`) using `urls:["pizza"]` + a full public UB1 address. NOT executed.
+
+### ISS-0018 update — final supported-input diagnostic executed (2026-07-18)
+
+One approved paid run (actor_run_id `1NY5EwEirCZi5h4s6`, dataset `xjn5ywNeQUvBtW7ws`, build 0.1.23,
+SUCCEEDED, charged 10, **actual $0.02**, under the $0.25 cap; exactly ONE paid run). Input:
+`{urls:["pizza"], country:GB, address:"Southall Town Hall, 1 High Street, Southall, UB1 3HA, United
+Kingdom", mode:discover, maxResults:10, includeReviews:false}`.
+
+**Result — progress but still not district-precise:** adding the required `urls` field **fixed the
+wrong-country bug** — the actor now returns **GB** records (country `{"GB":10}`, 10/10 valid UK
+postcodes) instead of US/San Francisco. **However** the records are **central London** pizza places
+(SE11, WC1X, WC2H, WC2B, N1, EC4Y, SW8) — **not UB1/Southall**. The actor does not honour the
+specific UB1 address to bound discovery to the district; it returns broad London results.
+
+The gate correctly classified all 10 `out_of_scope_geography` (signal `postcode_out_of_area`),
+business status `provider_succeeded_validation_failed`, **0 operational candidates**, and HALTED.
+Raw observations immutable (10 canonical, 0 duplicates, 0 dangling). Sparse `ld_json_fallback` shape
+again (phone/cuisines/media/isOpen present; rating/coords/delivery/eta/hours/menu absent).
+
+**Status:** wrong-country is RESOLVED; **district-precise UK discovery is NOT achievable** with this
+actor via address input. Recommend evaluating a tighter location input or an alternative actor for
+district-level UK discovery. No larger Uber run; no Deliveroo; no customer comparison.

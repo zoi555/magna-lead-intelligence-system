@@ -29,7 +29,7 @@ export function createProviderExecutionStore(
         actor_id: row.actorId, actor_run_id: row.actorRunId, dataset_id: row.datasetId, build_id: row.buildId, build_tag: row.buildTag,
         origin: row.origin, input_fingerprint: row.inputFingerprint, max_requested_results: row.maxRequestedResults,
         pricing_model: row.pricingModel, estimated_cost_usd: row.estimatedCostUsd, actor_status: row.actorStatus,
-        provider_run_ref: row.providerRunRef,
+        provider_run_ref: row.providerRunRef, started_at: row.startedAt,
       }).select("id").single();
       if (r.error) throw new Error(`insertRunning: ${JSON.stringify(r.error)}`);
       return { id: (r.data as { id: string }).id };
