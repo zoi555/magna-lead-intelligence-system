@@ -317,13 +317,34 @@ Provider-neutral, pure, no network — `src/lib/discovery-engine/providers/bench
   — distinct `source_outlet_id` values among business-geography-valid records. A distinct UUID is a
   **storefront**, not a confirmed physical kitchen; deduplicated separately from the raw valid-record
   count so a repeated/duplicate observation is never counted as a second storefront.
-- **`storefrontEntityBreakdown`** — reports `knownPhysicalLocations` / `knownVirtualStorefronts` /
-  `chainBranches` / `unknownEntityType` as TAGS on the same distinct-storefront set, using (a) a
-  matched reference listing's known `entity_type`, or (b) an evidence-based heuristic — storefronts
-  sharing an identical non-null address+phone with at least one other distinct storefront are
-  flagged as a shared-kitchen/virtual-brand cluster (the same signal behind the real docs/68 finding
-  — Loaded Burgers/Wings 100/Tasty Tenders at one UB1 address). **This never merges counts** — every
-  distinct UUID is still counted individually; the breakdown is an additional tag, not a collapse.
+- **`storefrontEntityBreakdown`** — reports `sharedAddressPhoneClusterStorefronts` (a raw SIGNAL:
+  storefronts sharing an identical non-null address+phone with at least one other distinct
+  storefront — the same signal behind the real docs/68 finding, Loaded Burgers/Wings 100/Tasty
+  Tenders at one UB1 address), `confirmedVirtualBrandStorefronts` / `confirmedPhysicalStorefronts` /
+  `confirmedChainBranchStorefronts` (ONLY from an explicit matched reference-set `entity_type` —
+  real source/branding/menu/operator evidence, never the address+phone signal alone),
+  `suspectedVirtualBrandStorefronts` (in a shared-address+phone cluster but with NO reference
+  confirmation — this is the corrected, honest label for what an earlier draft of this module
+  called "known virtual storefronts": **shared address and phone prove a shared-location/shared-
+  operator signal, they do NOT by themselves prove every member is a virtual brand** — see the
+  "Follow-up correction" note below), and `unresolvedEntityTypeStorefronts` (no reference match, not
+  in a cluster). **This never merges counts** — every distinct UUID is still counted individually;
+  the breakdown is an additional tag, not a collapse. No genuine physical-location grouping key or
+  methodology is implemented, so `confirmedPhysicalStorefronts` reflects reference-set evidence
+  only — never claimed as an independently-derived "unique physical location" count.
+
+#### Follow-up correction (2026-07-18, later same-day session)
+
+A second audit pass found the first version of this breakdown auto-labelled any storefront in a
+shared address+phone cluster as a "known virtual storefront" — treating a location/operator signal
+as if it were confirmation. Fixed: cluster membership alone now only ever produces
+`suspectedVirtualBrandStorefronts`; `confirmedVirtualBrandStorefronts` requires an explicit
+reference-set `entity_type: "virtual_brand"` match (real evidence), and reference confirmation for
+one cluster member never promotes or demotes any other member. New tests
+(`test:ub1-benchmark`) prove: two storefronts sharing an address+phone are reported in the cluster
+signal but are NOT auto-confirmed as virtual brands; when one cluster member IS reference-confirmed
+physical, that confirmation applies only to that storefront, while its cluster-mate remains
+suspected, not merged or reclassified by association.
 - **`physicalUB1Precision`** — the existing geography-validation gate reused unmodified
   (`partitionByGeography`), so precision scoring is consistent with the production pipeline's own
   in-scope/out-of-scope logic, not a parallel reimplementation. Raw totals, out-of-scope counts and
@@ -357,7 +378,9 @@ totalRecords=40 distinctRecords=40 duplicates=0 (0.0%)
 geography: valid=10 outOfScope=28 unverifiable=2 total=40
 physicalUB1Precision: 10/40 = 25%
 uniqueValidUB1StorefrontCount=10
-storefrontEntityBreakdown: knownPhysicalLocations=0 knownVirtualStorefronts=3 chainBranches=0 unknownEntityType=7
+storefrontEntityBreakdown: sharedAddressPhoneClusterStorefronts=3 confirmedVirtualBrandStorefronts=0
+  suspectedVirtualBrandStorefronts=3 confirmedPhysicalStorefronts=0 confirmedChainBranchStorefronts=0
+  unresolvedEntityTypeStorefronts=7
 verifiedActiveRecall (verified_active only): 0/2 = 0%
 candidateReferenceCoverage (full 7-listing set): 0/7 = 0%
 costPerUniqueValidStorefront=$0.02 ($0.20 ÷ 10 storefronts)
@@ -367,9 +390,12 @@ fieldCompleteness: postcode=95% latitude=100% phone=100% rating=95% review_count
 
 This **exactly reproduces** docs/68's manually-computed finding for the broad run alone (10 UB1
 records, 0/7 known reference restaurants) — a useful cross-check that the corrected scorer is
-accurate, not just differently wrong. The `knownVirtualStorefronts=3` tag independently recovers
-the same shared-kitchen cluster docs/68 identified by hand (Loaded Burgers/Wings 100/Tasty Tenders
-at one UB1 address), via the address+phone heuristic, without merging their counts.
+accurate, not just differently wrong. The `sharedAddressPhoneClusterStorefronts=3` /
+`suspectedVirtualBrandStorefronts=3` pair independently recovers the same shared-kitchen cluster
+docs/68 identified by hand (Loaded Burgers/Wings 100/Tasty Tenders at one UB1 address) via the
+address+phone signal — correctly reported as **suspected**, not confirmed, since none of those
+three storefronts matched an explicit reference-set `virtual_brand` entry
+(`confirmedVirtualBrandStorefronts=0`). Their counts are never merged — all 3 remain distinct UUIDs.
 **`verifiedActiveRecall` is 0/2 for the broad run specifically** — Ali Baba's Pizza and Tops Pizza
 Southall were found only in the earlier narrow pizza-query run (`jg2xJwXcMgvmggYnT`), not this one;
 across BOTH borderline runs combined the project's known evidence remains 2/7 (unchanged from

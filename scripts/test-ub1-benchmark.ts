@@ -139,9 +139,51 @@ async function main() {
   {
     const b = score.storefrontEntityBreakdown;
     assert(b.uniqueValidUB1StorefrontCount === 3, "breakdown total matches the top-level unique storefront count");
-    assert(b.knownPhysicalLocations === 3, "all 3 valid storefronts matched a reference-set entry classified physical_restaurant — correctly tagged, not merged");
-    assert(b.knownVirtualStorefronts === 0 && b.chainBranches === 0, "no virtual-brand or chain-branch evidence exists in this fixture — correctly reported as zero, not guessed");
-    assert(b.unknownEntityType === 0, "every valid storefront in this fixture had a reference match, so none fall into unknownEntityType here");
+    assert(b.confirmedPhysicalStorefronts === 3, "all 3 valid storefronts matched a reference-set entry classified physical_restaurant — correctly tagged, not merged");
+    assert(b.confirmedVirtualBrandStorefronts === 0 && b.confirmedChainBranchStorefronts === 0, "no virtual-brand or chain-branch evidence exists in this fixture — correctly reported as zero, not guessed");
+    assert(b.suspectedVirtualBrandStorefronts === 0, "none of these 3 storefronts share an address+phone with another storefront, so none are even suspected virtual brands");
+    assert(b.sharedAddressPhoneClusterStorefronts === 0, "no shared-address-phone cluster exists in this fixture");
+    assert(b.unresolvedEntityTypeStorefronts === 0, "every valid storefront in this fixture had a reference match, so none fall into unresolvedEntityTypeStorefronts here");
+  }
+
+  // --- FOLLOW-UP CORRECTION: shared address+phone is a SIGNAL, never automatic virtual-brand proof ---
+  {
+    const geoCtx = { requestedCountry: "GB", geographySelection: "UB1", resolvedQueryUnits: ["UB1"] };
+    const sharedAddr = "1 Test Parade, Southall, UB1 9ZZ";
+    const sharedPhone = "+442085551234";
+    const outletA: SourceOutlet = {
+      source: "uber_eats", source_outlet_id: "cluster-a", source_url: null,
+      name: "Cluster Brand A", brand: null, address: sharedAddr, postcode: "UB1 9ZZ",
+      latitude: 51.508, longitude: -0.377, phone: sharedPhone, rating: null, review_count: null,
+      cuisines: [], is_delivery: null, is_collection: null, delivery_cost: null, minimum_order: null,
+      eta_minutes: null, is_sponsored: null, halal_flag: null, logo_url: null, observed_at: "2026-07-18T00:00:00Z",
+    };
+    const outletB: SourceOutlet = { ...outletA, source_outlet_id: "cluster-b", name: "Cluster Brand B" };
+
+    // (a) Neither storefront has a reference match — both share address+phone. This must be
+    // reported as a CLUSTER SIGNAL and, at most, a SUSPECTED virtual brand — never "confirmed".
+    const noRefScore = scoreUB1Benchmark({ actorLabel: "cluster-test-no-reference", outlets: [outletA, outletB], geoCtx, referenceSet: [] });
+    const noRefB = noRefScore.storefrontEntityBreakdown;
+    assert(noRefB.sharedAddressPhoneClusterStorefronts === 2, "both storefronts sharing address+phone are reported in the cluster signal count");
+    assert(noRefB.suspectedVirtualBrandStorefronts === 2, "with NO reference evidence, shared address+phone downgrades both to SUSPECTED virtual brand");
+    assert(noRefB.confirmedVirtualBrandStorefronts === 0, "shared address+phone alone NEVER produces a CONFIRMED virtual brand — this is exactly the bug being fixed");
+
+    // (b) One storefront in the SAME cluster is reference-confirmed as a physical restaurant.
+    // Reference evidence must win for that storefront; its cluster-mate remains suspected, not
+    // dragged down or merged.
+    const refSet: UB1ReferenceListing[] = [{
+      name: "Cluster Brand A", postcode: null, address: null, uber_url: null, uber_uuid: null,
+      status: "unconfirmed", verification_date: "2026-07-18",
+      verification_method: "synthetic test fixture only — simulates explicit source evidence for one cluster member",
+      entity_type: "physical_restaurant", category: "test",
+    }];
+    const withRefScore = scoreUB1Benchmark({ actorLabel: "cluster-test-with-reference", outlets: [outletA, outletB], geoCtx, referenceSet: refSet });
+    const withRefB = withRefScore.storefrontEntityBreakdown;
+    assert(withRefB.sharedAddressPhoneClusterStorefronts === 2, "cluster signal is still reported for BOTH storefronts regardless of reference confirmation");
+    assert(withRefB.confirmedPhysicalStorefronts === 1, "the reference-confirmed storefront is CONFIRMED physical — explicit evidence overrides the shared-address+phone signal for that storefront");
+    assert(withRefB.suspectedVirtualBrandStorefronts === 1, "the OTHER cluster member, still unconfirmed, remains SUSPECTED virtual brand — not merged with, or promoted by, its cluster-mate's confirmation");
+    assert(withRefB.confirmedVirtualBrandStorefronts === 0, "no storefront here is ever labelled a CONFIRMED virtual brand — that requires explicit reference-set evidence of entity_type virtual_brand, which neither outlet has");
+    assert(withRefB.uniqueValidUB1StorefrontCount === 2, "both distinct UUIDs are still counted individually — no merging occurred at any point");
   }
 
   // Field completeness — a real fraction, not a boolean pass/fail.

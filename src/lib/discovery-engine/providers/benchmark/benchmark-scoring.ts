@@ -13,6 +13,19 @@
 // matched the reference set against ALL raw returned outlets, so an out-of-UB1 record sharing a
 // reference restaurant's name earned recall credit it should not have. Recall is now computed ONLY
 // against geography-VALID records (`part.valid`), never the raw outlet list.
+//
+// FOLLOW-UP CORRECTION (2026-07-18, same audit thread): the entity breakdown auto-labelled any
+// storefront sharing a non-null address+phone with another storefront as a "known virtual
+// storefront." Shared address and phone are a shared-location/shared-operator SIGNAL, not proof —
+// they do not by themselves confirm every storefront in the cluster is a virtual brand (it could
+// just as easily be two unrelated businesses sharing a serviced-office phone line, or a data error
+// upstream). `sharedAddressPhoneClusterStorefronts` now reports that raw signal on its own; a
+// storefront is only ever "confirmed" virtual/physical/chain when a matched reference-set listing
+// explicitly says so (source/branding/menu/operator evidence recorded on that reference entry).
+// Cluster membership alone downgrades a storefront to "suspected" virtual brand, never "confirmed."
+// No genuine physical-location grouping key/methodology is implemented here, so there is no
+// separate "unique physical location" count beyond `confirmedPhysicalStorefronts` (reference-
+// evidenced only) — implementing real location clustering is future work, not claimed here.
 
 import type { SourceOutlet } from "../../consolidation/types";
 import { partitionByGeography, type GeographyRunContext } from "../../geography/provider-geography-gate";
@@ -131,16 +144,29 @@ function duplicateReport(outlets: SourceOutlet[]): DuplicateReport {
 }
 
 export interface StorefrontEntityBreakdown {
+  /** Distinct Uber storefront UUIDs among business-geography-valid records. */
   uniqueValidUB1StorefrontCount: number;
-  /** Distinct valid storefronts whose entity type is known from a matched reference-set listing,
-   *  or (physical/virtual heuristic only) inferred from sharing an identical non-null
-   *  address+phone with at least one other distinct valid storefront — the same shared-kitchen
-   *  signal documented in docs/68 (Loaded Burgers/Wings 100/Tasty Tenders at one UB1 address).
-   *  This is a TAG, never a merge: each storefront keeps its own row/UUID/count. */
-  knownPhysicalLocations: number;
-  knownVirtualStorefronts: number;
-  chainBranches: number;
-  unknownEntityType: number;
+  /** Storefronts sharing an identical non-null address+phone pair with at least one other
+   *  distinct storefront. A raw SIGNAL only — shared location/operator, not a virtual-brand
+   *  conclusion. Independent of the classification below; a storefront can be both in a cluster
+   *  AND separately "confirmed" something else via reference evidence. */
+  sharedAddressPhoneClusterStorefronts: number;
+  /** Matched a reference-set listing whose entity_type is explicitly `virtual_brand` — i.e. the
+   *  reference entry itself carries source/branding/menu/operator evidence, not just a shared
+   *  address+phone signal. */
+  confirmedVirtualBrandStorefronts: number;
+  /** In a shared address+phone cluster but WITHOUT a reference-set confirmation of virtual-brand
+   *  status. This is the corrected, honest label for what the earlier version of this module
+   *  called "knownVirtualStorefronts" — a shared kitchen signal alone is suspicion, not proof. */
+  suspectedVirtualBrandStorefronts: number;
+  /** Matched a reference-set listing whose entity_type is explicitly `physical_restaurant`. No
+   *  independent physical-location grouping/clustering is implemented — this count reflects only
+   *  reference-set evidence, never a geometric/address-based location inference. */
+  confirmedPhysicalStorefronts: number;
+  /** Matched a reference-set listing whose entity_type is explicitly `chain_branch`. */
+  confirmedChainBranchStorefronts: number;
+  /** No reference-set confirmation of any kind, and not part of a shared address+phone cluster. */
+  unresolvedEntityTypeStorefronts: number;
 }
 
 function classifyStorefrontEntities(validOutlets: SourceOutlet[], referenceMatches: ReferenceMatch[]): StorefrontEntityBreakdown {
@@ -148,14 +174,16 @@ function classifyStorefrontEntities(validOutlets: SourceOutlet[], referenceMatch
   for (const o of validOutlets) if (!byId.has(o.source_outlet_id)) byId.set(o.source_outlet_id, o);
   const distinctOutlets = [...byId.values()];
 
-  const knownTypeById = new Map<string, ReferenceEntityType>();
+  const confirmedTypeById = new Map<string, ReferenceEntityType>();
   for (const m of referenceMatches) {
-    if (m.matchedOutlet) knownTypeById.set(m.matchedOutlet.source_outlet_id, m.reference.entity_type);
+    if (m.matchedOutlet) confirmedTypeById.set(m.matchedOutlet.source_outlet_id, m.reference.entity_type);
   }
 
-  // Heuristic (evidence-based tag, NOT a merge): distinct storefronts sharing an identical
-  // non-null address+phone pair with at least one other distinct storefront are flagged as a
-  // shared-kitchen / virtual-brand cluster.
+  // Raw signal only (NOT a virtual-brand conclusion): distinct storefronts sharing an identical
+  // non-null address+phone pair with at least one other distinct storefront. This is the same
+  // shared-location signal behind the real docs/68 finding (Loaded Burgers/Wings 100/Tasty Tenders
+  // at one UB1 address) — but shared address+phone alone does not prove every member is a virtual
+  // brand (it could be an unrelated coincidence, a serviced address, or a data error upstream).
   const addressPhoneKey = (o: SourceOutlet): string | null => {
     const addr = (o.address ?? "").trim().toLowerCase();
     const phone = (o.phone ?? "").trim();
@@ -170,19 +198,34 @@ function classifyStorefrontEntities(validOutlets: SourceOutlet[], referenceMatch
     arr.push(o.source_outlet_id);
     groups.set(key, arr);
   }
-  const sharedKitchenIds = new Set<string>();
-  for (const ids of groups.values()) if (ids.length > 1) for (const id of ids) sharedKitchenIds.add(id);
+  const sharedClusterIds = new Set<string>();
+  for (const ids of groups.values()) if (ids.length > 1) for (const id of ids) sharedClusterIds.add(id);
 
-  let knownPhysicalLocations = 0, knownVirtualStorefronts = 0, chainBranches = 0, unknownEntityType = 0;
+  let confirmedVirtualBrandStorefronts = 0, suspectedVirtualBrandStorefronts = 0;
+  let confirmedPhysicalStorefronts = 0, confirmedChainBranchStorefronts = 0, unresolvedEntityTypeStorefronts = 0;
   for (const o of distinctOutlets) {
-    const knownType = knownTypeById.get(o.source_outlet_id);
-    if (knownType === "physical_restaurant") { knownPhysicalLocations++; continue; }
-    if (knownType === "virtual_brand") { knownVirtualStorefronts++; continue; }
-    if (knownType === "chain_branch") { chainBranches++; continue; }
-    if (sharedKitchenIds.has(o.source_outlet_id)) { knownVirtualStorefronts++; continue; }
-    unknownEntityType++;
+    const confirmedType = confirmedTypeById.get(o.source_outlet_id);
+    // Reference-set confirmation always wins — it is explicit source/branding/menu/operator
+    // evidence, not a heuristic — regardless of whether the storefront also happens to be in a
+    // shared address+phone cluster.
+    if (confirmedType === "virtual_brand") { confirmedVirtualBrandStorefronts++; continue; }
+    if (confirmedType === "physical_restaurant") { confirmedPhysicalStorefronts++; continue; }
+    if (confirmedType === "chain_branch") { confirmedChainBranchStorefronts++; continue; }
+    // No reference confirmation. A shared-cluster membership is SUSPICION of a virtual brand, not
+    // confirmation — never auto-promoted to "confirmed".
+    if (sharedClusterIds.has(o.source_outlet_id)) { suspectedVirtualBrandStorefronts++; continue; }
+    unresolvedEntityTypeStorefronts++;
   }
-  return { uniqueValidUB1StorefrontCount: distinctOutlets.length, knownPhysicalLocations, knownVirtualStorefronts, chainBranches, unknownEntityType };
+
+  return {
+    uniqueValidUB1StorefrontCount: distinctOutlets.length,
+    sharedAddressPhoneClusterStorefronts: sharedClusterIds.size,
+    confirmedVirtualBrandStorefronts,
+    suspectedVirtualBrandStorefronts,
+    confirmedPhysicalStorefronts,
+    confirmedChainBranchStorefronts,
+    unresolvedEntityTypeStorefronts,
+  };
 }
 
 export interface RecallMetric { matched: number; total: number; pct: number }

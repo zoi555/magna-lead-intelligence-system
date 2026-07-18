@@ -205,3 +205,36 @@ These are design corrections, not app bug fixes:
   assertions), `npm run test:borderline-provider`, `npm run test:geography-gate`,
   `npm run test:uber-parse`, `npm run test:multi-source`, `git diff --check` all green. See
   `docs/69_UBER_ACTOR_MARKET_RESEARCH_AND_BENCHMARK.md` ("Audit correction") for the full narrative.
+
+## 2026-07-18 (second follow-up, same audit thread) — storefront entity signals over-claimed confidence
+
+- **BUG (evidence-honesty defect, not a runtime crash):** the entity breakdown added in the first
+  follow-up correction (above) auto-labelled any storefront sharing a non-null address+phone with
+  another storefront as a "known virtual storefront." Shared address and phone are a shared-
+  location/shared-operator SIGNAL — they do not by themselves prove every storefront in the cluster
+  is a virtual brand (could be an unrelated coincidence, a serviced address, or an upstream data
+  error). Separately, `knownPhysicalLocations` counted only reference-matched storefronts but its
+  name implied an independently-derived physical-location count, which was never implemented.
+- **Fix:** `benchmark-scoring.ts`'s `StorefrontEntityBreakdown` now reports six evidence-scoped
+  fields: `uniqueValidUB1StorefrontCount` (distinct UUIDs), `sharedAddressPhoneClusterStorefronts`
+  (the raw address+phone signal, reported independently of any classification),
+  `confirmedVirtualBrandStorefronts` / `confirmedPhysicalStorefronts` / `confirmedChainBranchStorefronts`
+  (ONLY from an explicit matched reference-set `entity_type` — real source/branding/menu/operator
+  evidence), `suspectedVirtualBrandStorefronts` (cluster membership with NO reference confirmation —
+  the corrected, honest label for what was previously auto-labelled "known"), and
+  `unresolvedEntityTypeStorefronts`. Reference-set confirmation for one cluster member never
+  promotes, demotes, or merges any other member — each storefront is classified independently.
+- **Tests:** `test:ub1-benchmark` gained a dedicated synthetic two-storefront cluster test proving
+  (a) two storefronts sharing address+phone with NO reference evidence are reported in the cluster
+  signal but downgraded only to SUSPECTED virtual brand, never CONFIRMED; and (b) when one cluster
+  member is independently reference-confirmed physical, that confirmation applies only to that
+  storefront — its cluster-mate remains suspected, not reclassified by association. Existing
+  fixture-based assertions updated to the new field names.
+- **Docs:** `docs/69` updated (field names in "Scoring model" and the offline-baseline re-score
+  block) — the real retained Borderline broad-run data now correctly reports
+  `suspectedVirtualBrandStorefronts=3` / `confirmedVirtualBrandStorefronts=0` for the Loaded
+  Burgers/Wings 100/Tasty Tenders cluster, rather than the previous over-confident
+  `knownVirtualStorefronts=3`.
+- **Verified:** `npm run typecheck`, `npm run build`, `npm run test:ub1-benchmark`,
+  `npm run test:geography-gate`, `npm run test:uber-parse`, `npm run test:multi-source`,
+  `git diff --check` all green. No actor run, no Apify call, no Vercel/Supabase changes.
