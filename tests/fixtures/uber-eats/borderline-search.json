@@ -1,0 +1,88 @@
+{
+  "_note": "SANITISED synthetic fixture in the documented borderline/uber-eats-scraper-ppr shape (nested location object with lat/lng + postalCode + country). Three records: in-UB1 (target_district), near Southall but outside UB1 (near_target), central London (unrelated_location). No real business PII.",
+  "stores": [
+    {
+      "uuid": "bl-ub1-001",
+      "url": "https://www.ubereats.com/gb/store/sample-southall-pizza/bl-ub1-001",
+      "title": "Sample Southall Pizza",
+      "sanitizedTitle": "sample-southall-pizza",
+      "merchantType": "MERCHANT_TYPE_RESTAURANT",
+      "phoneNumber": "020 8574 0000",
+      "emails": [],
+      "location": {
+        "address": "1 The Broadway, Southall UB1 1JR",
+        "streetAddress": "1 The Broadway",
+        "city": "Southall",
+        "region": "England",
+        "postalCode": "UB1 1JR",
+        "country": "GB",
+        "latitude": 51.5089,
+        "longitude": -0.376,
+        "geo": { "city": "london", "country": "gb", "region": "england", "neighborhood": "southall" }
+      },
+      "rating": { "ratingValue": 4.5, "reviewCount": "120" },
+      "cuisineList": ["Pizza", "Italian"],
+      "categories": ["Pizza"],
+      "supportedDiningModes": ["DELIVERY", "PICKUP"],
+      "isOpen": true,
+      "storeAvailablityStatus": "AVAILABLE",
+      "etaRange": "20-35 min",
+      "hours": [{ "dayRange": "Mon-Sun", "sectionHours": [{ "startTime": 660, "endTime": 1380 }] }],
+      "menu": [{ "catalogName": "Pizzas", "catalogSectionUUID": "sec-1", "catalogItems": [{ "title": "Margherita", "price": 899 }] }],
+      "heroImageUrl": "https://cdn.test/bl-ub1-001-hero.jpg",
+      "logoImageUrl": "https://cdn.test/bl-ub1-001-logo.jpg",
+      "distance": { "text": "0.3 mi", "accessibilityText": "0.3 miles away" },
+      "currencyCode": "GBP"
+    },
+    {
+      "uuid": "bl-near-002",
+      "url": "https://www.ubereats.com/gb/store/sample-hayes-pizza/bl-near-002",
+      "title": "Sample Hayes Pizza",
+      "sanitizedTitle": "sample-hayes-pizza",
+      "merchantType": "MERCHANT_TYPE_RESTAURANT",
+      "phoneNumber": "020 8848 0000",
+      "location": {
+        "address": "5 Station Road, Hayes UB3 4DA",
+        "streetAddress": "5 Station Road",
+        "city": "Hayes",
+        "region": "England",
+        "postalCode": "UB3 4DA",
+        "country": "GB",
+        "latitude": 51.5033,
+        "longitude": -0.4207,
+        "geo": { "city": "london", "country": "gb", "region": "england", "neighborhood": "hayes" }
+      },
+      "rating": { "ratingValue": 4.1, "reviewCount": "80" },
+      "cuisineList": ["Pizza"],
+      "supportedDiningModes": ["DELIVERY"],
+      "isOpen": true,
+      "heroImageUrl": "https://cdn.test/bl-near-002.jpg",
+      "currencyCode": "GBP"
+    },
+    {
+      "uuid": "bl-far-003",
+      "url": "https://www.ubereats.com/gb/store/sample-holborn-pizza/bl-far-003",
+      "title": "Sample Holborn Pizza",
+      "sanitizedTitle": "sample-holborn-pizza",
+      "merchantType": "MERCHANT_TYPE_RESTAURANT",
+      "phoneNumber": "020 7242 0000",
+      "location": {
+        "address": "10 High Holborn, London WC1V 6AA",
+        "streetAddress": "10 High Holborn",
+        "city": "London",
+        "region": "England",
+        "postalCode": "WC1V 6AA",
+        "country": "GB",
+        "latitude": 51.5175,
+        "longitude": -0.1189,
+        "geo": { "city": "london", "country": "gb", "region": "england", "neighborhood": "holborn" }
+      },
+      "rating": { "ratingValue": 4.3, "reviewCount": "300" },
+      "cuisineList": ["Pizza"],
+      "supportedDiningModes": ["DELIVERY", "PICKUP"],
+      "isOpen": true,
+      "heroImageUrl": "https://cdn.test/bl-far-003.jpg",
+      "currencyCode": "GBP"
+    }
+  ]
+}

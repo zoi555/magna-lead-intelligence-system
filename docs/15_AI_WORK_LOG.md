@@ -343,3 +343,15 @@ acquire OS Open Names + ONSPD; persist consolidation; extend JE parser.
 - Pilot rewired to capture full provenance; business-validation status kept separate from actor status.
 - Tests: `test:apify-provenance` (10 required proofs) + geography-gate + uber-parse + multi-source +
   typecheck + build + diff-check all green. Diagnostic-plan dry 9/9.
+
+## Session — Reject Uber discovery actor; add borderline PPR replacement (pre-run)
+- Classified `sourabhbgp/ubereats-scraper` discovery=REJECTED / enrichment=provisional in a new
+  provider capability registry (`provider-registry.ts`); rejected/unvalidated actors are never
+  auto-selected (`selectDiscoveryProviders`). Adapter + observations retained. Docs/67.
+- Added `uber_eats_borderline_ppr` (borderline/uber-eats-scraper-ppr, PPR $5/1k): tolerant initial
+  parser (`parse-borderline.ts`, calibrated post-run), exact input builder with hard maxRows cap +
+  rental guard, location-fidelity classifier (`location-fidelity.ts`: target_district/near_target/
+  unrelated/unverifiable — evaluation only, does NOT relax the gate), pilot `uber:pilot:borderline`
+  and offline `uber:borderline:replay`, sanitised fixture. Reuses the provenance/orchestrator/gate seam.
+- Tests: `test:borderline-provider` (12 required proofs) + apify-provenance + geography-gate +
+  uber-parse + multi-source + typecheck + build + diff-check all green. Offline replay verified.
