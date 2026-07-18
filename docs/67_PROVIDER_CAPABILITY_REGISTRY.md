@@ -20,11 +20,21 @@ unvalidated actor can never be auto-selected for a geography-discovery run.
 
 ## `borderline/uber-eats-scraper-ppr` → `uber_eats_borderline_ppr`
 - **Pay-per-result** ($5 / 1,000 restaurants — NOT a rental actor). `resultCapSupported` via `maxRows`.
-- `discovery: unvalidated` · `operationalStatus: candidate` — under bounded diagnostic evaluation,
+- `discovery: supported` · `operationalStatus: candidate` — under bounded diagnostic evaluation,
   **not** promoted to production discovery. Runs only via the explicit `uber:pilot:borderline`
   command, never auto-selected.
 - Reuses the generic Apify provenance/orchestrator seam, the geography-validation gate and
-  consolidation. Initial tolerant parser `uber-eats-borderline-parse-0.1.0` (calibrated post-run).
+  consolidation. Calibrated parser `uber-eats-borderline-parse-0.2.0`.
+- **Precision vs recall — kept as two separate registry fields, do not conflate them:**
+  `verifiedGeographyPrecision: "district"` means records this actor returns, when they appear, are
+  reliably localised to the correct district (0 `unrelated_location` across 50 combined diagnostic
+  records). It is **not** a completeness claim. `verifiedRecall: "inadequate"` is the separate,
+  empirically-measured completeness dimension: across both diagnostic runs (docs/68), only **2 of
+  7** independently-verified UB1 reference restaurants were ever returned (2/7 on the narrow pizza
+  run, 0/7 on the broad no-query run). The actor behaves as a proximity/relevance-ranked delivery
+  home feed truncated per anchor+query, **not** a directory — it must not be classified as a
+  complete district-discovery provider on precision evidence alone. It remains available for
+  enrichment, delivery-area intelligence, and supplementary/verification discovery.
 
 ## Two geography questions (kept separate)
 - **Business-geography validity** (`provider-geography-gate`): is the restaurant's own address inside

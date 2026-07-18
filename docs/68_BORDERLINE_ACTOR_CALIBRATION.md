@@ -74,8 +74,13 @@ home feed truncated per anchor+query — **not** a guaranteed directory; a singl
 district completeness regardless of query breadth or `maxRows`.
 
 ### Path to adequate district recall (not built here)
-- **Several UB1 delivery anchors + `excludeStores` pagination** — highest-value scalable breadth
-  (defeats single-anchor proximity truncation; page deeper by excluding seen UUIDs).
+- **Several UB1 delivery anchors + `excludeStores`** — highest-value scalable breadth in principle
+  (defeats single-anchor proximity truncation by varying the anchor; the field's name suggests it
+  could also page deeper by excluding seen UUIDs on repeat calls to the same anchor). **Caveat:**
+  `excludeStores` is an accepted input field (`borderline-input.ts`) but its pagination behaviour
+  has **not been empirically verified** — no diagnostic run has confirmed that passing previously
+  seen UUIDs actually changes the result set. Do not describe it as proven pagination until that is
+  tested; the varying-anchor part of this approach does not depend on `excludeStores` working.
 - **Uber search/category-URL actor mode** (`urls[]`) — worth a cheap test; may be more directory-like
   than the personalised feed.
 - **Sitemap / store-URL enumeration + store-URL enrichment** — the route to true completeness

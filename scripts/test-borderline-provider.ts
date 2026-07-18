@@ -145,6 +145,14 @@ async function main() {
   // registry sanity: source platform separate from acquisition identity.
   assert(getProvider("uber_eats_borderline_ppr")!.sourcePlatform === "uber_eats" && getProvider("uber_eats_sourabhbgp")!.discovery === "rejected", "platform identity separate from acquisition identity; sourabhbgp discovery=rejected");
 
+  // registry honesty: district PRECISION must never be read as district RECALL/completeness.
+  {
+    const bl = getProvider("uber_eats_borderline_ppr")!;
+    assert(bl.verifiedGeographyPrecision === "district", "borderline actor: localisation precision verified at district level");
+    assert(bl.verifiedRecall === "inadequate", "borderline actor: recall/completeness is explicitly INADEQUATE (2/7 known UB1 restaurants across both diagnostic runs) — precision does not imply completeness");
+    assert(!!bl.recallEvidence && bl.recallEvidence.includes("2/7"), "recall evidence cites the reference-set shortfall, not just a pass/fail label");
+  }
+
   console.log(fails === 0 ? "\nAll replacement-provider assertions passed ✓" : `\n${fails} FAILED`);
   process.exit(fails === 0 ? 0 : 1);
 }
