@@ -355,3 +355,13 @@ acquire OS Open Names + ONSPD; persist consolidation; extend JE parser.
   and offline `uber:borderline:replay`, sanitised fixture. Reuses the provenance/orchestrator/gate seam.
 - Tests: `test:borderline-provider` (12 required proofs) + apify-provenance + geography-gate +
   uber-parse + multi-source + typecheck + build + diff-check all green. Offline replay verified.
+
+## Session (cont.) — borderline diagnostic executed + parser calibrated
+- One paid run jg2xJwXcMgvmggYnT ($0.05, cap $0.25): GB 10/10, coords 10/10, 2 in UB1 (→2 candidates),
+  8 near_target (~2.8-3.5km), 0 unrelated → binds to the Southall delivery area. business geography_validated.
+- Calibrated parser → uber-eats-borderline-parse-0.2.0 (rating, reviewCount string→num, cuisines,
+  dining-mode OBJECT array → delivery/collection, UK phone E.164, eta from text; delivery_cost null
+  as fareBadge is promo text). Verified by OFFLINE replay of the saved payload — no second paid call.
+  Registry: discovery=supported, verifiedCountries=[GB], precision=district, still operationalStatus=candidate.
+- Persistence: 1 provider run, 10 raw/10 canonical/0 dup/0 dangling, 10 validations (2 valid/8 out/0 unv),
+  2 valid candidates, 1 snapshot. Docs/68. All suites + typecheck + build + diff-check green.

@@ -72,7 +72,20 @@ async function main() {
     assert(threw, "RENTAL actor is rejected by the pay-per-result guard");
     assert(assertPayPerResult("uber_eats_borderline_ppr").pricingModel === "PAY_PER_RESULT", "borderline actor passes the pay-per-result guard");
     assert(!selectDiscoveryProviders().some((p) => p.id === "uber_eats_sourabhbgp"), "rejected sourabhbgp actor is NOT auto-selected for discovery");
-    assert(!selectDiscoveryProviders().some((p) => p.id === "uber_eats_borderline_ppr"), "unvalidated borderline actor is NOT auto-selected (only via the explicit diagnostic)");
+    assert(!selectDiscoveryProviders().some((p) => p.id === "uber_eats_borderline_ppr"), "candidate borderline actor is NOT auto-selected (operationalStatus=candidate; only via the explicit diagnostic)");
+  }
+
+  // Calibrated parser (uber-eats-borderline-parse-0.2.0) maps the rich real-shape fields.
+  {
+    assert(ub1.rating === 4.5 && ub1.review_count === 120, "rating mapped; reviewCount string → number");
+    assert(ub1.cuisines.includes("Pizza") && ub1.halal_flag === true, "cuisineList mapped; halal inferred from cuisines");
+    assert(ub1.is_delivery === true && ub1.is_collection === true, "dining modes (array of OBJECTS) → delivery/collection");
+    assert(ub1.phone === "+442085740000", "UK phone normalised to E.164");
+    assert(ub1.eta_minutes === 20, "eta lower-bound minutes parsed from etaRange text");
+    const ex = (ub1.source_extra ?? {}) as any;
+    assert(ex.fare_badge?.includes("Delivery Fee") && ub1.delivery_cost === null, "promotional fareBadge retained in source_extra; delivery_cost stays null (not fabricated)");
+    assert(ex.menu_item_count === 2 && ex.menu_section_count === 1 && Array.isArray(ex.hours), "menu counts + hours retained in source_extra");
+    assert(ex.location_type === "ADDRESS" && Array.isArray(ex.categories_link), "location type + categoriesLink retained");
   }
 
   // (6) raw results immutable — the gate discards nothing (evidence retained).

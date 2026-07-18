@@ -54,16 +54,16 @@ export const PROVIDER_REGISTRY: ProviderCapability[] = [
     sourcePlatform: "uber_eats",
     actorId: "borderline/uber-eats-scraper-ppr",
     pricingModel: "PAY_PER_RESULT",           // $5 / 1,000 restaurants — NOT a rental actor
-    discovery: "unvalidated",
+    discovery: "supported",                    // proven by run jg2xJwXcMgvmggYnT (binds to the delivery area)
     enrichment: "supported",
-    verifiedCountries: [],
+    verifiedCountries: ["GB"],
     geographyInputTypes: ["address", "addressCountry", "query", "storeType"],
-    verifiedGeographyPrecision: "unvalidated",
     resultCapSupported: true,                  // maxRows
-    parserVersion: "uber-eats-borderline-parse-0.1.0",
-    lastValidated: null,
-    operationalStatus: "candidate",
-    warning: "Under bounded diagnostic evaluation. NOT promoted to production discovery until it demonstrably binds results to the requested UK delivery area.",
+    verifiedGeographyPrecision: "district",    // empirically: 2/10 in UB1, 8/10 near_target, 0 unrelated
+    parserVersion: "uber-eats-borderline-parse-0.2.0",
+    lastValidated: "2026-07-18",
+    operationalStatus: "candidate",            // strong candidate; promotion is a product-owner decision
+    warning: "Diagnostic PASSED (run jg2xJwXcMgvmggYnT): binds tightly to the Southall delivery area (10/10 GB, 2 in UB1, 8 near_target, 0 unrelated). Still a candidate — promote to production discovery only on product-owner sign-off.",
   },
 ];
 

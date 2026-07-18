@@ -6,4 +6,4 @@ export const PARSER_VERSION = "je-search-1.1.0"; // Just Eat search-response par
 export const ADAPTER_VERSION = "je-adapter-1.0.0";
 export const NORMALISATION_VERSION = "je-normalise-1.0.0";
 export const UBER_PARSER_VERSION = "uber-eats-parse-1.1.0"; // calibrated to sourabhbgp/ubereats-scraper real output
-export const UBER_BORDERLINE_PARSER_VERSION = "uber-eats-borderline-parse-0.1.0"; // tolerant; calibrated post-run
+export const UBER_BORDERLINE_PARSER_VERSION = "uber-eats-borderline-parse-0.2.0"; // calibrated to run jg2xJwXcMgvmggYnT real payload

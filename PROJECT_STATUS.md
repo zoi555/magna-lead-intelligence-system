@@ -268,3 +268,6 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
 - Capability registry (`provider-registry.ts`, docs/67): `sourabhbgp/ubereats-scraper` **discovery REJECTED** / enrichment provisional (ISS-0018 evidence); rejected/unvalidated actors never auto-selected.
 - New `uber_eats_borderline_ppr` (borderline/uber-eats-scraper-ppr, PPR $5/1k): tolerant parser, exact-input builder (hard maxRows cap, rental guard), location-fidelity classifier (evaluation-only; never relaxes the gate), `uber:pilot:borderline` + offline `uber:borderline:replay`, sanitised fixture. Reuses provenance/orchestrator/gate seam.
 - Tests: `test:borderline-provider` (12 proofs) + all suites + typecheck + build + diff-check green. **Pre-run committed; one paid diagnostic pending.**
+
+### Borderline PPR diagnostic PASSED + calibrated — 2026-07-18
+- One paid run (jg2xJwXcMgvmggYnT, $0.05): **GB 10/10, 2 in UB1 → 2 candidates, 8 near_target, 0 unrelated** — the actor binds to the Southall delivery area. Parser calibrated → `uber-eats-borderline-parse-0.2.0` and verified by **offline replay** (no 2nd paid call). Registry: discovery=supported/GB/district precision, operationalStatus=**candidate** (not auto-promoted). Docs/68. 1 provider run; 10 canonical obs, 0 dup/dangling; 2 valid candidates.
