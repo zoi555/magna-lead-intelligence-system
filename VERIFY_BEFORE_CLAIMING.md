@@ -61,35 +61,42 @@ No assistant, developer, or unfortunate human may claim the project works withou
 
 ### 2026-07-18 (overnight autonomous session) — Vercel dual-project docs + Uber actor research
 
-- Change tested: documentation-only (Vercel topology record in `docs/08_DEPLOYMENT.md`, ISS-0019
+- Change tested: documentation (Vercel topology record in `docs/08_DEPLOYMENT.md`, ISS-0019
   correction, new ADR, `PROJECT_STATUS.md`/`README.md` updates) + Uber Eats discovery-actor market
   research doc (`docs/69`) + a narrowly-scoped `provider-registry.ts` precision/recall correction +
   no-network dry-run benchmark fixtures/tests + `.env.example` (`NPM_TOKEN` documented).
 - Command/manual check:
-  - Vercel project IDs, deployment IDs, statuses **independently re-verified this session** via
-    read-only Vercel API calls (`get_project`, `get_deployment` for both projects) — not just
-    transcribed from the task brief. Both confirmed READY on commit `2d6f4fb1...`, matching the
-    task brief exactly. No Vercel setting was changed.
+  - Vercel project IDs and deployment status were **independently re-queried against the live
+    Vercel API twice**: once before this session's commits were pushed (both projects confirmed
+    `READY` on commit `2d6f4fb1...`, matching the task brief), and once **after** pushing (see
+    below) — not just transcribed from the task brief.
+  - **Consequence of the push, confirmed live, not assumed:** pushing this session's four commits
+    to `feature/mvp-vertical-slice-001` auto-triggered a fresh build on **both** projects via their
+    GitHub git integration. A follow-up `get_deployment` call on both new deployment IDs
+    (`dpl_ASwCwfy6pA7BFrh5cpuiBSjq3rGX` for `-pngu`, `dpl_6ThJkny15TMmuDqKWvyb15vrvbX6` for the
+    other project) confirmed both reached `READY` on the final commit
+    (`aab8764ae79fa0fa527dd86b4b34d769723d7802`). `docs/08_DEPLOYMENT.md` updated with these newer
+    deployment IDs (the pre-push IDs are kept as historical record, not deleted). No Vercel project
+    setting was changed at any point.
   - Uber actor claims verified via live WebFetch of real Apify Store pages this session (cited by
     URL in `docs/69`); anything not confirmed there is marked "not verified" in the doc, not guessed.
   - `npm run typecheck`, `npm run build`, and `npm run test:ub1-benchmark`, `test:borderline-
     provider`, `test:geography-gate`, `test:uber-parse`, `test:multi-source`, `test:apify-
     provenance`, `test:geo`, `test:run-draft`, `test:custom-config`, `test:scoring`, `test:telesales-
     safe`, `test:geography-standard` — all green. `git diff --check` clean before every commit.
-- Result: three commits (`bb2e268` Vercel topology, `8575514` provider-registry precision/recall
-  fix, `7389898` Uber research + benchmark module), plus this wrap-up commit. See the terminal
-  summary at the end of this session for full detail.
+- Result: four commits on `feature/mvp-vertical-slice-001`, pushed (`bb2e268` Vercel topology,
+  `8575514` provider-registry precision/recall fix, `7389898` Uber research + benchmark module,
+  `aab8764` wrap-up docs + a `docs/08_DEPLOYMENT.md` follow-up correcting the deployment IDs to the
+  post-push state). Both Vercel projects rebuilt this branch's new tip and reached `READY`.
+- Evidence link/screenshot: commit hashes above; Vercel deployment IDs above, confirmed via live
+  `get_project`/`get_deployment` API calls (not just the task brief).
 - Remaining risk: neither Vercel deployment was browser-tested this session (SSO wall + no Chrome
   extension connection — ISS-0019, unchanged). The paid three-actor UB1 benchmark is proposed only,
   not run — two of the three candidates' exact input field names are sourced from marketing/docs
   pages, not this project's own live pre-flight verification, and must be schema-checked before any
-  real spend (see docs/69).
-- Evidence link/screenshot: commit hashes on `feature/mvp-vertical-slice-001`, pushed this session.
-- Remaining risk: Vercel-reported facts (project IDs/deployment IDs/statuses) are recorded as
-  given, not re-verified against the live Vercel API this session — if they have changed since the
-  brief was written, `docs/08_DEPLOYMENT.md` needs a refresh. No live/paid Uber actor benchmark was
-  run — the benchmark proposal is unexecuted by design. In-browser verification of either Vercel
-  deployment remains outstanding (ISS-0019).
+  real spend (see docs/69). Vercel deployment state can change again after this session ends (any
+  further push, or a manual redeploy, will move the "latest deployment" again) — treat the recorded
+  IDs as a snapshot at session end, not a permanent fact.
 
 ### YYYY-MM-DD HH:mm
 

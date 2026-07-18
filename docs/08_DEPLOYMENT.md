@@ -57,11 +57,16 @@ document.
 - **Project ID:** `prj_vxcbOvftT2CdzUmnxyCWhjF9f3U2`
 - **Apparent role:** deploys `feature/mvp-vertical-slice-001` as **Production**. Behaves as the
   working feature-branch deployment.
-- **Latest successful deployment:** `dpl_DvJ49zyyhVdV5ND8Rzhv8USNcCSZ`
-  - URL: `https://magna-lead-intelligence-system-pngu-egqkbl8fl-zoeb-s-projects.vercel.app`
-  - Commit: `2d6f4fb158b5ed60f93db1081e6a9b0c5fbf4fda`
-  - Status: `READY`
+- **Latest successful deployment (self-verified via the Vercel API after this session's own push):**
+  `dpl_ASwCwfy6pA7BFrh5cpuiBSjq3rGX`
+  - URL: `https://magna-lead-intelligence-system-pngu-n37o9whun-zoeb-s-projects.vercel.app`
+  - Commit: `aab8764ae79fa0fa527dd86b4b34d769723d7802` (this overnight session's final commit —
+    pushing it auto-triggered this build via the project's GitHub git integration)
+  - Status: `READY` (confirmed by a live `get_deployment` call, not assumed)
   - Environment: `Production`
+  - Prior recorded deployment (still accurate as history): `dpl_DvJ49zyyhVdV5ND8Rzhv8USNcCSZ`,
+    commit `2d6f4fb158b5ed60f93db1081e6a9b0c5fbf4fda`, `READY`, `Production` — this was the tip
+    before this session's commits.
 - **Historical incident (now resolved):** earlier deployments `dpl_kT5umq1CWAEHPp4Zvijkw5VkAUqH`
   and `dpl_AWMDRJXfo5JyG7KtMqr4FoQoPdta` failed. Root cause: this project still used an obsolete
   custom Git SSH rewrite/install command from before the GitHub Packages migration, and lacked the
@@ -76,11 +81,17 @@ document.
 - **Apparent role:** the original Vercel project. Deploys the current feature branch as
   **Preview**. May represent the future main-branch production project once `main` is promoted —
   **this is not yet decided.**
-- **Latest successful deployment:** `dpl_7ZSr1BuoTYgef9njpnaTfAGsqPn8`
-  - URL: `https://magna-lead-intelligence-system-a0fkf7l3h-zoeb-s-projects.vercel.app`
-  - Commit: `2d6f4fb158b5ed60f93db1081e6a9b0c5fbf4fda`
-  - Status: `READY`
-  - Environment: `Preview`
+- **Latest successful deployment (self-verified via the Vercel API after this session's own push):**
+  `dpl_6ThJkny15TMmuDqKWvyb15vrvbX6`
+  - URL: `https://magna-lead-intelligence-system-2mo4yoew0-zoeb-s-projects.vercel.app`
+  - Commit: `aab8764ae79fa0fa527dd86b4b34d769723d7802` (this overnight session's final commit)
+  - Status: `READY` (confirmed by a live `get_deployment` call, not assumed)
+  - Environment: `target: null` in the Vercel API response (this project's non-production branch
+    deployments read as `null` rather than an explicit `"preview"` string) — consistent with the
+    "Preview" role recorded below.
+  - Prior recorded deployment (still accurate as history): `dpl_7ZSr1BuoTYgef9njpnaTfAGsqPn8`,
+    commit `2d6f4fb158b5ed60f93db1081e6a9b0c5fbf4fda`, `READY`, `Preview` — the tip before this
+    session's commits.
 
 ### Current facts (verified)
 
@@ -90,7 +101,11 @@ document.
 3. They have **different environment roles** today (A = Production, B = Preview) — this is the
    opposite of what the naming suggests (`-pngu` sounds like the "extra" one, but it is the one
    currently tagged Production for this branch).
-4. **Both currently deploy successfully** (both `READY`, same commit `2d6f4fb1...`).
+4. **Both currently deploy successfully.** Pushing this session's commits to
+   `feature/mvp-vertical-slice-001` auto-triggered a fresh build on both projects (their GitHub git
+   integration builds every push to this branch) — both reached `READY` on the same final commit
+   (`aab8764...`), independently confirmed via the Vercel API after the push, not assumed from the
+   task brief.
 5. **The canonical Vercel project remains undecided.** Do not treat either project as "the real
    one" in code, scripts, or documentation beyond what is recorded here.
 
