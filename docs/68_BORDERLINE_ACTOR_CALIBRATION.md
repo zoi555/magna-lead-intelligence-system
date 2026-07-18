@@ -50,3 +50,35 @@ the requested delivery area and returns valid GB geography with coordinates. It 
 production discovery on a single 10-record run. A slightly larger confirmatory run (still bounded)
 and a check of the near_target radius policy are the sensible next steps. sourabhbgp stays discovery-
 rejected / enrichment-provisional. No Deliveroo; no customer comparison; no larger Uber run here.
+
+## Broad-query diagnostic (run MrKoKg8322ZVzk449, 2026-07-18)
+Second approved run — BROAD (no `query`), `maxRows 40`, Southall anchor. SUCCEEDED, charged 40,
+**actual $0.20**. 40 items, 40 unique UUIDs. Persistence: raw 40 / canonical **34** / duplicates **6**
+(restaurants also seen in the pizza run — cross-run content-hash dedup) / 0 dangling · validations 40
+· candidates **7** · snapshot 1.
+
+Business geography: **valid 10** (in UB1) / out-of-scope 28 / unverifiable 2. Location fidelity:
+target_district 10 / near_target 26 / unrelated 4. Coverage across 40: postcode 38/40, coords 40/40,
+phone 40/40, rating 38/40, cuisine 40/40, hours 40/40, menu 40/40, url 40/40.
+
+**Broad query raised UB1 count 2 → 10** (10 UB1 listings = **7 physical restaurants**; Loaded
+Burgers/Wings 100/Tasty Tenders are virtual brands at UB1 1RT sharing one kitchen → `confirmed_same`).
+UB1 restaurants appeared at feed **ranks 15–33** (interleaved, not the top).
+
+### Recall is NOT adequate — the home feed is not a complete UB1 directory
+The broad run found a DIFFERENT set from the pizza run and **dropped** Ali Baba's Pizza + Tops Pizza
+(the pizza run's 2 UB1 records). Of the 7 known UB1 restaurants, the broad run found **0/7**; across
+BOTH runs only **2/7** (Ali Baba's, Tops Pizza — pizza run only). Watan, Spice Village, Pizzeria Hut,
+Kebabish Original, Pizza Planet were never returned. The feed is a proximity/relevance-ranked delivery
+home feed truncated per anchor+query — **not** a guaranteed directory; a single call cannot achieve
+district completeness regardless of query breadth or `maxRows`.
+
+### Path to adequate district recall (not built here)
+- **Several UB1 delivery anchors + `excludeStores` pagination** — highest-value scalable breadth
+  (defeats single-anchor proximity truncation; page deeper by excluding seen UUIDs).
+- **Uber search/category-URL actor mode** (`urls[]`) — worth a cheap test; may be more directory-like
+  than the personalised feed.
+- **Sitemap / store-URL enumeration + store-URL enrichment** — the route to true completeness
+  (enumerate UB-area store URLs, enrich each), independent of the ranked feed. Heavier.
+- Multiple category queries — minor supplement (surfaces cuisine-specific places the broad feed drops).
+- Custom Uber discovery actor — only if the above are insufficient.

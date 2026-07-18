@@ -271,3 +271,7 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
 
 ### Borderline PPR diagnostic PASSED + calibrated — 2026-07-18
 - One paid run (jg2xJwXcMgvmggYnT, $0.05): **GB 10/10, 2 in UB1 → 2 candidates, 8 near_target, 0 unrelated** — the actor binds to the Southall delivery area. Parser calibrated → `uber-eats-borderline-parse-0.2.0` and verified by **offline replay** (no 2nd paid call). Registry: discovery=supported/GB/district precision, operationalStatus=**candidate** (not auto-promoted). Docs/68. 1 provider run; 10 canonical obs, 0 dup/dangling; 2 valid candidates.
+
+### Broad Uber diagnostic — UB1 recall still incomplete — 2026-07-18
+- One paid run (MrKoKg8322ZVzk449, **$0.20**, 40 charged): broad query lifted UB1 count **2 → 10** (7 physical restaurants; ghost-kitchen merge). Coverage strong (coords/phone/cuisine/hours/menu/url 40/40; postcode 38/40). Persistence 34 canonical / 6 cross-run dupes / 0 dangling / 7 candidates. But **0/7 known UB1 restaurants** in the broad run; only 2/7 across both runs — the actor is a proximity-ranked delivery **home feed, not a complete directory**. Docs/68.
+- Next (not built): several UB1 anchors + `excludeStores` pagination; evaluate Uber search-URL mode; sitemap/store-URL enumeration for completeness. No Deliveroo; no customer comparison.
