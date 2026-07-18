@@ -29,6 +29,12 @@ One approved postcode scope in, verified/scored/deduplicated leads out to Magna 
 - `docs/06_SECURITY.md`
 - `docs/11_ISSUES_LOG.md`
 
+## Deployment
+
+Two Vercel projects are currently connected to this repository and both build successfully; the
+canonical one is not yet decided. See `docs/08_DEPLOYMENT.md` ("Vercel deployment topology") for
+the current record — do not delete or rename either project without reading that first.
+
 ## Source material
 
 Original source files are kept in `docs/source_material/` for reference. Do not commit secrets or API keys.

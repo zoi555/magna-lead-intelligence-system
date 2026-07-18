@@ -300,8 +300,33 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
 - **Not verified:** the live preview was not browser-tested this session — it sits behind Vercel's
   deployment-protection SSO wall (blocks `curl`) and the Claude Chrome extension was not
   connected. Home page / Run Builder / map / APIs / console errors remain **unverified in-browser**.
-- **Open (ISS-0019, needs user action):** a separate, stale duplicate Vercel project
-  (`magna-lead-intelligence-system-pngu`) still runs a legacy SSH-rewrite install command with no
-  `NPM_TOKEN` and fails every build — it posts a `failure` status on this branch's commits
-  alongside the real project's `success`. User should delete it or fix its config.
+- **Open (ISS-0019, needs user decision):** a second Vercel project
+  (`magna-lead-intelligence-system-pngu`) is connected to the same repo. Its earlier legacy
+  SSH-rewrite install command / missing `NPM_TOKEN` failure has since been repaired (see the
+  2026-07-18 overnight session below) — **both** Vercel projects now build successfully. The open
+  question is not brokenness but **which project is canonical**; no deletion/rename without an
+  explicit owner decision. See `docs/08_DEPLOYMENT.md`.
 - No paid Uber actor run, no Deliveroo, no customer comparison this session, per instruction.
+
+### Overnight autonomous session — Vercel dual-project record + Uber actor market research — 2026-07-18
+- **Vercel topology recorded** (`docs/08_DEPLOYMENT.md` "Vercel deployment topology"): both
+  `magna-lead-intelligence-system-pngu` (`prj_vxcbOvftT2CdzUmnxyCWhjF9f3U2`, deployment
+  `dpl_DvJ49zyyhVdV5ND8Rzhv8USNcCSZ`, READY, Production) and `magna-lead-intelligence-system`
+  (`prj_SNY6dJsXzfV6X145cynpqBACHnuT`, deployment `dpl_7ZSr1BuoTYgef9njpnaTfAGsqPn8`, READY,
+  Preview) deploy commit `2d6f4fb1...` successfully. Recorded as **intentional dual
+  infrastructure**, not an accidental duplicate — new ADR in `docs/09_DECISIONS.md`; ISS-0019
+  corrected (`-pngu` is no longer "stale/failing"); `docs/10_BUGS_AND_FIXES.md` updated. Canonical
+  project remains an **open owner decision**; a possible future clean-up (retain one, migrate
+  aliases/env vars, rename to `aspectlead-web`) is proposed but **not actioned**. No Vercel
+  settings were changed this session (out of authorised scope) — this is a documentation pass
+  recording state reported to be already true.
+- **Uber Eats discovery-actor market research** (see `docs/09_DECISIONS.md` pointer / new doc):
+  shortlisted current Apify marketplace actors beyond the two already diagnosed
+  (`sourabhbgp/ubereats-scraper` rejected; `borderline/uber-eats-scraper-ppr` candidate, recall
+  incomplete per docs/68), classified each as primary/supplementary discovery, enrichment, or
+  verification candidate, and designed a bounded (<$1) three-way UB1 benchmark plan against the
+  7-restaurant reference set — **proposed only, not executed.** `provider-registry.ts` wording
+  corrected where it conflated district-precision (records that appear are correctly localised)
+  with district-completeness (finding every restaurant) — see `docs/10_BUGS_AND_FIXES.md`.
+- No paid actor run, no Deliveroo, no customer comparison, no Vercel/Supabase setting changes this
+  session. Full detail: see the Uber research doc and `VERIFY_BEFORE_CLAIMING.md`.

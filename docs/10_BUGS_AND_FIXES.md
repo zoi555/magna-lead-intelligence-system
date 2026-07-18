@@ -116,8 +116,11 @@ These are design corrections, not app bug fixes:
   `dpl_85AwBaHZvzsXZoF14S67EibBPEJ7` (project `magna-lead-intelligence-system`) reached READY with
   build logs matching the local build (same route list, same pre-existing NFT-trace warning on
   `/api/tw-map-data`, no npm/auth errors). Commit `597044a`.
-- **Not fixed here (separate stale project):** `magna-lead-intelligence-system-pngu` — a duplicate
-  Vercel project auto-created at some point — still runs a legacy custom Install Command
-  (`git config --global url."https://x-access-token:${GITHUB_TOKEN}@..." insteadOf ssh://...`) left
-  over from an earlier stopgap, and has no `NPM_TOKEN`, so it fails with `E401 unauthenticated` on
-  the GitHub Packages fetch. It is not the project this app deploys from. See ISS-0019.
+- **Also repaired (separate project, same root cause):** `magna-lead-intelligence-system-pngu` — a
+  second Vercel project connected to the same repo — had the same class of failure (legacy custom
+  Install Command doing an SSH→HTTPS git rewrite, left over from an earlier stopgap, plus no
+  `NPM_TOKEN`), giving `E401 unauthenticated` on the GitHub Packages fetch. **Fixed** by adding
+  `NPM_TOKEN` and removing the custom Install Command, matching `magna-lead-intelligence-system`'s
+  working configuration; the project now reaches `READY` on the default `npm ci` route. Both
+  projects currently deploy successfully; which one is canonical remains an open owner decision —
+  see ISS-0019 and `docs/08_DEPLOYMENT.md` ("Vercel deployment topology").

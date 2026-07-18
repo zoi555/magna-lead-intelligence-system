@@ -59,6 +59,26 @@ No assistant, developer, or unfortunate human may claim the project works withou
   command, no `NPM_TOKEN`) and shows `failure` on the commit's GitHub status alongside the real
   project's `success` — see ISS-0019.
 
+### 2026-07-18 (overnight autonomous session) — Vercel dual-project docs + Uber actor research
+
+- Change tested: documentation-only (Vercel topology record in `docs/08_DEPLOYMENT.md`, ISS-0019
+  correction, new ADR, `PROJECT_STATUS.md`/`README.md` updates) + Uber Eats discovery-actor market
+  research doc + (if made) a narrowly-scoped `provider-registry.ts` wording correction and
+  no-network dry-run benchmark fixtures/tests.
+- Command/manual check: the Vercel project IDs, deployment IDs, URLs, commit hash and statuses
+  recorded here were supplied as verified facts in the task brief, not independently re-queried
+  against the Vercel API this session (no Vercel setting changes were made or needed). All new/
+  changed source code (if any) verified via `npm run typecheck`, `npm run build`, and the relevant
+  `npm run test:*` suites — see the commit log for exact commands and results. `git diff --check`
+  run before commit.
+- Result: see terminal summary at the end of this session and the commit log for exact outcomes.
+- Evidence link/screenshot: commit hashes on `feature/mvp-vertical-slice-001`, pushed this session.
+- Remaining risk: Vercel-reported facts (project IDs/deployment IDs/statuses) are recorded as
+  given, not re-verified against the live Vercel API this session — if they have changed since the
+  brief was written, `docs/08_DEPLOYMENT.md` needs a refresh. No live/paid Uber actor benchmark was
+  run — the benchmark proposal is unexecuted by design. In-browser verification of either Vercel
+  deployment remains outstanding (ISS-0019).
+
 ### YYYY-MM-DD HH:mm
 
 - Change tested:

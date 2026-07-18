@@ -1,5 +1,43 @@
 # Decisions — Magna Lead Intelligence System
 
+## ADR — Dual Vercel projects are intentional infrastructure pending an owner canonicalisation decision
+
+Date: 2026-07-18
+Status: Accepted (interim) — canonical project not yet chosen
+
+### Context
+
+Two Vercel projects (`magna-lead-intelligence-system-pngu`,
+`prj_vxcbOvftT2CdzUmnxyCWhjF9f3U2`, and `magna-lead-intelligence-system`,
+`prj_SNY6dJsXzfV6X145cynpqBACHnuT`) are both connected to the same GitHub repository and both
+now build successfully after the GitHub Packages migration (see the adjacent ADR "Consume the
+geospatial package from GitHub Packages"). Prior documentation (ISS-0019,
+`docs/10_BUGS_AND_FIXES.md`) incorrectly framed `-pngu` as a stale, permanently-broken duplicate
+to be deleted. That framing is corrected here.
+
+### Decision
+
+1. **Both projects are treated as intentional infrastructure**, not an accident, until a formal
+   owner decision resolves their roles. Neither may be deleted or renamed without that decision.
+2. **The canonical Vercel project is explicitly undecided.** No code, script, or documentation
+   should assume one project is "the real one" beyond the factual environment-role record in
+   `docs/08_DEPLOYMENT.md`.
+3. **A future clean-up may retain one project**, migrate its domains/aliases/environment
+   variables from the other, and rename the retained project to `aspectlead-web` — but only after
+   an audit of domains, aliases, environment variables, Git integration (production branch, deploy
+   hooks), full deployment history, and rollback requirements for both projects. This ADR does not
+   authorise that clean-up; it only records the proposed shape of a future decision.
+4. **Full current-state record lives in `docs/08_DEPLOYMENT.md`** ("Vercel deployment topology")
+   — update it in place rather than creating additional topology documents.
+
+### Reason
+
+Silently deleting either project risks losing a working deployment target, an alias, or an
+environment-variable set with no audit trail, at a point where the team has not yet decided which
+project should be canonical. Recording both as intentional (with an explicit, auditable path to
+later consolidation) avoids both accidental data loss and an indefinite unresolved-duplicate state
+being repeatedly mis-described as "broken."
+
 ## ADR-0001 — Use Project Operating System v2 before coding
 
 Date: 2026-07-09  

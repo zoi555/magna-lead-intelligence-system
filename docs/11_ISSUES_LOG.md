@@ -342,32 +342,47 @@ again (phone/cuisines/media/isOpen present; rating/coords/delivery/eta/hours/men
 actor via address input. Recommend evaluating a tighter location input or an alternative actor for
 district-level UK discovery. No larger Uber run; no Deliveroo; no customer comparison.
 
-### ISS-0019 (new, open) — stale duplicate Vercel project fails; deployment-protection SSO blocks direct browser verification
+### ISS-0019 — dual Vercel project ownership unresolved; deployment-protection SSO blocks direct browser verification
 
-**2026-07-18.** Two Vercel projects post to GitHub status checks on this branch:
-`magna-lead-intelligence-system` (correct — `prj_SNY6dJsXzfV6X145cynpqBACHnuT`) and
-`magna-lead-intelligence-system-pngu` (a duplicate, apparently created at some earlier point).
-The `-pngu` project still has a legacy custom Install Command
-(`git config --global url."https://x-access-token:${GITHUB_TOKEN}@..." insteadOf ssh://...` then
-`npm ci`) from before the GitHub-Packages migration, and has **no `NPM_TOKEN`** set — it fails every
-build with `npm error code E401 ... unauthenticated` fetching `@zoi555/geospatial-map` from
-`npm.pkg.github.com`. This makes the commit's overall GitHub status `failure` even though the real
-app deployment (`magna-lead-intelligence-system`) is READY. **Action needed from the user:** delete
-the `-pngu` project, or add `NPM_TOKEN` + drop the custom Install Command there too, whichever is
-intended.
+**Status as of 2026-07-18 (overnight session):** the earlier framing of this issue — that
+`magna-lead-intelligence-system-pngu` is "a stale duplicate that fails every build" — is **no
+longer accurate** and must not be repeated. It has been corrected as follows:
 
-**Separately:** the READY preview (`dpl_85AwBaHZvzsXZoF14S67EibBPEJ7`,
-`https://magna-lead-intelligence-system-qyaz78cuh-zoeb-s-projects.vercel.app`) sits behind Vercel's
-**deployment-protection SSO wall** (redirects to `vercel.com/sso-api`) — `curl` cannot reach the app
-without an authenticated Vercel session or a protection-bypass secret (none configured). The Claude
-Chrome browser extension was also **not connected** this session (same limitation noted in
-`PROJECT_STATUS.md`'s national-map history). Result: home page / Run Builder / map / APIs were
-**not directly browser-tested against the live preview** this session. Verification instead relied
-on: identical local `npm run build` output, all required local test suites green, Vercel build logs
-matching the local build exactly (same routes, same pre-existing NFT-trace warning, no npm/auth
-errors), and `get_runtime_errors`/`get_runtime_logs` (Vercel MCP) showing no errors — though the
-latter also show **no traffic**, since no authenticated request reached the deployment. **Needed to
-close this out:** either the user opens the preview URL themselves (their browser already has an
-authenticated Vercel session) and confirms the pages/APIs render, or reconnects the Claude Chrome
-extension so an agent can do it, or a `VERCEL_AUTOMATION_BYPASS_SECRET` is added so `curl`/headless
-tools can reach protected previews directly.
+- **GitHub Packages migration is complete.** The root cause of the `-pngu` project's earlier
+  failures (legacy SSH-rewrite Install Command, no `NPM_TOKEN`) has been fixed by repairing that
+  project's settings to match the working project: `NPM_TOKEN` added, custom Install Command
+  removed, default `npm ci` install route restored.
+- **Both Vercel projects now build successfully.** `magna-lead-intelligence-system-pngu`
+  (`prj_vxcbOvftT2CdzUmnxyCWhjF9f3U2`, deployment `dpl_DvJ49zyyhVdV5ND8Rzhv8USNcCSZ`, `READY`,
+  Production) and `magna-lead-intelligence-system` (`prj_SNY6dJsXzfV6X145cynpqBACHnuT`,
+  deployment `dpl_7ZSr1BuoTYgef9njpnaTfAGsqPn8`, `READY`, Preview) both deploy commit
+  `2d6f4fb158b5ed60f93db1081e6a9b0c5fbf4fda` successfully. Full topology recorded in
+  `docs/08_DEPLOYMENT.md` ("Vercel deployment topology").
+- **Browser verification remains incomplete where applicable.** Neither deployment's live pages
+  have been directly browser-tested this session (see the SSO/extension limitation below, carried
+  forward unchanged from the prior entry).
+- **Dual-project ownership and canonical deployment architecture remain unresolved.** Two
+  projects legitimately exist, connected to the same repo, with different environment roles
+  (Production vs Preview) that do not obviously map to which one *should* be canonical. This is
+  **not** a bug to auto-fix — it needs an explicit owner decision (see `docs/08_DEPLOYMENT.md` for
+  the proposed future clean-up: retain one project, migrate aliases/env vars, rename to
+  `aspectlead-web`, only after a domains/aliases/env-vars/Git-integration/history/rollback audit).
+- **Owner decision is required later.** Nothing about either project's settings, domains, or
+  existence was changed this session (out of authorised scope) beyond what is described above as
+  already having been repaired.
+
+**Original SSO/browser-verification note (still open):** the READY preview
+(`dpl_85AwBaHZvzsXZoF14S67EibBPEJ7`,
+`https://magna-lead-intelligence-system-qyaz78cuh-zoeb-s-projects.vercel.app`, an older deployment
+of Project B) sits behind Vercel's **deployment-protection SSO wall** (redirects to
+`vercel.com/sso-api`) — `curl` cannot reach the app without an authenticated Vercel session or a
+protection-bypass secret (none configured). The Claude Chrome browser extension was also **not
+connected** this session (same limitation noted in `PROJECT_STATUS.md`'s national-map history).
+Result: home page / Run Builder / map / APIs remain **not directly browser-tested against either
+live deployment**. Verification instead relies on: identical local `npm run build` output, all
+required local test suites green, and Vercel build logs matching the local build exactly (same
+routes, no npm/auth errors). **Needed to close this out:** either the user opens a preview URL
+themselves (their browser already has an authenticated Vercel session) and confirms the pages/APIs
+render, or reconnects the Claude Chrome extension so an agent can do it, or a
+`VERCEL_AUTOMATION_BYPASS_SECRET` is added so `curl`/headless tools can reach protected previews
+directly.
