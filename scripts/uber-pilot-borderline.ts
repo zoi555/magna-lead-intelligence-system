@@ -10,8 +10,10 @@ import path from "node:path";
 const PROVIDER_ID = "uber_eats_borderline_ppr";
 const DISTRICT = "UB1";
 const ADDRESS = process.env.UBER_EATS_ADDRESS ?? "Southall Town Hall, 1 High Street, Southall, UB1 3HA, United Kingdom";
-const QUERY = process.env.UBER_EATS_QUERY ?? "pizza";
-const MAX_ROWS = 10;
+// Broad discovery by default: omit `query` (all restaurant types). Set UBER_EATS_QUERY to filter.
+const QUERY = process.env.UBER_EATS_QUERY;   // undefined ⇒ broad
+const MAX_ROWS_CAP = 40;                      // approved ceiling this session ($0.20 < $0.25)
+const MAX_ROWS = Math.min(Number(process.env.UBER_EATS_MAX_ROWS ?? 10) || 10, MAX_ROWS_CAP);
 const SCRATCH = "/private/tmp/claude-501/-Users-homemac-Projects-magna-lead-intelligence-system/ecfebd28-c44e-4d10-850a-4175d6a0fad6/scratchpad/uber-pilot-raw";
 
 async function loadDotEnv() {
@@ -51,9 +53,9 @@ async function main() {
   const provider = assertPayPerResult(PROVIDER_ID);
   const ACTOR = provider.actorId;
 
-  const input = buildBorderlineInput({ address: ADDRESS, query: QUERY, maxRows: MAX_ROWS });
+  const input = buildBorderlineInput({ address: ADDRESS, query: QUERY, maxRows: MAX_ROWS, maxRowsCap: MAX_ROWS_CAP });
   const inputFingerprint = contentHash(input);
-  const estCost = MAX_ROWS * 5 / 1000;   // $5 / 1,000 restaurants
+  const estCost = (input.maxRows as number) * 5 / 1000;   // $5 / 1,000 restaurants
 
   // Pre-flight assertions on the EXACT input.
   const fail = (m: string) => { console.error(`ABORT: ${m}`); process.exit(6); };
@@ -63,10 +65,12 @@ async function main() {
   if (input.address !== ADDRESS) fail("address changed");
   if (input.addressCountry !== "GB") fail("addressCountry");
   if (input.storeType !== "RESTAURANTS") fail("storeType");
-  if (input.maxRows !== 10) fail("maxRows");
+  if ((input.maxRows as number) < 1 || (input.maxRows as number) > MAX_ROWS_CAP) fail(`maxRows ${input.maxRows} out of range`);
+  if (QUERY === undefined && "query" in input) fail("broad run must omit query");
   if ((input as any).urls) fail("store urls must not be supplied");
   if (input.getMenuCustomizations !== false) fail("menu customisations must be off");
   if (estCost >= 0.25) fail(`estimated cost $${estCost} not below cap`);
+  console.log(input.query ? `Query filter: "${input.query}"` : "Query: OMITTED (broad — all restaurant types)");
 
   console.log(`Borderline diagnostic: provider=${PROVIDER_ID} actor=${ACTOR} (${provider.pricingModel})`);
   console.log("Sanitised execution plan (exact actor input):"); console.log(JSON.stringify(input, null, 2));
@@ -86,7 +90,7 @@ async function main() {
     run = { id: inflight.data.run_id as string }; exec = { id: inflight.data.execution_id as string };
     console.log(`↻ Resuming in-flight run ${inflight.data.actor_run_id} — reusing internal run ${run.id}/exec ${exec.id} (NO new paid run).`);
   } else {
-    const created = await repo.createRun({ tenant_id: tenantId, name: `uber-borderline-pilot: ${DISTRICT}`, territory_input: DISTRICT, derived_query_units: [DISTRICT], search_terms: [QUERY], target_filters: {}, requested_fields: [], source_config: { source: "uber_eats", provider: PROVIDER_ID, actor: ACTOR, pilot: true }, config_snapshot: { input } });
+    const created = await repo.createRun({ tenant_id: tenantId, name: `uber-borderline-pilot: ${DISTRICT}`, territory_input: DISTRICT, derived_query_units: [DISTRICT], search_terms: QUERY ? [QUERY] : [], target_filters: { broad: !QUERY }, requested_fields: [], source_config: { source: "uber_eats", provider: PROVIDER_ID, actor: ACTOR, pilot: true }, config_snapshot: { input } });
     const execRec = await repo.createExecution(created.id, tenantId, 1);
     run = { id: created.id }; exec = { id: execRec.id };
   }

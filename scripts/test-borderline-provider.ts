@@ -62,8 +62,14 @@ async function main() {
     assert(input.storeType === "RESTAURANTS" && input.address === ADDRESS && (input as any).urls === undefined, "storeType RESTAURANTS, address unchanged, no store urls");
   }
 
-  // (4) maxRows cannot exceed the approved value.
-  assert(buildBorderlineInput({ address: ADDRESS, maxRows: 1000 }).maxRows === BORDERLINE_MAX_ROWS_CAP, "maxRows is HARD-capped at the approved value (10)");
+  // (4) maxRows cannot exceed the approved value (default cap, and an explicit raised cap).
+  assert(buildBorderlineInput({ address: ADDRESS, maxRows: 1000 }).maxRows === BORDERLINE_MAX_ROWS_CAP, "maxRows is HARD-capped at the default value (10)");
+  assert(buildBorderlineInput({ address: ADDRESS, maxRows: 1000, maxRowsCap: 40 }).maxRows === 40, "an explicit maxRowsCap is honoured (40) and still caps overshoot");
+
+  // (4b) broad discovery OMITS query; a filter is included only when provided.
+  assert(!("query" in buildBorderlineInput({ address: ADDRESS })), "no query ⇒ broad (query key omitted)");
+  assert(!("query" in buildBorderlineInput({ address: ADDRESS, query: "  " })), "blank query ⇒ broad (omitted)");
+  assert(buildBorderlineInput({ address: ADDRESS, query: "pizza" }).query === "pizza", "explicit query is included");
 
   // (5) rental actors cannot be selected accidentally.
   {
