@@ -32,6 +32,7 @@
     "test:multi-source": "tsx scripts/test-multi-source.ts",
     "test:uber-parse": "tsx scripts/test-uber-parse.ts",
     "test:geography-gate": "tsx scripts/test-geography-gate.ts",
+    "test:apify-provenance": "tsx scripts/test-apify-provenance.ts",
     "typecheck": "tsc --noEmit",
     "uber:diagnostic-plan": "tsx scripts/uber-diagnostic-plan.ts",
     "ingest:os-open-names": "tsx scripts/ingest-os-open-names.ts",

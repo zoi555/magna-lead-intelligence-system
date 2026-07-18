@@ -334,3 +334,12 @@ acquire OS Open Names + ONSPD; persist consolidation; extend JE parser.
   `npm run uber:diagnostic-plan` verifies the exact request dry (9/9), ~$0.02 < $0.25 cap.
 - Tests: `test:geography-gate` (10 required proofs) + `test:uber-parse` + `test:multi-source` green;
   typecheck + build + `git diff --check` clean.
+
+## Session — Apify execution provenance + one final approved diagnostic (ISS-0018)
+- Replaced run-sync with the async run API: `apify-run.ts` (client, token in Authorization header
+  only), `apify-orchestrator.ts` (idempotent create-once → persist run id immediately → poll →
+  retrieve from the exact dataset id; resume in-flight runs; ResumableTimeoutError; actor failure ⇒
+  no ingest + halt), `provider-execution-store.ts`, migration 0020 `provider_executions` (advisor-clean).
+- Pilot rewired to capture full provenance; business-validation status kept separate from actor status.
+- Tests: `test:apify-provenance` (10 required proofs) + geography-gate + uber-parse + multi-source +
+  typecheck + build + diff-check all green. Diagnostic-plan dry 9/9.

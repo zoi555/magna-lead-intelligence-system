@@ -357,3 +357,14 @@ Design only. Nothing here is built, migrated, deployed, or verified. Dedup-depen
 - Persistence: append-only `provider_geography_validations` (0018) + `consolidated_candidates.
   geography_status` (0019) + invalidations via existing `candidate_merge_decisions`. No raw
   observation is ever mutated.
+
+## ADR — Apify execution via the run object API, with permanent provenance (not run-sync)
+- Paid provider runs use the async run API (`POST /v2/acts/{id}/runs` → run object), then poll the
+  run by its id and read items from the returned `defaultDatasetId`. NOT `run-sync` (no provenance)
+  and NEVER a "last run" endpoint (nondeterministic under concurrency). Persisted in
+  `provider_executions` (migration 0020).
+- Idempotency: an in-flight run for the same actor+input is RESUMED, never re-created (no duplicate
+  charges on timeout/restart). The run id is stored the instant it exists (crash-reconcilable). A
+  poll timeout is resumable and starts no second run. Actor failure prevents ingestion and halts.
+- Token is sent only as an Authorization header — never in a URL, log, error, fixture, Git or a DB
+  field. `provider_run_ref` is a credential-free console URL.

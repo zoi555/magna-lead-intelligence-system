@@ -252,3 +252,8 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
 - **Migrations 0018/0019:** append-only `provider_geography_validations`; `consolidated_candidates.geography_status` (default valid). Advisor-clean. **Backfilled/quarantined** the 2×10 historical US candidates (geography_status + 20 validations + 20 `candidate_merge_decisions` invalidations); 1,623 JE candidates untouched; raw observations immutable.
 - **Diagnostic prepared, NOT run:** fetcher/pilot now send `urls`+full UB1 address; `npm run uber:diagnostic-plan` verifies the exact request dry (9/9), ~$0.02 < $0.25. Awaiting explicit approval to run `npm run uber:pilot`.
 - Tests: `test:geography-gate` (10 required proofs) + `test:uber-parse` + `test:multi-source` green; typecheck + build + `git diff --check` clean. Migrations 0001–0019 applied.
+
+### Apify execution provenance — 2026-07-18
+- Replaced `run-sync` with the async run API (docs/66): create one run → persist run id immediately → poll by id → retrieve items from the exact returned dataset id. `apify-run.ts` (token in Authorization header only, never a URL/log/DB field), `apify-orchestrator.ts` (idempotent; resumes in-flight runs; `ResumableTimeoutError` starts no second run; actor failure ⇒ no ingest + halt), `provider-execution-store.ts`, migration **0020** `provider_executions` (advisor-clean). Actor technical status stored separately from business-validation status.
+- Tests: `test:apify-provenance` (10 required proofs) + geography-gate + uber-parse + multi-source + typecheck + build + diff-check green. Migrations 0001–0020 applied.
+- **Next:** execute exactly one approved 10-result UB1 diagnostic with the supported `urls`+full-address input (~$0.02, cap $0.25).

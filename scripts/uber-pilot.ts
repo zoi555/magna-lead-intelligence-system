@@ -44,8 +44,11 @@ async function main() {
   const { hasServiceCredentials, createServiceClient } = await import("../src/lib/discovery-engine/supabase-client");
   if (!hasServiceCredentials()) { console.error("Missing Supabase service credentials."); process.exit(1); }
 
-  const { uberEatsApifyFetcher } = await import("../src/lib/discovery-engine/providers/apify-fetcher");
-  const { UberEatsAdapter } = await import("../src/lib/discovery-engine/uber-eats/adapter");
+  const { buildUberEatsInput } = await import("../src/lib/discovery-engine/providers/apify-fetcher");
+  const { createHttpApifyClient } = await import("../src/lib/discovery-engine/providers/apify-run");
+  const { runApifyProvider, ResumableTimeoutError } = await import("../src/lib/discovery-engine/providers/apify-orchestrator");
+  const { createProviderExecutionStore } = await import("../src/lib/discovery-engine/providers/provider-execution-store");
+  const { parseUberEatsSearch } = await import("../src/lib/discovery-engine/uber-eats/parse");
   const { consolidate } = await import("../src/lib/discovery-engine/consolidation/consolidate");
   const { persistConsolidation } = await import("../src/lib/discovery-engine/consolidation/persist");
   const { buildComparisonReport } = await import("../src/lib/discovery-engine/reports/comparison");
@@ -54,40 +57,73 @@ async function main() {
   const { resolveDefaultTenantId } = await import("../src/lib/discovery-engine/server");
   const { SupabaseRepository } = await import("../src/lib/discovery-engine/repository/supabase");
 
-  console.log(`Uber Eats pilot: actor=${ACTOR} district=${DISTRICT} urls=${JSON.stringify(URLS)} address="${ADDRESS}" maxResults=${MAX_RESULTS} includeReviews=false (cap $0.25)`);
-  const fetcher = uberEatsApifyFetcher(ACTOR, token, { maxResults: MAX_RESULTS, includeReviews: false, urls: URLS, address: ADDRESS });
-  const adapter = new UberEatsAdapter(fetcher);
-  const res = await adapter.executeQuery({ code: DISTRICT, index: 0 }, { enabled: true, maxCallsPerRun: 1, requestDelayMs: 0, queryUnits: [DISTRICT] });
-  if (!res.ok) { console.error("Provider run failed:", res.error); process.exit(1); }
-
-  // retain raw provider payload OUTSIDE git (immutable audit evidence)
-  mkdirSync(SCRATCH, { recursive: true });
-  writeFileSync(`${SCRATCH}/uber-${DISTRICT}.json`, JSON.stringify(res.raw, null, 2));
-  const outlets = res.outlets.map((o) => ({ ...o, observed_at: new Date().toISOString() }));
-  console.log(`Fetched ${outlets.length} Uber Eats outlets (raw saved to scratchpad, not git).`);
-  if (!outlets.length) { console.log("No outlets returned — check the actor's field mapping (calibration)."); process.exit(0); }
-
-  // observed field names across the raw records (which fields the actor supplies)
-  const rawArr = ((res.raw as { stores?: unknown[] })?.stores ?? []) as Record<string, unknown>[];
-  const observedFields = [...new Set(rawArr.flatMap((r) => Object.keys(r ?? {})))].sort();
-  console.log("Actor fields observed:", observedFields.join(", "));
+  const input = buildUberEatsInput(DISTRICT, { maxResults: MAX_RESULTS, includeReviews: false, urls: URLS, address: ADDRESS });
+  const inputFingerprint = contentHash(input);
+  const estCost = MAX_RESULTS * 2 / 1000;
+  console.log(`Uber Eats pilot: actor=${ACTOR} district=${DISTRICT}`);
+  console.log("Sanitised execution plan (exact actor input):"); console.log(JSON.stringify(input, null, 2));
+  console.log(`input_fingerprint=${inputFingerprint} estimated_max_cost=~$${estCost.toFixed(3)} (cap $0.25)`);
 
   const db = createServiceClient();
   const repo = new SupabaseRepository();
   const tenantId = await resolveDefaultTenantId();
 
-  // persist as immutable observations (source=uber_eats) under a pilot run/execution
-  const run = await repo.createRun({ tenant_id: tenantId, name: `uber-pilot: ${DISTRICT}`, territory_input: DISTRICT, derived_query_units: [DISTRICT], search_terms: [], target_filters: {}, requested_fields: [], source_config: { source: "uber_eats", provider: ACTOR, pilot: true }, config_snapshot: {} });
+  // Internal run + execution FIRST, so provenance links to them.
+  const run = await repo.createRun({ tenant_id: tenantId, name: `uber-pilot: ${DISTRICT}`, territory_input: DISTRICT, derived_query_units: [DISTRICT], search_terms: [], target_filters: {}, requested_fields: [], source_config: { source: "uber_eats", provider: ACTOR, pilot: true }, config_snapshot: { input } });
   const exec = await repo.createExecution(run.id, tenantId, 1);
+
+  // --- Provider execution with permanent provenance (idempotent; run id stored the instant it exists). ---
+  const store = createProviderExecutionStore(db, { tenantId, runId: run.id, executionId: exec.id, provider: "apify" });
+  const client = createHttpApifyClient(token, { timeoutMs: 90_000 });
+  let provider: Awaited<ReturnType<typeof runApifyProvider>>;
+  try {
+    provider = await runApifyProvider({ client, store, actorId: ACTOR, input, inputFingerprint, maxRequestedResults: MAX_RESULTS, estimatedCostUsd: estCost, pricingModel: "PAY_PER_RESULT", timeoutMs: 180_000, pollIntervalMs: 3_000 });
+  } catch (e) {
+    if (e instanceof ResumableTimeoutError) {
+      console.error(`⏳ Poll timeout. Apify run RECORDED and resumable — NO second run started. actor_run_id=${e.actorRunId}`);
+      console.error(`   Re-run \`npm run uber:pilot\` to resume polling the SAME run (idempotent). Not marking success.`);
+      await repo.finishExecution(exec.id, "failed", { metrics: { source: "uber_eats", business_status: "provider_poll_timeout", provider_run_id: e.actorRunId } });
+      process.exit(4);
+    }
+    throw e;   // create/network error BEFORE a run id ⇒ no paid run created; safe to surface & retry
+  }
+
+  const runObj = provider.run;
+  console.log(`Provider run: id=${runObj.runId} dataset=${runObj.datasetId} status=${runObj.status} resumed=${provider.resumed} usageUsd=${runObj.usageTotalUsd ?? "n/a"}`);
+
+  if (!provider.ingested) {
+    // Actor FAILED/ABORTED/TIMED-OUT → do NOT ingest, do NOT continue to any further paid source.
+    console.error(`⛔ Actor did not succeed (status=${runObj.status}, ${runObj.statusMessage ?? "no message"}). No dataset ingested. HALT.`);
+    await store.update(provider.provenanceId, { business_validation_status: "no_observations" });
+    await repo.finishExecution(exec.id, "failed", { metrics: { source: "uber_eats", business_status: "actor_failed", actor_status: runObj.status, provider_run_id: runObj.runId } });
+    process.exit(5);
+  }
+
+  const items = provider.items as Record<string, unknown>[];
+  // retain raw provider payload OUTSIDE git (immutable audit evidence)
+  mkdirSync(SCRATCH, { recursive: true });
+  writeFileSync(`${SCRATCH}/uber-${DISTRICT}.json`, JSON.stringify({ stores: items, provider_run_id: runObj.runId, dataset_id: runObj.datasetId }, null, 2));
+  const outlets = parseUberEatsSearch({ stores: items }, new Date().toISOString());
+  console.log(`Fetched ${items.length} dataset items → ${outlets.length} parsed outlets (raw saved to scratchpad, not git).`);
+  const observedFields = [...new Set(items.flatMap((r) => Object.keys(r ?? {})))].sort();
+  console.log("Actor fields observed:", observedFields.join(", "));
+  if (!outlets.length) {
+    await store.update(provider.provenanceId, { business_validation_status: "no_observations" });
+    await repo.finishExecution(exec.id, "completed", { completedQueries: 1, plannedQueries: 1, metrics: { source: "uber_eats", outlets: 0, business_status: "no_observations", provider_run_id: runObj.runId } });
+    console.log("No parseable outlets returned."); process.exit(0);
+  }
+
+  // persist immutable observations (source=uber_eats); content-hash dedup ⇒ re-reading the same
+  // dataset never creates duplicate canonical observations.
   let obsCount = 0;
   const obsIdBySourceId = new Map<string, string>();
   for (const o of outlets) {
-    const rawRec = rawArr.find((r) => String(r?.uuid ?? r?.id ?? r?.storeUuid ?? "") === o.source_outlet_id) ?? o;
+    const rawRec = items.find((r) => String(r?.uuid ?? r?.id ?? r?.storeUuid ?? "") === o.source_outlet_id) ?? (o as unknown as Record<string, unknown>);
     const hash = contentHash(rawRec);
     const dup = await repo.findObservationByHash(tenantId, hash);
     const inserted = await repo.insertRawObservation({
       tenant_id: tenantId, execution_id: exec.id, run_id: run.id, source: "uber_eats", response_type: "search",
-      source_record_id: o.source_outlet_id, query_context: { district: DISTRICT, provider: ACTOR },
+      source_record_id: o.source_outlet_id, query_context: { district: DISTRICT, provider: ACTOR, provider_run_id: runObj.runId, dataset_id: runObj.datasetId },
       http_status: 200, raw_payload: rawRec, content_hash: hash, parser_version: UBER_PARSER_VERSION,
       adapter_version: ADAPTER_VERSION, schema_version: SCHEMA_VERSION, parse_status: "parsed", parse_warnings: [], attempt: 1,
       duplicate_of: dup?.id ?? null,
@@ -102,6 +138,9 @@ async function main() {
   const geoCtx = { requestedCountry: "GB", geographySelection: DISTRICT, resolvedQueryUnits: [DISTRICT] };
   const part = partitionByGeography(outlets, geoCtx);
   await persistGeographyValidations(db, { tenantId, runId: run.id, executionId: exec.id, source: "uber_eats", ctx: geoCtx, verdicts: part.verdicts, observationIdBySourceId: obsIdBySourceId });
+
+  // Record the business-validation verdict on the provider execution (SEPARATE from actor status).
+  await store.update(provider.provenanceId, { business_validation_status: part.runStatus.status });
 
   // Business-validation status is kept SEPARATE from the actor/execution technical status.
   await repo.finishExecution(exec.id, "completed", { completedQueries: 1, plannedQueries: 1, metrics: {
@@ -131,6 +170,9 @@ async function main() {
   const scrapedFrom = [...new Set(outlets.map((o) => String((o.source_extra as any)?.scraped_from ?? "?")))];
 
   console.log(`\n--- Uber pilot result (UB1) — parser ${UBER_PARSER_VERSION} ---`);
+  console.log(`provider execution: internal_run=${run.id} execution=${exec.id} provenance=${provider.provenanceId}`);
+  console.log(`  actor_run_id=${runObj.runId} dataset_id=${runObj.datasetId} actor_id=${runObj.actorId ?? ACTOR} build=${runObj.buildTag ?? runObj.buildId ?? "n/a"}`);
+  console.log(`  actor_status=${runObj.status} started=${runObj.startedAt ?? "n/a"} finished=${runObj.finishedAt ?? "n/a"} usageUsd=${runObj.usageTotalUsd ?? "n/a"} charged=${runObj.chargedResultCount ?? "n/a"} ref=${provider.run.runId ? "https://console.apify.com/actors/runs/" + runObj.runId : "n/a"}`);
   console.log(`observations=${obsCount} outlets=${outlets.length} (raw evidence retained, immutable)`);
   console.log(`geography validation: valid=${part.runStatus.valid} out_of_scope=${part.runStatus.outOfScope} unverifiable=${part.runStatus.unverifiable} → business_status=${part.runStatus.status}`);
   console.log(`geography: country distribution=${JSON.stringify(countries)} scrapedFrom=${JSON.stringify(scrapedFrom)}`);
