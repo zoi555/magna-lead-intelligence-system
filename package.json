@@ -34,6 +34,7 @@
     "test:geography-gate": "tsx scripts/test-geography-gate.ts",
     "test:apify-provenance": "tsx scripts/test-apify-provenance.ts",
     "test:borderline-provider": "tsx scripts/test-borderline-provider.ts",
+    "test:ub1-benchmark": "tsx scripts/test-ub1-benchmark.ts",
     "uber:pilot:borderline": "tsx scripts/uber-pilot-borderline.ts",
     "uber:borderline:replay": "tsx scripts/uber-borderline-replay.ts",
     "typecheck": "tsc --noEmit",
