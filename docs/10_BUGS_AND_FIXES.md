@@ -97,3 +97,27 @@ These are design corrections, not app bug fixes:
   JSONB for all unmapped fields. Coverage calc now credits menu/hours/promotion/media from
   `source_extra`. Tests: `test:uber-parse` (40 assertions) + `test:multi-source` green; live
   rerun confirmed. See docs/64.
+
+## 2026-07-18 — Vercel build failed: private git dependency has no SSH auth in CI
+
+- **BUG:** every Vercel build failed installing `@geospatial/map` (pinned
+  `github:zoi555/geospatial-platform#v0.3.0`), which npm resolves via `git+ssh://git@github.com/`.
+  Vercel's build container has no SSH key/agent for the private `geospatial-platform` repo, so
+  `npm ci`/`npm install` errored on that dependency before the build could start.
+- **Fix:** the independent repo now publishes `@zoi555/geospatial-map` to GitHub Packages.
+  AspectLead's `package.json` now depends on `@zoi555/geospatial-map@0.3.0`; a committed,
+  token-free `.npmrc` (`//npm.pkg.github.com/:_authToken=${NPM_TOKEN}`) authenticates the install;
+  `NPM_TOKEN` is set as an environment variable in Vercel (Preview + Production) and locally. All
+  imports and `next.config.mjs` `transpilePackages` updated to the new package name;
+  `package-lock.json` regenerated. See ADR in docs/09_DECISIONS.md.
+- **Verified:** clean `npm ci` (local + Vercel) resolves `@zoi555/geospatial-map@0.3.0` from
+  `npm.pkg.github.com` with an integrity hash; typecheck, build, `test:geography-gate`,
+  `test:uber-parse`, `test:multi-source`, and `git diff --check` all green; Vercel deployment
+  `dpl_85AwBaHZvzsXZoF14S67EibBPEJ7` (project `magna-lead-intelligence-system`) reached READY with
+  build logs matching the local build (same route list, same pre-existing NFT-trace warning on
+  `/api/tw-map-data`, no npm/auth errors). Commit `597044a`.
+- **Not fixed here (separate stale project):** `magna-lead-intelligence-system-pngu` — a duplicate
+  Vercel project auto-created at some point — still runs a legacy custom Install Command
+  (`git config --global url."https://x-access-token:${GITHUB_TOKEN}@..." insteadOf ssh://...`) left
+  over from an earlier stopgap, and has no `NPM_TOKEN`, so it fails with `E401 unauthenticated` on
+  the GitHub Packages fetch. It is not the project this app deploys from. See ISS-0019.

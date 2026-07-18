@@ -368,3 +368,40 @@ Design only. Nothing here is built, migrated, deployed, or verified. Dedup-depen
   poll timeout is resumable and starts no second run. Actor failure prevents ingestion and halts.
 - Token is sent only as an Authorization header — never in a URL, log, error, fixture, Git or a DB
   field. `provider_run_ref` is a credential-free console URL.
+
+## ADR — Consume the geospatial package from GitHub Packages, not a private git dependency
+
+Date: 2026-07-18
+
+### Context
+
+`@geospatial/map` was pinned as `github:zoi555/geospatial-platform#v0.3.0`, which npm resolves via
+`git+ssh://git@github.com/`. Vercel's build environment has no SSH key/agent for the private repo,
+so every build failed (`fix(uber): calibrate replacement actor payload` session onward — see
+docs/10_BUGS_AND_FIXES.md). A prior stopgap (`git config --global url.insteadOf` rewriting ssh→https
+with `GITHUB_TOKEN`, set as a custom Vercel Install Command) still exists on a **stale duplicate**
+Vercel project (`magna-lead-intelligence-system-pngu`) and is now known-broken there (ISS-0019).
+
+### Decision
+
+The independent `geospatial-platform` repo publishes the package to **GitHub Packages** as
+`@zoi555/geospatial-map`. AspectLead now depends on `@zoi555/geospatial-map@0.3.0` resolved from
+`https://npm.pkg.github.com`, authenticated by a **token-free, committed `.npmrc`**
+(`//npm.pkg.github.com/:_authToken=${NPM_TOKEN}`) plus an `NPM_TOKEN` environment variable set in
+Vercel (Preview + Production) and the local shell. No SSH key, no custom Install Command, no
+`GITHUB_TOKEN` git-rewrite — the default `npm ci` now works unmodified in Vercel.
+
+### Reason
+
+GitHub Packages + a scoped read-only token is the standard, Vercel-native way to consume a private
+npm package without SSH. It removes a full class of CI-environment-specific breakage and keeps the
+token out of git history (`.npmrc` interpolates it from the environment; nothing is committed).
+
+### Status note
+
+Verified: `package-lock.json` resolves `@zoi555/geospatial-map@0.3.0` from `npm.pkg.github.com` with
+an integrity hash; clean `npm ci` succeeds locally and on Vercel (`prj_SNY6dJsXzfV6X145cynpqBACHnuT`,
+deployment `dpl_85AwBaHZvzsXZoF14S67EibBPEJ7`, READY). The unrelated duplicate project
+`magna-lead-intelligence-system-pngu` still has the old SSH-rewrite Install Command and no
+`NPM_TOKEN`, and fails — see ISS-0019. It is not the project this app deploys from; recommend the
+user delete or reconfigure it to avoid confusing status checks on future pushes.

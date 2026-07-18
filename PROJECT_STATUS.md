@@ -275,3 +275,33 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
 ### Broad Uber diagnostic — UB1 recall still incomplete — 2026-07-18
 - One paid run (MrKoKg8322ZVzk449, **$0.20**, 40 charged): broad query lifted UB1 count **2 → 10** (7 physical restaurants; ghost-kitchen merge). Coverage strong (coords/phone/cuisine/hours/menu/url 40/40; postcode 38/40). Persistence 34 canonical / 6 cross-run dupes / 0 dangling / 7 candidates. But **0/7 known UB1 restaurants** in the broad run; only 2/7 across both runs — the actor is a proximity-ranked delivery **home feed, not a complete directory**. Docs/68.
 - Next (not built): several UB1 anchors + `excludeStores` pagination; evaluate Uber search-URL mode; sitemap/store-URL enumeration for completeness. No Deliveroo; no customer comparison.
+
+### GitHub Packages + Vercel deployment repair — 2026-07-18 (ISS-0019, docs/09 ADR)
+- **Root cause fixed:** `@geospatial/map` was pinned as a private git+ssh dependency
+  (`github:zoi555/geospatial-platform#v0.3.0`); Vercel's build container has no SSH key for that
+  repo, so every build failed installing it. Switched to **`@zoi555/geospatial-map@0.3.0` published
+  on GitHub Packages**, authenticated by a committed token-free `.npmrc`
+  (`//npm.pkg.github.com/:_authToken=${NPM_TOKEN}`) + `NPM_TOKEN` set in Vercel (Preview +
+  Production) and locally. Updated `package.json`, `next.config.mjs`, all app + script imports (4
+  leftover script imports found and fixed), regenerated `package-lock.json`. No remaining
+  `ssh://git@github.com` / `github:zoi555/geospatial-platform` / `@geospatial/map` references in
+  code or config (only in historical docs, left as an accurate record).
+- **Verified:** clean `npm ci` locally and on Vercel resolves the package from
+  `npm.pkg.github.com` with an integrity hash; typecheck, build, `test:geography-gate`,
+  `test:uber-parse`, `test:multi-source`, `git diff --check` all green. Diff reviewed —
+  mechanical renames only. Committed **`597044a`** (`fix(build): consume geospatial package from
+  GitHub Packages`), pushed to `feature/mvp-vertical-slice-001`.
+- **Deployment READY:** project `magna-lead-intelligence-system`
+  (`prj_SNY6dJsXzfV6X145cynpqBACHnuT`), deployment **`dpl_85AwBaHZvzsXZoF14S67EibBPEJ7`**
+  (`https://magna-lead-intelligence-system-qyaz78cuh-zoeb-s-projects.vercel.app`). Build logs
+  match the local build exactly (same routes, same pre-existing NFT-trace warning on
+  `/api/tw-map-data`, no npm/auth errors). Vercel runtime-error/log tools show zero errors (and
+  zero traffic — nothing has hit the deployment yet).
+- **Not verified:** the live preview was not browser-tested this session — it sits behind Vercel's
+  deployment-protection SSO wall (blocks `curl`) and the Claude Chrome extension was not
+  connected. Home page / Run Builder / map / APIs / console errors remain **unverified in-browser**.
+- **Open (ISS-0019, needs user action):** a separate, stale duplicate Vercel project
+  (`magna-lead-intelligence-system-pngu`) still runs a legacy SSH-rewrite install command with no
+  `NPM_TOKEN` and fails every build — it posts a `failure` status on this branch's commits
+  alongside the real project's `success`. User should delete it or fix its config.
+- No paid Uber actor run, no Deliveroo, no customer comparison this session, per instruction.

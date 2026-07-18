@@ -365,3 +365,34 @@ acquire OS Open Names + ONSPD; persist consolidation; extend JE parser.
   Registry: discovery=supported, verifiedCountries=[GB], precision=district, still operationalStatus=candidate.
 - Persistence: 1 provider run, 10 raw/10 canonical/0 dup/0 dangling, 10 validations (2 valid/8 out/0 unv),
   2 valid candidates, 1 snapshot. Docs/68. All suites + typecheck + build + diff-check green.
+
+## Session — GitHub Packages + Vercel deployment repair (ISS-0019, docs/09 ADR)
+- Continued a working tree that already swapped `@geospatial/map` (private git+ssh,
+  `github:zoi555/geospatial-platform#v0.3.0`) for `@zoi555/geospatial-map@0.3.0` (GitHub Packages)
+  across `package.json`, `next.config.mjs`, and all app imports, plus a token-free `.npmrc`.
+  Completed the remaining work: regenerated `package-lock.json` (resolves from
+  `npm.pkg.github.com` with an integrity hash); found and fixed 4 leftover
+  `@geospatial/map` imports the earlier pass missed (`scripts/seed-postcode-reference.ts`,
+  `scripts/test-geo-foundation.ts`, `scripts/test-geography-standard.ts`,
+  `scripts/test-je-stage1.ts`); confirmed no remaining `ssh://git@github.com`,
+  `github:zoi555/geospatial-platform`, or `@geospatial/map` references outside historical docs.
+- Clean `npm ci` (after `rm -rf node_modules`) succeeded locally, authenticated via `NPM_TOKEN`.
+  Typecheck, `next build`, `test:geography-gate`, `test:uber-parse`, `test:multi-source`, and
+  `git diff --check` all green. Diff reviewed — every change is a mechanical import/comment rename
+  plus the lockfile regeneration; no logic changes.
+- Committed (`597044a`, `fix(build): consume geospatial package from GitHub Packages`) and pushed to
+  `feature/mvp-vertical-slice-001`.
+- **Deployment:** the correct project `magna-lead-intelligence-system`
+  (`prj_SNY6dJsXzfV6X145cynpqBACHnuT`) built and reached **READY**
+  (`dpl_85AwBaHZvzsXZoF14S67EibBPEJ7`,
+  `https://magna-lead-intelligence-system-qyaz78cuh-zoeb-s-projects.vercel.app`) — build logs show
+  a default (non-custom) `npm ci` resolving `@zoi555/geospatial-map` cleanly, no auth errors, and
+  the same route list/warnings as the local build. A separate, stale duplicate project
+  (`magna-lead-intelligence-system-pngu`) still runs a legacy SSH-rewrite Install Command with no
+  `NPM_TOKEN` and fails — logged as **ISS-0019**, not a defect in this app.
+- **Not verified this session:** direct browser testing of the live preview (home page, Run
+  Builder, map, APIs, assets, console errors). The preview sits behind Vercel's deployment-
+  protection SSO wall (blocks plain `curl`), and the Claude Chrome browser extension was not
+  connected. Vercel's own runtime-error/log tools show zero errors but also zero traffic (nothing
+  has hit the deployment yet). See ISS-0019 for what would close this out.
+- No paid Uber actor run, no Deliveroo, no customer comparison — none attempted, per instruction.
