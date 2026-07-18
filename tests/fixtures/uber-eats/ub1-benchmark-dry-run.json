@@ -1,5 +1,5 @@
 {
-  "_note": "SYNTHETIC fixture for testing benchmark-scoring.ts ONLY. Not a real actor response, not a real diagnostic result. Deliberately includes: 2 records matching real diagnostic-confirmed reference entries (Ali Baba's Pizza / Tops Pizza Southall, matched by name since their real UUIDs are not committed), 1 record matching a web-search-sourced reference entry BY UUID (Watan Southall), 1 near-target out-of-area record, 1 unrelated-location record, and 1 exact duplicate (repeated source_outlet_id) to exercise duplicate-rate scoring.",
+  "_note": "SYNTHETIC fixture for testing benchmark-scoring.ts ONLY. Not a real actor response, not a real diagnostic result. Deliberately includes: 2 records matching real diagnostic-confirmed reference entries (Ali Baba's Pizza / Tops Pizza Southall, matched by name since their real UUIDs are not committed), 1 record matching a web-search-sourced reference entry BY UUID (Watan Southall), 1 near-target out-of-area record, 1 unrelated-location record, 1 exact duplicate (repeated source_outlet_id) to exercise duplicate-rate scoring, and 1 OUT-OF-UB1 record deliberately named identically to a reference-set entry ('Spice Village Southall', but located in Hayes/UB3) to prove the geography-gated recall fix: this record WOULD match by exact name if the raw outlet list were scored unfiltered, but must NOT earn recall credit once matching is correctly scoped to geography-valid records only.",
   "outlets": [
     {
       "source": "uber_eats",
@@ -142,6 +142,30 @@
       "eta_minutes": 25,
       "is_sponsored": null,
       "halal_flag": true,
+      "logo_url": null,
+      "observed_at": "2026-07-18T00:00:00Z"
+    },
+    {
+      "source": "uber_eats",
+      "source_outlet_id": "syn-007-fake-spice-outside-ub1",
+      "source_url": "https://example.invalid/store/syn-007",
+      "name": "Spice Village Southall",
+      "brand": null,
+      "address": "Hayes, UB3 4AB",
+      "postcode": "UB3 4AB",
+      "latitude": 51.5033,
+      "longitude": -0.4207,
+      "phone": null,
+      "rating": 4.0,
+      "review_count": 10,
+      "cuisines": ["Indian"],
+      "is_delivery": true,
+      "is_collection": false,
+      "delivery_cost": null,
+      "minimum_order": null,
+      "eta_minutes": 30,
+      "is_sponsored": null,
+      "halal_flag": null,
       "logo_url": null,
       "observed_at": "2026-07-18T00:00:00Z"
     }

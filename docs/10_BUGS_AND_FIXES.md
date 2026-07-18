@@ -150,3 +150,58 @@ These are design corrections, not app bug fixes:
 - **Verified:** `npm run typecheck`, `npm run test:borderline-provider`, `npm run build` all green;
   no other file constructs a `ProviderCapability` object, so the new required fields did not need a
   backward-compatibility shim.
+
+## 2026-07-18 (later, follow-up audit) — UB1 benchmark scorer recall bug + actor-prioritisation correction
+
+- **BUG (real defect, would have produced a wrong recall number on a live diagnostic):**
+  `benchmark-scoring.ts` matched the reference set against ALL raw returned outlets before
+  geography filtering, not just business-geography-valid ones. A discovery actor returning a
+  restaurant sharing a reference listing's name but located OUTSIDE UB1 would have earned recall
+  credit it should not have. Caught in a follow-up audit before any paid diagnostic was approved.
+- **Fix:** `scoreUB1Benchmark` now calls `partitionByGeography` FIRST and matches the reference set
+  only against `part.valid`; raw totals/out-of-scope/unverifiable counts stay reported separately.
+  New test in `test:ub1-benchmark` adds a synthetic out-of-UB1 record sharing a reference listing's
+  exact name ("Spice Village Southall", located in Hayes/UB3) and proves it earns zero recall
+  credit, while the same UNFILTERED match would have found it (demonstrating exactly why the gate
+  matters).
+- **Also corrected in the same audit:**
+  - `uniquePhysicalUB1RestaurantCount` renamed to `uniqueValidUB1StorefrontCount` (a distinct
+    `source_outlet_id` is a storefront, not a confirmed physical kitchen); a new
+    `storefrontEntityBreakdown` tags known physical/virtual/chain/unknown entity types without ever
+    merging distinct UUIDs.
+  - Name matching's containment/substring fallback (false-positive risk for short/generic names)
+    replaced with a strict order: exact UUID → canonical URL/URL-UUID → conservative normalised
+    EXACT name match → a bounded, explicit alias list. New tests prove a 5-character generic name
+    ("Kebab") no longer matches a longer outlet name containing it, and that alias matching is
+    exact, not substring.
+  - `ub1-reference-set.ts`'s two-value `active_presumed`/`unconfirmed` status split into
+    `verified_active` / `active_presumed` / `unconfirmed` / `inactive` / `unknown`. Ali Baba's Pizza
+    and Tops Pizza Southall upgraded to `verified_active` (real paid-run evidence); the other 5
+    remain `unconfirmed`. Two separate recall metrics added: `verifiedActiveRecall`
+    (verified_active-only denominator by default) and `candidateReferenceCoverage` (informational,
+    full 7-listing set) — never blended into one score.
+  - `piotrv1001/uber-eats-menu-scraper` reclassified from "primary geographic discovery candidate"
+    to a fallback recall/completeness + sitemap-enumeration + enrichment-where-useful candidate,
+    matching the product-owner's stated architecture preference (one direct discovery actor +
+    enrichment; enumeration as fallback only). Four direct-geography candidates researched from
+    live documentation (`memo23/uber-eats-scraper`, `jdtpnjtp/uber-eats-restaurant-scraper`,
+    `sovereigntaylor/ubereats-scraper` — schema unfetchable this session, `scrapier/uber-eats-scraper`
+    — flagged as near-identical in schema to the already-rejected `sourabhbgp/ubereats-scraper`).
+  - The proposed paid benchmark no longer includes re-running the existing Borderline broad
+    diagnostic. Its retained raw payload (run `MrKoKg8322ZVzk449`) was re-parsed with the real
+    parser and re-scored offline through the corrected scorer
+    (`npm run uber:borderline:benchmark-replay`, new script) — reproduced docs/68's manually-found
+    result exactly (10 UB1 records, 0/7 known reference restaurants on the broad run alone), which
+    cross-validates the corrected scorer against a known-real outcome.
+  - Removed an invented city slug (`"southall-uk"`) from the withdrawn prior paid-benchmark
+    proposal — no placeholder value is invented for a field whose real format is unconfirmed; it is
+    now explicitly marked unverified instead.
+- **Vercel docs:** added a "Deployment-ID discipline" note to `docs/08_DEPLOYMENT.md` — deployment
+  IDs are point-in-time snapshots that change on every push; stable identity (project name/ID,
+  environment role, production branch, alias, Git integration) is the durable reference, not a
+  deployment ID. No separate commit was created solely to chase updated deployment IDs; the latest
+  snapshot (verified after commit `a938900`) was folded into this same fix.
+- **Verified:** `npm run typecheck`, `npm run build`, `npm run test:ub1-benchmark` (all new/updated
+  assertions), `npm run test:borderline-provider`, `npm run test:geography-gate`,
+  `npm run test:uber-parse`, `npm run test:multi-source`, `git diff --check` all green. See
+  `docs/69_UBER_ACTOR_MARKET_RESEARCH_AND_BENCHMARK.md` ("Audit correction") for the full narrative.

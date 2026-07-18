@@ -37,6 +37,7 @@
     "test:ub1-benchmark": "tsx scripts/test-ub1-benchmark.ts",
     "uber:pilot:borderline": "tsx scripts/uber-pilot-borderline.ts",
     "uber:borderline:replay": "tsx scripts/uber-borderline-replay.ts",
+    "uber:borderline:benchmark-replay": "tsx scripts/uber-borderline-benchmark-replay.ts",
     "typecheck": "tsc --noEmit",
     "uber:diagnostic-plan": "tsx scripts/uber-diagnostic-plan.ts",
     "ingest:os-open-names": "tsx scripts/ingest-os-open-names.ts",

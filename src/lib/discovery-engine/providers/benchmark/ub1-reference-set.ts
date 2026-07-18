@@ -13,16 +13,31 @@
 //      index).
 // "Found via a search index" is explicitly NOT the same as "currently active" — Uber Eats returned
 // an anti-bot/reCAPTCHA interstitial on at least one direct page fetch attempt this session, so no
-// entry's live Uber Eats status was independently confirmed. `status` reflects that honestly: only
-// the two diagnostic-confirmed entries are `active_presumed` (evidenced by a real successful paid
-// run returning them); the rest are `unconfirmed` until someone opens the store URL in an
-// authenticated/human browser session, or a future diagnostic run returns them.
-
-export type ReferenceListingStatus = "active_presumed" | "inactive" | "unconfirmed";
+// entry's live Uber Eats status was independently confirmed by browser observation.
+//
+// Status vocabulary (audited 2026-07-18 — see docs/69's "Audit correction" section for why this
+// split replaced the earlier two-value active_presumed/unconfirmed status):
+//  - `verified_active`   — an actual successful paid diagnostic run returned this exact listing as
+//                          a live, orderable Uber Eats result at the stated verification_date. The
+//                          strongest evidence this project can produce without a fresh live check.
+//  - `active_presumed`   — reasonable grounds to believe the listing is currently active (e.g. a
+//                          recently-dated directory listing) but NOT confirmed by this project's
+//                          own data capture. Distinct from `verified_active` — do not conflate.
+//  - `unconfirmed`       — found via a search index / directory only; no live confirmation attempt
+//                          succeeded (e.g. anti-bot block). Default for anything not diagnostic-
+//                          confirmed. Must NOT be used as pass/fail recall evidence by default.
+//  - `inactive`          — positively known to have closed/delisted. None currently classified this
+//                          way (would require an explicit closure signal, not an absence of proof).
+//  - `unknown`           — no meaningful evidence either way (reserved for future entries with only
+//                          a bare name and no corroborating source at all).
+export type ReferenceListingStatus = "verified_active" | "active_presumed" | "unconfirmed" | "inactive" | "unknown";
 export type ReferenceEntityType = "physical_restaurant" | "virtual_brand" | "chain_branch";
 
 export interface UB1ReferenceListing {
   name: string;
+  /** Optional exact alternate names this listing is known to trade under (e.g. a rebrand). Used
+   *  ONLY for a bounded, exact-match alias lookup — never a substring/fuzzy list. */
+  aliases?: string[];
   postcode: string | null;         // null when no full postcode unit could be verified — never guessed
   address: string | null;
   uber_url: string | null;
@@ -42,10 +57,10 @@ export const UB1_BENCHMARK_REFERENCE_SET: UB1ReferenceListing[] = [
     address: null,
     uber_url: null,
     uber_uuid: null,
-    status: "active_presumed",
+    status: "verified_active",
     verification_date: "2026-07-18",
     verification_method:
-      "Confirmed by a real paid Apify diagnostic run (borderline/uber-eats-scraper-ppr, run jg2xJwXcMgvmggYnT, $0.05) — returned as a target_district, business-geography-valid UB1 record (docs/68). Store URL/UUID were not separately recorded in committed docs beyond the run's raw payload (not committed to git).",
+      "Confirmed by a real paid Apify diagnostic run (borderline/uber-eats-scraper-ppr, run jg2xJwXcMgvmggYnT, $0.05) — returned as a target_district, business-geography-valid, live/orderable UB1 record (docs/68). Store URL/UUID were not separately recorded in committed docs beyond the run's raw payload (not committed to git).",
     entity_type: "physical_restaurant",
     category: "Pizza",
   },
@@ -55,10 +70,10 @@ export const UB1_BENCHMARK_REFERENCE_SET: UB1ReferenceListing[] = [
     address: null,
     uber_url: null,
     uber_uuid: null,
-    status: "active_presumed",
+    status: "verified_active",
     verification_date: "2026-07-18",
     verification_method:
-      "Confirmed by the same paid diagnostic run as Ali Baba's Pizza (docs/68) — target_district, business-geography-valid.",
+      "Confirmed by the same paid diagnostic run as Ali Baba's Pizza (docs/68) — target_district, business-geography-valid, live/orderable at verification_date.",
     entity_type: "physical_restaurant",
     category: "Pizza",
   },
