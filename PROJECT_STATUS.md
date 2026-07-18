@@ -320,13 +320,21 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   aliases/env vars, rename to `aspectlead-web`) is proposed but **not actioned**. No Vercel
   settings were changed this session (out of authorised scope) — this is a documentation pass
   recording state reported to be already true.
-- **Uber Eats discovery-actor market research** (see `docs/09_DECISIONS.md` pointer / new doc):
-  shortlisted current Apify marketplace actors beyond the two already diagnosed
+- **Uber Eats discovery-actor market research** (`docs/69_UBER_ACTOR_MARKET_RESEARCH_AND_BENCHMARK.md`):
+  shortlisted 8 current Apify marketplace actors beyond the two already diagnosed
   (`sourabhbgp/ubereats-scraper` rejected; `borderline/uber-eats-scraper-ppr` candidate, recall
-  incomplete per docs/68), classified each as primary/supplementary discovery, enrichment, or
-  verification candidate, and designed a bounded (<$1) three-way UB1 benchmark plan against the
-  7-restaurant reference set — **proposed only, not executed.** `provider-registry.ts` wording
-  corrected where it conflated district-precision (records that appear are correctly localised)
-  with district-completeness (finding every restaurant) — see `docs/10_BUGS_AND_FIXES.md`.
+  incomplete per docs/68). Two new **primary geographic discovery candidates** identified:
+  `memo23/uber-eats-scraper` (cheapest verified PPR price, best usage/rating evidence, genuine
+  address/lat-lng/keyword discovery) and `piotrv1001/uber-eats-menu-scraper` (only actor offering
+  true sitemap-shard enumeration, directly targeting the recall gap). `borderline/uber-eats-scraper-ppr`
+  remains the strongest **enrichment/delivery-area-intelligence/supplementary-discovery** candidate.
+  Designed a bounded (<$1, ~$0.42 expected/~$0.60 hard-capped) three-way UB1 benchmark plan against
+  the 7-restaurant reference set (`ub1-reference-set.ts`) and a reusable scoring model
+  (`benchmark-scoring.ts`, `npm run test:ub1-benchmark`) — **proposed only, not executed; two of the
+  three candidates need a pre-flight schema/proxy check before any real spend.**
+  `provider-registry.ts` wording corrected where it conflated district-precision (records that
+  appear are correctly localised) with district-completeness (finding every restaurant) — see
+  `docs/10_BUGS_AND_FIXES.md`.
 - No paid actor run, no Deliveroo, no customer comparison, no Vercel/Supabase setting changes this
-  session. Full detail: see the Uber research doc and `VERIFY_BEFORE_CLAIMING.md`.
+  session. Full detail: see `docs/69_UBER_ACTOR_MARKET_RESEARCH_AND_BENCHMARK.md` and
+  `VERIFY_BEFORE_CLAIMING.md`.

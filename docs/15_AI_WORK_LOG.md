@@ -396,3 +396,58 @@ acquire OS Open Names + ONSPD; persist consolidation; extend JE parser.
   connected. Vercel's own runtime-error/log tools show zero errors but also zero traffic (nothing
   has hit the deployment yet). See ISS-0019 for what would close this out.
 - No paid Uber actor run, no Deliveroo, no customer comparison — none attempted, per instruction.
+
+## Session: 2026-07-18 (overnight, autonomous) — Vercel dual-project topology record + Uber actor market research
+
+Tool used: Claude Code (autonomous overnight run, no owner available to answer questions).
+Human request: (1) record both Vercel projects as intentional infrastructure with a canonical
+topology doc, correcting ISS-0019's "stale duplicate" framing; (2) research the current Apify
+marketplace for Uber Eats discovery actors, classify each, design a bounded (<$1) UB1 benchmark
+against a 7-restaurant reference set, and propose (not run) a paid three-way comparison; (3) make
+safe provider-registry corrections + dry-run fixtures/tests only; (4) verify + commit + push.
+Absolute restrictions observed throughout: no paid actor execution, no actor API calls, no spend,
+no Vercel/Supabase setting changes, no branch/merge/reset/clean, no deletions, no Deliveroo, no
+customer comparison.
+
+- **Vercel topology** — independently re-verified both projects via the Vercel API (not just
+  transcribed): `magna-lead-intelligence-system-pngu` (`prj_vxcbOvftT2CdzUmnxyCWhjF9f3U2`,
+  `dpl_DvJ49zyyhVdV5ND8Rzhv8USNcCSZ`, READY, Production) and `magna-lead-intelligence-system`
+  (`prj_SNY6dJsXzfV6X145cynpqBACHnuT`, `dpl_7ZSr1BuoTYgef9njpnaTfAGsqPn8`, READY, Preview), both on
+  commit `2d6f4fb1...`. Canonical record in `docs/08_DEPLOYMENT.md`; new ADR in
+  `docs/09_DECISIONS.md`; ISS-0019 and `docs/10_BUGS_AND_FIXES.md` corrected (no longer "stale
+  duplicate that fails"); `PROJECT_STATUS.md`, `README.md`, `VERIFY_BEFORE_CLAIMING.md` updated.
+  Future clean-up (retain one project, migrate aliases/env vars, rename to `aspectlead-web`)
+  proposed only, gated on a domains/env-vars/Git-integration/history/rollback audit. Committed
+  `bb2e268`.
+- **Uber actor market research** — live Apify Store fetches (WebSearch + WebFetch, not memory) of
+  8 current actors, cross-checked against the two already diagnosed with real paid runs in this
+  project (`sourabhbgp` rejected, `borderline/uber-eats-scraper-ppr` precision-confirmed/recall-
+  inadequate). New primary-discovery candidates identified: `memo23/uber-eats-scraper` (cheapest,
+  best usage/rating evidence) and `piotrv1001/uber-eats-menu-scraper` (sitemap-shard enumeration —
+  targets the recall gap directly). Full shortlist, classification, and a bounded three-way UB1
+  benchmark proposal (~$0.42 expected / ~$0.60 hard-capped, under the $1 ceiling) in
+  `docs/69_UBER_ACTOR_MARKET_RESEARCH_AND_BENCHMARK.md`. **Not executed** — proposal only.
+- **Provider-registry correction** — `verifiedGeographyPrecision: "district"` for the borderline
+  actor was true but was read as if it meant complete district coverage; the broad-query diagnostic
+  (docs/68) actually found only 2/7 known UB1 restaurants across both runs. Added a separate
+  `verifiedRecall`/`recallEvidence` field so precision and recall/completeness can never be
+  conflated again; corrected `docs/67`, `docs/68`'s `excludeStores` wording (accepted field, but
+  pagination behaviour unverified — do not claim it), and `docs/10_BUGS_AND_FIXES.md`. 3 new
+  assertions in `test:borderline-provider` lock the distinction in. Committed `8575514`.
+- **Dry-run benchmark module** (no network/DB/Apify) — `benchmark-scoring.ts` (provider-neutral,
+  reuses the existing geography gate + location-fidelity modules unmodified) and
+  `ub1-reference-set.ts` (7 required restaurants, honestly marked `active_presumed` only where a
+  real paid run confirmed them, `unconfirmed` elsewhere — no fabricated "active" status from an
+  indexed/historic page). Tested against a clearly-labelled synthetic fixture
+  (`npm run test:ub1-benchmark`). Committed `7389898`.
+- Added `NPM_TOKEN` to `.env.example` (previously undocumented despite being required for the
+  GitHub Packages install since the prior session's ADR).
+- **Verified:** `npm run typecheck`, `npm run build`, and all retained test suites (`test:ub1-
+  benchmark`, `test:borderline-provider`, `test:geography-gate`, `test:uber-parse`,
+  `test:multi-source`, `test:apify-provenance`, `test:geo`, `test:run-draft`, `test:custom-config`,
+  `test:scoring`, `test:telesales-safe`, `test:geography-standard`) all green; `git diff --check`
+  clean.
+- **Not done (per instruction):** no paid Apify actor run, no actor-API call, no spend, no Vercel/
+  Supabase setting changes, no Deliveroo work, no customer comparison, no custom scraping actor
+  built. Browser verification of either Vercel deployment remains outstanding (ISS-0019) — no
+  Chrome extension connection this session either.

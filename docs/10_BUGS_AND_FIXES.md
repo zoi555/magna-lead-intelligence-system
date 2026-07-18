@@ -124,3 +124,29 @@ These are design corrections, not app bug fixes:
   working configuration; the project now reaches `READY` on the default `npm ci` route. Both
   projects currently deploy successfully; which one is canonical remains an open owner decision —
   see ISS-0019 and `docs/08_DEPLOYMENT.md` ("Vercel deployment topology").
+
+## 2026-07-18 — Provider registry conflated district PRECISION with district RECALL/completeness
+
+- **BUG (documentation/metadata honesty, not a runtime defect):** `provider-registry.ts`'s
+  `uber_eats_borderline_ppr` entry set `verifiedGeographyPrecision: "district"` with a comment
+  referencing only the narrow pizza-query diagnostic (`jg2xJwXcMgvmggYnT`, 2/10 in UB1) and a
+  registry `discovery` value of `"supported"`. Read together with `operationalStatus: "candidate"`,
+  this could be misread as "this actor is a working district-discovery provider" — but the later
+  broad-query diagnostic (`MrKoKg8322ZVzk449`, docs/68) found only **0/7** independently-verified
+  UB1 reference restaurants (2/7 combined across both runs). Precision (records returned are
+  correctly localised) and recall/completeness (finding most/all real restaurants) are different
+  claims; the registry only tracked the former.
+- **Fix:** added a separate `verifiedRecall: RecallStatus` field (`"unvalidated" | "inadequate" |
+  "partial" | "adequate"`) plus `recallEvidence`, with explicit type-level comments distinguishing
+  precision from recall. `uber_eats_borderline_ppr` now carries `verifiedRecall: "inadequate"` with
+  the 2/7 evidence cited; its `warning` field states both dimensions explicitly and says it "must
+  not be classified as a complete district-discovery provider on precision evidence alone." Doc
+  `docs/67_PROVIDER_CAPABILITY_REGISTRY.md` corrected to match (also fixed a stale `discovery:
+  unvalidated` line that no longer matched the code's `discovery: "supported"`). `docs/68`'s
+  `excludeStores` mention corrected to flag its pagination behaviour as unverified, not proven.
+- **Tests:** `test:borderline-provider` (`scripts/test-borderline-provider.ts`) gained 3 new
+  assertions locking in `verifiedGeographyPrecision === "district"` AND `verifiedRecall ===
+  "inadequate"` together, so precision can never again be recorded without recall alongside it.
+- **Verified:** `npm run typecheck`, `npm run test:borderline-provider`, `npm run build` all green;
+  no other file constructs a `ProviderCapability` object, so the new required fields did not need a
+  backward-compatibility shim.

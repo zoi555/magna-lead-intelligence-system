@@ -63,15 +63,27 @@ No assistant, developer, or unfortunate human may claim the project works withou
 
 - Change tested: documentation-only (Vercel topology record in `docs/08_DEPLOYMENT.md`, ISS-0019
   correction, new ADR, `PROJECT_STATUS.md`/`README.md` updates) + Uber Eats discovery-actor market
-  research doc + (if made) a narrowly-scoped `provider-registry.ts` wording correction and
-  no-network dry-run benchmark fixtures/tests.
-- Command/manual check: the Vercel project IDs, deployment IDs, URLs, commit hash and statuses
-  recorded here were supplied as verified facts in the task brief, not independently re-queried
-  against the Vercel API this session (no Vercel setting changes were made or needed). All new/
-  changed source code (if any) verified via `npm run typecheck`, `npm run build`, and the relevant
-  `npm run test:*` suites — see the commit log for exact commands and results. `git diff --check`
-  run before commit.
-- Result: see terminal summary at the end of this session and the commit log for exact outcomes.
+  research doc (`docs/69`) + a narrowly-scoped `provider-registry.ts` precision/recall correction +
+  no-network dry-run benchmark fixtures/tests + `.env.example` (`NPM_TOKEN` documented).
+- Command/manual check:
+  - Vercel project IDs, deployment IDs, statuses **independently re-verified this session** via
+    read-only Vercel API calls (`get_project`, `get_deployment` for both projects) — not just
+    transcribed from the task brief. Both confirmed READY on commit `2d6f4fb1...`, matching the
+    task brief exactly. No Vercel setting was changed.
+  - Uber actor claims verified via live WebFetch of real Apify Store pages this session (cited by
+    URL in `docs/69`); anything not confirmed there is marked "not verified" in the doc, not guessed.
+  - `npm run typecheck`, `npm run build`, and `npm run test:ub1-benchmark`, `test:borderline-
+    provider`, `test:geography-gate`, `test:uber-parse`, `test:multi-source`, `test:apify-
+    provenance`, `test:geo`, `test:run-draft`, `test:custom-config`, `test:scoring`, `test:telesales-
+    safe`, `test:geography-standard` — all green. `git diff --check` clean before every commit.
+- Result: three commits (`bb2e268` Vercel topology, `8575514` provider-registry precision/recall
+  fix, `7389898` Uber research + benchmark module), plus this wrap-up commit. See the terminal
+  summary at the end of this session for full detail.
+- Remaining risk: neither Vercel deployment was browser-tested this session (SSO wall + no Chrome
+  extension connection — ISS-0019, unchanged). The paid three-actor UB1 benchmark is proposed only,
+  not run — two of the three candidates' exact input field names are sourced from marketing/docs
+  pages, not this project's own live pre-flight verification, and must be schema-checked before any
+  real spend (see docs/69).
 - Evidence link/screenshot: commit hashes on `feature/mvp-vertical-slice-001`, pushed this session.
 - Remaining risk: Vercel-reported facts (project IDs/deployment IDs/statuses) are recorded as
   given, not re-verified against the live Vercel API this session — if they have changed since the
