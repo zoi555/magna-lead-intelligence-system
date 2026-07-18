@@ -9,7 +9,7 @@
 // audit evidence. Nothing here fabricates a location; missing geography is treated as UNVERIFIABLE,
 // never silently valid.
 
-import { classifyPostcode } from "@geospatial/map";
+import { classifyPostcode } from "@zoi555/geospatial-map";
 import type { SourceOutlet } from "../consolidation/types";
 
 export type GeographyStatus = "valid_geography" | "out_of_scope_geography" | "unverifiable_geography";

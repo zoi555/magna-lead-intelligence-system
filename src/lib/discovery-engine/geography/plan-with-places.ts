@@ -4,7 +4,7 @@
 // choices (never auto-guessed). Postcode expansion is unchanged.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { PostcodeReference, SourceGeographySupport } from "@geospatial/map";
+import type { PostcodeReference, SourceGeographySupport } from "@zoi555/geospatial-map";
 import { planTerritory, type TerritoryPlan } from "./planner";
 import { resolvePlaceName, type PlaceCandidate } from "./place-resolver";
 

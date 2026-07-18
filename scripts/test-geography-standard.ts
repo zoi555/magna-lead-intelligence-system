@@ -8,10 +8,10 @@ import path from "node:path";
 import { referenceFromEntries } from "../src/lib/discovery-engine/geography/reference";
 import { planTerritory, resolveOne, JUST_EAT_GEOGRAPHY_SUPPORT } from "../src/lib/discovery-engine/geography/planner";
 import { buildRunInput } from "../src/lib/discovery-engine/run-service";
-import type { PostcodeReferenceEntry } from "@geospatial/map";
+import type { PostcodeReferenceEntry } from "@zoi555/geospatial-map";
 import { SCOPE_TYPE_LABELS, SCOPE_TYPE_DESCRIPTIONS } from "../src/lib/pipeline/run-config";
 import { TERRITORY_LABELS } from "../src/config/territory-config";
-import { GEOGRAPHY_LABELS } from "@geospatial/map";
+import { GEOGRAPHY_LABELS } from "@zoi555/geospatial-map";
 
 let fails = 0;
 const assert = (c: boolean, m: string) => { if (!c) { console.error("  ✗", m); fails++; } else console.log("  ✓", m); };

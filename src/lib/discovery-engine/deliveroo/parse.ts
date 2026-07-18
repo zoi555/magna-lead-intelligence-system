@@ -1,7 +1,7 @@
 // Deliveroo search parser → source-neutral SourceOutlet. Structure mirrors the public
 // listing response shape; values in tests come from SANITISED fixtures only.
 
-import { classifyPostcode } from "@geospatial/map";
+import { classifyPostcode } from "@zoi555/geospatial-map";
 import type { SourceOutlet } from "../consolidation/types";
 import { phoneComparison } from "../consolidation/source-adapter";
 

@@ -13,7 +13,7 @@
 //  - `phone` (the UK comparison key) is populated ONLY for a valid UK number; the raw string is
 //    always kept in source_extra.phone_number.
 
-import { classifyPostcode } from "@geospatial/map";
+import { classifyPostcode } from "@zoi555/geospatial-map";
 import type { SourceOutlet } from "../consolidation/types";
 import { normaliseUkPhone } from "../just-eat/phone";
 

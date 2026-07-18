@@ -3,7 +3,7 @@
 // districts/sectors to inspect, honest unresolved (place/admin) reporting, and exclusions.
 
 import { NextResponse } from "next/server";
-import { expandArea, expandDistrict } from "@geospatial/map";
+import { expandArea, expandDistrict } from "@zoi555/geospatial-map";
 import { loadPostcodeReference } from "@/lib/discovery-engine/geography/reference";
 import { JUST_EAT_GEOGRAPHY_SUPPORT } from "@/lib/discovery-engine/geography/planner";
 import { planTerritoryWithPlaces } from "@/lib/discovery-engine/geography/plan-with-places";

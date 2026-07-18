@@ -8,7 +8,7 @@
 import { promises as fs } from "node:fs";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { classifyPostcode, areaOf } from "@geospatial/map";
+import { classifyPostcode, areaOf } from "@zoi555/geospatial-map";
 
 const SOURCE = "postcode_labels.geojson (Code-Point Open derived)";
 const SOURCE_VERSION = "gb-2026-07-14";

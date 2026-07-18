@@ -3,7 +3,7 @@
 // generic index + expansion; AspectLead just supplies the data from its own DB.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { buildPostcodeReference, type PostcodeReference, type PostcodeReferenceEntry } from "@geospatial/map";
+import { buildPostcodeReference, type PostcodeReference, type PostcodeReferenceEntry } from "@zoi555/geospatial-map";
 import { createServiceClient } from "../supabase-client";
 
 let cached: PostcodeReference | null = null;

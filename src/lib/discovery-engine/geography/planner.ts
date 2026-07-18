@@ -7,7 +7,7 @@
 import {
   parseMixedSelections, planForSource, resolveSelection,
   type PostcodeReference, type GeographySelection, type ResolvedSelection, type SourceGeographySupport,
-} from "@geospatial/map";
+} from "@zoi555/geospatial-map";
 
 /** Just Eat queries by postcode district only (bypostcode/{district}). */
 export const JUST_EAT_GEOGRAPHY_SUPPORT: SourceGeographySupport = {

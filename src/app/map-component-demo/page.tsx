@@ -1,13 +1,13 @@
 "use client";
 
-// Portability demo — proves the @geospatial/map package works with ONLY generic
+// Portability demo — proves the @zoi555/geospatial-map package works with ONLY generic
 // configuration and no AspectLead operational data. It imports nothing from
 // src/lib/discovery, src/features, leads, customers or the TW API. Any TypeScript/React
 // app could render exactly this.
 
 import React from "react";
-import { GeospatialMap } from "@geospatial/map";
-import type { GeospatialSourceConfig, FeederRoadEntry, MapOverlayDefinition } from "@geospatial/map";
+import { GeospatialMap } from "@zoi555/geospatial-map";
+import type { GeospatialSourceConfig, FeederRoadEntry, MapOverlayDefinition } from "@zoi555/geospatial-map";
 
 // Generic, self-contained source config (points at whatever asset host you configure).
 const DEMO_SOURCES: GeospatialSourceConfig = {
@@ -44,7 +44,7 @@ export default function MapComponentDemoPage() {
     <div style={{ height: "calc(100vh - 104px)", width: "100%", position: "relative" }}>
       <div style={{ position: "absolute", top: 10, right: 10, zIndex: 6, background: "rgba(255,255,255,0.95)", border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 12px", font: "12px system-ui", maxWidth: 260 }}>
         <b>Portable map demo</b>
-        <div style={{ color: "#6b7280", fontSize: 11, marginTop: 2 }}>Uses only <code>@geospatial/map</code> + generic config. No AspectLead data.</div>
+        <div style={{ color: "#6b7280", fontSize: 11, marginTop: 2 }}>Uses only <code>@zoi555/geospatial-map</code> + generic config. No AspectLead data.</div>
         {sel && <div style={{ marginTop: 6 }}>Selected: <b>{sel}</b></div>}
       </div>
       <GeospatialMap

@@ -1,6 +1,6 @@
 "use client";
 
-// AspectLead wrapper around the portable @geospatial/map component.
+// AspectLead wrapper around the portable @zoi555/geospatial-map component.
 // Adds an "Expand" control WITHOUT creating a second map: the single GeospatialMap
 // instance is never unmounted — expanding only swaps the CSS of its container between
 // an embedded box and a full-viewport overlay, then calls maplibre's resize(). Because
@@ -11,8 +11,8 @@
 // the package. Application-specific overlay panels are passed in as `children`.
 
 import React from "react";
-import { GeospatialMap } from "@geospatial/map";
-import type { GeospatialMapProps, MapInstanceReference } from "@geospatial/map";
+import { GeospatialMap } from "@zoi555/geospatial-map";
+import type { GeospatialMapProps, MapInstanceReference } from "@zoi555/geospatial-map";
 
 interface ExpandableMapProps extends GeospatialMapProps {
   /** Tailwind height classes for the EMBEDDED (non-expanded) state. */

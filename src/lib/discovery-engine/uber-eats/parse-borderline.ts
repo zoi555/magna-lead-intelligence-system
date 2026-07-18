@@ -8,7 +8,7 @@
 // record + all unmapped fields retained in source_extra. Source PLATFORM stays "uber_eats"; the
 // ACQUISITION identity (uber_eats_borderline_ppr) is tracked separately (registry/provenance).
 
-import { classifyPostcode } from "@geospatial/map";
+import { classifyPostcode } from "@zoi555/geospatial-map";
 import type { SourceOutlet } from "../consolidation/types";
 import { normaliseUkPhone } from "../just-eat/phone";
 

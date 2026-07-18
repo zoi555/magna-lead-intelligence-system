@@ -4,7 +4,7 @@
 // the browser is recovery only; THIS writes the canonical rows via the repository.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { PostcodeReference } from "@geospatial/map";
+import type { PostcodeReference } from "@zoi555/geospatial-map";
 import type { DiscoveryRepository } from "./repository/repository";
 import type { RunInput, RunRecord, ExecutionRecord } from "./types";
 import { planTerritory, JUST_EAT_GEOGRAPHY_SUPPORT, type TerritoryPlan } from "./geography/planner";

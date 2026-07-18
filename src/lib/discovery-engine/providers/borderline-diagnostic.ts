@@ -4,7 +4,7 @@
 import type { SourceOutlet } from "../consolidation/types";
 import { partitionByGeography, type GeographyRunContext, type GeographyPartition } from "../geography/provider-geography-gate";
 import { summariseFidelity, type FidelityContext, type FidelitySummary, type FidelityVerdict } from "../geography/location-fidelity";
-import { classifyPostcode } from "@geospatial/map";
+import { classifyPostcode } from "@zoi555/geospatial-map";
 
 export interface BorderlineAnalysis {
   outlets: SourceOutlet[];

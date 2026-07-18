@@ -1,12 +1,12 @@
 "use client";
 
-// Coverage Map — the shared portable @geospatial/map with AspectLead lead-coverage
+// Coverage Map — the shared portable @zoi555/geospatial-map with AspectLead lead-coverage
 // overlays layered on top. The geographic map (roads, labels, postcodes) is generic and
 // lead-independent; only the coverage points come from the current TW run via an adapter.
 // The delivery-coverage area is an application overlay (currently a labelled mock).
 
 import React from "react";
-import type { MapOverlayDefinition, MapInstanceReference, MapFeatureSelection } from "@geospatial/map";
+import type { MapOverlayDefinition, MapInstanceReference, MapFeatureSelection } from "@zoi555/geospatial-map";
 import { ExpandableMap } from "@/features/geospatial/ExpandableMap";
 import { aspectleadSourceConfig } from "@/features/geospatial/aspectlead-map-config";
 import { loadCoverageOverlays, deliveryCoverageOverlay } from "@/features/geospatial/aspectlead-coverage-overlays";

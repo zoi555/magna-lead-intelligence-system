@@ -6,7 +6,7 @@
 // asset, NOT the package's production map source — the package CDN carries postcode
 // CENTROID POINTS only. The map package never imports this file.
 
-import { classifyPostcode, areaOf, type TerritoryGeometry } from "@geospatial/map";
+import { classifyPostcode, areaOf, type TerritoryGeometry } from "@zoi555/geospatial-map";
 
 interface DistrictFeature { type: "Feature"; properties: { code?: string }; geometry: unknown }
 let districtCache: Promise<DistrictFeature[]> | null = null;

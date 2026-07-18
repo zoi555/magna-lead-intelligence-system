@@ -20,7 +20,7 @@ import { JUST_EAT_FIELD_CATALOGUE, COLLECTED_FIELD_KEYS } from "../src/lib/disco
 import { saveRun, queueJustEatExecution } from "../src/lib/discovery-engine/run-service";
 import { referenceFromEntries } from "../src/lib/discovery-engine/geography/reference";
 import type { AdapterConfig } from "../src/lib/discovery-engine/adapter";
-import type { PostcodeReferenceEntry } from "@geospatial/map";
+import type { PostcodeReferenceEntry } from "@zoi555/geospatial-map";
 
 // deterministic reference (mirrors the real national enumeration for UB + HA0)
 const geoRef = referenceFromEntries([

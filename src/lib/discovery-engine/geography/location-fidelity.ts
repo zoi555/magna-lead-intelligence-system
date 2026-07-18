@@ -7,7 +7,7 @@
 // actor genuinely binds to the delivery area. It NEVER admits records into a UB1 lead run; that
 // remains governed solely by the gate.
 
-import { classifyPostcode } from "@geospatial/map";
+import { classifyPostcode } from "@zoi555/geospatial-map";
 import type { SourceOutlet } from "../consolidation/types";
 
 export type LocationFidelity = "target_district" | "near_target" | "unrelated_location" | "unverifiable_location";

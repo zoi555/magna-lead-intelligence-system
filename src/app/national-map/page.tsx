@@ -1,12 +1,12 @@
 "use client";
 
-// National Map Workbench — renders the shared, portable @geospatial/map component
+// National Map Workbench — renders the shared, portable @zoi555/geospatial-map component
 // with all controls. No bespoke MapLibre setup here (that lives in the package).
 // Feeder-road state is owned by this app and persisted locally.
 
 import React from "react";
-import { GeospatialMap } from "@geospatial/map";
-import type { FeederRoadEntry } from "@geospatial/map";
+import { GeospatialMap } from "@zoi555/geospatial-map";
+import type { FeederRoadEntry } from "@zoi555/geospatial-map";
 import { aspectleadSourceConfig, NATIONAL_INITIAL_VIEW } from "@/features/geospatial/aspectlead-map-config";
 
 const LS_KEY = "aspectlead.national-map.feeders";

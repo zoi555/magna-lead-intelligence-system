@@ -45,8 +45,8 @@
   "dependencies": {
     "@expo-google-fonts/open-sans": "^0.4.2",
     "@fontsource/open-sans": "^5.2.7",
-    "@geospatial/map": "github:zoi555/geospatial-platform#v0.3.0",
     "@supabase/supabase-js": "^2.110.6",
+    "@zoi555/geospatial-map": "0.3.0",
     "fontnik": "^0.7.7",
     "maplibre-gl": "^5.24.0",
     "next": "^16.2.10",

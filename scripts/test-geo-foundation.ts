@@ -3,7 +3,7 @@
 // Road/label/profile logic now lives in the portable package; this test verifies the
 // locked rules there PLUS the AspectLead-level source manifest honesty.
 
-import { motorwayLocked, validateRoadCoverage, ROAD_CLASS_MAPPINGS, LOCKED_DECISIONS } from "@geospatial/map";
+import { motorwayLocked, validateRoadCoverage, ROAD_CLASS_MAPPINGS, LOCKED_DECISIONS } from "@zoi555/geospatial-map";
 import { GEOSPATIAL_SOURCES, isNationalCoverageReady, sourceById } from "../src/lib/geo/geospatial-source-manifest";
 
 let failures = 0;

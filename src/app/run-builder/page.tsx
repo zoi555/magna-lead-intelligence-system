@@ -26,7 +26,7 @@ import {
 import {
   ChainEntry, loadChainRegistry, saveChainRegistry, addChain, setChainEnabled,
 } from "@/lib/discovery/chain-registry";
-import type { FeederRoadEntry, MapViewState, TerritoryGeometry } from "@geospatial/map";
+import type { FeederRoadEntry, MapViewState, TerritoryGeometry } from "@zoi555/geospatial-map";
 import { ExpandableMap } from "@/features/geospatial/ExpandableMap";
 import { aspectleadSourceConfig, NATIONAL_INITIAL_VIEW } from "@/features/geospatial/aspectlead-map-config";
 import { runTerritoryGeometry } from "@/features/geospatial/aspectlead-territory";
