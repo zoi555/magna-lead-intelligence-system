@@ -13,6 +13,7 @@ const STATUS_STYLE: Record<SourceStatus, { fg: string; bg: string; label: string
   disabled_cost_control_required: { fg: "#b45309", bg: "#FDF3E1", label: "Disabled — cost control" },
   manual_import_placeholder: { fg: "#92600b", bg: "#FDF3E1", label: "Manual import (placeholder)" },
   poc_derived_local_static: { fg: "#6b21d6", bg: "#F1EAFC", label: "POC-derived (static)" },
+  pending_authorised_source: { fg: "#b45309", bg: "#FDF3E1", label: "Pending authorised source" },
 };
 
 const RISK_FG: Record<string, string> = { none: "#64748b", low: "#137a3b", medium: "#b45309", high: "#b91c1c" };
@@ -93,6 +94,22 @@ export function SourceRegistryPanel({
                   <KV k="Env var" v={s.envVar ? `${s.envVar} — ${keyMissing ? "not set" : "set"}` : "—"} mono vColor={keyMissing ? "#b45309" : undefined} />
                 </div>
               </div>
+
+              {s.adapterImplemented !== undefined && (
+                <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 border-t border-bordergrey pt-2 text-[12.5px]">
+                  <KV k="Adapter implemented" v={s.adapterImplemented ? "Yes" : "No"} vColor={s.adapterImplemented ? "#137a3b" : "#b91c1c"} />
+                  <KV k="Source authorised" v={s.sourceAuthorised ? "Yes" : "No"} vColor={s.sourceAuthorised ? "#137a3b" : "#b91c1c"} />
+                  <KV k="Credentials available" v={s.credentialsAvailable ? "Yes" : "No"} vColor={s.credentialsAvailable ? "#137a3b" : "#64748b"} />
+                  <KV k="Records available" v={s.recordsAvailable != null ? String(s.recordsAvailable) : "—"} vColor={s.recordsAvailable ? "#137a3b" : "#b45309"} />
+                  <div className="col-span-2"><KV k="Latest successful import" v={s.latestSuccessfulImport ?? "None"} vColor={s.latestSuccessfulImport ? "#137a3b" : "#64748b"} /></div>
+                  {s.latestSourceFailure && (
+                    <div className="col-span-2 mt-1 rounded border px-2 py-1.5" style={{ background: "#FBE9E9", borderColor: "#f2c1c1" }}>
+                      <span className="text-[11px] font-semibold" style={{ color: "#b91c1c" }}>Latest source failure: </span>
+                      <span className="text-[11.5px]" style={{ color: "#7a1f1f" }}>{s.latestSourceFailure}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="mt-3 border-t border-bordergrey pt-2 text-[12.5px]">
                 <p className="text-ink"><span className="text-muted">Pipeline use: </span>{s.pipelineUse}</p>

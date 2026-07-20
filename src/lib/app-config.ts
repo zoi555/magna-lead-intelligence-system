@@ -13,6 +13,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Coverage Map", href: "/coverage-map" },
   { label: "Territories", href: "/territories" },
   { label: "Pipeline Runs", href: "/pipeline-runs" },
+  { label: "Discovery Results", href: "/discovery-results" },
   { label: "Leads", href: "/leads" },
   { label: "Telesales", href: "/telesales" },
   { label: "Export Review", href: "/export-review" },

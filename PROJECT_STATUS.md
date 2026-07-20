@@ -338,3 +338,26 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
 - No paid actor run, no Deliveroo, no customer comparison, no Vercel/Supabase setting changes this
   session. Full detail: see `docs/69_UBER_ACTOR_MARKET_RESEARCH_AND_BENCHMARK.md` and
   `VERIFY_BEFORE_CLAIMING.md`.
+
+### Canonical contract + Just Eat proof + Uber readiness + Deliveroo evaluation + new screens — 2026-07-21
+
+- **Canonical `SourceOutlet` completed** to full `MarketplaceRestaurant` field parity (19 new fields,
+  TypeScript-level only — no Supabase migration yet, that is the next deployment step). Populated
+  honestly across all 3 parsers; nothing fabricated.
+- **Just Eat proof, real UB1 sample:** live run (717 outlets delivering to UB1; 121 physically in
+  UB1). Field-completeness: ID/URL/name/address/postcode/coords/cuisines/review-count/opening-status/
+  delivery-fee/min-order/ETA/collection/logo 100%, rating 86.8%, phone/hours/offers/hygiene 0%
+  (confirmed honest — not supplied by Just Eat's listing endpoint). Two new browser-verified,
+  DB-backed screens: `/discovery-results` (list) and `/discovery-results/[id]` (detail — provenance +
+  append-only rating history). Phone/address detail enrichment was **not** re-attempted — already
+  proven blocked (Cloudflare 403, ISS-0016).
+- **Uber Eats:** adapter now accepts authorised API / licensed JSON / controlled CSV import only (no
+  live scraping) — `test:uber-import` (19 assertions) green. Registry status `pending_authorised_source`;
+  Settings now shows adapter/authorisation/credentials/import/failure/records status distinctly.
+- **Deliveroo:** `thirdwatch/deliveroo-scraper` evaluated (real actor, $0 spent, no paid run) and
+  rejected — UK input needs neighbourhood slugs not an exact address, and it escalates to a
+  residential proxy on block. Verdict `DELIVEROO_BLOCKED_PENDING_AUTHORISATION` (ISS-0021).
+- **Screens:** 7 complete / 3 partial / 4 missing (run detail, data-quality exceptions, import
+  screen, audit/evidence view — ISS-0020).
+- Verified: typecheck, build, and 14 test suites all green; two screens confirmed rendering real
+  data via a live dev-server fetch. No Vercel/Supabase production changes.

@@ -30,6 +30,33 @@ export interface SourceOutlet {
   /** Controlled bag of source-specific fields not mapped to the neutral columns above (JSONB).
    *  Never fabricated; the full raw provider record is also retained on the observation. */
   source_extra?: Record<string, unknown>;
+
+  // --- Canonical marketplace-record completion fields (added for the full contract audit).
+  // All optional/nullable: absent on older construction sites (tests/fixtures) means "not
+  // populated", never fabricated. Populated by the mapping layer only when the source
+  // genuinely supplies the value. supportsDelivery/supportsCollection from the spec map onto
+  // the existing is_delivery/is_collection above — not duplicated as separate fields.
+  schema_version?: string;
+  branch_name?: string | null;
+  address_line1?: string | null;
+  address_line2?: string | null;
+  locality?: string | null;
+  city?: string | null;
+  categories?: string[];
+  rating_distribution?: Record<string, number> | null;
+  is_open?: boolean | null;
+  opening_hours?: unknown | null;
+  service_fee?: number | null;
+  distance_miles?: number | null;
+  offers?: unknown[];
+  badges?: string[];
+  image_url?: string | null;
+  hygiene_rating?: string | number | null;
+  anchor_id?: string | null;
+  pipeline_run_id?: string | null;
+  provider_version?: string | null;
+  parser_version?: string | null;
+  raw_evidence_reference?: string | null;
 }
 
 export type MatchStatus =

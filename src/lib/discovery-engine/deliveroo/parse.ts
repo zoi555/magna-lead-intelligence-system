@@ -4,6 +4,7 @@
 import { classifyPostcode } from "@zoi555/geospatial-map";
 import type { SourceOutlet } from "../consolidation/types";
 import { phoneComparison } from "../consolidation/source-adapter";
+import { SCHEMA_VERSION, DELIVEROO_PARSER_VERSION, DELIVEROO_ADAPTER_VERSION } from "../version";
 
 const s = (v: unknown): string | null => { const t = (v ?? "").toString().trim(); return t || null; };
 const num = (v: unknown): number | null => { const n = Number(v); return Number.isFinite(n) ? n : null; };
@@ -35,6 +36,28 @@ export function parseDeliverooRestaurant(raw: any, observedAt: string): SourceOu
     halal_flag: typeof raw?.halal === "boolean" ? raw.halal : null,
     logo_url: s(raw?.image),
     observed_at: observedAt,
+
+    schema_version: String(SCHEMA_VERSION),
+    branch_name: null,                    // no branch/trading-name distinction seen in the assumed shape
+    address_line1: s(addr?.address1),
+    address_line2: s(addr?.address2),     // present only if the real response supplies it (unconfirmed)
+    locality: s(addr?.locality),
+    city: s(addr?.city),
+    categories: Array.isArray(raw?.cuisines) ? raw.cuisines.map(String) : [],
+    rating_distribution: null,            // no per-star breakdown in the assumed shape (FIELD_MAPPING.md: likely absent)
+    is_open: typeof raw?.isOpen === "boolean" ? raw.isOpen : null,
+    opening_hours: raw?.openingHours ?? null,
+    service_fee: raw?.serviceFee != null ? Number(raw.serviceFee) / 100 : null,
+    distance_miles: null,                 // not in the assumed listing shape
+    offers: Array.isArray(raw?.offers) ? raw.offers : [],
+    badges: Array.isArray(raw?.badges) ? raw.badges.map(String) : [],
+    image_url: s(raw?.heroImage ?? raw?.image),
+    hygiene_rating: null,                 // Deliveroo does not expose FHRS/hygiene data in this shape
+    anchor_id: null,                      // set by the caller (per-query anchor), not known here
+    pipeline_run_id: null,                // set by the caller (worker/execution), not known here
+    provider_version: DELIVEROO_ADAPTER_VERSION,
+    parser_version: DELIVEROO_PARSER_VERSION,
+    raw_evidence_reference: null,         // set by the caller once a live provider is configured
   };
 }
 

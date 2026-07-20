@@ -16,6 +16,7 @@
 import { classifyPostcode } from "@zoi555/geospatial-map";
 import type { SourceOutlet } from "../consolidation/types";
 import { normaliseUkPhone } from "../just-eat/phone";
+import { SCHEMA_VERSION, UBER_PARSER_VERSION, ADAPTER_VERSION } from "../version";
 
 const s = (v: unknown): string | null => { const t = (v ?? "").toString().trim(); return t || null; };
 const num = (v: unknown): number | null => {
@@ -168,6 +169,28 @@ export function parseUberEatsStore(raw: any, observedAt: string): SourceOutlet {
     logo_url: logoImage ?? heroImage,
     observed_at: observedAt,
     source_extra,
+
+    schema_version: String(SCHEMA_VERSION),
+    branch_name: null,                    // actor does not distinguish branch from store title
+    address_line1: s(addr.address ?? loc.address ?? loc.streetAddress),
+    address_line2: null,                  // actor supplies one address line, no line 2
+    locality: s(addr.neighborhood),
+    city: s(addr.city),
+    categories: cuisines,                 // actor exposes one category-like list (cuisineList); no separate categories
+    rating_distribution: null,            // actor supplies an average + count only, no breakdown
+    is_open: boolOrNull(raw?.isOpen),
+    opening_hours: Array.isArray(raw?.hours) && raw.hours.length ? raw.hours : null,
+    service_fee: serviceFee,
+    distance_miles: null,                 // not supplied by discover-mode output
+    offers: raw?.promotion ? [raw.promotion] : [],
+    badges: [raw?.fareBadge, raw?.closedMessage].filter((b): b is string => Boolean(s(b))),
+    image_url: heroImage ?? logoImage,
+    hygiene_rating: null,                 // Uber Eats does not expose FHRS/hygiene data
+    anchor_id: null,                      // set by the caller (per-query anchor), not known here
+    pipeline_run_id: null,                // set by the caller (worker/execution), not known here
+    provider_version: ADAPTER_VERSION,
+    parser_version: UBER_PARSER_VERSION,
+    raw_evidence_reference: null,         // set by the caller — points at the stored raw evidence file
   };
 }
 

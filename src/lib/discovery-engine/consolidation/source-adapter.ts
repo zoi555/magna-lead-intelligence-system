@@ -7,6 +7,7 @@
 import type { SourceOutlet, SourceName } from "./types";
 import type { ParsedOutlet } from "../just-eat/parse";
 import { normaliseUkPhone } from "../just-eat/phone";
+import { SCHEMA_VERSION, PARSER_VERSION, ADAPTER_VERSION } from "../version";
 
 export interface ProviderOption {
   name: string;
@@ -73,6 +74,29 @@ export function justEatToSourceOutlet(o: ParsedOutlet, observedAt: string): Sour
     halal_flag: o.halal_flag,
     logo_url: o.logo_url,
     observed_at: observedAt,
+
+    schema_version: String(SCHEMA_VERSION),
+    branch_name: null,                    // JE listing does not distinguish branch from trading name
+    address_line1: o.address_first_line,
+    address_line2: null,                  // JE listing supplies only one address line
+    locality: null,                       // not distinctly supplied (only City + Postcode)
+    city: o.city,
+    categories: o.tags,
+    rating_distribution: null,            // JE listing supplies an average + count only, no breakdown
+    is_open: o.is_open_now,
+    opening_hours: o.opening_times.length ? o.opening_times : null,
+    service_fee: null,                    // JE has no separate service-fee field
+    distance_miles: null,                 // not supplied by the listing endpoint
+    offers: o.offers,
+    badges: o.badges,
+    image_url: null,                      // JE supplies only logo_url, no separate hero image
+    hygiene_rating: (o.source_extra as Record<string, unknown> | undefined)?.HygieneRating as string | number | null ?? null,
+    anchor_id: null,                      // set by the caller (per-query anchor), not known here
+    pipeline_run_id: null,                // set by the caller (worker/execution), not known here
+    provider_version: ADAPTER_VERSION,
+    parser_version: PARSER_VERSION,
+    raw_evidence_reference: null,         // set by the caller — points at the immutable raw observation row
+    source_extra: o.source_extra,
   };
 }
 

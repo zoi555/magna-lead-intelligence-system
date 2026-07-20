@@ -443,3 +443,70 @@ deployment `dpl_85AwBaHZvzsXZoF14S67EibBPEJ7`, READY). The unrelated duplicate p
 `magna-lead-intelligence-system-pngu` still has the old SSH-rewrite Install Command and no
 `NPM_TOKEN`, and fails — see ISS-0019. It is not the project this app deploys from; recommend the
 user delete or reconfigure it to avoid confusing status checks on future pushes.
+
+## ADR — Canonical marketplace-record contract completed on `SourceOutlet`, not a new schema
+
+Date: 2026-07-21
+Status: Accepted
+
+### Context
+
+A canonical `MarketplaceRestaurant` contract was specified for audit/completion. Two candidate
+targets existed: the live, wired `SourceOutlet`/`ConsolidatedCandidate` types
+(`src/lib/discovery-engine/consolidation/types.ts`, used by all three parsers, consolidation and
+persistence), and a separate `ListingRecord` type in the actor laboratory
+(`aspectlead-actor-lab/custom-actors/uber-eats-discovery/packages/marketplace-schema`) — a parallel,
+unwired investigation package with its own schema, never consumed by this repository.
+
+### Decision
+
+Extended `SourceOutlet` in place with the missing fields (schema_version, branch_name,
+address_line1/2, locality, city, categories, rating_distribution, is_open, opening_hours,
+service_fee, distance_miles, offers, badges, image_url, hygiene_rating, anchor_id, pipeline_run_id,
+provider_version, parser_version, raw_evidence_reference) as optional/nullable, keeping the existing
+snake_case convention. `supportsDelivery`/`supportsCollection` from the source spec map onto the
+existing `is_delivery`/`is_collection` — not duplicated. The actor-lab's `ListingRecord` was left
+untouched (separate, unwired package; out of scope for the primary repository). Populated from real
+provider data only in the three mapping functions (`justEatToSourceOutlet`, `parseUberEatsStore`,
+`parseDeliverooRestaurant`) — never fabricated; nulled where the source genuinely does not supply a
+field.
+
+### Reason
+
+Forking a second, incompatible canonical schema would have meant either duplicating consolidation/
+persistence/parsers or reconciling two schemas mid-session. Extending the one already wired into the
+DB and every parser is the smaller, lower-risk change and keeps a single source of truth.
+
+## ADR — Deliveroo: `thirdwatch/deliveroo-scraper` evaluated and rejected for UK use
+
+Date: 2026-07-21
+Status: Accepted — Deliveroo remains `pending_authorised_source`, $0 spent
+
+### Context
+
+Per the authorised Deliveroo evaluation order (official API → public discovery response → embedded
+structured data → licensed provider → bounded third-party actor proof → browser automation without
+evasion), items 1–3 were already closed: the official API is merchant-only (existing adapter docs);
+public HTML/structured-data fetching is explicitly out of scope per this repo's own standing policy
+(`src/lib/sources/deliveroo-public.ts`: "We do NOT and WILL NOT: fetch its HTML... or otherwise evade
+bot detection"), consistent with the actor-lab's `BROWSER_PROXY_RISK_NOTE.md` inference of a
+comparable anti-bot posture to Uber Eats/Just Eat. No licensed provider is contracted. That left the
+one authorised bounded ($1 cap) third-party actor evaluation.
+
+### Decision
+
+Looked up `thirdwatch/deliveroo-scraper` via the public Apify API (read-only, no spend): it is real
+and actively maintained (508 runs, 5 active users in the past week, pay-per-event pricing, no
+subscription). It was **not run** — disqualified on two independent grounds before any paid call:
+
+1. For the UK (`co.uk`) domain it requires `city/neighbourhood` slug `queries`, not a free-text
+   address or postcode — it does not accept "the exact UB1 address/postcode" as required.
+2. Its documented behaviour escalates from a datacentre proxy to a residential proxy when blocked —
+   proxy rotation to defeat blocking, explicitly excluded by both this session's instructions and
+   this repo's standing anti-evasion policy.
+
+### Reason
+
+Commissioning a third party to evade Deliveroo's bot detection on our behalf is the same policy
+violation as doing it directly, regardless of who runs the request. $0 spent, 0 runs. See
+`docs/11_ISSUES_LOG.md` ISS-0020 and `src/lib/sources/source-registry.ts` for the current status.

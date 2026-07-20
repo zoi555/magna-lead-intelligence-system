@@ -125,7 +125,7 @@ export function DataTable({
                           {columns.map((c) => (
                             <div key={c.key} className="text-[12.5px]">
                               <span className="text-muted">{c.label}: </span>
-                              <span className="text-ink">{String(r[c.key])}</span>
+                              <span className="text-ink">{r[c.key] as React.ReactNode}</span>
                             </div>
                           ))}
                         </div>

@@ -386,3 +386,56 @@ themselves (their browser already has an authenticated Vercel session) and confi
 render, or reconnects the Claude Chrome extension so an agent can do it, or a
 `VERCEL_AUTOMATION_BYPASS_SECRET` is added so `curl`/headless tools can reach protected previews
 directly.
+
+## ISS-0020 — Four product screens remain missing (screen completion matrix, 2026-07-21)
+
+Date: 2026-07-21
+Severity: Medium
+Owner: Zoeb
+Status: Open
+
+### Problem
+
+A screen completion matrix run against actual routes/source code found 4 of 14 required screens
+missing entirely (not placeholder — no route exists): **run detail** (a page for a single
+`discovery_runs` run's full execution/quality/consolidation history — only visible transiently inside
+the Run Builder panel while a run is active), **data-quality exceptions** (no UI over
+`provider_geography_validations` / quarantined candidates / duplicate observations — e.g. the 20
+quarantined Uber US candidates from ISS-0018 have no browsable screen), **import screen** (the new
+Uber Eats CSV/JSON import functions — `src/lib/discovery-engine/uber-eats/import.ts` — have no upload
+UI; import is currently script/API-only), and **audit/evidence view** (raw provider payloads are
+immutably stored but have no dedicated viewer; the new restaurant-detail screen surfaces field
+provenance but not the full raw payload). 3 further screens are honest `PARTIAL`: dashboard (`/`) and
+`/territories` still read from `src/lib/mock-data.ts`; `/pipeline-runs` only covers the legacy
+TW/FSA file-backed pipeline, not `discovery_runs`.
+
+### Next action
+
+Build screens in priority order: data-quality exceptions first (reuses `provider_geography_validations`
++ existing quarantine data, no new backend work), then run detail, then import screen (backend
+already built this session, just needs a form), then audit/evidence view, then wire the dashboard/
+territories screens off `mock-data.ts` onto real Supabase-backed data.
+
+## ISS-0021 — Deliveroo remains `pending_authorised_source`; evaluated actor disqualified
+
+Date: 2026-07-21
+Severity: Medium
+Owner: Zoeb
+Status: Open — no lawful/compliant source currently available
+
+### Problem
+
+No live Deliveroo data can currently be acquired. Official API is merchant-only (not open
+discovery). Public HTML/structured-data fetching is out of scope per this repo's own standing policy.
+The one authorised third-party actor evaluated (`thirdwatch/deliveroo-scraper`, real and maintained,
+$0 spent) was disqualified: its UK input requires city/neighbourhood slugs (not an exact
+address/postcode), and it escalates to a residential proxy when blocked (proxy-rotation evasion,
+excluded). See `docs/09_DECISIONS.md` (2026-07-21 ADR) for full reasoning.
+
+### Next action
+
+Product-owner decision: either source a licensed commercial Deliveroo feed, or identify a different
+UK-capable discovery actor that accepts an exact address/postcode and does not escalate to
+proxy-evasion when blocked. The existing fixture/provider-driven adapter
+(`src/lib/discovery-engine/deliveroo/adapter.ts`) and its now-completed canonical field mapping
+(`deliveroo/parse.ts`) are ready to accept either without further code changes.

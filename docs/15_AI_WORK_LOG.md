@@ -451,3 +451,45 @@ customer comparison.
   Supabase setting changes, no Deliveroo work, no customer comparison, no custom scraping actor
   built. Browser verification of either Vercel deployment remains outstanding (ISS-0019) — no
   Chrome extension connection this session either.
+
+### Canonical contract completion + Just Eat proof + Uber readiness + Deliveroo evaluation + Discovery Results screens — 2026-07-21
+
+- **Canonical contract:** extended `SourceOutlet` (not a new schema — see 09_DECISIONS ADR) with 19
+  fields to reach full `MarketplaceRestaurant` parity, populated honestly (never fabricated) in all
+  three parsers (`just-eat`, `uber-eats`, `deliveroo`). Typecheck + all 14 relevant test suites green
+  before and after.
+- **Just Eat proof:** live UB1 run executed (`npm run je:run -- "UB1"`, 149s, 717 outlets, 0 failed
+  queries, 0 duplicates). New runtime field-completeness report (`npm run je:field-report`, docs in
+  `scripts/je-field-completeness-report.ts`) against 121 real outlets physically in UB1 (outcode
+  exact-match; the 717 figure includes delivers-to-UB1 outlets outside the district):
+  ID/URL/name/address/postcode/coords/cuisines/review-count/opening-status/delivery-fee/min-order/
+  ETA/collection/logo = **100%**; rating **86.8%**; phone/opening-hours/offers/hygiene-rating =
+  **0%** (all confirmed-honest — Just Eat's listing endpoint does not supply them; phone/address
+  detail enrichment was NOT re-attempted — already proven blocked, Cloudflare 403 + no detail
+  endpoint, ISS-0016/docs/59; re-attempting would be retrying a known-blocked, anti-bot-protected
+  endpoint).
+- **New visible screens** (both DB-backed, browser-verified, no placeholder data): `/discovery-results`
+  (real Just Eat records list — 121 UB1 restaurants confirmed rendering, e.g. "Ali Baba's", real
+  Southall addresses) and `/discovery-results/[id]` (single-restaurant detail — full canonical
+  record, field provenance, append-only rating history; verified against a real record showing 7
+  historical rating observations and 20 provenance rows).
+- **Uber Eats:** production adapter now accepts authorised API records / licensed provider JSON /
+  controlled CSV import (`uber-eats/import.ts`, `templates/uber-eats-import-template.csv`, 19
+  passing assertions in `test:uber-import`) — no live scraping. Registry status set to
+  `pending_authorised_source`; Settings screen now shows adapter-implemented / source-authorised /
+  credentials-available / latest-import / latest-failure / records-available distinctly (0 records
+  operational — prior diagnostic runs proved recall-incomplete, not accepted as a production source).
+- **Deliveroo:** evaluated `thirdwatch/deliveroo-scraper` (real, maintained actor) via the public
+  Apify API — read-only, $0 spent — and rejected it before any paid run: UK domain requires
+  city/neighbourhood slugs (not the exact UB1 address/postcode), and it escalates to a residential
+  proxy when blocked (excluded proxy-rotation-to-defeat-blocking). Verdict:
+  `DELIVEROO_BLOCKED_PENDING_AUTHORISATION`. Full reasoning in docs/09_DECISIONS.md, ISS-0021.
+- **Screen completion matrix:** 7 complete / 3 partial / 4 missing (run detail, data-quality
+  exceptions, import screen, audit/evidence view) — logged as ISS-0020.
+- **Verified:** `npm run typecheck`, `npm run build`, and 14 test suites all green after every
+  change; two live browser fetches (`curl` against the local dev server) confirmed real DB data
+  rendering on both new screens.
+- **Not done:** the 4 missing screens (logged, not built this session — scope decision, see
+  ISS-0020); no Supabase migration applied (canonical contract extension is TypeScript-level only,
+  per "no Supabase changes until local implementation and tests pass" — schema/DB columns for the
+  new fields are the next deployment step, not yet written); no Vercel/production changes.
