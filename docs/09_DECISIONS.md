@@ -653,3 +653,21 @@ Reusing the existing multi-source consolidation model (already designed to hold 
 Eats and Deliveroo records side by side) avoids a second, parallel canonical-record schema. A
 single-function-call transaction is the simplest correct way to get atomicity through the
 Supabase JS client, which has no multi-statement transaction API of its own.
+
+## New package: `@supabase/ssr` (2026-07-22)
+
+Added `@supabase/ssr@0.12.3` to implement real Supabase Auth for the internal beta (login,
+session, route protection) on Next.js App Router. This is the standard, officially-supported
+package for cookie-based Supabase Auth sessions across Server Components, Route Handlers and
+middleware — the existing `@supabase/supabase-js` dependency alone has no cookie/session
+management for SSR frameworks. No auth scaffolding existed anywhere in the repo before this;
+the tenancy schema (`tenant_members`, `app_current_tenant_ids()`, migration 0001) was built for
+auth from the start but never wired up until now.
+
+### Reason
+
+Avoids hand-rolling cookie/session/token-refresh handling for Supabase Auth in a Next.js App
+Router app — a well-known, error-prone thing to get right manually (expired-token races, cookie
+attribute mismatches between client/server). `@supabase/ssr` is Supabase's own answer to
+exactly this, actively maintained, and small (no transitive framework lock-in beyond Supabase
+itself, which is already the project's database).

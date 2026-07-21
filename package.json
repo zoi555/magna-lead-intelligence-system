@@ -60,6 +60,7 @@
   "dependencies": {
     "@expo-google-fonts/open-sans": "^0.4.2",
     "@fontsource/open-sans": "^5.2.7",
+    "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.6",
     "@zoi555/geospatial-map": "0.3.0",
     "fontnik": "^0.7.7",
