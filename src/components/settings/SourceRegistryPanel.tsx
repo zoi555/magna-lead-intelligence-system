@@ -1,7 +1,16 @@
 "use client";
 
 import React from "react";
-import type { SourceEntry, SourceStatus, RegistrySummary } from "@/lib/sources/source-registry";
+import type { SourceEntry, SourceStatus, MarketplaceSourceStatus, RegistrySummary } from "@/lib/sources/source-registry";
+
+const MARKETPLACE_STATUS_STYLE: Record<MarketplaceSourceStatus, { color: string; background: string; border: string }> = {
+  ACTIVE: { color: "#137a3b", background: "#E7F5EC", border: "1px solid #137a3b33" },
+  PENDING_AUTHORISATION: { color: "#b45309", background: "#FDF3E1", border: "1px solid #b4530933" },
+  CREDENTIALS_MISSING: { color: "#b45309", background: "#FDF3E1", border: "1px solid #b4530933" },
+  PROVIDER_UNAVAILABLE: { color: "#b91c1c", background: "#FBE9E9", border: "1px solid #b91c1c33" },
+  SCHEMA_MISMATCH: { color: "#b91c1c", background: "#FBE9E9", border: "1px solid #b91c1c33" },
+  DISABLED_BY_POLICY: { color: "#475569", background: "#EEF1F5", border: "1px solid #47556933" },
+};
 
 const STATUS_STYLE: Record<SourceStatus, { fg: string; bg: string; label: string }> = {
   live_ready: { fg: "#137a3b", bg: "#E7F5EC", label: "Live ready" },
@@ -80,7 +89,14 @@ export function SourceRegistryPanel({
                   <h3 className="text-[15px] font-semibold text-ink">{s.name}</h3>
                   <p className="mt-0.5 text-[12.5px] text-muted">{s.purpose}</p>
                 </div>
-                <span className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: st.fg, background: st.bg, border: `1px solid ${st.fg}33` }}>{st.label}</span>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: st.fg, background: st.bg, border: `1px solid ${st.fg}33` }}>{st.label}</span>
+                  {s.marketplaceStatus && (
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ ...MARKETPLACE_STATUS_STYLE[s.marketplaceStatus] }}>
+                      {s.marketplaceStatus}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12.5px]">

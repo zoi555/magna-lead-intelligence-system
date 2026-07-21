@@ -1,0 +1,2 @@
+source_outlet_id,source_url,name,brand,address1,address2,postcode,latitude,longitude,phone,rating,review_count,cuisines,is_delivery,is_collection,delivery_fee,service_fee,minimum_order,eta_minutes,is_sponsored,is_open,image_url
+example-dl-001,https://deliveroo.co.uk/menu/london/southall/example,Example Kitchen,,1 Example Road,,UB1 2AA,51.5081,-0.3762,+442079460111,4.4,95,Indian;Curry,true,false,1.99,0.50,12.00,30,false,true,https://example-cdn.test/logo.jpg

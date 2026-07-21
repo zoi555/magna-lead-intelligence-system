@@ -510,3 +510,34 @@ subscription). It was **not run** — disqualified on two independent grounds be
 Commissioning a third party to evade Deliveroo's bot detection on our behalf is the same policy
 violation as doing it directly, regardless of who runs the request. $0 spent, 0 runs. See
 `docs/11_ISSUES_LOG.md` ISS-0020 and `src/lib/sources/source-registry.ts` for the current status.
+
+## ADR — Migration 0022 written and locally tested, NOT applied to production Supabase
+
+Date: 2026-07-21
+Status: Accepted — migration file committed, application deferred to an explicit owner decision
+
+### Context
+
+Commit `e329a79` extended `SourceOutlet` at the TypeScript level only, deliberately deferring the
+database migration (per that session's own "no Supabase changes until local implementation and tests
+pass" rule). This session was instructed to write that migration but explicitly forbidden from
+applying it to production.
+
+### Decision
+
+Wrote `supabase/migrations/0022_marketplace_contract_completion.sql` — additive-only (14 new nullable
+columns + 2 new indexes on `je_outlets`, 2 new nullable columns on `je_field_provenance`; no drops, no
+renames, no destructive type changes). Verified it by applying the **entire** migration history
+(0001–0022) against a disposable local Postgres cluster (`scripts/test-migration-local.sh`, checked
+into the repo and runnable via `npm run test:migration`) — confirming existing (old-shape) rows stay
+readable, new columns default to null/empty-array (never fabricated), a full canonical record can be
+inserted, `je_rating_history` retains multiple distinct timestamps, and the new indexes exist. **Not
+applied to the real Supabase project** — that remains a separate, explicit next step requiring a
+database backup first (per the user's global database-safety rule), not taken by this session.
+
+### Reason
+
+Testing against a faithful, disposable reproduction of the full schema (not a hand-picked subset)
+catches interaction bugs a minimal stub schema would miss, while keeping the hard "no production
+execution" boundary intact. See `docs/71_MARKETPLACE_SCHEMA_MAPPING.md` for the full field-to-column
+mapping and rollback SQL (documented in the migration file itself).

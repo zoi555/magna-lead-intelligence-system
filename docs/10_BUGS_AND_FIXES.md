@@ -238,3 +238,26 @@ These are design corrections, not app bug fixes:
 - **Verified:** `npm run typecheck`, `npm run build`, `npm run test:ub1-benchmark`,
   `npm run test:geography-gate`, `npm run test:uber-parse`, `npm run test:multi-source`,
   `git diff --check` all green. No actor run, no Apify call, no Vercel/Supabase changes.
+
+## Fix — Deliveroo parser fabricated `0` for absent numeric fields (2026-07-21)
+
+**Bug:** `src/lib/discovery-engine/deliveroo/parse.ts`'s `num()` helper did `Number(v)` without
+first checking for `null`/`undefined`/`''`. Since `Number(null) === 0` and `Number('') === 0`, any
+genuinely-absent rating/fee/ETA value from a Deliveroo CSV/JSON import was silently written as `0`
+instead of `null` — a real fabrication risk (`0` implies "confirmed zero", not "unknown"). Caught by
+a new test (`test:deliveroo-import`, "CSV blank cells map to null, never fabricated") when the
+Deliveroo import path was built; the Uber Eats and Just Eat parsers already guarded against this
+correctly, so it was Deliveroo-specific.
+
+**Fix:** added the same `null`/`undefined`/`''` guard already used in `uber-eats/parse.ts` before
+`Number(v)`. Verified: `test:deliveroo-import` (20 assertions) + `test:multi-source` green.
+
+## Fix — field-completeness report used a `LIKE` prefix match on postcode outcode (2026-07-21)
+
+**Bug:** `scripts/je-field-completeness-report.ts` filtered `outcode LIKE 'UB1%'`, which also matches
+the genuinely distinct `UB10` and `UB11` postcode districts, inflating the reported UB1 restaurant
+count (121 instead of the correct 107) and diluting field-coverage percentages. `outlet-results.ts`
+(the `/discovery-results` screen's query) already used an exact match and was unaffected.
+
+**Fix:** changed to `.eq("outcode", outcodePrefix)` (exact match). Re-verified against the live
+UB1 dataset: 107 restaurants, corrected coverage figures recorded in docs/73.

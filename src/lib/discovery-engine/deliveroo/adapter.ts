@@ -6,6 +6,7 @@
 
 import { ADAPTER_VERSION } from "../version";
 import { parseDeliverooSearch } from "./parse";
+import { importDeliverooJson, importDeliverooCsv } from "./import";
 import type { SourceOutlet } from "../consolidation/types";
 import type { PlatformAdapter, PlatformCapabilities, PlatformAdapterConfig, PlatformQuery, PlatformQueryResult } from "../consolidation/source-adapter";
 
@@ -65,6 +66,20 @@ export class DeliverooAdapter implements PlatformAdapter {
 
   parseSearchResults(raw: unknown, _code: string): SourceOutlet[] {
     return parseDeliverooSearch(raw, new Date().toISOString());
+  }
+
+  /** Import authorised API records or licensed-provider JSON. */
+  importJson(records: unknown[], observedAt = new Date().toISOString()): SourceOutlet[] {
+    const outlets = importDeliverooJson(records, observedAt);
+    this.diagnostics.lastImport = { method: "json", count: outlets.length, at: observedAt };
+    return outlets;
+  }
+
+  /** Import a controlled CSV export (see templates/deliveroo-import-template.csv). */
+  importCsv(csvText: string, observedAt = new Date().toISOString()): SourceOutlet[] {
+    const outlets = importDeliverooCsv(csvText, observedAt);
+    this.diagnostics.lastImport = { method: "csv", count: outlets.length, at: observedAt };
+    return outlets;
   }
 
   exposeDiagnostics(): Record<string, unknown> { return { ...this.diagnostics, adapterVersion: this.adapterVersion }; }

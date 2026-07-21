@@ -16,6 +16,17 @@ export type SourceStatus =
 
 export type Risk = "none" | "low" | "medium" | "high";
 
+/** Honest marketplace-provider readiness status (distinct from the general SourceStatus
+ *  above, which spans every source type). Never show ACTIVE without real accepted records
+ *  from an authorised/lawful source. */
+export type MarketplaceSourceStatus =
+  | "ACTIVE"
+  | "PENDING_AUTHORISATION"
+  | "CREDENTIALS_MISSING"
+  | "PROVIDER_UNAVAILABLE"
+  | "SCHEMA_MISMATCH"
+  | "DISABLED_BY_POLICY";
+
 export interface SourceEntry {
   id: string;
   name: string;
@@ -41,6 +52,7 @@ export interface SourceEntry {
   latestSuccessfulImport?: string | null;
   latestSourceFailure?: string | null;
   recordsAvailable?: number | null;
+  marketplaceStatus?: MarketplaceSourceStatus;
 }
 
 export const SOURCE_REGISTRY: SourceEntry[] = [
@@ -113,6 +125,7 @@ export const SOURCE_REGISTRY: SourceEntry[] = [
     latestSuccessfulImport: null,
     latestSourceFailure: "2026-07-18 — broad UB1 diagnostic (run MrKoKg8322ZVzk449, $0.20): 0/7 known UB1 restaurants matched; actor returns a proximity-ranked home feed, not a complete area directory (docs/68). All prior geography-invalid runs quarantined, 0 candidates promoted to consolidation.",
     recordsAvailable: 0,
+    marketplaceStatus: "PROVIDER_UNAVAILABLE",
   },
   {
     id: "deliveroo",
@@ -123,34 +136,42 @@ export const SOURCE_REGISTRY: SourceEntry[] = [
     envVar: null,
     costRisk: "none",
     legalRisk: "medium",
-    pipelineUse: "Adapter accepts authorised API records or licensed provider JSON only. No live scraping, no evaluated third-party actor qualified for use — see 2026-07-21 evaluation.",
+    pipelineUse: "Adapter accepts authorised API records, licensed provider JSON, or controlled CSV/JSON import only. No live scraping, no evaluated third-party actor qualified for use — see 2026-07-21 evaluation.",
     liveEnabled: false,
     safeTonight: true,
     blocksExport: false,
     nextAction: "Either obtain an official/licensed source, or find a UK-capable discovery actor that (a) accepts an exact UK address/postcode — not just city/neighbourhood slugs — and (b) does not fall back to residential-proxy escalation on block.",
-    notes: "No scraping / login / anti-bot bypass / bulk menu-price-review extraction. thirdwatch/deliveroo-scraper evaluated 2026-07-21 (real, maintained, pay-per-event, no subscription) but DISQUALIFIED for UK use: requires city/neighbourhood slug queries (not the exact UB1 address/postcode), and documented to escalate to a residential proxy when its datacentre proxy is blocked — proxy rotation to defeat blocking, out of scope. $0 spent, 0 runs.",
+    notes: "No scraping / login / anti-bot bypass / bulk menu-price-review extraction. thirdwatch/deliveroo-scraper evaluated 2026-07-21 (real, maintained, pay-per-event, no subscription) but DISQUALIFIED for UK use: requires city/neighbourhood slug queries (not the exact UB1 address/postcode), and documented to escalate to a residential proxy when its datacentre proxy is blocked — proxy rotation to defeat blocking, out of scope. $0 spent, 0 runs. One bounded public-flow test also run 2026-07-21 (docs/72): the assumed public search URL returned Deliveroo's own honest 404 (\"Page Not Found\") — NOT a bot challenge (no Cloudflare/PerimeterX block page) — so the correct discovery URL remains unconfirmed; per the one-test limit, not re-attempted.",
     adapterImplemented: true,
     sourceAuthorised: false,
     credentialsAvailable: false,
     latestSuccessfulImport: null,
-    latestSourceFailure: null,
+    latestSourceFailure: "2026-07-21 — one bounded public-flow request to the assumed search URL returned HTTP 404 (genuine Deliveroo 404 page, not a block) — 0 records.",
     recordsAvailable: 0,
+    marketplaceStatus: "PROVIDER_UNAVAILABLE",
   },
   {
     id: "just_eat",
     name: "Just Eat",
-    purpose: "Delivery-platform presence signal.",
-    status: "manual_import_placeholder",
-    authNeeded: "No",
-    envVar: null,
-    costRisk: "none",
-    legalRisk: "medium",
-    pipelineUse: "Presence collector — manual/import only; unknown → manual review (not a blocker).",
-    liveEnabled: false,
+    purpose: "Delivery-platform presence + rating-summary signal.",
+    status: "live_ready",
+    authNeeded: "No (lawful public listing endpoint) + Google Places API key for phone enrichment",
+    envVar: "JUST_EAT_ENABLED",
+    costRisk: "low",
+    legalRisk: "low",
+    pipelineUse: "Live discovery adapter (real UB1 run: 107 outlets, docs/71) + Google Places phone enrichment (28/107 = 26.2%, ISS-0016/docs/73). Only fully operational marketplace source.",
+    liveEnabled: true,
     safeTonight: true,
     blocksExport: false,
-    nextAction: "Manual evidence entry or an approved public collector.",
-    notes: "No scraping / login / anti-bot bypass / bulk menu-price-review extraction.",
+    nextAction: "Expand phone enrichment beyond the 30-outlet bounded batch; consider website/Companies House as further enrichment sources for the remaining gap.",
+    notes: "No scraping / login / anti-bot bypass. Listing endpoint supplies no phone/menu/opening-hours (docs/59, Cloudflare 403 on detail page — not retried). Phone filled via Google Places (official/licensed API), never fabricated, full provenance retained.",
+    adapterImplemented: true,
+    sourceAuthorised: true,
+    credentialsAvailable: true,
+    latestSuccessfulImport: "2026-07-20 — live UB1 run, 717 delivers-to-UB1 outlets (121 physically in UB1); 2026-07-21 — 28-outlet Google Places phone enrichment",
+    latestSourceFailure: null,
+    recordsAvailable: 107,
+    marketplaceStatus: "ACTIVE",
   },
   {
     id: "existing_customers",

@@ -361,3 +361,22 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   screen, audit/evidence view — ISS-0020).
 - Verified: typecheck, build, and 14 test suites all green; two screens confirmed rendering real
   data via a live dev-server fetch. No Vercel/Supabase production changes.
+
+### Migration + Just Eat phone enrichment + Deliveroo public-flow test + 3 new screens — 2026-07-21 (follow-up)
+
+- Pushed `e329a79` → `origin/feature/mvp-vertical-slice-001`.
+- **Migration 0022** (additive, 14+2 new nullable columns, 2 indexes) written and verified against a
+  disposable full-history local Postgres cluster (`npm run test:migration`) — **not applied to
+  production**. Mapping: `docs/71`.
+- **Just Eat phone: 0% → 26.2%** (28/107 real UB1 outlets, live paid Google Places calls, full
+  provenance retained, 1 duplicate-phone conflict flagged not resolved). `docs/73`, ISS-0022 (77
+  outlets remain — deliberate bounded batch, not a limit).
+- **Deliveroo:** one bounded public-flow test — the assumed search URL returned Deliveroo's own
+  honest 404, not a challenge (`docs/72`). Provider-neutral adapter completed (CSV/JSON import for
+  both Uber and Deliveroo); found and fixed a real null→`0` fabrication bug in the Deliveroo parser.
+  New `MarketplaceSourceStatus`: Just Eat `ACTIVE`, Uber/Deliveroo `PROVIDER_UNAVAILABLE`.
+- **3 of 4 missing screens built**, real DB-backed, browser-verified: run detail
+  (`/discovery-runs[/[id]]`), data-quality exceptions, audit/evidence (`/audit[/[id]]`). Import
+  screen documented, not built (not required for the core scan workflow; backend ready).
+- Verified: typecheck, build, 17 test suites green (no skips). No Vercel/production changes; no
+  merge to main.

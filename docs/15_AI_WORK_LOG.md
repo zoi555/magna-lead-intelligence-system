@@ -493,3 +493,40 @@ customer comparison.
   ISS-0020); no Supabase migration applied (canonical contract extension is TypeScript-level only,
   per "no Supabase changes until local implementation and tests pass" — schema/DB columns for the
   new fields are the next deployment step, not yet written); no Vercel/production changes.
+
+### Migration + Just Eat phone enrichment + Deliveroo bounded test + 3 new screens — 2026-07-21 (same-day follow-up)
+
+- **Pushed** `e329a79` to `origin/feature/mvp-vertical-slice-001` (source backup only, no merge/deploy).
+- **Migration 0022** written (14 new nullable `je_outlets` columns + 2 new `je_field_provenance`
+  columns, 2 indexes, additive-only, rollback documented) and verified by applying the full 0001–0022
+  migration history against a disposable local Postgres cluster (`npm run test:migration`, 10
+  assertions: backward-compat insert, full-canonical insert, null-not-fabricated defaults, index
+  presence, rating-history multi-timestamp retention, enrichment-provenance columns). **Not applied
+  to production Supabase.** Schema mapping: `docs/71_MARKETPLACE_SCHEMA_MAPPING.md`.
+- **Just Eat phone enrichment:** inspected existing evidence first (field catalogue, docs/59) —
+  confirmed nothing was overlooked, the field genuinely doesn't exist in the lawful listing response.
+  Reused the existing, already-live `GooglePlacesRunner` (no new acquisition logic) to enrich a
+  bounded 30-outlet batch: 28/30 found and written (real paid Google Places calls), 1 duplicate-phone
+  conflict flagged. Full real-sample (107 outlets, corrected exact-outcode match) acceptance test:
+  phone 26.2% (was 0%), full-address/postcode 100%, rating 85.0%, review-count 100%. Fixed a real bug
+  in the field-completeness report along the way (`LIKE 'UB1%'` wrongly included UB10/UB11). Full
+  detail: `docs/73_JUST_EAT_PHONE_ENRICHMENT.md`, ISS-0022 (remaining 77 outlets not yet enriched —
+  deliberate scope bound).
+- **Deliveroo:** one bounded public-flow test performed (docs/72) — assumed search URL returned
+  Deliveroo's own honest 404, not a bot challenge; correct URL still unconfirmed, not re-attempted
+  (one-test limit). Completed the provider-neutral adapter (`importJson`/`importCsv` for both Uber
+  and Deliveroo, `test:uber-import` + `test:deliveroo-import`, 39 assertions) — found and fixed a real
+  fabrication bug in the Deliveroo parser (`num()` converting null/blank to `0`). New honest
+  `MarketplaceSourceStatus` vocabulary added to the source registry (`ACTIVE` for Just Eat,
+  `PROVIDER_UNAVAILABLE` for Uber and Deliveroo).
+- **3 of 4 missing screens built** (real DB-backed, loading/error/empty states,
+  `test:new-screens` — 15 live-integration assertions, browser-verified against real data):
+  `/discovery-runs` + `/discovery-runs/[id]` (run detail), `/data-quality-exceptions`,
+  `/audit` + `/audit/[id]`. Import screen deliberately not built — not required for the core scan
+  workflow; backend ready, exact route/blocker documented in ISS-0020.
+- **Verified:** `npm run typecheck`, `npm run build`, and 17 test suites (all pre-existing suites
+  plus every new one) green, no silent skips. Live dev-server fetches confirmed real data on all
+  screens (e.g. 717 raw observations on the real run-detail page, 68 real geography mismatches on
+  the exceptions page, a real content hash + provenance on the audit page).
+- **Not done:** migration not applied to production; import screen UI not built (documented); Vercel
+  untouched; no merge to main.

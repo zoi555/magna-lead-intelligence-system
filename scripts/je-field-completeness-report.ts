@@ -63,14 +63,14 @@ async function main() {
     .from("je_outlets")
     .select("*")
     .eq("tenant_id", tenantId)
-    .like("outcode", `${outcodePrefix}%`)
+    .eq("outcode", outcodePrefix) // exact match — UB10/UB11 are real, distinct districts, a LIKE prefix would wrongly include them
     .order("last_seen_at", { ascending: false });
   if (res.error) { console.error("Query failed:", JSON.stringify(res.error)); process.exit(1); }
 
   const rows = (res.data ?? []) as Record<string, unknown>[];
   const total = rows.length;
 
-  console.log(`\n=== Just Eat field-completeness report — outcode prefix "${outcodePrefix}" ===`);
+  console.log(`\n=== Just Eat field-completeness report — outcode "${outcodePrefix}" (exact match) ===`);
   console.log(`Total restaurants (canonical outlets): ${total}`);
   if (!total) { console.log("No persisted outlets for this outcode — nothing to report."); process.exit(0); }
 
@@ -83,14 +83,58 @@ async function main() {
     console.log(`${f.label.padEnd(30)}${String(populated).padStart(11)}${String(nullCount).padStart(8)}${(pct + "%").padStart(11)}`);
   }
 
-  console.log(`\n--- 10 representative normalised records ---`);
-  const sample = rows.slice(0, 10);
+  // Phone source breakdown: was the phone ever supplied by Just Eat itself (never — the
+  // listing endpoint supplies none, docs/59), or filled by an enrichment source?
+  const outletIds = rows.map((r) => String(r.id));
+  const provRes = await db
+    .from("je_field_provenance")
+    .select("outlet_id,source,value,collected_at")
+    .eq("tenant_id", tenantId)
+    .eq("field_key", "telephone")
+    .not("value", "is", null) // only rows that actually populated a value — the original
+    // JE parser also writes a "telephone: unavailable-from-source, value=null" row on every
+    // outlet; that row must NOT be counted as a phone source or it silently masks enrichment.
+    .in("outlet_id", outletIds)
+    .order("collected_at", { ascending: true }); // latest wins if an outlet was ever re-enriched
+  const phoneSourceByOutlet = new Map<string, string>();
+  for (const p of (provRes.data ?? []) as { outlet_id: string; source: string }[]) phoneSourceByOutlet.set(p.outlet_id, p.source);
+
+  const sourceBreakdown = new Map<string, number>();
+  let phonePopulated = 0;
+  for (const r of rows) {
+    if (!r.telephone_e164) continue;
+    phonePopulated++;
+    const src = phoneSourceByOutlet.get(String(r.id)) ?? "just_eat_listing";
+    sourceBreakdown.set(src, (sourceBreakdown.get(src) ?? 0) + 1);
+  }
+  console.log(`\n--- Phone source breakdown (${phonePopulated}/${total} = ${((phonePopulated / total) * 100).toFixed(1)}%) ---`);
+  for (const [src, n] of sourceBreakdown) console.log(`  ${src}: ${n}`);
+  if (!sourceBreakdown.size) console.log("  (none populated)");
+
+  // Duplicate-phone conflicts: the same phone number assigned to more than one outlet.
+  const phoneOwners = new Map<string, string[]>();
+  for (const r of rows) {
+    if (!r.telephone_e164) continue;
+    const key = String(r.telephone_e164);
+    const owners = phoneOwners.get(key) ?? [];
+    owners.push(String(r.trading_name));
+    phoneOwners.set(key, owners);
+  }
+  const dupes = [...phoneOwners.entries()].filter(([, owners]) => owners.length > 1);
+  console.log(`\n--- Duplicate-phone conflicts: ${dupes.length} ---`);
+  for (const [phone, owners] of dupes) console.log(`  ⚠ ${phone} → ${owners.join(" / ")}`);
+
+  console.log(`\n--- 10 representative normalised records (mix of phone-enriched and phone-missing) ---`);
+  const withPhone = rows.filter((r) => r.telephone_e164);
+  const withoutPhone = rows.filter((r) => !r.telephone_e164);
+  const sample = [...withPhone.slice(0, 5), ...withoutPhone.slice(0, 5)];
   for (const r of sample) {
     console.log(JSON.stringify({
       restaurant_id: r.je_outlet_id,
       url: r.source_url,
       name: r.trading_name,
       phone: r.telephone_e164,
+      phone_source: r.telephone_e164 ? (phoneSourceByOutlet.get(String(r.id)) ?? "just_eat_listing") : null,
       address: [r.address_first_line, r.city].filter(Boolean).join(", ") || null,
       postcode: r.postcode,
       coordinates: r.latitude != null && r.longitude != null ? [r.latitude, r.longitude] : null,

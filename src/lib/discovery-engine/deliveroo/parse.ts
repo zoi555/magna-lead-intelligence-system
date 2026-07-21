@@ -7,7 +7,13 @@ import { phoneComparison } from "../consolidation/source-adapter";
 import { SCHEMA_VERSION, DELIVEROO_PARSER_VERSION, DELIVEROO_ADAPTER_VERSION } from "../version";
 
 const s = (v: unknown): string | null => { const t = (v ?? "").toString().trim(); return t || null; };
-const num = (v: unknown): number | null => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+// Guard null/undefined/'' explicitly — Number(null) is 0 and Number('') is 0, which would
+// silently fabricate a rating/fee/eta of zero for a genuinely-absent value.
+const num = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 const normPc = (pc: string | null): string | null => (pc ? classifyPostcode(pc).value || pc.toUpperCase() : null);
 
 export function parseDeliverooRestaurant(raw: any, observedAt: string): SourceOutlet {

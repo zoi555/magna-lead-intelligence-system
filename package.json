@@ -44,6 +44,10 @@
     "ingest:os-open-names": "tsx scripts/ingest-os-open-names.ts",
     "je:run": "tsx scripts/je-run.ts",
     "je:field-report": "tsx scripts/je-field-completeness-report.ts",
+    "test:migration": "bash scripts/test-migration-local.sh",
+    "je:phone-enrich": "tsx scripts/je-phone-enrichment.ts",
+    "test:deliveroo-import": "tsx scripts/test-deliveroo-import.ts",
+    "test:new-screens": "tsx scripts/test-new-screens.ts",
     "uber:pilot": "tsx scripts/uber-pilot.ts"
   },
   "dependencies": {

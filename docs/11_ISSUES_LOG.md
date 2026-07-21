@@ -392,7 +392,11 @@ directly.
 Date: 2026-07-21
 Severity: Medium
 Owner: Zoeb
-Status: Open
+Status: **Partially resolved (same-day follow-up session)** — 3 of 4 built: `/discovery-runs`
++ `/discovery-runs/[id]` (run detail), `/data-quality-exceptions`, `/audit` + `/audit/[id]`
+(audit/evidence), all real database-backed, browser-verified, with loading/error/empty states and
+`test:new-screens` (15 assertions). **Import screen remains open** — see "Next action" below,
+carried forward as the one still-missing screen.
 
 ### Problem
 
@@ -411,10 +415,16 @@ TW/FSA file-backed pipeline, not `discovery_runs`.
 
 ### Next action
 
-Build screens in priority order: data-quality exceptions first (reuses `provider_geography_validations`
-+ existing quarantine data, no new backend work), then run detail, then import screen (backend
-already built this session, just needs a form), then audit/evidence view, then wire the dashboard/
-territories screens off `mock-data.ts` onto real Supabase-backed data.
+Data-quality exceptions, run detail, and audit/evidence are now built (this follow-up session).
+**Remaining: the import screen.** Backend is fully ready — `UberEatsAdapter.importJson`/`.importCsv`
+and `DeliverooAdapter.importJson`/`.importCsv` (both built this session, tested: `test:uber-import`,
+`test:deliveroo-import`) — only a UI form + an API route to receive an uploaded file/pasted JSON and
+call those adapter methods is missing. Not built this session because it is not required for the core
+scan workflow (Just Eat discovery → results → exceptions → audit) — it is an onboarding path for
+Uber/Deliveroo data once one of those sources is authorised, which neither currently is (ISS-0018,
+ISS-0021). Exact route when built: `/import` (new), API route `/api/discovery/import` (new). Also
+still open: wire the dashboard (`/`) and `/territories` off `src/lib/mock-data.ts` onto real
+Supabase-backed data; `/pipeline-runs` still only covers the legacy TW/FSA file-backed pipeline.
 
 ## ISS-0021 — Deliveroo remains `pending_authorised_source`; evaluated actor disqualified
 
@@ -432,6 +442,22 @@ $0 spent) was disqualified: its UK input requires city/neighbourhood slugs (not 
 address/postcode), and it escalates to a residential proxy when blocked (proxy-rotation evasion,
 excluded). See `docs/09_DECISIONS.md` (2026-07-21 ADR) for full reasoning.
 
+**Update (same-day follow-up session):** the one authorised bounded public-flow test was performed
+(docs/72). Result: the assumed public search URL returns Deliveroo's own honest HTTP 404 ("Page Not
+Found") — **not** a bot challenge (no Cloudflare/PerimeterX block page). The correct discovery URL/
+flow remains unconfirmed; per the one-test limit, no further URL was attempted. The provider-neutral
+Deliveroo adapter is now complete regardless (`importJson`/`importCsv`, `test:deliveroo-import` — 20
+assertions, including a real bug fix: the parser's `num()` helper was converting a blank/absent value
+to `0` instead of `null`, a latent fabrication risk now fixed for every numeric field). Registry status
+updated to the new honest vocabulary: `marketplaceStatus: PROVIDER_UNAVAILABLE`.
+
+### Next action
+
+Product-owner decision (unchanged): either source a licensed commercial Deliveroo feed, or identify a
+different UK-capable discovery actor/method that accepts an exact address/postcode, does not escalate
+to proxy-evasion when blocked, and can be confirmed to return real listing data (the assumed static
+search-URL pattern is now confirmed NOT to work).
+
 ### Next action
 
 Product-owner decision: either source a licensed commercial Deliveroo feed, or identify a different
@@ -439,3 +465,24 @@ UK-capable discovery actor that accepts an exact address/postcode and does not e
 proxy-evasion when blocked. The existing fixture/provider-driven adapter
 (`src/lib/discovery-engine/deliveroo/adapter.ts`) and its now-completed canonical field mapping
 (`deliveroo/parse.ts`) are ready to accept either without further code changes.
+
+## ISS-0022 — Just Eat phone enrichment covers 30/107 UB1 outlets only (bounded batch)
+
+Date: 2026-07-21
+Severity: Low
+Owner: Zoeb
+Status: Open — deliberate scope bound, not a technical limit
+
+### Problem
+
+`npm run je:phone-enrich -- "UB1" 30` enriched only the first 30 of 107 real UB1 outlets missing a
+phone (28 found via Google Places, 2 not found). Full-sample phone coverage is 26.2% (28/107), not
+higher, purely because the remaining 77 outlets were not yet run through the same enrichment step —
+`GOOGLE_PLACES_MAX_CALLS_PER_RUN=800` has ample remaining budget; this was a deliberate bounded batch
+for this session, not a cap or error. See docs/73 for full detail. Also open: 1 duplicate-phone
+conflict was found and flagged (`+447863189603` → "Tehzeeb" / "Roma Restaurant") — not auto-resolved.
+
+### Next action
+
+Run `npm run je:phone-enrich -- "UB1" 107` (or omit the cap) to cover the remaining outlets; manually
+review the one duplicate-phone conflict; consider the same enrichment for other discovered outcodes.
