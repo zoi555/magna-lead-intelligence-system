@@ -13,9 +13,10 @@ export async function TopHeader() {
   const envStyle = ENV_STYLE[ENVIRONMENT_LABEL] ?? ENV_STYLE["Local Development"];
   const user = await getSessionUser();
   return (
-    <header className="flex h-14 items-center justify-between border-b border-bordergrey bg-card px-6">
-      {/* Tenant identity is DATA (configurable per deployment), not the product brand. */}
-      <div className="flex items-center gap-2">
+    <header className="flex h-14 flex-wrap items-center justify-between gap-2 border-b border-bordergrey bg-card py-2 pl-14 pr-4 md:flex-nowrap md:px-6 md:pl-6">
+      {/* Tenant identity is DATA (configurable per deployment), not the product brand.
+          pl-14 clears the mobile-only hamburger button rendered by Sidebar.tsx. */}
+      <div className="flex flex-wrap items-center gap-2">
         <span className="text-[13px] text-muted">Tenant</span>
         <span className="rounded-btn border border-bordergrey px-2 py-1 text-[13px] font-medium text-headertext">
           {TENANT_NAME}
@@ -27,7 +28,7 @@ export async function TopHeader() {
       <div className="flex items-center gap-3">
         {user ? (
           <>
-            <span className="text-[13px] text-ink">{user.email}</span>
+            <span className="hidden text-[13px] text-ink sm:inline">{user.email}</span>
             <form action="/auth/signout" method="POST">
               <button type="submit" className="rounded-btn border border-bordergrey px-2 py-1 text-[12px] text-muted hover:text-ink">Sign out</button>
             </form>
