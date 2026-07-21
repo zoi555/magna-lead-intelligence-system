@@ -153,3 +153,22 @@ The earlier record in `docs/10_BUGS_AND_FIXES.md` / `docs/09_DECISIONS.md` descr
 `magna-lead-intelligence-system-pngu` as "a stale duplicate Vercel project that fails every
 build" is now **out of date** — see ISS-0019 in `docs/11_ISSUES_LOG.md` for the corrected status.
 Both projects build; the outstanding question is ownership/canonicalisation, not brokenness.
+
+### Confirmed: pushes to `feature/mvp-vertical-slice-001` auto-deploy both projects (2026-07-21)
+
+Verified directly via the Vercel API (not assumed): pushing commit `72990dc` triggered a build on
+**both** projects simultaneously (deployment `createdAt` timestamps 31ms apart, both `source: git`,
+both `githubCommitSha: 72990dcbd8e44d61ff38d1c1f57e4a18a440ac4c`, both READY):
+
+- `magna-lead-intelligence-system` (`prj_SNY6dJsXzfV6X145cynpqBACHnuT`) — deployment
+  `dpl_GwtVSRq39mkK4dNrPfXQDZbjPBhc`, `target: null` (Preview), still behind Vercel's
+  deployment-protection SSO wall (redirects to `vercel.com/sso-api` — `curl` cannot reach it
+  without an authenticated Vercel session; not directly smoke-tested this session).
+- `magna-lead-intelligence-system-pngu` (`prj_vxcbOvftT2CdzUmnxyCWhjF9f3U2`) — deployment
+  `dpl_2giA6bRvg42oPd2wtAQ1YiyLmUcs`, `target: "production"`, publicly reachable at
+  `https://magna-lead-intelligence-system-pngu.vercel.app` with **no deployment protection** —
+  full smoke test performed directly against this URL (see `docs/15_AI_WORK_LOG.md` this date).
+
+**Every future push to this branch will deploy both projects automatically.** This is not
+optional and does not require a separate "deploy" step — pushing IS deploying. Treat any future
+push with the same care as a production deploy.

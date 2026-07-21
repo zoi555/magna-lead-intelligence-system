@@ -48,6 +48,9 @@
     "je:phone-enrich": "tsx scripts/je-phone-enrichment.ts",
     "test:deliveroo-import": "tsx scripts/test-deliveroo-import.ts",
     "test:new-screens": "tsx scripts/test-new-screens.ts",
+    "test:phone-match": "tsx scripts/test-phone-match-validation.ts",
+    "test:deliveroo-real-parse": "tsx scripts/test-deliveroo-real-parse.ts",
+    "test:import-route": "tsx scripts/test-import-route.ts",
     "uber:pilot": "tsx scripts/uber-pilot.ts"
   },
   "dependencies": {

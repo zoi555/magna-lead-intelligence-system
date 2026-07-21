@@ -98,6 +98,52 @@ No assistant, developer, or unfortunate human may claim the project works withou
   further push, or a manual redeploy, will move the "latest deployment" again) — treat the recorded
   IDs as a snapshot at session end, not a permanent fact.
 
+### 2026-07-21 (second same-day follow-up session)
+
+- Change tested: production Supabase migration 0022; production Vercel smoke test; Just Eat phone
+  batch completion; real Deliveroo public-discovery test; `/import` screen.
+- Command/manual check:
+  - Verified Supabase project ref (`rubhjkgygauuixiqouza`) and name (`aspectlead-platform`) via
+    `get_project` before any write. Confirmed backup coverage via a direct `pg_stat_archiver`
+    query (continuous WAL archiving active, last archived ~1hr before the session) — no
+    on-demand-backup tool exists in the available toolset, so this was an honest evidence-based
+    confirmation, not a fabricated one.
+  - Applied migration 0022 via `apply_migration`; verified via `list_migrations`, direct
+    `information_schema.columns` queries for all 16 new columns, `pg_indexes` for both new
+    indexes, `pg_class`/`pg_policies` for unchanged RLS, exact-match row counts before/after on 5
+    tables, a `BEGIN...ROLLBACK` transaction proving a full canonical insert + a second
+    `je_rating_history` row both work with zero residual rows, and `get_advisors` (no new issues).
+  - Verified the Vercel auto-deploy claim independently via `get_project`/`get_deployment` — both
+    projects' latest deployments carry `githubCommitSha: 72990dc...`, both READY.
+  - Smoke-tested all 9 named routes directly against the live Production URL
+    (`magna-lead-intelligence-system-pngu.vercel.app`, no deployment protection) via `curl`,
+    checked for server/column-error markers, and grepped for real data (restaurant names, phone
+    numbers, exception counts, content hashes) actually present in the response HTML.
+  - `npm run je:phone-enrich -- "UB1" 79` — real, live, paid Google Places calls; DB writes
+    verified via direct Supabase queries before/after.
+  - Deliveroo: real Playwright/Chromium session (verified via screenshot, not just text-keyword
+    matching, after catching a false positive) against the live consumer site; captured real
+    `__NEXT_DATA__`, built and tested a calibrated parser against the real captured data.
+  - `npm run typecheck`, `npm run build`, and 19 test suites (`test:je-stage1`,
+    `test:multi-source`, `test:uber-parse`, `test:uber-import`, `test:deliveroo-import`,
+    `test:deliveroo-real-parse`, `test:phone-match`, `test:geography-gate`,
+    `test:borderline-provider`, `test:apify-provenance`, `test:geography-standard`,
+    `test:run-draft`, `test:custom-config`, `test:scoring`, `test:telesales-safe`, `test:geo`,
+    `test:ub1-benchmark`, `test:new-screens`, `test:migration`, `test:import-route`) — all green.
+- Result: migration live in production; 9/9 reachable production routes verified with real data;
+  Just Eat UB1 phone coverage 93.5% (100/107); Deliveroo `marketplaceStatus` corrected to
+  `PENDING_AUTHORISATION` with real supporting evidence; `/import` screen functional end-to-end.
+- Evidence link/screenshot: Supabase query outputs and Vercel API responses quoted in this
+  session's transcript; `docs/09_DECISIONS.md`, `docs/73`, `docs/74` for full detail; Deliveroo
+  screenshots retained at `/private/tmp/.../scratchpad/deliveroo-*.png` (session-local, not
+  committed — no personal data, public page content only).
+- Remaining risk: the Preview Vercel deployment was not directly smoke-tested (SSO wall, no
+  connected browser session this session either) — same limitation as ISS-0019, unchanged. Mobile-
+  width rendering was not visually verified for the same reason (new screens reuse existing
+  responsive Tailwind patterns, not independently confirmed on a real small viewport). Deliveroo's
+  validated discovery flow is a one-off manual research result, not a productionised, scheduled
+  adapter — treating it as such would be a separate, larger, unauthorised decision.
+
 ### YYYY-MM-DD HH:mm
 
 - Change tested:

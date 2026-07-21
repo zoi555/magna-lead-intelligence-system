@@ -380,3 +380,29 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   screen documented, not built (not required for the core scan workflow; backend ready).
 - Verified: typecheck, build, 17 test suites green (no skips). No Vercel/production changes; no
   merge to main.
+
+### Production migration + smoke test + JE phone completion + real Deliveroo discovery + import screen — 2026-07-21 (2nd follow-up)
+
+- **Every push to `feature/mvp-vertical-slice-001` auto-deploys both Vercel projects** — confirmed
+  directly via the Vercel API (not assumed). Production (`-pngu`) has no deployment protection;
+  Preview remains behind Vercel SSO. See `docs/08_DEPLOYMENT.md`.
+- **Migration 0022 applied to production Supabase**, with a real (not fabricated) backup
+  confirmation — queried `pg_stat_archiver` directly, found continuous WAL archiving active and
+  current. Full post-migration verification passed (columns/indexes present, RLS unchanged, row
+  counts identical, transactional insert+rollback proved). `docs/09_DECISIONS.md`.
+- **Production smoke test:** 9/9 reachable routes (Production deployment) returned 200 with real
+  data, no server/column errors. `/data-quality` (as named in the instruction) 404s — the real
+  route is `/data-quality-exceptions`, flagged as a naming mismatch. Preview not directly
+  reachable (SSO, no browser session).
+- **Just Eat phone: 26.2% → 93.5%** (100/107 UB1). Added real name+address match validation first
+  (catching and fixing a self-referential no-op in an early draft). Duplicate-phone conflict
+  resolved with evidence (shared premises). ISS-0022.
+- **Deliveroo: real discovery source found and validated** (corrects the earlier
+  `PROVIDER_UNAVAILABLE` verdict, which was drawn from one wrong URL guess). A real Playwright
+  browser session found 150 restaurant records, 10 local to UB1, strong core-field coverage.
+  `marketplaceStatus` → `PENDING_AUTHORISATION` (real path exists; production automation is a
+  separate, unauthorised decision). `docs/74`.
+- **Import screen built:** `/import` + `/api/discovery/import` — full dry-run validation flow
+  (field mapping, invalid rows, duplicates, geography), honest about not persisting to a live
+  table for either unauthorised source.
+- Verified: typecheck, build, 19 test suites green (no skips).

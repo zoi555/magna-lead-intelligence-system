@@ -200,6 +200,7 @@ export interface GooglePlacesResult {
   matched: boolean;
   status: GooglePlacesResultStatus;
   placeId: string | null;
+  matchedName: string | null; // the returned place's displayName — for caller-side match validation
   formattedPhone: string | null; // national preferred, else international
   website: string | null;
   formattedAddress: string | null;
@@ -221,6 +222,7 @@ const emptyResult = (
   matched: false,
   status,
   placeId: null,
+  matchedName: null,
   formattedPhone: null,
   website: null,
   formattedAddress: null,
@@ -354,6 +356,7 @@ export class GooglePlacesRunner {
       matched: true,
       status: "found",
       placeId: place.id ?? null,
+      matchedName: (place.displayName as { text?: string } | undefined)?.text ?? null,
       formattedPhone,
       website: place.websiteUri ?? null,
       formattedAddress: place.formattedAddress ?? null,
@@ -371,6 +374,7 @@ export class GooglePlacesRunner {
     // Record which fields actually came back populated (audit + reporting).
     const collected: string[] = [];
     if (result.placeId) collected.push("placeId");
+    if (result.matchedName) collected.push("matchedName");
     if (result.formattedPhone) collected.push("formattedPhone");
     if (result.website) collected.push("website");
     if (result.formattedAddress) collected.push("formattedAddress");

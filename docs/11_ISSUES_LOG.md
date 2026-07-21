@@ -392,11 +392,13 @@ directly.
 Date: 2026-07-21
 Severity: Medium
 Owner: Zoeb
-Status: **Partially resolved (same-day follow-up session)** — 3 of 4 built: `/discovery-runs`
-+ `/discovery-runs/[id]` (run detail), `/data-quality-exceptions`, `/audit` + `/audit/[id]`
-(audit/evidence), all real database-backed, browser-verified, with loading/error/empty states and
-`test:new-screens` (15 assertions). **Import screen remains open** — see "Next action" below,
-carried forward as the one still-missing screen.
+Status: **Resolved (second same-day follow-up session)** — all 4 built: `/discovery-runs` +
+`/discovery-runs/[id]` (run detail), `/data-quality-exceptions`, `/audit` + `/audit/[id]`
+(audit/evidence), and `/import` (source selection, CSV/JSON upload, downloadable templates,
+dry-run validation, field-mapping preview, invalid-row display, duplicate detection, geography
+validation via the existing gate, confirm step with honest evidence-hash retention — does NOT
+mark a source `ACTIVE` merely because import is supported). All real/live-backed, browser- and
+API-verified, with loading/error/empty states. `test:new-screens` (15) + `test:import-route` (10).
 
 ### Problem
 
@@ -415,74 +417,82 @@ TW/FSA file-backed pipeline, not `discovery_runs`.
 
 ### Next action
 
-Data-quality exceptions, run detail, and audit/evidence are now built (this follow-up session).
-**Remaining: the import screen.** Backend is fully ready — `UberEatsAdapter.importJson`/`.importCsv`
-and `DeliverooAdapter.importJson`/`.importCsv` (both built this session, tested: `test:uber-import`,
-`test:deliveroo-import`) — only a UI form + an API route to receive an uploaded file/pasted JSON and
-call those adapter methods is missing. Not built this session because it is not required for the core
-scan workflow (Just Eat discovery → results → exceptions → audit) — it is an onboarding path for
-Uber/Deliveroo data once one of those sources is authorised, which neither currently is (ISS-0018,
-ISS-0021). Exact route when built: `/import` (new), API route `/api/discovery/import` (new). Also
-still open: wire the dashboard (`/`) and `/territories` off `src/lib/mock-data.ts` onto real
+Data-quality exceptions, run detail, audit/evidence, and (second same-day follow-up session) the
+import screen (`/import` + `/api/discovery/import`) are now all built — see the status line above.
+Still open: wire the dashboard (`/`) and `/territories` off `src/lib/mock-data.ts` onto real
 Supabase-backed data; `/pipeline-runs` still only covers the legacy TW/FSA file-backed pipeline.
 
-## ISS-0021 — Deliveroo remains `pending_authorised_source`; evaluated actor disqualified
+## ISS-0021 — Deliveroo: real public discovery source found; production authorisation still needed
 
 Date: 2026-07-21
 Severity: Medium
 Owner: Zoeb
-Status: Open — no lawful/compliant source currently available
+Status: Open — a real path now exists; owner authorisation to productionise it does not
 
-### Problem
+### Problem (original, 2026-07-21)
 
-No live Deliveroo data can currently be acquired. Official API is merchant-only (not open
-discovery). Public HTML/structured-data fetching is out of scope per this repo's own standing policy.
-The one authorised third-party actor evaluated (`thirdwatch/deliveroo-scraper`, real and maintained,
+No live Deliveroo data could be acquired. Official API is merchant-only (not open discovery). The
+one authorised third-party actor evaluated (`thirdwatch/deliveroo-scraper`, real and maintained,
 $0 spent) was disqualified: its UK input requires city/neighbourhood slugs (not an exact
 address/postcode), and it escalates to a residential proxy when blocked (proxy-rotation evasion,
-excluded). See `docs/09_DECISIONS.md` (2026-07-21 ADR) for full reasoning.
+excluded). One bounded public-flow test (docs/72) used a guessed static search URL, which returned
+Deliveroo's own honest 404 — not a challenge, but not proof of unavailability either.
 
-**Update (same-day follow-up session):** the one authorised bounded public-flow test was performed
-(docs/72). Result: the assumed public search URL returns Deliveroo's own honest HTTP 404 ("Page Not
-Found") — **not** a bot challenge (no Cloudflare/PerimeterX block page). The correct discovery URL/
-flow remains unconfirmed; per the one-test limit, no further URL was attempted. The provider-neutral
-Deliveroo adapter is now complete regardless (`importJson`/`importCsv`, `test:deliveroo-import` — 20
-assertions, including a real bug fix: the parser's `num()` helper was converting a blank/absent value
-to `0` instead of `null`, a latent fabrication risk now fixed for every numeric field). Registry status
-updated to the new honest vocabulary: `marketplaceStatus: PROVIDER_UNAVAILABLE`.
+### Update — real discovery flow found (second same-day follow-up session, docs/74)
+
+A genuine Playwright browser session (default Chromium, no evasion) used Deliveroo's own visible
+postcode-search UI and found real, working discovery: 150 restaurant cards, 10 genuinely local to
+UB1 (≤1 mile), 100% coverage on ID/URL/name/rating/review-count/image, phone confirmed absent
+(same pattern as Just Eat), full address obtained from one permitted detail-page inspection. A
+calibrated parser (`deliveroo-real-parse-0.1.0`, 16 assertions) was built from this real data.
+Registry corrected: `marketplaceStatus: PENDING_AUTHORISATION` (was incorrectly
+`PROVIDER_UNAVAILABLE` — that verdict was drawn from one wrong URL guess, not a genuine
+unavailability finding).
+
+Separately, the provider-neutral Deliveroo adapter is complete (`importJson`/`importCsv`,
+`test:deliveroo-import` — 20 assertions, including a real bug fix: the parser's `num()` helper was
+converting a blank/absent value to `0` instead of `null`).
 
 ### Next action
 
-Product-owner decision (unchanged): either source a licensed commercial Deliveroo feed, or identify a
-different UK-capable discovery actor/method that accepts an exact address/postcode, does not escalate
-to proxy-evasion when blocked, and can be confirmed to return real listing data (the assumed static
-search-URL pattern is now confirmed NOT to work).
+Owner decision: authorise wiring the validated public browser-flow discovery into a scheduled,
+automated production adapter (a materially bigger decision than a one-off manual check — recurring
+load on Deliveroo's site + an ongoing ToS/risk posture, not just "does discovery work"), or source
+a licensed commercial feed instead. Until authorised, Deliveroo stays `PENDING_AUTHORISATION`, not
+`ACTIVE` — a one-off manual research session does not make a source production-ready.
 
-### Next action
-
-Product-owner decision: either source a licensed commercial Deliveroo feed, or identify a different
-UK-capable discovery actor that accepts an exact address/postcode and does not escalate to
-proxy-evasion when blocked. The existing fixture/provider-driven adapter
-(`src/lib/discovery-engine/deliveroo/adapter.ts`) and its now-completed canonical field mapping
-(`deliveroo/parse.ts`) are ready to accept either without further code changes.
-
-## ISS-0022 — Just Eat phone enrichment covers 30/107 UB1 outlets only (bounded batch)
+## ISS-0022 — Just Eat phone batch: 93.5% coverage reached; remaining 7 honestly unresolved
 
 Date: 2026-07-21
 Severity: Low
 Owner: Zoeb
-Status: Open — deliberate scope bound, not a technical limit
+Status: **Resolved (second same-day follow-up session)** — full remaining batch run, with a
+correctness upgrade added first (name+address match validation — see docs/10_BUGS_AND_FIXES.md).
 
-### Problem
+### Original problem
 
-`npm run je:phone-enrich -- "UB1" 30` enriched only the first 30 of 107 real UB1 outlets missing a
-phone (28 found via Google Places, 2 not found). Full-sample phone coverage is 26.2% (28/107), not
-higher, purely because the remaining 77 outlets were not yet run through the same enrichment step —
-`GOOGLE_PLACES_MAX_CALLS_PER_RUN=800` has ample remaining budget; this was a deliberate bounded batch
-for this session, not a cap or error. See docs/73 for full detail. Also open: 1 duplicate-phone
-conflict was found and flagged (`+447863189603` → "Tehzeeb" / "Roma Restaurant") — not auto-resolved.
+`npm run je:phone-enrich -- "UB1" 30` enriched only 30/107 outlets, and blindly accepted every
+Google Places top-hit with a hardcoded 0.7 confidence — no real name/address cross-check.
 
-### Next action
+### Resolution
 
-Run `npm run je:phone-enrich -- "UB1" 107` (or omit the cap) to cover the remaining outlets; manually
-review the one duplicate-phone conflict; consider the same enrichment for other discovered outcodes.
+Before running the remaining batch, added a defensible match-validation gate (`namesMatch` +
+`addressMatches`, `test:phone-match` — 9 assertions; both the outlet's Just Eat name AND its
+postcode must independently corroborate the Google Places result, or the phone is rejected as
+"ambiguous" and not written). This required extending `GooglePlacesResult` with a `matchedName`
+field the runner's field mask already requested but never surfaced. Ran the remaining 79 eligible
+outlets (dry-run cost estimate £2.02–£2.53, well under the £10 authorised cap): **72 found and
+written** (name+address matched, confidence 0.85), 3 not found, **4 correctly rejected as
+ambiguous** (preventing wrong-number writes — e.g. a Google Places top-hit for "Falooda Village"
+returned "KULFI & JALEBI WALA" at a matching address; rejected despite the address match, since the
+name did not corroborate it). 0 new duplicate-phone conflicts.
+
+**Final: 100/107 UB1 outlets have a phone (93.5%),** up from the original 0%. The pre-existing
+duplicate-phone conflict (`+447863189603` → "Tehzeeb" / "Roma Restaurant") was resolved with
+evidence, not left open: both outlets share the exact same address, postcode, and coordinates (26
+The Broadway, UB1 1PS) — a shared-premises/virtual-brand pattern, not a data error.
+
+### Remaining (honestly unresolved, not further attempted)
+
+7/107 outlets have no phone: 3 no Google Places match found, 4 rejected as ambiguous matches. Per
+instruction, an ambiguous match was never accepted merely to raise the coverage number.

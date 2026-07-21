@@ -1,4 +1,12 @@
-# 73 — Just Eat phone enrichment (2026-07-21)
+# 73 — Just Eat phone enrichment (2026-07-21, updated same day — full batch complete)
+
+**Final result (second follow-up session): 100/107 UB1 outlets have a phone (93.5%)**, up from the
+0% recorded below and the 26.2% from the first bounded batch. A match-validation gate was added
+before running the remaining 79 outlets (see docs/10_BUGS_AND_FIXES.md and ISS-0022) — 72 more
+found and written (name+address verified, confidence 0.85), 3 not found, 4 correctly rejected as
+ambiguous (not accepted merely to raise the number). The pre-existing duplicate-phone conflict was
+resolved with evidence (shared premises, not a data error) — see ISS-0022 for full detail. The
+section below is the original (first-session) record, kept for history.
 
 Just Eat's listing endpoint supplies no phone number (verified, docs/57 field catalogue) and the
 restaurant-detail page/menu endpoint are lawfully unreachable (docs/59: Cloudflare 403 / 404, not

@@ -1,0 +1,2 @@
+source_outlet_id,source_url,name,brand,address,city,postcode,latitude,longitude,phone,rating,review_count,cuisines,is_delivery,is_collection,delivery_fee,minimum_order,eta_minutes,is_sponsored,logo_url,is_open
+example-uuid-001,https://www.ubereats.com/gb/store/example,Example Grill,,1 Example Road,Southall,UB1 2AA,51.5081,-0.3762,+442079460111,4.3,120,Indian;Curry,true,false,2.49,12.00,35,false,https://example-cdn.test/logo.jpg,true

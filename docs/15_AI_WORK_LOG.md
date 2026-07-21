@@ -530,3 +530,55 @@ customer comparison.
   the exceptions page, a real content hash + provenance on the audit page).
 - **Not done:** migration not applied to production; import screen UI not built (documented); Vercel
   untouched; no merge to main.
+
+### Production migration + smoke test + JE phone completion + real Deliveroo discovery + import screen — 2026-07-21 (second same-day follow-up)
+
+- **Verified before touching anything:** independently confirmed (not just trusted) both the
+  Supabase project ref (`rubhjkgygauuixiqouza` — matches `.env.local`, project `aspectlead-platform`)
+  and the Vercel auto-deploy claim (queried the Vercel API directly: both projects' latest
+  deployments carry `githubCommitSha: 72990dc...`, both READY).
+- **Production migration 0022 applied.** Could not trigger an on-demand backup (no such tool in the
+  available Supabase MCP toolset) — confirmed a real recoverable backup mechanism instead by
+  querying `pg_stat_archiver` directly (continuous WAL archiving active, last archived ~1 hour
+  before the session). Full post-migration verification: migration recorded, all 16 new
+  columns/2 indexes present, RLS unchanged, row counts identical before/after
+  (1005/20128/5189/5109/10 across the 5 affected tables), a transactional insert+rollback proved a
+  full canonical row + a second rating-history observation both work, `get_advisors` showed no new
+  issues. Full detail in `docs/09_DECISIONS.md`.
+- **Production smoke test:** the Preview deployment remains behind Vercel's SSO wall (not directly
+  testable without a browser session — none connected). The Production deployment
+  (`magna-lead-intelligence-system-pngu.vercel.app`) has no protection — smoke-tested all 9
+  requested routes directly (`/data-quality` genuinely 404s — the real route is
+  `/data-quality-exceptions`, flagged as a route-name mismatch in the instruction, not a bug).
+  9/9 reachable routes returned 200 with real data and no server/column errors (717 raw
+  observations, 2379 real exceptions, real content hashes, `ACTIVE`/`PROVIDER_UNAVAILABLE` status
+  badges — all confirmed live on production, not just locally). Mobile-width visual rendering not
+  independently verified (no connected browser this session either) — the new screens reuse the
+  same responsive Tailwind patterns as the rest of the verified app.
+- **Just Eat phone: 26.2% → 93.5%** (100/107 UB1 outlets). Added a real match-validation gate
+  first (extended `GooglePlacesResult` with `matchedName`, since the runner requested but never
+  surfaced it) after catching a self-referential no-op in an early draft of the validation logic.
+  Ran the remaining 79 eligible outlets (£2.02–£2.53 estimated, well under the £10 cap): 72 found
+  + written, 3 not found, 4 correctly rejected as ambiguous. Resolved the pre-existing
+  duplicate-phone conflict with evidence (identical address+coordinates — shared premises, not an
+  error). ISS-0022, docs/73 updated.
+- **Deliveroo: real discovery flow found and validated.** The prior `PROVIDER_UNAVAILABLE` verdict
+  (drawn from one guessed URL's 404) was corrected: a genuine Playwright/Chromium session (no
+  evasion) used Deliveroo's own visible postcode-search UI, found 150 real restaurant records (10
+  local to UB1, 100% ID/URL/name/rating/review-count/image coverage, phone confirmed absent, full
+  address from one detail-page inspection). Caught and fixed my own false-positive "challenge
+  detected" bug along the way (verified via screenshot before trusting a keyword match). New
+  calibrated parser `deliveroo-real-parse-0.1.0` (16 assertions) built from the real captured data.
+  `marketplaceStatus` corrected to `PENDING_AUTHORISATION` — a real path exists, productionising it
+  as a scheduled adapter is a separate, larger decision not made this session. docs/74.
+- **Import screen built:** `/import` + `/api/discovery/import` — source selection, CSV/JSON
+  upload, downloadable templates, dry-run validation, field-mapping preview, invalid-row display,
+  duplicate detection, geography validation (reuses the existing provider-geography-gate), confirm
+  step with a real content-hash evidence reference (honestly reports `persisted: false` — neither
+  source has a live outlets table yet). Does not mark a source `ACTIVE` from import support alone.
+  `test:import-route` (10 live assertions).
+- **Verified:** `npm run typecheck`, `npm run build`, and 19 test suites (18 static + the
+  server-dependent `test:import-route`) all green, no skips.
+- **Not done:** Preview deployment not directly smoke-tested (SSO wall, no browser session);
+  mobile-width rendering not visually verified (no browser session); Deliveroo production
+  automation not authorised or built (deliberately, per instruction); no merge to main.

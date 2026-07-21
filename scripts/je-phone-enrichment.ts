@@ -8,20 +8,22 @@
 // GooglePlacesRunner (src/lib/sources/google-places.ts) built for the TW/FSA pipeline.
 // No new acquisition logic was built — this reuses that runner exactly as it already
 // exists (single retry on transient errors only, honest disabled/error/not_found states,
-// per-run call cap).
+// per-run call cap, sequential/controlled concurrency).
 //
-//   npm run je:phone-enrich -- "UB1" [maxOutlets]
+//   npm run je:phone-enrich -- "UB1" [maxOutlets] [--dry-run]
+//
+// Match validation (added 2026-07-21): a Google Places top-hit is no longer accepted
+// blindly. The returned name and address are compared against the outlet's own Just Eat
+// name/postcode; a phone is written ONLY when BOTH signals agree (defensible match). A
+// single-signal match is classified "ambiguous" and NOT written — reported separately.
 //
 // Writes: je_outlets.telephone_* (ONLY when currently null — never overwrites a valid
-// value) + a je_field_provenance row per enriched field, using EXISTING columns only
-// (source, source_field_path, value, original_value, confidence, collected_at) — the new
-// source_url/enrichment_evidence_reference columns from migration 0022 are NOT used here
-// because that migration has not been applied to this (production) Supabase project; the
-// Google Maps URI / place ID evidence is retained inside original_value (jsonb) instead,
-// so nothing is lost.
+// value) + a je_field_provenance row per enriched field, using migration 0022's explicit
+// source_url / enrichment_evidence_reference columns (applied to production 2026-07-21).
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { namesMatch, addressMatches } from "../src/lib/discovery-engine/just-eat/phone-match";
 
 async function loadDotEnv() {
   for (const f of [".env.local", ".env"]) {
@@ -37,7 +39,8 @@ async function loadDotEnv() {
 
 async function main() {
   await loadDotEnv();
-  const args = process.argv.slice(2);
+  const args = process.argv.slice(2).filter((a) => a !== "--dry-run");
+  const dryRun = process.argv.includes("--dry-run");
   const outcodePrefix = (args[0] || "UB1").toUpperCase().replace(/\s+/g, "");
   const maxOutlets = Number.parseInt(args[1] ?? "30", 10);
 
@@ -60,19 +63,25 @@ async function main() {
     .select("id,je_outlet_id,trading_name,address_first_line,city,postcode,telephone_e164")
     .eq("tenant_id", tenantId)
     .eq("outcode", outcodePrefix)
-    .is("telephone_e164", null)
+    .is("telephone_e164", null) // guard: never re-call an outlet that already has a phone (cached/enriched already)
     .order("last_seen_at", { ascending: false })
     .limit(maxOutlets);
   if (res.error) { console.error("Query failed:", JSON.stringify(res.error)); process.exit(1); }
   const targets = (res.data ?? []) as Record<string, unknown>[];
 
   console.log(`\n=== Just Eat phone enrichment — outcode ${outcodePrefix}, up to ${maxOutlets} outlets missing a phone ===`);
-  console.log(`Targets: ${targets.length}`);
+  console.log(`Eligible targets (telephone_e164 IS NULL, not previously called): ${targets.length}`);
+  if (dryRun) {
+    console.log(`DRY RUN — no calls will be made. Estimated Google Places (New) calls: ${targets.length}.`);
+    console.log(`Estimated cost at ~$0.032-0.040/call (Text Search, Contact+Atmosphere fields): ~$${(targets.length * 0.032).toFixed(2)}-$${(targets.length * 0.04).toFixed(2)} (~£${(targets.length * 0.032 * 0.8).toFixed(2)}-£${(targets.length * 0.04 * 0.8).toFixed(2)}).`);
+    process.exit(0);
+  }
   if (!targets.length) { console.log("Nothing to enrich."); process.exit(0); }
 
   const runner = new GooglePlacesRunner();
-  let found = 0, notFound = 0, errored = 0, capReached = 0;
-  const phoneOwners = new Map<string, string[]>(); // e164 -> [je_outlet_id, ...] for duplicate-conflict detection
+  let found = 0, notFound = 0, ambiguous = 0, errored = 0, capReached = 0;
+  const phoneOwners = new Map<string, string[]>();
+  const representative: Record<string, unknown>[] = [];
 
   for (const t of targets) {
     const lead = {
@@ -80,17 +89,27 @@ async function main() {
       postcode: String(t.postcode ?? ""),
       address: String(t.address_first_line ?? ""),
     };
-    const result = await runner.enrich(lead);
+    const result = await runner.enrich(lead); // sequential — controlled concurrency (1 in flight)
     const observedAt = new Date().toISOString();
 
     if (result.status === "cap_reached") { capReached++; console.log(`  [cap reached] stopping — ${found} found so far`); break; }
     if (result.status === "error") { errored++; console.log(`  ✗ ${lead.businessName}: ${result.warning}`); continue; }
     if (result.status !== "found" || !result.formattedPhone) { notFound++; continue; }
 
+    // Defensible match check — reject ambiguous matches before even normalising the phone.
+    // Both the returned place NAME and its ADDRESS must independently corroborate the Just
+    // Eat listing; a single matching signal is not enough to accept a phone number.
+    const nameMatch = result.matchedName ? namesMatch(lead.businessName, result.matchedName) : false;
+    const addrMatch = addressMatches(lead.postcode, result.formattedAddress);
+    if (!(nameMatch && addrMatch)) {
+      ambiguous++;
+      console.log(`  ~ ${lead.businessName}: ambiguous match (name=${nameMatch} vs "${result.matchedName ?? "none"}", address=${addrMatch} vs "${result.formattedAddress ?? "none"}") — not accepted`);
+      continue;
+    }
+
     const norm = normaliseUkPhone(result.formattedPhone);
     if (!norm.valid || !norm.e164) { notFound++; console.log(`  ~ ${lead.businessName}: Google returned "${result.formattedPhone}" but it did not normalise to a valid UK number — not written`); continue; }
 
-    // Guarded update: only fills a currently-null phone, never overwrites a valid value.
     const upd = await db
       .from("je_outlets")
       .update({
@@ -110,15 +129,12 @@ async function main() {
       outlet_id: t.id,
       field_key: "telephone",
       value: JSON.stringify(norm.e164),
-      original_value: JSON.stringify({
-        formattedPhone: result.formattedPhone,
-        placeId: result.placeId,
-        googleMapsUri: result.googleMapsUri,
-        website: result.website,
-      }),
+      original_value: JSON.stringify({ formattedPhone: result.formattedPhone, placeId: result.placeId, matchedName: result.matchedName, matchedAddress: result.formattedAddress }),
       source: "google_places",
       source_field_path: "places.nationalPhoneNumber",
-      confidence: 0.7,
+      source_url: result.googleMapsUri,
+      enrichment_evidence_reference: result.placeId ? `google_places:${result.placeId}` : null,
+      confidence: 0.85, // both name AND address matched — higher than the previous unvalidated 0.7
       is_derived: false,
       collected_at: observedAt,
     });
@@ -127,19 +143,29 @@ async function main() {
     const owners = phoneOwners.get(norm.e164) ?? [];
     owners.push(String(t.je_outlet_id));
     phoneOwners.set(norm.e164, owners);
-    console.log(`  ✓ ${lead.businessName}: ${norm.e164} (Google Places, confidence 0.7)`);
+    if (representative.length < 10) {
+      representative.push({
+        je_outlet_id: t.je_outlet_id, name: lead.businessName, phone: norm.e164, source: "google_places",
+        placeId: result.placeId, sourceUrl: result.googleMapsUri, retrievedAt: observedAt,
+        matchConfidence: 0.85, matchedName: result.matchedName, matchedAddress: result.formattedAddress,
+      });
+    }
+    console.log(`  ✓ ${lead.businessName}: ${norm.e164} (Google Places, name+address matched, confidence 0.85)`);
   }
 
   const duplicates = [...phoneOwners.entries()].filter(([, owners]) => owners.length > 1);
 
   console.log(`\n--- Enrichment summary ---`);
-  console.log(`Attempted: ${found + notFound + errored}${capReached ? " (stopped early — call cap reached)" : ""}`);
-  console.log(`Found + written: ${found}`);
+  console.log(`Attempted: ${found + notFound + ambiguous + errored}${capReached ? " (stopped early — call cap reached)" : ""}`);
+  console.log(`Found + written (name+address matched): ${found}`);
   console.log(`Not found: ${notFound}`);
+  console.log(`Ambiguous (rejected — match not defensible): ${ambiguous}`);
   console.log(`Errors: ${errored}`);
   console.log(`Google Places calls used this run: ${runner.callsMade}`);
-  console.log(`Duplicate-phone conflicts (same number, different outlets): ${duplicates.length}`);
+  console.log(`New duplicate-phone conflicts this run: ${duplicates.length}`);
   for (const [phone, owners] of duplicates) console.log(`  ⚠ ${phone} → ${owners.join(", ")}`);
+  console.log(`\n--- Representative records (up to 10) ---`);
+  for (const r of representative) console.log(JSON.stringify(r));
 
   process.exit(0);
 }

@@ -17,6 +17,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Discovery Results", href: "/discovery-results" },
   { label: "Data-Quality Exceptions", href: "/data-quality-exceptions" },
   { label: "Audit / Evidence", href: "/audit" },
+  { label: "Import", href: "/import" },
   { label: "Leads", href: "/leads" },
   { label: "Telesales", href: "/telesales" },
   { label: "Export Review", href: "/export-review" },

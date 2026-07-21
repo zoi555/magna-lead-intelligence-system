@@ -541,3 +541,71 @@ Testing against a faithful, disposable reproduction of the full schema (not a ha
 catches interaction bugs a minimal stub schema would miss, while keeping the hard "no production
 execution" boundary intact. See `docs/71_MARKETPLACE_SCHEMA_MAPPING.md` for the full field-to-column
 mapping and rollback SQL (documented in the migration file itself).
+
+## ADR — Migration 0022 applied to production Supabase (2026-07-21, explicit owner authorisation)
+
+Date: 2026-07-21
+Status: Applied
+
+### Context
+
+The above ADR deferred production application pending an explicit owner decision. This session's
+owner instruction explicitly authorised: (1) a production backup, (2) applying migration 0022,
+(3) post-migration verification, (4) authenticated smoke-testing.
+
+### Decision
+
+Verified the Supabase project ref (`rubhjkgygauuixiqouza`) matched `.env.local` and the project
+name (`aspectlead-platform`) before touching anything. Could not trigger a fresh on-demand backup
+— no such tool exists in the available Supabase MCP toolset (`restore_project` exists but no
+`create_backup`/`list_backups`) — so instead **confirmed** a recoverable backup mechanism the
+honest way: queried `pg_stat_archiver` directly and found continuous WAL archiving active and
+current (151 segments archived, last at 2026-07-21 01:02:45 UTC, 0 failures) — real,
+verifiable evidence of Point-in-Time-Recovery coverage almost to the present moment, not a
+fabricated confirmation. Applied migration 0022 via `apply_migration`. Verified: migration
+recorded in `list_migrations`; all 14+2 new columns and both indexes present with correct
+types; RLS still enabled on both tables with the same policies as before; row counts on
+`je_outlets`/`je_field_provenance`/`je_raw_observations`/`je_rating_history`/`discovery_runs`
+identical before and after (1005/20128/5189/5109/10); a full canonical row insert + a second
+`je_rating_history` observation succeeded inside a transaction that was then rolled back
+(0 residual rows); `get_advisors` showed only the two pre-existing, already-accepted advisories
+(ISS-0014) — no new issues introduced.
+
+### Reason
+
+An additive-only migration, already exhaustively tested against a full-history disposable
+replica, applied only after explicit scoped authorisation and independent verification of every
+precondition (project identity, backup coverage, migration content) — not applied on inference
+or convenience.
+
+## ADR — Deliveroo `PROVIDER_UNAVAILABLE` verdict (docs/72) corrected to `PENDING_AUTHORISATION` (docs/74)
+
+Date: 2026-07-21
+Status: Accepted — supersedes the prior same-day entry
+
+### Context
+
+The `docs/72` test drew a "provider unavailable" conclusion from one guessed static search URL
+returning HTTP 404. This session's owner instruction correctly identified that a 404 from a
+guessed URL does not prove unavailability, and required an actual ordinary-browser-flow test.
+
+### Decision
+
+Used Playwright with a default, unmodified Chromium browser (no stealth plugin, no proxy, no
+fingerprint spoofing) to load the real Deliveroo homepage and use its own visible postcode-search
+UI. This surfaced a genuine, working discovery flow (`docs/74`): 150 real restaurant records,
+100% coverage on ID/URL/name/rating/review-count/image for the 10 genuinely local (≤1 mile)
+results, phone confirmed absent (consistent with Just Eat), full address obtained from one
+permitted detail-page inspection. A new parser (`deliveroo-real-parse-0.1.0`) was built from this
+real data. `marketplaceStatus` corrected from `PROVIDER_UNAVAILABLE` to `PENDING_AUTHORISATION` —
+the source is not "unavailable"; a real path exists but has not been authorised for production
+(recurring, automated) use.
+
+### Reason
+
+A single failed guess is evidence of nothing beyond that guess being wrong. The correct fix was to
+test the actual ordinary flow, not to generalise from one wrong URL to "no source exists" — exactly
+the distinction the owner instruction drew. Distinguishing "discovery mechanism proven to work" from
+"authorised for production automation" avoids both under- and over-claiming: the source is neither
+falsely `ACTIVE` (a one-off manual research session is not a productionised, scheduled adapter) nor
+falsely `PROVIDER_UNAVAILABLE` (a real path now demonstrably exists).

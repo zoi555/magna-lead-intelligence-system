@@ -1,0 +1,34 @@
+{
+  "id": "587501",
+  "name": "Chick Filler - Southall STL\t",
+  "uname": "chick-filler-southall-stl",
+  "hasOrderNotes": false,
+  "tipMessage": null,
+  "menuDisabled": false,
+  "menuDisabledByLocationOnly": false,
+  "testSite": false,
+  "deliversToCustomerLocation": true,
+  "menuId": "2808998",
+  "drnId": "3d4fe48d-651f-4248-b311-7736d9fe0057",
+  "brandDrnId": null,
+  "currencyCode": "GBP",
+  "currencySymbol": "\u00a3",
+  "branchType": "RESTAURANT",
+  "fulfillmentType": "DELIVEROO",
+  "location": {
+    "cityId": 1,
+    "zoneId": 1340,
+    "address": {
+      "address1": "20 South Road, London, UB11RT",
+      "postCode": null,
+      "neighborhood": "Southall",
+      "city": "london",
+      "country": "GB"
+    }
+  },
+  "links": {
+    "self": {
+      "href": "/menu/london/southall/chick-filler-southall-stl"
+    }
+  }
+}

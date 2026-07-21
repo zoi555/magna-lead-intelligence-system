@@ -1,0 +1,92 @@
+[
+  {
+    "restaurant_id": "587501",
+    "drn_id": "3d4fe48d-651f-4248-b311-7736d9fe0057",
+    "href": "/menu/London/southall/chick-filler-southall-stl?day=today&geohash=gcptp3rdtekk&time=ASAP",
+    "screen_reader": "Chick Filler. 0.1 mi. Delivers at 10. Rated 4.1 from 332 reviews.",
+    "distance_miles": 0.1,
+    "eta_minutes": "10",
+    "image_url": "https://rs-menus-api.roocdn.com/images/ce5c7384-7e8e-47f8-9e34-58ebeefcb43c/image.jpeg?width={w}&height={h}&auto=webp&format=jpg&fit=crop&v={&quality}"
+  },
+  {
+    "restaurant_id": "586915",
+    "drn_id": "50e46b53-b03e-4070-98b0-6b166fe02752",
+    "href": "/menu/London/southall/burgers-shack-southall?day=today&geohash=gcptp3rdtekk&time=ASAP",
+    "screen_reader": "Burgers Shack. 0.1 mi. Delivers at 10. Rated 3.9 from 51 reviews.",
+    "distance_miles": 0.1,
+    "eta_minutes": "10",
+    "image_url": "https://rs-menus-api.roocdn.com/images/075ea11d-02d8-42a1-b390-449e61e9971a/image.jpeg?width={w}&height={h}&auto=webp&format=jpg&fit=crop&v={&quality}"
+  },
+  {
+    "restaurant_id": "812381",
+    "drn_id": "cec54368-8f71-451c-be5b-b486110b56aa",
+    "href": "/menu/London/southall/wings-100-southall?day=today&geohash=gcptp3rdtekk&time=ASAP",
+    "screen_reader": "WINGS 100 . 0.1 mi. Delivers at 10. Rated 3.7 from 11 reviews.",
+    "distance_miles": 0.1,
+    "eta_minutes": "10",
+    "image_url": "https://rs-menus-api.roocdn.com/images/d224307b-2d74-4e53-8cf3-2de732777206/image.jpeg?width={w}&height={h}&auto=webp&format=jpg&fit=crop&v={&quality}"
+  },
+  {
+    "restaurant_id": "246479",
+    "drn_id": "af4e9969-1a37-4a88-8f46-9e7ddb6adce6",
+    "href": "/menu/London/southall/eggfree-cakebox-southall?day=today&geohash=gcptp3rdtekk&time=1015&timestamp=1784625300",
+    "screen_reader": "Cake Box - Southall (South Road). 0.1 mi. Delivers at 10:15. Rated 3.7 from 43 reviews.",
+    "distance_miles": 0.1,
+    "eta_minutes": "Pre-order",
+    "image_url": "https://rs-menus-api.roocdn.com/images/0ad11f9b-a0e3-43f6-8237-b4ba18b3c3ff/image.jpeg?width={w}&height={h}&auto=webp&format=jpg&fit=crop&v={&quality}"
+  },
+  {
+    "restaurant_id": "236053",
+    "drn_id": "1f800c1a-503f-4542-9be5-e9e03a2c8d74",
+    "href": "/menu/London/southall/chicken-cottage-southall?day=today&geohash=gcptp3rdtekk&time=ASAP",
+    "screen_reader": "Chicken Cottage. 0.2 mi. Delivers at 10. Rated 4.3 from 500+ reviews.",
+    "distance_miles": 0.2,
+    "eta_minutes": "10",
+    "image_url": "https://rs-menus-api.roocdn.com/images/348f2a47-c310-464e-bd67-7fbcb45f3ff0/image.jpeg?width={w}&height={h}&auto=webp&format=jpg&fit=crop&v={&quality}"
+  },
+  {
+    "restaurant_id": "367360",
+    "drn_id": "04a9399e-d03f-4764-8698-1c9f3f4c83b7",
+    "href": "/menu/London/southall/sambal-express-extra-southall?day=today&geohash=gcptp3rdtekk&time=0915&timestamp=1784621700",
+    "screen_reader": "Sambal Express Extra. 0.2 mi. Delivers at 09:15. Rated 4.5 from 108 reviews.",
+    "distance_miles": 0.2,
+    "eta_minutes": "Pre-order",
+    "image_url": "https://rs-menus-api.roocdn.com/images/d1718c3a-b2ba-436e-95d5-3da5342da432/image.jpeg?width={w}&height={h}&auto=webp&format=jpg&fit=crop&v={&quality}"
+  },
+  {
+    "restaurant_id": "504399",
+    "drn_id": "6a99bc23-aad8-4046-8250-6e91dd5da9c3",
+    "href": "/menu/London/southall/sams-chicken-southall-stl?day=today&geohash=gcptp3rdtekk&time=1000&timestamp=1784624400",
+    "screen_reader": "Sam's Chicken. 0.2 mi. Delivers at 10:00. Rated 4.3 from 500+ reviews.",
+    "distance_miles": 0.2,
+    "eta_minutes": "Pre-order",
+    "image_url": "https://rs-menus-api.roocdn.com/images/689d3b9f-da3c-4dd1-90c7-7146b81d7fda/image.jpeg?width={w}&height={h}&auto=webp&format=jpg&fit=crop&v={&quality}"
+  },
+  {
+    "restaurant_id": "672466",
+    "drn_id": "cbac14bc-bd08-4cea-ab00-c3455670e577",
+    "href": "/menu/London/southall/chaii-master-stl?day=today&geohash=gcptp3rdtekk&time=0815&timestamp=1784618100",
+    "screen_reader": "Chai Mast. 0.3 mi. Delivers at 08:15. Rated 4.4 from 65 reviews.",
+    "distance_miles": 0.3,
+    "eta_minutes": "Pre-order",
+    "image_url": "https://rs-menus-api.roocdn.com/images/90ee8d89-a2eb-4671-a068-3014b0c3c4a7/image.jpeg?width={w}&height={h}&auto=webp&format=jpg&fit=crop&v={&quality}"
+  },
+  {
+    "restaurant_id": "214186",
+    "drn_id": "4fe06e95-d007-4f6c-b7a3-cbaaf9da0e94",
+    "href": "/menu/London/southall/saravana-bhavan-southall?day=today&geohash=gcptp3rdtekk&time=0915&timestamp=1784621700",
+    "screen_reader": "Saravana Bhavan . 0.3 mi. Delivers at 09:15. Rated 4.4 from 500+ reviews.",
+    "distance_miles": 0.3,
+    "eta_minutes": "Pre-order",
+    "image_url": "https://rs-menus-api.roocdn.com/images/56682439-bdf8-4a99-a6c9-90d05b52bcfb/image.jpeg?width={w}&height={h}&auto=webp&format=jpg&fit=crop&v={&quality}"
+  },
+  {
+    "restaurant_id": "448182",
+    "drn_id": "f966df6c-f285-466b-a364-2f7c59f9022a",
+    "href": "/menu/London/southall/mcdonalds-0722-hanwell?day=today&geohash=gcptp3rdtekk&time=ASAP",
+    "screen_reader": "McDonald's. 0.8 mi. Delivers at 10. Rated 4.4 from 500+ reviews.",
+    "distance_miles": 0.8,
+    "eta_minutes": "10",
+    "image_url": "https://rs-menus-api.roocdn.com/images/b9b1d171-6363-43f5-bc93-5a9b7166db96/image.jpeg?width={w}&height={h}&auto=webp&format=jpg&fit=crop&v={&quality}"
+  }
+]

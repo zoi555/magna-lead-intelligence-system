@@ -261,3 +261,38 @@ count (121 instead of the correct 107) and diluting field-coverage percentages. 
 
 **Fix:** changed to `.eq("outcode", outcodePrefix)` (exact match). Re-verified against the live
 UB1 dataset: 107 restaurants, corrected coverage figures recorded in docs/73.
+
+## Fix — phone-enrichment match validation was a self-referential no-op (2026-07-21)
+
+**Bug:** an early draft of the upgraded `scripts/je-phone-enrichment.ts` computed a "name match"
+signal as `namesMatch(lead.businessName, lead.businessName)` — comparing the search query to
+itself, which is always true and therefore validates nothing. Caught before any live calls were
+made, while wiring up the required "exact name plus physical address/postcode matching" gate.
+
+**Root cause:** `GooglePlacesResult` (`src/lib/sources/google-places.ts`) did not surface the
+Google-returned place's `displayName`, even though the field mask already requested it — only
+`formattedAddress` was exposed.
+
+**Fix:** added `matchedName: string | null` to `GooglePlacesResult`, populated from
+`place.displayName?.text`. The enrichment script now compares the outlet's own name against this
+independently-returned name (token-overlap match) AND its postcode against the returned address —
+a phone is written only when both signals agree; a single-signal match is rejected as "ambiguous"
+and not written. `test:phone-match` (9 assertions) covers both functions directly. Verified live:
+of 79 real UB1 enrichment attempts, 4 were correctly rejected as ambiguous (e.g. a Google Places
+top-hit named "KULFI & JALEBI WALA" for a Just Eat listing "Falooda Village" at a matching address
+— same premises, different signage — correctly not accepted as a phone match without corroborating
+evidence).
+
+## Fix — Deliveroo challenge-detection false positive during the real browser test (2026-07-21)
+
+**Bug:** the first Deliveroo Playwright browser-test pass flagged a "CAPTCHA/challenge detected"
+on the genuine, fully-rendered homepage load — a false positive from a loose keyword match (the
+word "captcha" appears in hidden PerimeterX accessibility/boilerplate text present on many normal,
+unblocked pages, the same false-positive class the earlier curl-based test hit with "captcha" text
+in a script reference). A screenshot proved the page was the real, normal Deliveroo homepage with
+no visible block. See docs/74.
+
+**Fix:** verified via screenshot before trusting the keyword match; corrected the detection to
+require a specific page-title pattern ("attention required" / "access denied" / "just a moment")
+rather than any keyword appearing anywhere in the full DOM text, and completed the real UI
+interaction. No actual bot challenge was encountered at any point.
