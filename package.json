@@ -60,7 +60,9 @@
     "test:auth-bootstrap-idempotency": "tsx scripts/test-owner-bootstrap-idempotency.ts",
     "test:route-protection": "tsx scripts/test-route-protection-playwright.ts",
     "test:settings": "tsx scripts/test-settings-playwright.ts",
-    "test:create-new-run-playwright": "tsx scripts/test-create-new-run-playwright.ts"
+    "test:create-new-run-playwright": "tsx scripts/test-create-new-run-playwright.ts",
+    "live:je-proof": "tsx scripts/live-je-proof-playwright.ts",
+    "live:je-proof-verify": "tsx scripts/live-je-proof-verify-only.ts"
   },
   "dependencies": {
     "@expo-google-fonts/open-sans": "^0.4.2",

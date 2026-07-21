@@ -71,30 +71,28 @@ async function main() {
     assert(reopened != null && (reopened.target_filters.selectedProviders as string[])?.[0] === "just_eat", "reopening the draft returns the same selectedProviders");
     assert(reopened != null && reopened.target_filters.spendCeilingGbp === 25, "reopening the draft returns the same spend ceiling");
 
-    // Conflict check: same territory, still draft -> identical-active conflict
-    const conflictRes = await fetch("http://localhost:3000/api/discovery/runs/conflicts", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ queryUnits: plan.queryUnits }),
-    }).catch(() => null);
-    if (conflictRes) {
-      const cj = await conflictRes.json();
-      assert(cj.ok === true, "conflicts endpoint responds ok (dev server running)");
-    } else {
-      console.log("  SKIP: conflicts endpoint check needs the dev server running on :3000 (not started by this script).");
-    }
+    // Conflict-detection and PATCH-freeze behaviour are now covered more thoroughly by
+    // npm run test:create-new-run-playwright (a real authenticated browser session driving
+    // the actual wizard, including a genuine conflict warning + owner override + confirming
+    // a queued run really is frozen). /api/discovery/runs/conflicts and PATCH /api/discovery/runs/[id]
+    // are protected routes as of the auth work — an unauthenticated fetch() from this script
+    // now correctly gets 401, which is NOT a regression, so those two direct-fetch checks
+    // were removed here rather than left as permanently-red false failures.
+    console.log("  (conflict-detection + PATCH-freeze via unauthenticated fetch: superseded by test:create-new-run-playwright, which tests them authenticated)");
 
     const updated = await repo.updateRunDraft(run.id, buildRunInput({ tenant_id, name: run.name, territory_input: uniqueOutcode, target_filters: { ...targetFilters, ownerOverride: { acknowledged: true, note: "test override", at: new Date(0).toISOString() } } }, plan));
     assert((updated.target_filters.ownerOverride as { acknowledged: boolean })?.acknowledged === true, "owner override is recorded on the run");
 
     await repo.setRunStatus(run.id, "queued");
-    if (conflictRes) {
+    {
       const patchRes = await fetch(`http://localhost:3000/api/discovery/runs/${run.id}`, {
         method: "PATCH", headers: { "content-type": "application/json" },
         body: JSON.stringify({ name: "should be rejected", territory_input: uniqueOutcode }),
       });
-      assert(patchRes.status === 409, "PATCH is rejected (409) once a run is no longer 'draft' — config freezes once queued");
-    } else {
-      console.log("  SKIP: PATCH-freeze check needs the dev server running on :3000.");
+      // Unauthenticated now correctly gets 401 (route protection) before the route even
+      // reaches its own draft-only check — the authenticated 409 case is proven by
+      // test:create-new-run-playwright instead.
+      assert(patchRes.status === 401, `PATCH is rejected before reaching the route body when unauthenticated (got ${patchRes.status})`);
     }
 
     await repo.deleteRunCascade(run.id);
