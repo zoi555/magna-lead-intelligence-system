@@ -93,8 +93,20 @@ async function main() {
     const observedAt = new Date().toISOString();
 
     if (result.status === "cap_reached") { capReached++; console.log(`  [cap reached] stopping — ${found} found so far`); break; }
-    if (result.status === "error") { errored++; console.log(`  ✗ ${lead.businessName}: ${result.warning}`); continue; }
-    if (result.status !== "found" || !result.formattedPhone) { notFound++; continue; }
+    // Every attempt — success or not — writes an audit-trail provenance row (field_key
+    // 'telephone_enrichment_exception' with a null value; a phone is NEVER written here) so
+    // a later data-quality-exceptions review can see exactly why an outlet is still unresolved,
+    // not just that it is. See ISS-0022 / docs/77.
+    const recordException = async (reason: string, candidateName: string | null, candidateAddress: string | null) => {
+      await db.from("je_field_provenance").insert({
+        tenant_id: tenantId, outlet_id: t.id, field_key: "telephone_enrichment_exception",
+        value: null, original_value: JSON.stringify({ reason, candidateName, candidateAddress, searchedName: lead.businessName, searchedPostcode: lead.postcode }),
+        source: "google_places", source_field_path: "places.nationalPhoneNumber", confidence: null, is_derived: false, collected_at: observedAt,
+      });
+    };
+
+    if (result.status === "error") { errored++; console.log(`  ✗ ${lead.businessName}: ${result.warning}`); await recordException("provider_error", null, null); continue; }
+    if (result.status !== "found" || !result.formattedPhone) { notFound++; await recordException("no_match", null, null); continue; }
 
     // Defensible match check — reject ambiguous matches before even normalising the phone.
     // Both the returned place NAME and its ADDRESS must independently corroborate the Just
@@ -104,11 +116,12 @@ async function main() {
     if (!(nameMatch && addrMatch)) {
       ambiguous++;
       console.log(`  ~ ${lead.businessName}: ambiguous match (name=${nameMatch} vs "${result.matchedName ?? "none"}", address=${addrMatch} vs "${result.formattedAddress ?? "none"}") — not accepted`);
+      await recordException(`ambiguous_match (name_match=${nameMatch}, address_match=${addrMatch})`, result.matchedName, result.formattedAddress);
       continue;
     }
 
     const norm = normaliseUkPhone(result.formattedPhone);
-    if (!norm.valid || !norm.e164) { notFound++; console.log(`  ~ ${lead.businessName}: Google returned "${result.formattedPhone}" but it did not normalise to a valid UK number — not written`); continue; }
+    if (!norm.valid || !norm.e164) { notFound++; console.log(`  ~ ${lead.businessName}: Google returned "${result.formattedPhone}" but it did not normalise to a valid UK number — not written`); await recordException("matched_but_not_uk_phone", result.matchedName, result.formattedAddress); continue; }
 
     const upd = await db
       .from("je_outlets")

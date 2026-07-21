@@ -496,3 +496,40 @@ The Broadway, UB1 1PS) — a shared-premises/virtual-brand pattern, not a data e
 
 7/107 outlets have no phone: 3 no Google Places match found, 4 rejected as ambiguous matches. Per
 instruction, an ambiguous match was never accepted merely to raise the coverage number.
+
+**Update (third same-day follow-up session):** each of the 7 now has a full audit-trail record —
+reason, any candidate name/address considered, timestamp — written to `je_field_provenance`
+(`field_key='telephone_enrichment_exception'`, value always null, never a fabricated phone) and
+surfaced on `/data-quality-exceptions` under "Just Eat phone: unresolved (audit trail)" with a
+`resolutionStatus: 'unresolved'` badge and a drill-down link to the outlet. **Fully resolved as a
+tracking gap** — matching standards were not lowered; this only makes the existing rejections
+visible and explainable rather than silent.
+
+## ISS-0023 — Interface honesty audit: global banner corrected; dashboard demo data flagged locally
+
+Date: 2026-07-21 (third same-day follow-up session)
+Severity: Medium
+Owner: Zoeb
+Status: Resolved
+
+### Problem
+
+The global `PrototypeBanner` ("Prototype using mock data. No real customer data. No integrations
+connected.") was shown on **every** route, including 8 of 10 routes that are genuinely
+database-backed (docs/75 audit). This was misleading for anyone using the deployed app.
+
+### Resolution
+
+Replaced with `StatusBanner` — reads the same `SOURCE_REGISTRY` `/settings` already uses (one
+source of truth), showing per-source status (`Just Eat: ACTIVE`, `Uber Eats: PENDING AUTHORISED
+SOURCE`, `Deliveroo: PUBLIC SOURCE VALIDATED — PIPELINE INTEGRATION IN PROGRESS`, `Manual import:
+AVAILABLE`, `Customer comparison: NOT STARTED`). The dashboard (`/`, still 100% `mock-data.ts`) now
+carries its own explicit page-level "DEMO DATA" warning instead of relying on a global banner that
+no longer makes that claim. `PROTOTYPE_NOTICE`/`PrototypeBanner` removed (fully unused after the
+swap, not left as dead code).
+
+### Next action
+
+None — resolved. Full route-level classification in `docs/75_LIVE_DATA_AUDIT.md`. Wiring `/` and
+`/territories` off `mock-data.ts` onto real data remains open (unchanged from ISS-0020) but is now
+honestly labelled rather than silently misrepresented.

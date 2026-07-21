@@ -2,7 +2,7 @@
   "name": "lead-intelligence-app-shell",
   "version": "0.0.0",
   "private": true,
-  "description": "Lead Intelligence Platform — SaaS-neutral app shell (mock data only, not production).",
+  "description": "AspectLead Internal Beta — Lead Intelligence Platform. Just Eat discovery is live and database-backed; see /settings for per-source status.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -51,6 +51,8 @@
     "test:phone-match": "tsx scripts/test-phone-match-validation.ts",
     "test:deliveroo-real-parse": "tsx scripts/test-deliveroo-real-parse.ts",
     "test:import-route": "tsx scripts/test-import-route.ts",
+    "deliveroo:pilot": "tsx scripts/deliveroo-ub1-pilot.ts",
+    "test:deliveroo-provider": "tsx scripts/test-deliveroo-provider.ts",
     "uber:pilot": "tsx scripts/uber-pilot.ts"
   },
   "dependencies": {

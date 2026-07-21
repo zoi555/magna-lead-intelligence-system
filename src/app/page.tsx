@@ -20,6 +20,13 @@ export default function OverviewPage() {
     <div>
       <PageHeader title="Overview" subtitle={`${TENANT_NAME} · West London operations`} />
 
+      <div role="status" className="mb-4 rounded-card border px-4 py-2 text-[12.5px]" style={{ background: "#FDF3E1", borderColor: "#f2d9a6", color: "#92600b" }}>
+        <b>DEMO DATA:</b> every number on this dashboard is illustrative, not database-backed. For
+        real, live records see <a href="/discovery-results" className="underline">Discovery Results</a>,{" "}
+        <a href="/discovery-runs" className="underline">Discovery Runs</a>, or{" "}
+        <a href="/data-quality-exceptions" className="underline">Data-Quality Exceptions</a>.
+      </div>
+
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <StatCard label="New leads" value={kpis.newLeads} trend="this run" />
         <StatCard label="Ready for review" value={kpis.readyForReview} />

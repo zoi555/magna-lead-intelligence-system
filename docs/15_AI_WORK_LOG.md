@@ -582,3 +582,52 @@ customer comparison.
 - **Not done:** Preview deployment not directly smoke-tested (SSO wall, no browser session);
   mobile-width rendering not visually verified (no browser session); Deliveroo production
   automation not authorised or built (deliberately, per instruction); no merge to main.
+
+### Internal-beta correction: real persistence, real Deliveroo pilot, honest interface — 2026-07-21 (third same-day follow-up)
+
+- **Live-data audit** (`docs/75`): every named route classified from its actual loader code, not
+  HTTP status. `/` = `DEMO_DATA` (100% `mock-data.ts`); 8 routes = `LIVE_REAL_DATA`; `/settings` =
+  `LIVE_PARTIAL_DATA` (real env checks, hand-maintained registry); `/import` (before this session's
+  fix) = `EMPTY_BUT_OPERATIONAL`.
+- **Interface corrected:** replaced the global "Prototype using mock data... No integrations
+  connected" banner (shown on every route, false for 8/10) with `StatusBanner` reading the same
+  `SOURCE_REGISTRY` `/settings` uses. Dashboard now carries its own explicit DEMO DATA warning.
+- **Import persistence — real, not claimed.** Two new tables (`import_batches`,
+  `provider_raw_observations`) plus one additive evidence-traceability column on two existing
+  consolidation tables — everything else reuses migration 0015's existing multi-source
+  architecture, per instruction (no duplicate schema). Transaction safety via
+  `commit_import_batch()` — one Postgres function call is one transaction; proved with a real
+  mid-batch-failure test (record 1, inserted before record 2's deliberate failure, is confirmed
+  NOT left behind). **Production correction mid-session:** migration 0023's first real persistence
+  attempt failed (`digest()` unresolvable — Supabase installs `pgcrypto` in an `extensions` schema,
+  not `public`) — the transaction safety caught it correctly (nothing persisted); fixed forward
+  with migration 0024, and fixed the **local** test harness (previously didn't mirror this Supabase
+  convention, which is why the bug wasn't caught first). Verified end-to-end against production:
+  a real record posted through `/import` is genuinely visible on `/discovery-results` and its
+  detail page — not just claimed by the API. `/discovery-results` extended to merge
+  `consolidated_candidates` (imports) alongside `je_outlets` (a follow-up bug — no `ORDER BY` +
+  `limit(200)` meant a fresh import could be pushed past the page by 1000+ historical rows — was
+  found and fixed the same way, verified against production).
+- **Deliveroo real provider + pilot:** `DeliverooAdapter.importRealDiscovery`/`.importRealDetail`
+  wired onto the calibrated real parser. Ran the bounded UB1 pilot twice: first attempt's detail
+  step used `networkidle` (never fires on Deliveroo — fixed to `domcontentloaded`, not a block);
+  second attempt captured 150/150 real discovery records with no challenge, but 3-way concurrent
+  detail-page requests triggered a genuine Cloudflare challenge on the first batch — correctly
+  stopped, not bypassed, not retried. Net result: 150 raw records, **0 canonical records persisted
+  this run** (postcode confirmation blocked by the challenge — reported honestly, not disguised).
+  Full detail: `docs/76`.
+- **Just Eat's 7 unresolved outlets** now have a full audit trail (`je_field_provenance`,
+  `field_key='telephone_enrichment_exception'`) — reason, candidate considered, timestamp — surfaced
+  on `/data-quality-exceptions`. Matching standards were not lowered; this only makes existing
+  rejections visible.
+- **Backup wording corrected** per instruction: recorded as "WAL archiving verified; restore
+  capability not independently proven" — retention window, PITR availability, restore permissions,
+  and last-successful-backup are NOT independently verifiable via the available Supabase MCP
+  toolset (no `list_backups`/`get_backup_status` tool exists) and are reported as such, not guessed.
+- **Verified:** `npm run typecheck`, `npm run build`, 21 test suites (20 static + the
+  server-dependent `test:import-route`, which proves real persistence end-to-end against a live
+  server) all green.
+- **Not done:** sequential (non-concurrent) Deliveroo detail enrichment not attempted (would be a
+  retry against the same site after a challenge — explicitly excluded); Deliveroo production
+  automation not authorised; mobile-width visual verification and Preview-deployment smoke test
+  still blocked by no connected browser session (unchanged limitation, ISS-0019).

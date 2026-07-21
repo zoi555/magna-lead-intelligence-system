@@ -7,6 +7,7 @@
 import { ADAPTER_VERSION } from "../version";
 import { parseDeliverooSearch } from "./parse";
 import { importDeliverooJson, importDeliverooCsv } from "./import";
+import { parseDeliverooFeedCards, parseDeliverooDetail, type DeliverooFeedCard, type DeliverooDetailRestaurant } from "./parse-real";
 import type { SourceOutlet } from "../consolidation/types";
 import type { PlatformAdapter, PlatformCapabilities, PlatformAdapterConfig, PlatformQuery, PlatformQueryResult } from "../consolidation/source-adapter";
 
@@ -80,6 +81,22 @@ export class DeliverooAdapter implements PlatformAdapter {
     const outlets = importDeliverooCsv(csvText, observedAt);
     this.diagnostics.lastImport = { method: "csv", count: outlets.length, at: observedAt };
     return outlets;
+  }
+
+  /** Map real public-flow discovery cards (docs/74, docs/76) — the ordinary browser search
+   *  UI, not a bypassed API — into canonical SourceOutlet records. Live capture happens in
+   *  scripts/deliveroo-ub1-pilot.ts (browser automation, not this adapter's job); this method
+   *  is the calibrated real-data mapping step. */
+  importRealDiscovery(cards: DeliverooFeedCard[], observedAt = new Date().toISOString()): SourceOutlet[] {
+    const outlets = parseDeliverooFeedCards(cards, observedAt);
+    this.diagnostics.lastImport = { method: "real_discovery", count: outlets.length, at: observedAt };
+    return outlets;
+  }
+
+  /** Map one real public restaurant-detail page's captured metadata (address/postcode) — see
+   *  docs/74. Phone is never present here; confirmed absent from the public detail page too. */
+  importRealDetail(detail: DeliverooDetailRestaurant, observedAt = new Date().toISOString()): SourceOutlet {
+    return parseDeliverooDetail(detail, observedAt);
   }
 
   exposeDiagnostics(): Record<string, unknown> { return { ...this.diagnostics, adapterVersion: this.adapterVersion }; }

@@ -30,9 +30,19 @@ sleep 1
 
 export PGHOST="$SOCKDIR" PGPORT="$PORT" PGUSER=testuser PGDATABASE=postgres
 createdb aspectlead_migration_test
+# Supabase databases default search_path to include `extensions` (where pgcrypto etc. live) —
+# match that here so unqualified gen_random_uuid()/digest() calls resolve the same way locally
+# as they do on the real project.
+psql -q -c 'ALTER DATABASE aspectlead_migration_test SET search_path = "$user", public, extensions;'
 
 psql -v ON_ERROR_STOP=1 -d aspectlead_migration_test -q <<'STUBS'
-create extension if not exists pgcrypto;
+-- Match Supabase's real convention: pgcrypto (and most extensions) install into a dedicated
+-- `extensions` schema, NOT `public`. A local stub that installed pgcrypto into `public` (as
+-- vanilla Postgres would by default) missed a real production bug this session — a SECURITY
+-- DEFINER function's `search_path = public` could not resolve digest() on Supabase. Fixed here
+-- so this class of bug is caught locally before it ever reaches production again.
+create schema if not exists extensions;
+create extension if not exists pgcrypto with schema extensions;
 create schema if not exists auth;
 create table if not exists auth.users (id uuid primary key default gen_random_uuid());
 create or replace function auth.uid() returns uuid language sql stable as $$ select null::uuid $$;
@@ -105,6 +115,36 @@ SQL
     "select source_url from je_field_provenance where outlet_id = '$OUTLET_ID' and field_key = 'telephone';" "https://maps.google.com/?cid=12345"
   check "enrichment provenance: non-JE evidence reference column works" \
     "select enrichment_evidence_reference from je_field_provenance where outlet_id = '$OUTLET_ID' and field_key = 'telephone';" "evidence/google_places_full-shape-1.json"
+
+  # --- commit_import_batch: successful commit ---
+  GOOD_RECORDS='[{"source_outlet_id":"imp-1","name":"Import Test Diner","postcode":"UB1 1AA","latitude":"51.5","longitude":"-0.37","field_values":{"phone":"+442079460111"}},{"source_outlet_id":"imp-2","name":"Import Test Cafe","postcode":"UB1 2BB","latitude":"51.51","longitude":"-0.38"}]'
+  COMMIT_RESULT="$(psql -t -A -q -c "select commit_import_batch('$TENANT_ID'::uuid, null, 'uber_eats', 'csv', 'test.csv', 'abc123hash', 'test-parser-1.0', 'test-adapter-1.0', 0, 0, '$GOOD_RECORDS'::jsonb);")"
+  check "commit_import_batch returns accepted=2 for a valid 2-record batch" \
+    "select ('$COMMIT_RESULT')::jsonb->>'accepted';" "2"
+  check "committed batch has 2 provider_raw_observations rows" \
+    "select count(*) from provider_raw_observations where source_record_id in ('imp-1','imp-2');" "2"
+  check "committed batch has 2 consolidated_candidates rows" \
+    "select count(*) from consolidated_candidates where name in ('Import Test Diner','Import Test Cafe');" "2"
+  check "import_batches row marked committed with correct accepted_count" \
+    "select status || ':' || accepted_count from import_batches where file_checksum = 'abc123hash';" "committed:2"
+  check "candidate_source_links.raw_observation_id populated (evidence traceability)" \
+    "select count(*) from candidate_source_links where source_outlet_id in ('imp-1','imp-2') and raw_observation_id is not null;" "2"
+  check "candidate_field_provenance populated with the field_values payload" \
+    "select value::text from candidate_field_provenance where source_outlet_id='imp-1' and field_key='phone';" "\"+442079460111\""
+
+  # --- commit_import_batch: transaction rollback on a mid-batch failure ---
+  # Record 2's latitude is not numeric — the cast inside the function raises an exception
+  # partway through the loop (after record 1 has already been inserted within the SAME
+  # function call). One function invocation is one transaction, so this must roll back
+  # BOTH records and the import_batches row — never a partial batch.
+  BAD_RECORDS='[{"source_outlet_id":"bad-imp-1","name":"Should Not Persist One","postcode":"UB1 3CC","latitude":"51.5","longitude":"-0.37"},{"source_outlet_id":"bad-imp-2","name":"Should Not Persist Two","postcode":"UB1 4DD","latitude":"NOT_A_NUMBER","longitude":"-0.37"}]'
+  psql -q -c "select commit_import_batch('$TENANT_ID'::uuid, null, 'uber_eats', 'csv', 'bad.csv', 'deadbeefhash', 'test-parser-1.0', 'test-adapter-1.0', 0, 0, '$BAD_RECORDS'::jsonb);" >/dev/null 2>&1 || true
+  check "rollback: no import_batches row for the failed checksum" \
+    "select count(*) from import_batches where file_checksum = 'deadbeefhash';" "0"
+  check "rollback: record 1 (which succeeded before the failure) was NOT left behind" \
+    "select count(*) from consolidated_candidates where name = 'Should Not Persist One';" "0"
+  check "rollback: record 1's raw observation was NOT left behind either" \
+    "select count(*) from provider_raw_observations where source_record_id = 'bad-imp-1';" "0"
 
   if [ "$ASSERT_FAIL" -eq 1 ]; then FAILED=1; fi
 fi

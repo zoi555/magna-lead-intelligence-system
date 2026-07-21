@@ -296,3 +296,45 @@ no visible block. See docs/74.
 require a specific page-title pattern ("attention required" / "access denied" / "just a moment")
 rather than any keyword appearing anywhere in the full DOM text, and completed the real UI
 interaction. No actual bot challenge was encountered at any point.
+
+## Fix — commit_import_batch() could not resolve digest() on production Supabase (2026-07-21)
+
+**Bug:** the first production attempt to persist a real import via `commit_import_batch()` failed
+with `function digest(text, unknown) does not exist`. `pgcrypto` (which provides `digest()`) is
+installed by Supabase into a dedicated `extensions` schema, not `public` — but the function's
+`SET search_path = public` did not include it. Caught by the transaction-safety design itself:
+the failed call rolled back completely, nothing was persisted.
+
+**Fix:** migration 0024 sets `search_path = public, extensions` on the function (fix-forward, not
+an edit to the already-applied 0023). Also fixed `scripts/test-migration-local.sh`'s disposable
+Postgres stub, which previously installed `pgcrypto` into `public` by default (vanilla Postgres
+behaviour) — this is why the bug wasn't caught locally first. The stub now creates an `extensions`
+schema and sets the test database's default `search_path` to match Supabase's real convention, so
+this class of bug is caught before it ever reaches production again.
+
+## Fix — Deliveroo detail-page fetch used `networkidle`, which never fires on Deliveroo (2026-07-21)
+
+**Bug:** the first Deliveroo UB1 pilot attempt used `page.goto(url, { waitUntil: "networkidle" })`
+for restaurant-detail pages. All 20 timed out after 20s. This was misread as a possible block at
+first glance, but is not — Deliveroo's pages continuously poll analytics/tracking endpoints in the
+background, so the page never reaches "no network activity for 500ms," regardless of whether the
+content has actually loaded.
+
+**Fix:** switched to `waitUntil: "domcontentloaded"` + a short fixed wait, the same approach
+already proven to work for the single-restaurant detail fetch earlier in the session (docs/74).
+On retry, discovery and the wait-strategy fix both worked correctly; a genuine Cloudflare
+challenge was then encountered on the first 3-concurrent-request detail batch (docs/76) — a
+separate, real finding, correctly not bypassed or retried.
+
+## Fix — /discovery-results candidate query missed a new import (no ORDER BY, limit exhausted) (2026-07-21)
+
+**Bug:** after wiring imported Uber Eats/Deliveroo records into `/discovery-results` (via
+`consolidated_candidates`), a freshly-persisted test import did not appear on the page. The
+underlying query had no `ORDER BY` and a `limit(200)` — with 1000+ historical `consolidated_candidates`
+rows for the tenant (accumulated over months of prior Just Eat consolidation runs) returned in an
+arbitrary order, the new row simply wasn't in the first 200 returned.
+
+**Fix:** added `.order("last_seen", { ascending: false })` (newest first) and switched the
+non-Just-Eat filter to a DB-level `candidate_source_links!inner(...)` + `.neq(...)` filter instead
+of fetching everything and filtering client-side — both fixes verified against production by
+confirming the test import appeared correctly after the change, then removing the test data.

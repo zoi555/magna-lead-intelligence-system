@@ -14,6 +14,17 @@ export interface GeographyMismatchGroup {
 
 export interface DuplicatePhoneConflict { phone: string; outlets: OutletRef[] }
 
+export interface PhoneEnrichmentException {
+  outletId: string;
+  name: string;
+  postcode: string | null;
+  reason: string; // "no_match" | "ambiguous_match (...)" | "matched_but_not_uk_phone" | "provider_error"
+  candidateName: string | null;
+  candidateAddress: string | null;
+  attemptedAt: string;
+  resolutionStatus: "unresolved"; // no resolution-workflow tooling built yet — always honest
+}
+
 export interface DataQualityExceptions {
   configured: boolean;
   totalOutlets: number;
@@ -26,6 +37,7 @@ export interface DataQualityExceptions {
   geographyMismatches: GeographyMismatchGroup[];
   duplicateObservations: { totalCanonical: number; totalDuplicates: number; sample: { sourceRecordId: string; duplicateOfId: string }[] };
   schemaFailures: { count: number; sample: { sourceRecordId: string; source: string; parseStatus: string }[] };
+  phoneEnrichmentExceptions: PhoneEnrichmentException[];
 }
 
 function toRef(r: Record<string, unknown>): OutletRef {
@@ -41,6 +53,7 @@ export async function fetchDataQualityExceptions(): Promise<DataQualityException
     duplicatePhoneConflicts: [], geographyMismatches: [],
     duplicateObservations: { totalCanonical: 0, totalDuplicates: 0, sample: [] },
     schemaFailures: { count: 0, sample: [] },
+    phoneEnrichmentExceptions: [],
   };
   if (!hasServiceCredentials()) return empty;
 
@@ -139,6 +152,35 @@ export async function fetchDataQualityExceptions(): Promise<DataQualityException
     .eq("tenant_id", tenantId)
     .neq("parse_status", "parsed");
 
+  // Phone-enrichment audit trail (ISS-0022) — every enrichment attempt that did NOT result in
+  // a phone being written, with its reason and any candidate match considered. Never a
+  // fabricated phone: this table only ever records what was rejected and why.
+  const phoneExcRes = await db
+    .from("je_field_provenance")
+    .select("outlet_id,original_value,collected_at")
+    .eq("tenant_id", tenantId)
+    .eq("field_key", "telephone_enrichment_exception")
+    .order("collected_at", { ascending: false });
+  const phoneExcOutletIds = [...new Set((phoneExcRes.data ?? []).map((r: Record<string, unknown>) => String(r.outlet_id)))];
+  const phoneExcOutletsRes = phoneExcOutletIds.length
+    ? await db.from("je_outlets").select("id,trading_name,postcode,telephone_e164").in("id", phoneExcOutletIds)
+    : { data: [] as Record<string, unknown>[] };
+  const phoneExcOutletMap = new Map(((phoneExcOutletsRes.data ?? []) as Record<string, unknown>[]).map((o) => [String(o.id), o]));
+  const phoneEnrichmentExceptions: PhoneEnrichmentException[] = ((phoneExcRes.data ?? []) as Record<string, unknown>[])
+    .filter((r) => {
+      const o = phoneExcOutletMap.get(String(r.outlet_id));
+      return o && !o.telephone_e164; // only still-unresolved outlets — a later successful enrichment supersedes the exception record
+    })
+    .map((r) => {
+      const o = phoneExcOutletMap.get(String(r.outlet_id))!;
+      const ov = typeof r.original_value === "string" ? JSON.parse(r.original_value) : (r.original_value as Record<string, unknown>) ?? {};
+      return {
+        outletId: String(r.outlet_id), name: String(o.trading_name ?? ""), postcode: (o.postcode as string) ?? null,
+        reason: String(ov.reason ?? "unknown"), candidateName: (ov.candidateName as string) ?? null, candidateAddress: (ov.candidateAddress as string) ?? null,
+        attemptedAt: String(r.collected_at), resolutionStatus: "unresolved" as const,
+      };
+    });
+
   return {
     configured: true,
     totalOutlets: outlets.length,
@@ -162,5 +204,6 @@ export async function fetchDataQualityExceptions(): Promise<DataQualityException
         sourceRecordId: String(r.source_record_id), source: String(r.source), parseStatus: String(r.parse_status),
       })),
     },
+    phoneEnrichmentExceptions,
   };
 }

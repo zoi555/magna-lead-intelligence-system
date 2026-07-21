@@ -7,7 +7,7 @@ import { APP_FULL_NAME } from "@/lib/app-config";
 
 export const metadata: Metadata = {
   title: APP_FULL_NAME,
-  description: "SaaS-neutral app shell — mock data only, not production.",
+  description: "AspectLead internal beta — Just Eat discovery is live and database-backed; Uber Eats/Deliveroo/customer comparison status shown per-source in-app.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

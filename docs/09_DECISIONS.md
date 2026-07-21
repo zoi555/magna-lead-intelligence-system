@@ -609,3 +609,47 @@ the distinction the owner instruction drew. Distinguishing "discovery mechanism 
 "authorised for production automation" avoids both under- and over-claiming: the source is neither
 falsely `ACTIVE` (a one-off manual research session is not a productionised, scheduled adapter) nor
 falsely `PROVIDER_UNAVAILABLE` (a real path now demonstrably exists).
+
+## ADR — Import/discovery persistence reuses consolidation architecture; migrations 0023 + 0024 applied to production
+
+Date: 2026-07-21 (third same-day follow-up)
+Status: Applied
+
+### Context
+
+`/import` validated but never persisted (`persisted: false`, honestly). The owner instruction
+required real persistence for authorised CSV/JSON imports, without requiring a live Uber/Deliveroo
+integration first.
+
+### Decision
+
+Two new tables only (`import_batches`, `provider_raw_observations`) — everything else reuses the
+EXISTING consolidation architecture from migration 0015 (`consolidated_candidates`,
+`candidate_source_links`, `candidate_field_values`, `candidate_field_provenance`), adding one
+additive `raw_observation_id` evidence-traceability column to two of those tables. Transaction
+safety via one new function, `commit_import_batch()` — a single Postgres function call is already
+atomically transactional, so a failure partway through a batch rolls back everything the function
+had written, proven with a real mid-batch-failure test (`scripts/test-migration-local.sh`): record
+1, inserted successfully before record 2's failure, is confirmed NOT left behind.
+
+Applied to production after the same verification discipline as migration 0022 (project-ref check,
+backup-status confirmation, full post-migration verification). **Correction mid-session:** the
+first production apply (0023) failed at the FIRST real persistence attempt — `digest()` (from
+`pgcrypto`) could not be resolved because Supabase installs `pgcrypto` into an `extensions` schema,
+not `public`, and the function's `search_path` only included `public`. The transaction-safety
+design caught this exactly as intended: nothing was persisted by the failed attempt. Fixed forward
+with migration 0024 (`search_path = public, extensions`) rather than editing the already-applied
+0023. Also fixed the **local** disposable-Postgres test harness to install `pgcrypto` into an
+`extensions` schema too (previously it defaulted to `public`, which is why this class of bug
+wasn't caught locally first) — future migrations will catch this before touching production.
+
+The SAME `commit_import_batch()` function is reused for the Deliveroo UB1 pilot (docs/76) — a
+live discovery run and a controlled file import are the same shape (pre-validated records
+committed atomically), so no separate persistence path was built for Deliveroo.
+
+### Reason
+
+Reusing the existing multi-source consolidation model (already designed to hold Just Eat, Uber
+Eats and Deliveroo records side by side) avoids a second, parallel canonical-record schema. A
+single-function-call transaction is the simplest correct way to get atomicity through the
+Supabase JS client, which has no multi-statement transaction API of its own.

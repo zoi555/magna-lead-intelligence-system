@@ -144,6 +144,40 @@ No assistant, developer, or unfortunate human may claim the project works withou
   validated discovery flow is a one-off manual research result, not a productionised, scheduled
   adapter — treating it as such would be a separate, larger, unauthorised decision.
 
+### 2026-07-21 (third same-day follow-up session)
+
+- Change tested: interface honesty (banner + audit), real import persistence (migrations 0023 +
+  0024), Deliveroo real provider + UB1 pilot, Just Eat exception audit trail, backup-wording
+  correction.
+- Command/manual check:
+  - Read every named route's actual data-loader source before classifying it (not HTTP status).
+  - Applied 0023 to production; first real persistence attempt failed genuinely (`digest()`
+    unresolved) — confirmed via the actual error, not assumed; nothing was left persisted
+    (checked directly via SQL); fixed forward with 0024; re-verified the exact same real
+    persistence call then succeeded.
+  - `SMOKE_TEST_BASE_URL` live test posts a real record through `/import`, confirms it via SQL,
+    confirms it is genuinely rendered on `/discovery-results` HTML (not just claimed by the JSON
+    response), then deletes everything it created.
+  - Ran the Deliveroo pilot twice; second run's "detail challenge" classification checked against
+    a specific, well-known Cloudflare interstitial title pattern, not a loose keyword (the class of
+    check that produced a false positive earlier this session) — accepted as genuine on that basis.
+  - Backup: queried `pg_stat_archiver` directly (WAL archiving confirmed active/current). No tool
+    in the available Supabase MCP toolset can list backups, confirm PITR retention, or test a
+    restore — reported as "not independently proven," not guessed or assumed.
+  - `npm run typecheck`, `npm run build`, 21 test suites (20 static + `test:import-route` against
+    a live server) all green.
+- Result: `/import` genuinely persists to production (verified, not claimed); interface no longer
+  misrepresents 8/10 live routes as mock; Deliveroo pilot ran for real (150 discovery records, 0
+  canonical — honestly reported, cause identified); JE's 7 unresolved phones now have a real audit
+  trail.
+- Evidence link/screenshot: `docs/75` (audit), `docs/76` (pilot), `docs/09_DECISIONS.md` (both
+  migration ADRs), `docs/10_BUGS_AND_FIXES.md` (4 real bugs found and fixed this session, each
+  caught by direct verification, not assumed away).
+- Remaining risk: sequential (non-concurrent) Deliveroo detail enrichment was not attempted — doing
+  so now would be a retry against the same site shortly after a challenge, which is explicitly
+  excluded; whether it would avoid the challenge is genuinely unknown. Preview Vercel deployment
+  and mobile-width rendering remain unverified (no connected browser session, unchanged limitation).
+
 ### YYYY-MM-DD HH:mm
 
 - Change tested:

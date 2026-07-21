@@ -43,6 +43,7 @@ export default async function DiscoveryResultsPage({
   const rows = page.rows.map((r) => ({
     name: <Link href={`/discovery-results/${r.id}`} className="font-medium text-actionblue hover:text-actionhover">{r.name}</Link>,
     name_text: r.name, // plain-text mirror of `name` for search matching (the cell itself is a JSX link)
+    source: r.source,
     address: r.address ?? "—",
     postcode: r.postcode ?? "—",
     phone: r.phone ?? "Not supplied",
@@ -60,11 +61,12 @@ export default async function DiscoveryResultsPage({
     <div>
       <PageHeader
         title="Discovery Results"
-        subtitle={`${page.total} real Just Eat record${page.total === 1 ? "" : "s"} for outcode ${page.outcode} — from the canonical database (je_outlets), not a placeholder.`}
+        subtitle={`${page.total} real record${page.total === 1 ? "" : "s"} for outcode ${page.outcode} — Just Eat (je_outlets, live discovery) + any imported Uber Eats/Deliveroo records (consolidated_candidates). Not a placeholder.`}
       />
       <DataTable
         columns={[
           { key: "name", label: "Name" },
+          { key: "source", label: "Source", badge: true },
           { key: "address", label: "Address" },
           { key: "postcode", label: "Postcode" },
           { key: "phone", label: "Phone" },

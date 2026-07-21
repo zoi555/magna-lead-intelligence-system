@@ -17,6 +17,9 @@ interface ImportResult {
   confirmed?: boolean;
   persisted?: boolean;
   persistenceNote?: string;
+  importBatchId?: string;
+  runId?: string;
+  persistedCount?: number;
   totalRowsSubmitted?: number;
   parsedCount?: number;
   invalidRowCount?: number;
@@ -63,7 +66,7 @@ export function ImportPanel() {
       const res = await fetch("/api/discovery/import", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ source, format, content, confirm }),
+        body: JSON.stringify({ source, format, content, confirm, fileName }),
       });
       const j = (await res.json()) as ImportResult;
       if (!j.ok) throw new Error(j.error || "Import failed");
@@ -133,8 +136,14 @@ export function ImportPanel() {
       {result && (
         <div aria-live="polite" className="space-y-4">
           {result.confirmed && (
-            <div className="rounded-card border px-4 py-3 text-[13px]" style={{ background: "#E7F5EC", borderColor: "#bfe6cd", color: "#137a3b" }}>
-              <b>Import confirmed.</b> {result.persistenceNote}
+            <div className="rounded-card border px-4 py-3 text-[13px]" style={{ background: result.persisted ? "#E7F5EC" : "#FDF3E1", borderColor: result.persisted ? "#bfe6cd" : "#f2d9a6", color: result.persisted ? "#137a3b" : "#92600b" }}>
+              <b>{result.persisted ? `Import confirmed — ${result.persistedCount} record(s) persisted.` : "Import confirmed."}</b> {result.persistenceNote}
+              {result.persisted && (
+                <div className="mt-1 text-[12px]">
+                  Batch <span className="font-mono">{result.importBatchId}</span> ·{" "}
+                  <a href="/discovery-results" className="underline">View in Discovery Results →</a>
+                </div>
+              )}
             </div>
           )}
 

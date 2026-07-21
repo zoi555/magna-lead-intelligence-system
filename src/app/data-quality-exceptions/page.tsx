@@ -116,6 +116,23 @@ export default async function DataQualityExceptionsPage() {
             ))}
           </ul>
         </Section>
+
+        <Section title="Just Eat phone: unresolved (audit trail)" count={x.phoneEnrichmentExceptions.length}>
+          <p className="mb-2 text-[11.5px] text-muted">Every attempt is logged, including rejected candidate matches — never a fabricated phone.</p>
+          <ul className="space-y-2 text-[12.5px]">
+            {x.phoneEnrichmentExceptions.map((e) => (
+              <li key={e.outletId} className="border-b border-bordergrey pb-2 last:border-0">
+                <div className="flex items-center justify-between">
+                  <Link href={`/discovery-results/${e.outletId}`} className="text-actionblue hover:text-actionhover">{e.name || "(unnamed)"}</Link>
+                  <span className="rounded-full bg-[#EEF1F5] px-2 py-0.5 text-[11px] font-semibold text-muted">{e.resolutionStatus}</span>
+                </div>
+                <div className="text-muted">{e.postcode ?? "—"} · reason: <span className="text-ink">{e.reason}</span></div>
+                {e.candidateName && <div className="text-muted">Candidate considered: {e.candidateName} — {e.candidateAddress}</div>}
+                <div className="text-[11px] text-muted">Attempted {new Date(e.attemptedAt).toLocaleString("en-GB")}</div>
+              </li>
+            ))}
+          </ul>
+        </Section>
       </div>
     </div>
   );

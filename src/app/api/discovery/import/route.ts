@@ -15,6 +15,8 @@ import { createHash } from "node:crypto";
 import { UberEatsAdapter } from "@/lib/discovery-engine/uber-eats/adapter";
 import { DeliverooAdapter } from "@/lib/discovery-engine/deliveroo/adapter";
 import { partitionByGeography } from "@/lib/discovery-engine/geography/provider-geography-gate";
+import { createServiceClient, hasServiceCredentials } from "@/lib/discovery-engine/supabase-client";
+import { resolveDefaultTenantId } from "@/lib/discovery-engine/server";
 import type { SourceOutlet } from "@/lib/discovery-engine/consolidation/types";
 
 export const runtime = "nodejs";
@@ -65,6 +67,7 @@ export async function POST(req: Request) {
     const format = body.format as Format;
     const content = String(body.content ?? "");
     const confirm = Boolean(body.confirm);
+    const originalFilename: string | null = body.fileName ? String(body.fileName) : null;
     const anchorOutcodes: string[] = Array.isArray(body.anchorOutcodes) && body.anchorOutcodes.length ? body.anchorOutcodes : ["UB1"];
 
     if (source !== "uber_eats" && source !== "deliveroo") return NextResponse.json({ ok: false, error: "source must be 'uber_eats' or 'deliveroo'" }, { status: 400 });
@@ -126,14 +129,96 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, dryRun: true, ...summary });
     }
 
-    // Confirm: same validation, evidence reference retained — but NOT persisted to a live
-    // outlets table, honestly, because neither source has one yet (both PENDING_AUTHORISATION).
+    // Confirm: persist via commit_import_batch (migration 0023) — one function call, one
+    // Postgres transaction, so a failure partway through leaves nothing behind (see
+    // scripts/test-migration-local.sh for the rollback proof). Only valid geography +
+    // deduplicated (first occurrence per source_outlet_id) + non-invalid records are sent.
+    if (!hasServiceCredentials()) {
+      return NextResponse.json({ ok: false, error: "Supabase service credentials not configured — cannot persist." }, { status: 500 });
+    }
+
+    const seen = new Set<string>();
+    const toCommit = geo.valid.filter((o) => {
+      if (seen.has(o.source_outlet_id)) return false; // dedupe: keep first occurrence only
+      seen.add(o.source_outlet_id);
+      return true;
+    });
+
+    const db = createServiceClient();
+    const tenantId = await resolveDefaultTenantId();
+
+    const runRes = await db.from("discovery_runs").insert({
+      tenant_id: tenantId,
+      name: `Import: ${source} (${originalFilename ?? format}) ${observedAt}`,
+      territory_mode: "import",
+      territory_input: anchorOutcodes.join(", "),
+      status: "completed",
+    }).select("id").single();
+    if (runRes.error) return NextResponse.json({ ok: false, error: `Failed to create import run: ${JSON.stringify(runRes.error)}` }, { status: 500 });
+    const runId = (runRes.data as { id: string }).id;
+
+    const parserVersion = toCommit[0]?.parser_version ?? "unknown";
+    const providerVersion = toCommit[0]?.provider_version ?? "unknown";
+
+    const records = toCommit.map((o) => ({
+      source_outlet_id: o.source_outlet_id,
+      raw: o, // the canonical parsed record; the original row is recoverable via the batch's file_checksum + this source_outlet_id
+      name: o.name,
+      brand: o.brand,
+      postcode: o.postcode,
+      phone: o.phone,
+      latitude: o.latitude,
+      longitude: o.longitude,
+      source_url: o.source_url,
+      rating: o.rating,
+      review_count: o.review_count,
+      cuisines: o.cuisines,
+      is_delivery: o.is_delivery,
+      is_collection: o.is_collection,
+      field_values: {
+        address: o.address,
+        eta_minutes: o.eta_minutes,
+        delivery_cost: o.delivery_cost,
+        minimum_order: o.minimum_order,
+        is_sponsored: o.is_sponsored,
+        logo_url: o.logo_url,
+        image_url: o.image_url ?? null,
+        service_fee: o.service_fee ?? null,
+      },
+    }));
+
+    // duplicateRowCount = total rows beyond each source_outlet_id's first occurrence, across
+    // every parsed outlet (not just the valid-geography subset) — matches `duplicates` above.
+    const duplicateRowCount = duplicates.reduce((sum, d) => sum + (d.count - 1), 0);
+    const rejectedFromInvalidAndGeo = invalidRows.length + geo.outOfScope.length + geo.unverifiable.length;
+    const rpcRes = await db.rpc("commit_import_batch", {
+      p_tenant_id: tenantId,
+      p_run_id: runId,
+      p_source: source,
+      p_format: format,
+      p_original_filename: originalFilename,
+      p_file_checksum: createHash("sha256").update(content).digest("hex"),
+      p_parser_version: parserVersion,
+      p_provider_version: providerVersion,
+      p_rejected_count: rejectedFromInvalidAndGeo,
+      p_duplicate_count: duplicateRowCount,
+      p_records: records,
+    });
+
+    if (rpcRes.error) {
+      return NextResponse.json({ ok: false, error: `Import commit failed — nothing was persisted (transactional): ${JSON.stringify(rpcRes.error)}` }, { status: 500 });
+    }
+    const committed = rpcRes.data as { batch_id: string; accepted: number };
+
     return NextResponse.json({
       ok: true,
       dryRun: false,
       confirmed: true,
-      persisted: false,
-      persistenceNote: `${source === "uber_eats" ? "Uber Eats" : "Deliveroo"} is PENDING_AUTHORISATION (see Settings) — validated records are evidence-retained (${evidenceReference}) but not written to a live outlets table. Persistence becomes available once this source is authorised.`,
+      persisted: true,
+      importBatchId: committed.batch_id,
+      runId,
+      persistedCount: committed.accepted,
+      persistenceNote: `${committed.accepted} record(s) persisted to consolidated_candidates + provider_raw_observations (import batch ${committed.batch_id}). Appears in Discovery Results and Data-Quality Exceptions immediately.`,
       ...summary,
     });
   } catch (e) {

@@ -406,3 +406,23 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   (field mapping, invalid rows, duplicates, geography), honest about not persisting to a live
   table for either unauthorised source.
 - Verified: typecheck, build, 19 test suites green (no skips).
+
+### Internal-beta correction: real persistence, honest interface, Deliveroo pilot — 2026-07-21 (3rd follow-up)
+
+- **Interface corrected:** the global "mock data / no integrations connected" banner (shown on
+  every route, false for 8/10) replaced with a real per-source status banner. Live-data audit of
+  all 10 named routes: `docs/75`.
+- **`/import` now genuinely persists** — 2 new tables reusing the existing multi-source
+  consolidation architecture (no duplicate schema), atomic via one `commit_import_batch()`
+  Postgres function call, proven with a real mid-batch-failure rollback test. A production
+  `pgcrypto`-schema bug was caught by the transaction safety itself (nothing persisted), fixed
+  forward (migration 0024), and the local test harness fixed to catch this class of bug first
+  going forward. Verified end-to-end against production.
+- **Deliveroo pilot run:** 150/150 real discovery records, no challenge (twice). Detail
+  enrichment: single request works; 3-concurrent triggered a genuine Cloudflare challenge —
+  correctly stopped, not retried. 0 canonical records persisted this run (honest — postcode
+  confirmation was blocked). `docs/76`.
+- **Just Eat's 7 unresolved phones** now have a full audit trail on `/data-quality-exceptions`.
+- **Backup wording corrected**: "WAL archiving verified; restore capability not independently
+  proven" (not overclaimed as a confirmed backup).
+- Verified: typecheck, build, 21 test suites green (incl. a live end-to-end persistence test).

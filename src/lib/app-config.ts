@@ -3,9 +3,6 @@ export const APP_NAME = "Lead Intelligence";
 export const APP_FULL_NAME = "Lead Intelligence Platform";
 export const TENANT_NAME = "Demo Company";
 
-export const PROTOTYPE_NOTICE =
-  "Prototype using mock data. No real customer data. No integrations connected.";
-
 export type NavItem = { label: string; href: string };
 
 export const NAV_ITEMS: NavItem[] = [

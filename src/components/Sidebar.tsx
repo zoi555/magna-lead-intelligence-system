@@ -44,7 +44,7 @@ export function Sidebar() {
       </nav>
 
       <div className="px-5 py-3 text-[11px]" style={{ color: "#8b93a1" }}>
-        SaaS-neutral shell · mock data
+        Internal beta · Just Eat live
       </div>
     </aside>
   );
