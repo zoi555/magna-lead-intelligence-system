@@ -20,7 +20,15 @@ async function loadDotEnv() {
 
 async function main() {
   await loadDotEnv();
-  const input = process.argv.slice(2).join(" ").trim() || "UB1";
+  const args = process.argv.slice(2);
+  const tenantArgIdx = args.findIndex((a) => a.startsWith("--tenant-slug="));
+  const tenantSlug = tenantArgIdx >= 0 ? args[tenantArgIdx].split("=")[1] : process.env.WORKER_TENANT_SLUG;
+  const input = args.filter((_, i) => i !== tenantArgIdx).join(" ").trim() || "UB1";
+  if (!tenantSlug) {
+    console.error("No tenant specified — pass --tenant-slug=<slug> or set WORKER_TENANT_SLUG in .env.local.");
+    console.error("This CLI has no session to resolve a tenant from, and no longer silently defaults to 'magna'.");
+    process.exit(1);
+  }
   const { hasServiceCredentials, createServiceClient } = await import("../src/lib/discovery-engine/supabase-client");
   if (!hasServiceCredentials()) { console.error("Missing service credentials."); process.exit(1); }
   if (String(process.env.JUST_EAT_ENABLED ?? "").toLowerCase() !== "true") { console.error("JUST_EAT_ENABLED must be 'true' for a live run."); process.exit(1); }
@@ -32,11 +40,12 @@ async function main() {
   const { SupabaseRepository } = await import("../src/lib/discovery-engine/repository/supabase");
   const { runWorkerOnce } = await import("../src/lib/discovery-engine/worker/loop");
   const { consolidateRun } = await import("../src/lib/discovery-engine/consolidation/consolidate-run");
-  const { resolveDefaultTenantId } = await import("../src/lib/discovery-engine/server");
 
   const db = createServiceClient();
   const repo = new SupabaseRepository();
-  const tenantId = await resolveDefaultTenantId();
+  const tenantRes = await db.from("tenants").select("id").eq("slug", tenantSlug).maybeSingle();
+  if (tenantRes.error || !tenantRes.data) { console.error(`Tenant slug '${tenantSlug}' not found.`); process.exit(1); }
+  const tenantId = (tenantRes.data as { id: string }).id;
   const ref = await loadPostcodeReference();
 
   console.log(`\n=== Territory: "${input}" ===`);
@@ -46,7 +55,8 @@ async function main() {
   for (const a of plan.ambiguousPlaces) console.log(`  AMBIGUOUS ${a.token}: ${a.candidates.length} choices — not guessed`);
   if (!plan.queryUnits.length) { console.log("No query units — nothing to run."); process.exit(0); }
 
-  const { run } = await saveRunFromPlan(repo, { tenant_id: tenantId, name: `live: ${input}`, territory_mode: "manual_outcodes", territory_input: input }, plan);
+  const runName = `Just Eat discovery — ${input} — ${new Date().toISOString().slice(0, 10)}`;
+  const { run } = await saveRunFromPlan(repo, { tenant_id: tenantId, name: runName, territory_mode: "manual_outcodes", territory_input: input }, plan);
   const exec = await queueJustEatExecution(repo, run.id);
   console.log(`Run ${run.id} queued (execution ${exec.id}).`);
 
