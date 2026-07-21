@@ -338,3 +338,31 @@ arbitrary order, the new row simply wasn't in the first 200 returned.
 non-Just-Eat filter to a DB-level `candidate_source_links!inner(...)` + `.neq(...)` filter instead
 of fetching everything and filtering client-side — both fixes verified against production by
 confirming the test import appeared correctly after the change, then removing the test data.
+
+## Fix — `run-detail.ts` read a renamed column, silently returning `[]` forever (2026-07-21)
+
+**Bug:** migration `0014_rename_derived_query_units.sql` renamed `discovery_runs.derived_outcodes`
+→ `derived_query_units` (2 months before this session). `run-detail.ts`'s `fetchRunDetail()` still
+read `r.derived_outcodes` from its `select("*")` result — the column no longer existed under that
+name, so `Array.isArray(r.derived_outcodes)` was always `false` and `RunDetail.run.derivedOutcodes`
+silently returned `[]` for every run, forever, with no error (Supabase's `select("*")` just omits
+unknown-named reads rather than throwing). Found while building the Create New Run conflict-check
+endpoint, which needed this field to actually work.
+
+**Fix:** read `r.derived_query_units` instead. One-line fix, no migration needed (the correct
+column already existed).
+
+## Gotcha — cancelling a queued execution doesn't finish it; it can still be claimed by another test (2026-07-21)
+
+**Not a code bug** — a testing-process gotcha worth recording. `POST /api/discovery/executions/[id]/cancel`
+only sets `cancel_requested = true`; the execution stays `status = 'queued'` until a worker actually
+claims and processes it (the worker checks the flag mid-run and finishes as `'cancelled'`). A queued
+execution created during manual/E2E testing and merely "cancelled" this way is **not** inert — it
+remains claimable. This was discovered when a leftover queued-but-not-yet-claimed test execution
+(from a Create New Run E2E proof) was claimed by `test:je-supabase`'s own `claimNextExecution()`
+call ahead of that test's own freshly-queued execution (claimed_by matched the test's own worker
+name), causing a cascade of unrelated-looking assertion failures in that test.
+
+**Takeaway:** when manually creating+queueing a test run outside the normal worker flow, delete its
+full cascade (`repo.deleteRunCascade`) once the proof is captured — don't just cancel and leave the
+row — if there's any chance another test or the real worker could claim it first.

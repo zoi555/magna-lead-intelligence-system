@@ -54,7 +54,8 @@
     "deliveroo:pilot": "tsx scripts/deliveroo-ub1-pilot.ts",
     "test:deliveroo-provider": "tsx scripts/test-deliveroo-provider.ts",
     "uber:pilot": "tsx scripts/uber-pilot.ts",
-    "test:homepage-and-nav": "tsx scripts/test-homepage-and-nav.ts"
+    "test:homepage-and-nav": "tsx scripts/test-homepage-and-nav.ts",
+    "test:create-new-run": "tsx scripts/test-create-new-run.ts"
   },
   "dependencies": {
     "@expo-google-fonts/open-sans": "^0.4.2",
