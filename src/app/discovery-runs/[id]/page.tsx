@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { fetchRunDetail } from "@/lib/discovery-engine/reports/run-detail";
+import { RunResultsMap } from "./RunResultsMap";
 
 export const dynamic = "force-dynamic";
 
@@ -115,6 +116,11 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
             </table>
           </div>
         )}
+
+        <div className="rounded-card border border-bordergrey bg-card p-4 shadow-soft lg:col-span-2">
+          <h2 className="mb-2 text-[15px] font-semibold text-ink">Territory &amp; anchors</h2>
+          <RunResultsMap runId={d.run.id} territoryInput={d.run.territoryInput} />
+        </div>
 
         <div className="rounded-card border border-bordergrey bg-card p-4 shadow-soft lg:col-span-2">
           <h2 className="mb-2 text-[15px] font-semibold text-ink">Evidence links</h2>

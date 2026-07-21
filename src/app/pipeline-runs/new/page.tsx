@@ -34,6 +34,7 @@ import { ExpandableMap } from "@/features/geospatial/ExpandableMap";
 import { aspectleadSourceConfig, NATIONAL_INITIAL_VIEW } from "@/features/geospatial/aspectlead-map-config";
 import { runTerritoryGeometry } from "@/features/geospatial/aspectlead-territory";
 import { GeographySelector } from "@/features/discovery/GeographySelector";
+import { AspectLeadMap } from "@/features/geospatial/AspectLeadMap";
 import { SOURCE_REGISTRY, MANUAL_IMPORT_STATUS } from "@/lib/sources/source-registry";
 
 const STEPS = ["Identity", "Territory", "Target profile", "Anchors", "Provider & spend", "Review & confirm"] as const;
@@ -168,6 +169,10 @@ function NewRunPageInner() {
     if (!anchorLabel.trim() || !Number.isFinite(lat) || !Number.isFinite(lng)) { alert("Anchor needs a label and valid latitude/longitude."); return; }
     update((d) => { d.planning.anchors = [...d.planning.anchors, { id: `anchor_${Date.now()}`, label: anchorLabel.trim(), lat, lng }]; });
     setAnchorLabel(""); setAnchorLat(""); setAnchorLng("");
+  };
+  const addAnchorAtPoint = (pt: { lat: number; lng: number }) => {
+    update((d) => { d.planning.anchors = [...d.planning.anchors, { id: `anchor_${Date.now()}`, label: `Anchor ${d.planning.anchors.length + 1}`, lat: pt.lat, lng: pt.lng }]; });
+    announce("Anchor added from map click.");
   };
   const removeAnchor = (id: string) => update((d) => { d.planning.anchors = d.planning.anchors.filter((a) => a.id !== id); });
 
@@ -409,7 +414,8 @@ function NewRunPageInner() {
 
           {step === 3 && (
             <Card title="Anchors">
-              <Muted>One or more reference points for this run (e.g. a high street centre). Multiple anchors were never supported before this screen.</Muted>
+              <Muted>One or more reference points for this run (e.g. a high street centre). Multiple anchors were never supported before this screen — click the map or enter coordinates manually.</Muted>
+              <AspectLeadMap mode="run-planning" territoryInput={draft.territory.input} anchors={pl.anchors} onMapClickPoint={addAnchorAtPoint} embeddedClassName="h-[420px]" />
               <div className="grid sm:grid-cols-4 gap-2 my-2">
                 <input className={inp} value={anchorLabel} onChange={(e) => setAnchorLabel(e.target.value)} placeholder="Label, e.g. Southall Town Hall" />
                 <input className={inp} value={anchorLat} onChange={(e) => setAnchorLat(e.target.value)} placeholder="Latitude" />
