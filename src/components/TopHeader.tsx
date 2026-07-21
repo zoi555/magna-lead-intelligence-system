@@ -1,5 +1,6 @@
 import React from "react";
 import { TENANT_NAME, ENVIRONMENT_LABEL } from "@/lib/app-config";
+import { getSessionUser } from "@/lib/supabase/server-client";
 
 const ENV_STYLE: Record<string, { bg: string; fg: string }> = {
   Production: { bg: "#FBE9E9", fg: "#b91c1c" }, // deliberately the most visually distinct — production deserves attention
@@ -8,8 +9,9 @@ const ENV_STYLE: Record<string, { bg: string; fg: string }> = {
   "Local Development": { bg: "#EEF1F5", fg: "#475569" },
 };
 
-export function TopHeader() {
+export async function TopHeader() {
   const envStyle = ENV_STYLE[ENVIRONMENT_LABEL] ?? ENV_STYLE["Local Development"];
+  const user = await getSessionUser();
   return (
     <header className="flex h-14 items-center justify-between border-b border-bordergrey bg-card px-6">
       {/* Tenant identity is DATA (configurable per deployment), not the product brand. */}
@@ -23,8 +25,16 @@ export function TopHeader() {
         </span>
       </div>
       <div className="flex items-center gap-3">
-        {/* No authentication is implemented yet — this is never a fabricated signed-in user. */}
-        <span className="text-[13px] text-muted">No authentication configured</span>
+        {user ? (
+          <>
+            <span className="text-[13px] text-ink">{user.email}</span>
+            <form action="/auth/signout" method="POST">
+              <button type="submit" className="rounded-btn border border-bordergrey px-2 py-1 text-[12px] text-muted hover:text-ink">Sign out</button>
+            </form>
+          </>
+        ) : (
+          <span className="text-[13px] text-muted">Not signed in</span>
+        )}
       </div>
     </header>
   );

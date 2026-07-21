@@ -4,22 +4,26 @@
 // once queued, a run's config is frozen.
 
 import { NextResponse } from "next/server";
-import { getRepo, resolveDefaultTenantId } from "@/lib/discovery-engine/server";
+import { getRepo } from "@/lib/discovery-engine/server";
 import { buildRunInput, type CreateRunParams } from "@/lib/discovery-engine/run-service";
 import { loadPostcodeReference } from "@/lib/discovery-engine/geography/reference";
 import { JUST_EAT_GEOGRAPHY_SUPPORT } from "@/lib/discovery-engine/geography/planner";
 import { planTerritoryWithPlaces } from "@/lib/discovery-engine/geography/plan-with-places";
 import { createServiceClient } from "@/lib/discovery-engine/supabase-client";
+import { requireSessionAndRole } from "@/lib/auth/require-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await requireSessionAndRole();
+  if (session instanceof NextResponse) return session;
   try {
     const { id } = await params;
     const repo = getRepo();
     const existing = await repo.getRun(id);
     if (!existing) return NextResponse.json({ ok: false, error: "Run not found" }, { status: 404 });
+    if (existing.tenant_id !== session.tenantId) return NextResponse.json({ ok: false, error: "Run not found" }, { status: 404 });
     if (existing.status !== "draft") {
       return NextResponse.json({ ok: false, error: `Run is '${existing.status}', not 'draft' — its configuration is frozen once queued.` }, { status: 409 });
     }
@@ -30,7 +34,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (!name) return NextResponse.json({ ok: false, error: "Run name is required" }, { status: 400 });
     if (!territory_input) return NextResponse.json({ ok: false, error: "Territory (postcode districts / places) is required" }, { status: 400 });
 
-    const tenant_id = await resolveDefaultTenantId();
+    const tenant_id = session.tenantId;
     const ref = await loadPostcodeReference();
     const db = createServiceClient();
     const params2: CreateRunParams = {

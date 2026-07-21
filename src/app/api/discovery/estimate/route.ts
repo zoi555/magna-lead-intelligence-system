@@ -5,20 +5,22 @@
 // prior Just Eat presence, and that is reported honestly, not hidden.
 
 import { NextResponse } from "next/server";
-import { resolveDefaultTenantId } from "@/lib/discovery-engine/server";
 import { createServiceClient, hasServiceCredentials } from "@/lib/discovery-engine/supabase-client";
+import { requireSessionAndRole } from "@/lib/auth/require-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const session = await requireSessionAndRole();
+  if (session instanceof NextResponse) return session;
   try {
     const body = await req.json().catch(() => ({}));
     const queryUnits: string[] = Array.isArray(body.queryUnits) ? body.queryUnits.map((u: unknown) => String(u).toUpperCase()) : [];
     if (!queryUnits.length) return NextResponse.json({ ok: true, estimatedVolume: 0 });
     if (!hasServiceCredentials()) return NextResponse.json({ ok: true, estimatedVolume: null });
 
-    const tenant_id = await resolveDefaultTenantId();
+    const tenant_id = session.tenantId;
     const db = createServiceClient();
     const res = await db.from("je_outlets").select("id", { count: "exact", head: true }).eq("tenant_id", tenant_id).in("outcode", queryUnits);
     if (res.error) throw new Error(JSON.stringify(res.error));

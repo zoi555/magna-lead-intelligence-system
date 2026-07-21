@@ -7,6 +7,7 @@
 import { NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
+import { requireSessionAndRole } from "@/lib/auth/require-session";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,8 @@ function excludedLead(r: Record<string, string>, i: number) {
 }
 
 export async function GET() {
+  const session = await requireSessionAndRole();
+  if (session instanceof NextResponse) return session;
   const fallbackUsed = !exists(CLEAN);
   if (fallbackUsed) {
     const rows = readCsv(FALLBACK);

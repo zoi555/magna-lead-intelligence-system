@@ -4,17 +4,20 @@
 // recovery only.
 
 import { NextResponse } from "next/server";
-import { getRepo, resolveDefaultTenantId } from "@/lib/discovery-engine/server";
+import { getRepo } from "@/lib/discovery-engine/server";
 import { saveRunFromPlan, persistGeographyProvenance, type CreateRunParams } from "@/lib/discovery-engine/run-service";
 import { loadPostcodeReference } from "@/lib/discovery-engine/geography/reference";
 import { JUST_EAT_GEOGRAPHY_SUPPORT } from "@/lib/discovery-engine/geography/planner";
 import { planTerritoryWithPlaces } from "@/lib/discovery-engine/geography/plan-with-places";
 import { createServiceClient } from "@/lib/discovery-engine/supabase-client";
+import { requireSessionAndRole } from "@/lib/auth/require-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const session = await requireSessionAndRole();
+  if (session instanceof NextResponse) return session;
   try {
     const body = await req.json().catch(() => ({}));
     const name = String(body.name ?? "").trim();
@@ -22,7 +25,7 @@ export async function POST(req: Request) {
     if (!name) return NextResponse.json({ ok: false, error: "Run name is required" }, { status: 400 });
     if (!territory_input) return NextResponse.json({ ok: false, error: "Territory (postcode districts / places) is required" }, { status: 400 });
 
-    const tenant_id = await resolveDefaultTenantId();
+    const tenant_id = session.tenantId;
     const ref = await loadPostcodeReference();
     const db = createServiceClient();
     const params: CreateRunParams = {

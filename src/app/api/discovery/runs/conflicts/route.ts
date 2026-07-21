@@ -6,7 +6,8 @@
 // warning only.
 
 import { NextResponse } from "next/server";
-import { getRepo, resolveDefaultTenantId } from "@/lib/discovery-engine/server";
+import { getRepo } from "@/lib/discovery-engine/server";
+import { requireSessionAndRole } from "@/lib/auth/require-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,13 +15,15 @@ export const dynamic = "force-dynamic";
 const BLOCKING_STATUSES = new Set(["draft", "queued", "running"]);
 
 export async function POST(req: Request) {
+  const session = await requireSessionAndRole();
+  if (session instanceof NextResponse) return session;
   try {
     const body = await req.json().catch(() => ({}));
     const queryUnits: string[] = Array.isArray(body.queryUnits) ? body.queryUnits.map((u: unknown) => String(u).toUpperCase()) : [];
     const excludeRunId: string | null = body.excludeRunId ?? null;
     if (!queryUnits.length) return NextResponse.json({ ok: true, overlaps: [], identicalActiveConflict: false });
 
-    const tenant_id = await resolveDefaultTenantId();
+    const tenant_id = session.tenantId;
     const runs = await getRepo().listRuns(tenant_id);
     const proposed = new Set(queryUnits);
 

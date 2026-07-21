@@ -55,7 +55,10 @@
     "test:deliveroo-provider": "tsx scripts/test-deliveroo-provider.ts",
     "uber:pilot": "tsx scripts/uber-pilot.ts",
     "test:homepage-and-nav": "tsx scripts/test-homepage-and-nav.ts",
-    "test:create-new-run": "tsx scripts/test-create-new-run.ts"
+    "test:create-new-run": "tsx scripts/test-create-new-run.ts",
+    "test:auth-bootstrap": "tsx scripts/test-auth-bootstrap-playwright.ts",
+    "test:auth-bootstrap-idempotency": "tsx scripts/test-owner-bootstrap-idempotency.ts",
+    "test:route-protection": "tsx scripts/test-route-protection-playwright.ts"
   },
   "dependencies": {
     "@expo-google-fonts/open-sans": "^0.4.2",

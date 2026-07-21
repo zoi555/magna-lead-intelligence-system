@@ -16,8 +16,8 @@ import { UberEatsAdapter } from "@/lib/discovery-engine/uber-eats/adapter";
 import { DeliverooAdapter } from "@/lib/discovery-engine/deliveroo/adapter";
 import { partitionByGeography } from "@/lib/discovery-engine/geography/provider-geography-gate";
 import { createServiceClient, hasServiceCredentials } from "@/lib/discovery-engine/supabase-client";
-import { resolveDefaultTenantId } from "@/lib/discovery-engine/server";
 import type { SourceOutlet } from "@/lib/discovery-engine/consolidation/types";
+import { requireSessionAndRole } from "@/lib/auth/require-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -61,6 +61,8 @@ function findDuplicates(outlets: SourceOutlet[]): { source_outlet_id: string; co
 }
 
 export async function POST(req: Request) {
+  const session = await requireSessionAndRole();
+  if (session instanceof NextResponse) return session;
   try {
     const body = await req.json().catch(() => ({}));
     const source = body.source as Source;
@@ -145,7 +147,7 @@ export async function POST(req: Request) {
     });
 
     const db = createServiceClient();
-    const tenantId = await resolveDefaultTenantId();
+    const tenantId = session.tenantId;
 
     const runRes = await db.from("discovery_runs").insert({
       tenant_id: tenantId,

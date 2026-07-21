@@ -8,11 +8,14 @@ import { loadPostcodeReference } from "@/lib/discovery-engine/geography/referenc
 import { JUST_EAT_GEOGRAPHY_SUPPORT } from "@/lib/discovery-engine/geography/planner";
 import { planTerritoryWithPlaces } from "@/lib/discovery-engine/geography/plan-with-places";
 import { createServiceClient } from "@/lib/discovery-engine/supabase-client";
+import { requireSessionAndRole } from "@/lib/auth/require-session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const session = await requireSessionAndRole();
+  if (session instanceof NextResponse) return session;
   try {
     const body = await req.json().catch(() => ({}));
     const input = String(body.input ?? "").trim();
