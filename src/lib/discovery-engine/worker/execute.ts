@@ -180,6 +180,15 @@ export async function executeJustEatRun(
     });
   }
 
+  // Consolidation — turns this run's canonical raw observations into consolidated_candidates
+  // rows, so they actually appear in Discovery Results / Data-Quality Exceptions. Previously
+  // only ever triggered manually from scripts/je-run.ts's CLI flow; a run started through the
+  // real UI never got consolidated at all until this was wired in here (found live, during the
+  // step-17 UI proof run: 717 raw observations, 0 consolidated_candidates).
+  if (outletsByJeId.size > 0) {
+    await repo.consolidateRun(run.tenant_id, run.id);
+  }
+
   const completedQueries = succeeded;
   const report = computeQualityReport({
     outlets: [...outletsByJeId.values()],

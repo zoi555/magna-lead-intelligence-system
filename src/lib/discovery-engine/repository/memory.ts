@@ -144,4 +144,8 @@ export class MemoryRepository implements DiscoveryRepository {
     for (const v of args.verdicts) this.geographyValidations.push({ tenantId: args.tenantId, runId: args.runId, verdict: v.verdict });
     return { inserted: args.verdicts.length };
   }
+
+  async consolidateRun(_tenantId: string, _runId: string) {
+    return { outlets: 0, candidates: 0 }; // in-memory tests don't exercise real consolidation SQL
+  }
 }

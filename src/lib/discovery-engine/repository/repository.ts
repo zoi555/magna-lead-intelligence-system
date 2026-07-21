@@ -71,4 +71,10 @@ export interface DiscoveryRepository {
     ctx: GeographyRunContext; verdicts: { outlet: SourceOutlet; verdict: GeographyVerdict }[];
     observationIdBySourceId?: Map<string, string>;
   }): Promise<{ inserted: number }>;
+
+  /** Turns a run's canonical raw observations into consolidated_candidates rows (so they
+   *  appear in Discovery Results / Data-Quality Exceptions). Previously only ever called
+   *  from the ad-hoc scripts/je-run.ts CLI script, never automatically after a UI-driven
+   *  run finished — wired into the real execution-completion path in worker/execute.ts. */
+  consolidateRun(tenantId: string, runId: string): Promise<{ outlets: number; candidates: number }>;
 }

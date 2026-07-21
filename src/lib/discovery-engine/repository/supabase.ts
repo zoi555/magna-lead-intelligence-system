@@ -178,4 +178,9 @@ export class SupabaseRepository implements DiscoveryRepository {
     const { persistGeographyValidations } = await import("../geography/persist-geography");
     return persistGeographyValidations(this.db, args);
   }
+
+  async consolidateRun(tenantId: string, runId: string) {
+    const { consolidateRun } = await import("../consolidation/consolidate-run");
+    return consolidateRun(this.db, tenantId, runId);
+  }
 }
