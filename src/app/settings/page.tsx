@@ -5,7 +5,7 @@ import { SOURCE_REGISTRY, summariseRegistry } from "@/lib/sources/source-registr
 import { getCompaniesHouseConfig } from "@/lib/sources/companies-house";
 import { getGooglePlacesConfig } from "@/lib/sources/google-places";
 import { getDeliveryPlatformConfig } from "@/lib/sources/delivery-platforms";
-import { APP_FULL_NAME, TENANT_NAME } from "@/lib/app-config";
+import { APP_FULL_NAME, TENANT_NAME, ENVIRONMENT_LABEL } from "@/lib/app-config";
 
 // Source-control / readiness dashboard. Env var presence only — never values.
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ export default function SettingsPage() {
           <dl className="text-[13px]">
             <div className="flex justify-between border-b border-bordergrey py-1.5"><dt className="text-muted">Product</dt><dd className="text-ink">{APP_FULL_NAME}</dd></div>
             <div className="flex justify-between border-b border-bordergrey py-1.5"><dt className="text-muted">Tenant (configurable)</dt><dd className="text-ink">{TENANT_NAME}</dd></div>
-            <div className="flex justify-between py-1.5"><dt className="text-muted">Environment</dt><dd className="text-ink">UAT — Vertical Slice 001</dd></div>
+            <div className="flex justify-between py-1.5"><dt className="text-muted">Environment</dt><dd className="text-ink">{ENVIRONMENT_LABEL} — Vertical Slice 001 (VERCEL_ENV-derived, never hardcoded)</dd></div>
           </dl>
         </div>
         <div className="rounded-card border border-bordergrey bg-card p-4 shadow-soft">

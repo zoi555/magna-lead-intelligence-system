@@ -1,17 +1,48 @@
-// Product vs tenant identity — SaaS-neutral. Tenant is configurable data, NOT hardcoded to Magna.
-export const APP_NAME = "Lead Intelligence";
-export const APP_FULL_NAME = "Lead Intelligence Platform";
-export const TENANT_NAME = "Demo Company";
+// Product vs tenant identity — SaaS-neutral. Tenant is configurable data, NOT hardcoded to
+// Magna (or any other tenant) in this reusable config file. Server-only reads of
+// process.env are safe here — this file is imported only by server components
+// (TopHeader, Sidebar, layout metadata); nothing here is bundled to the client.
+
+export const APP_NAME = "AspectLead";
+export const APP_FULL_NAME = "AspectLead";
+
+/** Tenant display name — priority order: (1) authenticated tenant/user context, when auth
+ *  exists (it does not yet — no login/session system is implemented anywhere in this repo);
+ *  (2) NEXT_PUBLIC_TENANT_NAME env var, set per-deployment (e.g. in Vercel project settings —
+ *  never hardcoded here); (3) a clearly-labelled fallback, and ONLY for genuine local
+ *  development (no VERCEL_ENV at all) — a deployed environment without the var set shows an
+ *  honest "not configured" state rather than a fabricated tenant name. */
+export function resolveTenantName(): string {
+  const configured = process.env.NEXT_PUBLIC_TENANT_NAME;
+  if (configured) return configured;
+  const isLocalDev = !process.env.VERCEL_ENV; // VERCEL_ENV is only ever set on Vercel itself
+  return isLocalDev ? "Local Development Tenant" : "Tenant not configured";
+}
+export const TENANT_NAME = resolveTenantName();
+
+export type EnvironmentLabel = "Production" | "Preview" | "Development" | "Local Development";
+
+/** Real environment, from Vercel's own automatically-injected VERCEL_ENV — never a hardcoded
+ *  label. VERCEL_ENV is "production" | "preview" | "development" (Vercel's own dev proxy);
+ *  absent entirely = running outside Vercel (local `npm run dev`). */
+export function resolveEnvironmentLabel(): EnvironmentLabel {
+  const vercelEnv = process.env.VERCEL_ENV;
+  if (vercelEnv === "production") return "Production";
+  if (vercelEnv === "preview") return "Preview";
+  if (vercelEnv === "development") return "Development";
+  return "Local Development";
+}
+export const ENVIRONMENT_LABEL = resolveEnvironmentLabel();
 
 export type NavItem = { label: string; href: string };
 
 export const NAV_ITEMS: NavItem[] = [
   { label: "Overview", href: "/" },
-  { label: "Coverage Map", href: "/coverage-map" },
-  { label: "Territories", href: "/territories" },
   { label: "Pipeline Runs", href: "/pipeline-runs" },
   { label: "Discovery Runs", href: "/discovery-runs" },
   { label: "Discovery Results", href: "/discovery-results" },
+  { label: "Coverage Map", href: "/coverage-map" },
+  { label: "Territories", href: "/territories" },
   { label: "Data-Quality Exceptions", href: "/data-quality-exceptions" },
   { label: "Audit / Evidence", href: "/audit" },
   { label: "Import", href: "/import" },

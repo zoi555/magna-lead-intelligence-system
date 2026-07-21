@@ -15,8 +15,10 @@ const STYLES: Record<string, Style> = {
 
 function keyFor(status: string): keyof typeof STYLES {
   const s = status.toLowerCase();
+  // "incomplete" must never match "complete" — check it first and bail out to a neutral style.
+  if (/\bincomplete\b/.test(s)) return "warning";
   if (s.includes("mock")) return "mock";
-  if (s.includes("complete") || s.includes("contacted") || s.includes("done")) return "complete";
+  if (/\bcomplete/.test(s) || s.includes("contacted") || s.includes("done")) return "complete";
   if (s.includes("export")) return "exported";
   if (s.includes("block")) return "blocked";
   if (s.includes("warn") || s.includes("pending") || s.includes("ready") || s.includes("review")) return "warning";

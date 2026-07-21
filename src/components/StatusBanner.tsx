@@ -1,5 +1,5 @@
 import React from "react";
-import { SOURCE_REGISTRY } from "@/lib/sources/source-registry";
+import { SOURCE_REGISTRY, MANUAL_IMPORT_STATUS } from "@/lib/sources/source-registry";
 
 // Honest internal-beta status banner — replaces the old global "Prototype using mock data. No
 // real customer data. No integrations connected." banner, which was false for 8 of 10 live
@@ -43,14 +43,13 @@ export function StatusBanner() {
       >
         AspectLead Internal Beta
       </span>
-      {je && <Chip label="Just Eat" status={je.marketplaceStatus ?? "UNKNOWN"} color={STATUS_COLOR[je.marketplaceStatus ?? ""] ?? "#475569"} />}
-      {uber && <Chip label="Uber Eats" status="PENDING AUTHORISED SOURCE" color={STATUS_COLOR.PENDING_AUTHORISATION} />}
-      {deliveroo && <Chip label="Deliveroo" status="PUBLIC SOURCE VALIDATED — PIPELINE INTEGRATION IN PROGRESS" color={STATUS_COLOR.PENDING_AUTHORISATION} />}
-      <Chip label="Manual import" status="AVAILABLE" color={STATUS_COLOR.ACTIVE} />
-      <Chip label="Customer comparison" status="NOT STARTED" color="#475569" />
+      {je && <Chip label="Just Eat" status={je.statusLabel ?? je.marketplaceStatus ?? "UNKNOWN"} color={STATUS_COLOR[je.marketplaceStatus ?? ""] ?? "#475569"} />}
+      {uber && <Chip label="Uber Eats" status={uber.statusLabel ?? uber.marketplaceStatus ?? "UNKNOWN"} color={STATUS_COLOR[uber.marketplaceStatus ?? ""] ?? "#475569"} />}
+      {deliveroo && <Chip label="Deliveroo" status={deliveroo.statusLabel ?? deliveroo.marketplaceStatus ?? "UNKNOWN"} color={STATUS_COLOR[deliveroo.marketplaceStatus ?? ""] ?? "#475569"} />}
+      <Chip label="Manual import" status={MANUAL_IMPORT_STATUS} color={STATUS_COLOR.ACTIVE} />
       <span className="text-[11.5px] text-muted">
-        Dashboard (<code>/</code>) still shows illustrative demo numbers — see{" "}
-        <a href="/discovery-results" className="text-actionblue hover:text-actionhover">Discovery Results</a> for real, database-backed records.
+        See <a href="/discovery-results" className="text-actionblue hover:text-actionhover">Discovery Results</a> for individual records or{" "}
+        <a href="/settings" className="text-actionblue hover:text-actionhover">Settings</a> for full source detail.
       </span>
     </div>
   );

@@ -92,8 +92,8 @@ export function SourceRegistryPanel({
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: st.fg, background: st.bg, border: `1px solid ${st.fg}33` }}>{st.label}</span>
                   {s.marketplaceStatus && (
-                    <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ ...MARKETPLACE_STATUS_STYLE[s.marketplaceStatus] }}>
-                      {s.marketplaceStatus}
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ ...MARKETPLACE_STATUS_STYLE[s.marketplaceStatus] }} title={s.marketplaceStatus}>
+                      {s.statusLabel ?? s.marketplaceStatus}
                     </span>
                   )}
                 </div>

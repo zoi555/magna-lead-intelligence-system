@@ -53,7 +53,16 @@ export interface SourceEntry {
   latestSourceFailure?: string | null;
   recordsAvailable?: number | null;
   marketplaceStatus?: MarketplaceSourceStatus;
+  /** Optional human-readable override for marketplaceStatus, when the enum member alone
+   *  doesn't capture a nuance worth surfacing (e.g. distinguishing "discovery validated,
+   *  ingestion incomplete" from a bare PENDING_AUTHORISATION). Badge colour logic stays
+   *  keyed off marketplaceStatus itself, never off this string. */
+  statusLabel?: string;
 }
+
+/** Manual CSV/JSON import (not a marketplace source, so it doesn't belong in the
+ *  MarketplaceSourceStatus union) — the working import flow is genuinely active. */
+export const MANUAL_IMPORT_STATUS = "ACTIVE" as const;
 
 export const SOURCE_REGISTRY: SourceEntry[] = [
   {
@@ -126,6 +135,7 @@ export const SOURCE_REGISTRY: SourceEntry[] = [
     latestSourceFailure: "2026-07-18 — broad UB1 diagnostic (run MrKoKg8322ZVzk449, $0.20): 0/7 known UB1 restaurants matched; actor returns a proximity-ranked home feed, not a complete area directory (docs/68). All prior geography-invalid runs quarantined, 0 candidates promoted to consolidation.",
     recordsAvailable: 0,
     marketplaceStatus: "PROVIDER_UNAVAILABLE",
+    statusLabel: "PENDING AUTHORISED SOURCE",
   },
   {
     id: "deliveroo",
@@ -149,6 +159,7 @@ export const SOURCE_REGISTRY: SourceEntry[] = [
     latestSourceFailure: "2026-07-21 — UB1 pilot (docs/76): 150 discovery records captured (no challenge), but 3-way concurrent detail enrichment triggered a Cloudflare challenge on the first batch — 0/20 detail-enriched, 0 canonical records met the geography gate's postcode requirement, 0 persisted.",
     recordsAvailable: 0,
     marketplaceStatus: "PENDING_AUTHORISATION",
+    statusLabel: "PUBLIC DISCOVERY VALIDATED — INGESTION INCOMPLETE",
   },
   {
     id: "just_eat",

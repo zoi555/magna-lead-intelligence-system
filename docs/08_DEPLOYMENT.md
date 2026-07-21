@@ -172,3 +172,48 @@ both `githubCommitSha: 72990dcbd8e44d61ff38d1c1f57e4a18a440ac4c`, both READY):
 **Every future push to this branch will deploy both projects automatically.** This is not
 optional and does not require a separate "deploy" step — pushing IS deploying. Treat any future
 push with the same care as a production deploy.
+
+### Project comparison + canonical roles (recorded 2026-07-21, read-only)
+
+Gathered via `vercel project inspect` and `vercel env ls --format json` (each project linked in
+an isolated scratchpad directory — the repo's own `.vercel/project.json`, if any, was not
+touched) plus `mcp__claude_ai_Vercel__get_project`/`get_deployment`. No values were printed for
+any environment variable — names and target environments only. No Vercel account settings were
+changed while gathering this.
+
+| | `magna-lead-intelligence-system-pngu` (canonical production) | `magna-lead-intelligence-system` (preview/staging) |
+|---|---|---|
+| Project ID | `prj_vxcbOvftT2CdzUmnxyCWhjF9f3U2` | `prj_SNY6dJsXzfV6X145cynpqBACHnuT` |
+| Git repository | `github.com/zoi555/magna-lead-intelligence-system` | same |
+| Root directory | `.` | `.` |
+| Node.js version | `24.x` | `24.x` |
+| Framework preset | Next.js | Next.js |
+| Build command | `npm run build` (default) | same |
+| Install command | default (`npm install`/`yarn`/`pnpm`/`bun`, auto-detected) | same |
+| Cron jobs | none (no `vercel.json`/`vercel.ts` in the repo) | none |
+| Env vars present | `NPM_TOKEN`, `JUST_EAT_ENABLED`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `GITHUB_TOKEN` (all preview+production) | **only `NPM_TOKEN`** |
+| This branch's deployment `target` | `"production"` | `null` (branch-alias only) |
+| Deployment protection | none (per the 2026-07-21 confirmation above) | Vercel SSO wall (per the 2026-07-21 confirmation above — not re-verified this pass, dashboard check was declined) |
+| Production alias | `magna-lead-intelligence-system-pngu.vercel.app` | none observed (only branch-specific preview aliases) |
+
+**Material finding:** the preview/staging project is **missing** `SUPABASE_SERVICE_ROLE_KEY`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `JUST_EAT_ENABLED`, and `GITHUB_TOKEN`.
+Any deployment there cannot reach Supabase at all — the homepage, Discovery Runs, Data-Quality
+Exceptions, and every other DB-backed screen would show their honest "not configured" states, not
+real data. This is a real functional gap for using it as a staging environment, not a labelling
+issue.
+
+**Material finding:** the two projects appear to have **different "Production Branch" settings**
+(inferred from `target` differing on an identical commit/branch push, not from a settings read the
+CLI exposes directly) — `-pngu`'s production branch is `feature/mvp-vertical-slice-001` itself;
+the other project's is most likely `main`. Confirming and aligning this is a Vercel account-settings
+change and therefore **requires explicit owner permission in chat** — it is not made by this session.
+
+**Canonical roles (confirmed, unchanged from the 2026-07-18/21 record above):**
+- **Production:** `magna-lead-intelligence-system-pngu` — `https://magna-lead-intelligence-system-pngu.vercel.app`
+- **Preview/staging:** `magna-lead-intelligence-system` — currently unusable as a full staging
+  environment until its Supabase env vars are added (see finding above).
+
+**Remaining owner decision (not actioned this session — requires explicit chat permission):**
+add the four missing Supabase/Just-Eat env vars to the preview project (values only entered by
+the owner, never by the assistant), and confirm/align both projects' Production Branch setting.
