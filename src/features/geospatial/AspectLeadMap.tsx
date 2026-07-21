@@ -107,7 +107,7 @@ export function AspectLeadMap({
       </ExpandableMap>
       {territoryInput && territoryGeom.length === 0 && (
         <div className="absolute top-2.5 right-2.5 z-[7] rounded-md border border-amber-200 bg-amber-50/95 px-2.5 py-1.5 text-[11px] text-amber-700 shadow-sm">
-          No district polygons matched &ldquo;{territoryInput}&rdquo;.
+          Boundary geometry unavailable for &ldquo;{territoryInput}&rdquo; — no invented outline is shown.
         </div>
       )}
     </div>
