@@ -82,6 +82,17 @@ export default function PipelineRunsPage() {
         }
       />
 
+      <div className="flex items-center justify-between rounded-card border border-bordergrey bg-card p-4 shadow-soft">
+        <div>
+          <div className="text-[14px] font-semibold text-ink">Create a discovery run</div>
+          <div className="text-[12px] text-muted">
+            Configure territory, target profile, provider and spend, then review and confirm before it starts.
+            This is a separate, database-backed system from the local TW/FSA pipeline monitor below.
+          </div>
+        </div>
+        <a href="/pipeline-runs/new" className="rounded-btn bg-[#2563EB] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#1d4ed8]">Create New Run</a>
+      </div>
+
       {/* Latest run summary */}
       {hasRun && (
         <div className="space-y-3">

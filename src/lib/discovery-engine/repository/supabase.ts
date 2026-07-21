@@ -57,6 +57,10 @@ export class SupabaseRepository implements DiscoveryRepository {
     const r = await this.db.from("discovery_runs").update({ status }).eq("id", id);
     if (r.error) throw new Error(`setRunStatus: ${JSON.stringify(r.error)}`);
   }
+  async updateRunDraft(id: string, patch: Partial<RunInput>): Promise<RunRecord> {
+    const r = await this.db.from("discovery_runs").update(patch).eq("id", id).select().single();
+    return must(r, "updateRunDraft") as RunRecord;
+  }
 
   async createExecution(runId: string, tenantId: string, plannedQueries: number): Promise<ExecutionRecord> {
     const r = await this.db.from("je_executions")

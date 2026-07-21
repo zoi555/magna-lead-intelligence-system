@@ -102,7 +102,7 @@ export async function fetchRunDetail(runId: string): Promise<RunDetail> {
       status: String(r.status ?? ""),
       territoryMode: (r.territory_mode as string) ?? null,
       territoryInput: (r.territory_input as string) ?? null,
-      derivedOutcodes: Array.isArray(r.derived_outcodes) ? (r.derived_outcodes as string[]) : [],
+      derivedOutcodes: Array.isArray(r.derived_query_units) ? (r.derived_query_units as string[]) : [],
       createdAt: String(r.created_at ?? ""),
       updatedAt: String(r.updated_at ?? ""),
     },

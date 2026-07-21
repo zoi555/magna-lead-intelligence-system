@@ -30,6 +30,10 @@ export interface DiscoveryRepository {
   getRun(id: string): Promise<RunRecord | null>;
   listRuns(tenantId: string): Promise<RunRecord[]>;
   setRunStatus(id: string, status: RunStatus): Promise<void>;
+  /** Update a run's own config columns in place. Only meaningful while status is still
+   *  'draft' — callers must enforce that precondition; the repository itself does not
+   *  restrict which rows can be updated. */
+  updateRunDraft(id: string, patch: Partial<RunInput>): Promise<RunRecord>;
 
   // executions
   createExecution(runId: string, tenantId: string, plannedQueries: number): Promise<ExecutionRecord>;

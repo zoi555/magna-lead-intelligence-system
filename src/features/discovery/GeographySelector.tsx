@@ -29,7 +29,7 @@ const TYPE_LABEL: Record<string, string> = {
   map_polygon: "Map area (centroid-based)", unresolved: "Unresolved",
 };
 
-export function GeographySelector({ input, onExclusionsChange }: { input: string; onExclusionsChange: (codes: string[]) => void }) {
+export function GeographySelector({ input, onExclusionsChange, onResolvedChange }: { input: string; onExclusionsChange: (codes: string[]) => void; onResolvedChange?: (queryUnits: string[]) => void }) {
   const [data, setData] = React.useState<ResolveResult | null>(null);
   const [excluded, setExcluded] = React.useState<Set<string>>(new Set());
   const [open, setOpen] = React.useState<Set<string>>(new Set());
@@ -53,6 +53,7 @@ export function GeographySelector({ input, onExclusionsChange }: { input: string
   const toggleOpen = (orig: string) => setOpen((prev) => { const n = new Set(prev); n.has(orig) ? n.delete(orig) : n.add(orig); return n; });
 
   const finalUnits = data ? data.queryUnits.filter((u) => !excluded.has(u.toUpperCase())) : [];
+  React.useEffect(() => { onResolvedChange?.(finalUnits); }, [finalUnits.join(","), onResolvedChange]);
 
   return (
     <div className="mt-2 border-t border-gray-100 pt-2">

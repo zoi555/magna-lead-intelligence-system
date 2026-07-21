@@ -17,6 +17,24 @@ export interface RunTerritory {
   locationRule: "require" | "prefer" | "off";
 }
 
+export interface RunAnchor { id: string; label: string; lat: number; lng: number }
+
+/** Owner-override acknowledgement for a detected territory/provider conflict — an honest
+ *  audit record, not a silent bypass. Persisted inside the run's target_filters (no schema
+ *  migration — see docs/09_DECISIONS.md for why an existing jsonb column was reused). */
+export interface RunOwnerOverride { acknowledged: boolean; note: string; at: string }
+
+/** Create New Run planning fields that live alongside the target profile — new in the
+ *  Create New Run wizard (Phase 2), never present in older recovered drafts, hence all
+ *  optional with explicit defaulting in migrateDraft/newRunDraft. */
+export interface RunPlanningExtras {
+  anchors: RunAnchor[];
+  selectedProviders: string[];           // subset of source-registry ids the owner picked for this run
+  existingCustomerExclusion: boolean;
+  spendCeilingGbp: number | null;
+  ownerOverride: RunOwnerOverride | null;
+}
+
 export interface RunDraft {
   schemaVersion: 2;
   id: string;               // client-generated draft id (uuid-like)
@@ -26,7 +44,15 @@ export interface RunDraft {
   createdAtIso: string | null;
   territory: RunTerritory;
   profile: TargetProfile;   // target profile (taxonomies + terms + fields + tags)
+  planning: RunPlanningExtras;
   status: "draft";
+  /** Set once this draft has been saved to Supabase (discovery_runs.id) — lets the wizard
+   *  distinguish "new, unsaved draft" from "editing an already-persisted draft". */
+  savedRunId?: string | null;
+}
+
+export function defaultPlanningExtras(): RunPlanningExtras {
+  return { anchors: [], selectedProviders: ["just_eat"], existingCustomerExclusion: false, spendCeilingGbp: null, ownerOverride: null };
 }
 
 export function newRunDraft(idSeed: string, nowIso: string | null, defaultName = ""): RunDraft {
@@ -39,7 +65,9 @@ export function newRunDraft(idSeed: string, nowIso: string | null, defaultName =
     createdAtIso: nowIso,
     territory: { mode: "manual_outcodes", input: "", surrounding: "context", locationRule: "require" },
     profile: defaultIndependentFoodserviceProfile(),
+    planning: defaultPlanningExtras(),
     status: "draft",
+    savedRunId: null,
   };
 }
 
@@ -118,6 +146,16 @@ export function migrateDraft(raw: unknown): RunDraft | null {
   } else if (!Array.isArray(profile.customFields)) {
     profile.customFields = [];
   }
+  if (!d.planning || typeof d.planning !== "object") d.planning = defaultPlanningExtras();
+  else {
+    const pl = d.planning as Record<string, any>;
+    if (!Array.isArray(pl.anchors)) pl.anchors = [];
+    if (!Array.isArray(pl.selectedProviders)) pl.selectedProviders = ["just_eat"];
+    if (typeof pl.existingCustomerExclusion !== "boolean") pl.existingCustomerExclusion = false;
+    if (typeof pl.spendCeilingGbp !== "number") pl.spendCeilingGbp = null;
+    if (!pl.ownerOverride || typeof pl.ownerOverride !== "object") pl.ownerOverride = null;
+  }
+  if (typeof d.savedRunId !== "string") d.savedRunId = null;
   d.schemaVersion = CURRENT_SCHEMA_VERSION;
   return d as RunDraft;
 }

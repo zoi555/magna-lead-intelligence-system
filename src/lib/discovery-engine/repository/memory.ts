@@ -31,6 +31,13 @@ export class MemoryRepository implements DiscoveryRepository {
   async getRun(id: string) { return this.runs.get(id) ?? null; }
   async listRuns(tenantId: string) { return [...this.runs.values()].filter((r) => r.tenant_id === tenantId); }
   async setRunStatus(id: string, status: RunStatus) { const r = this.runs.get(id); if (r) { r.status = status; r.updated_at = now(); } }
+  async updateRunDraft(id: string, patch: Partial<RunInput>): Promise<RunRecord> {
+    const r = this.runs.get(id);
+    if (!r) throw new Error(`updateRunDraft: run ${id} not found`);
+    const next = { ...r, ...patch, updated_at: now() };
+    this.runs.set(id, next);
+    return next;
+  }
 
   async createExecution(runId: string, tenantId: string, plannedQueries: number): Promise<ExecutionRecord> {
     const rec: ExecutionRecord = {
