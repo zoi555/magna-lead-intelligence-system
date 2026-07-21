@@ -168,6 +168,22 @@ SQL
   check "one owner per tenant: second owner insert is rejected by the unique index" \
     "select count(*) from tenant_members where tenant_id = '$TENANT_ID' and role = 'owner';" "1"
 
+  # --- 0027: persisted tenant settings + settings-change audit trigger ---
+  check "tenant_settings seeded a row for the default tenant" \
+    "select count(*) from tenant_settings where tenant_id = '$TENANT_ID';" "1"
+  check "source_operational_settings seeded 4 rows for the default tenant" \
+    "select count(*) from source_operational_settings where tenant_id = '$TENANT_ID';" "4"
+  check "just_eat seeded as enabled (matches its real code-level support)" \
+    "select enabled from source_operational_settings where tenant_id = '$TENANT_ID' and source_id = 'just_eat';" "t"
+  check "uber_eats seeded as disabled (matches PENDING_AUTHORISATION status)" \
+    "select enabled from source_operational_settings where tenant_id = '$TENANT_ID' and source_id = 'uber_eats';" "f"
+
+  psql -q -c "update tenant_settings set default_spend_ceiling_gbp = 42 where tenant_id = '$TENANT_ID';" >/dev/null 2>&1
+  check "updating tenant_settings writes a settings_update audit row" \
+    "select count(*) from app_audit_log where tenant_id = '$TENANT_ID' and action = 'settings_update' and target_table = 'tenant_settings';" "1"
+  check "the audit row's new_value reflects the change" \
+    "select (new_value->>'default_spend_ceiling_gbp') from app_audit_log where tenant_id = '$TENANT_ID' and action = 'settings_update' and target_table = 'tenant_settings' order by created_at desc limit 1;" "42"
+
   if [ "$ASSERT_FAIL" -eq 1 ]; then FAILED=1; fi
 fi
 
