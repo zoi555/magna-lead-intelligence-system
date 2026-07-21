@@ -52,6 +52,11 @@ export interface RunDetail {
     outOfScopeGeography: number;
     consolidatedCandidates: number;
   };
+  /** True only when the geography-validation gate actually ran for this run (i.e. at
+   *  least one provider_geography_validations row exists). When false, validGeography/
+   *  outOfScopeGeography are both meaningless zeros — "never checked," not "checked, zero
+   *  valid." Callers must show "Not evaluated" rather than "0" when this is false. */
+  geographyValidationRan: boolean;
 }
 
 export async function fetchRunDetail(runId: string): Promise<RunDetail> {
@@ -59,6 +64,7 @@ export async function fetchRunDetail(runId: string): Promise<RunDetail> {
     configured: false, found: false, run: null, executions: [], providerExecutions: [],
     qualityReport: null,
     counts: { rawObservations: 0, canonicalObservations: 0, duplicateObservations: 0, validGeography: 0, outOfScopeGeography: 0, consolidatedCandidates: 0 },
+    geographyValidationRan: false,
   };
   if (!hasServiceCredentials()) return empty;
 
@@ -128,6 +134,7 @@ export async function fetchRunDetail(runId: string): Promise<RunDetail> {
       outOfScopeGeography,
       consolidatedCandidates: candRes.count ?? 0,
     },
+    geographyValidationRan: geoValidations.length > 0,
   };
 }
 

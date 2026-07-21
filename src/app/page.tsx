@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { TENANT_NAME } from "@/lib/app-config";
 import { fetchHomepageOverview } from "@/lib/discovery-engine/reports/homepage-overview";
 import { MANUAL_IMPORT_STATUS } from "@/lib/sources/source-registry";
+import { resolveTenantForSession } from "@/lib/auth/resolve-tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -17,12 +18,23 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-function NA() {
-  return <span className="text-muted">Not available</span>;
+function NA({ children = "Not available" }: { children?: string }) {
+  return <span className="text-muted">{children}</span>;
+}
+
+/** Stat card with a native-tooltip info marker — see docs/16_METRIC_DEFINITIONS.md for
+ *  the full definition; this string must stay in sync with that doc. */
+function Stat({ label, value, trend, accent, title }: { label: string; value: React.ReactNode; trend?: string; accent?: string; title: string }) {
+  return (
+    <div title={title}>
+      <StatCard label={`${label} ⓘ`} value={value} trend={trend} accent={accent} />
+    </div>
+  );
 }
 
 export default async function OverviewPage() {
-  const overview = await fetchHomepageOverview();
+  const session = await resolveTenantForSession().catch(() => null);
+  const overview = await fetchHomepageOverview(session?.tenantId);
 
   if (!overview.configured) {
     return (
@@ -35,27 +47,37 @@ export default async function OverviewPage() {
     );
   }
 
-  const { latestRun, justEatOutletCount, dataQualityExceptionsTotal, newCandidatesLast24h, latestImport, sourceHealth } = overview;
+  const { latestRun, justEat, dataQuality, newCandidatesLast24h, latestImport, sourceHealth } = overview;
 
   // Real, derived blockers — never fabricated. A source is a blocker while it isn't ACTIVE;
-  // outstanding data-quality exceptions are a blocker while the count is above zero.
+  // outstanding, unresolved manual-review exceptions are a blocker while the count is above zero.
   const blockers: { id: string; label: string }[] = [];
   for (const s of sourceHealth) {
     if (s.marketplaceStatus && s.marketplaceStatus !== "ACTIVE") {
       blockers.push({ id: s.id, label: `${s.name}: ${(s.statusLabel ?? s.marketplaceStatus.replace(/_/g, " ")).toLowerCase()}` });
     }
   }
-  if (typeof dataQualityExceptionsTotal === "number" && dataQualityExceptionsTotal > 0) {
-    blockers.push({ id: "dq_exceptions", label: `${dataQualityExceptionsTotal} open data-quality exceptions` });
+  if (typeof dataQuality.unresolvedManualReview === "number" && dataQuality.unresolvedManualReview > 0) {
+    blockers.push({ id: "dq_manual_review", label: `${dataQuality.unresolvedManualReview} exception(s) need manual review (no automated resolution path)` });
   }
+
+  // De-duplicate name/territory display: older runs (from scripts/je-run.ts before its
+  // 2026-07-22 fix) had names like "live: UB1" that already contain the territory —
+  // showing both would repeat it. Only show territory separately when the name doesn't
+  // already contain it.
+  const runName = latestRun?.run?.name ?? latestRun?.runId ?? "";
+  const territory = latestRun?.run?.territoryInput ?? null;
+  const territoryAlreadyInName = territory ? runName.toLowerCase().includes(territory.toLowerCase()) : true;
 
   return (
     <div>
       <PageHeader title="Overview" subtitle={`${TENANT_NAME} · internal beta`} />
 
       <div role="status" className="mb-4 rounded-card border px-4 py-2 text-[12.5px]" style={{ background: "#E7F5EC", borderColor: "#bfe5cd", color: "#137a3b" }}>
-        <b>Internal beta:</b> every figure below is a live database query. Metrics not yet implemented show
-        &ldquo;Not available&rdquo; rather than an invented number.
+        <b>Internal beta:</b> every figure below is a live database query, with its exact meaning documented in
+        docs/16_METRIC_DEFINITIONS.md (hover the ⓘ on any figure). Metrics not yet implemented show
+        &ldquo;Not available&rdquo;; metrics that require a check which has never run for the relevant record show
+        &ldquo;Not evaluated&rdquo; — neither is ever shown as an invented number.
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
@@ -66,22 +88,37 @@ export default async function OverviewPage() {
       </div>
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="Raw observations" value={latestRun ? latestRun.counts.rawObservations : <NA />} trend={latestRun ? "latest run" : undefined} />
-        <StatCard label="Canonical" value={latestRun ? latestRun.counts.canonicalObservations : <NA />} />
-        <StatCard label="Geography-valid" value={latestRun ? latestRun.counts.validGeography : <NA />} />
-        <StatCard label="Duplicates" value={latestRun ? latestRun.counts.duplicateObservations : <NA />} accent="#F59E0B" />
-        <StatCard label="Data-quality exceptions" value={dataQualityExceptionsTotal} accent="#b91c1c" />
-        <StatCard label="New candidates (24h)" value={newCandidatesLast24h} accent="#2563EB" />
+        <Stat label="Raw observations" value={latestRun ? latestRun.counts.rawObservations : <NA />} trend={latestRun ? "latest run" : undefined}
+          title="je_raw_observations rows for the latest run — every scrape response captured, including duplicates. Scope: one run." />
+        <Stat label="Canonical" value={latestRun ? latestRun.counts.canonicalObservations : <NA />}
+          title="Raw observations for the latest run minus duplicates (duplicate_of IS NULL). Scope: one run." />
+        <Stat label="Physically in target" value={justEat.physicallyInLatestRunTerritory === "Not evaluated" ? <NA>Not evaluated</NA> : justEat.physicallyInLatestRunTerritory === "Not available" ? <NA /> : justEat.physicallyInLatestRunTerritory}
+          title="Records from the latest run whose geography was validated as physically inside its target territory. Shows 'Not evaluated' (never 0) when the geography-validation gate did not run for this run." />
+        <Stat label="Duplicates" value={latestRun ? latestRun.counts.duplicateObservations : <NA />} accent="#F59E0B"
+          title="Raw observations for the latest run with duplicate_of set (i.e. a re-scrape of an already-captured record). Scope: one run." />
+        <Stat label="Affected restaurants" value={dataQuality.affectedRestaurants} accent="#b91c1c"
+          title="Distinct restaurants (je_outlets) with at least one field-level exception. Scope: all-time, all-territory. A restaurant missing 3 fields still counts once here." />
+        <Stat label="New candidates (24h)" value={newCandidatesLast24h} accent="#2563EB"
+          title="consolidated_candidates rows created in the last 24 hours. Scope: all-time (rolling 24h window), all-territory." />
+      </div>
+
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
+        <Stat label="Total field exceptions" value={dataQuality.totalFieldExceptions}
+          title="Summed count of missing phone/address/postcode/coordinates/rating across all restaurants — a restaurant missing 2 fields contributes 2, not 1. Never the same number as 'affected restaurants.'" />
+        <Stat label="Needs manual review" value={dataQuality.unresolvedManualReview}
+          title="Unresolved phone-enrichment attempts + duplicate-phone conflicts — exceptions with no automated resolution path yet." />
+        <Stat label="Just Eat outlets (all-time)" value={justEat.totalCanonicalOutletsAllTime}
+          title="je_outlets total row count for this tenant — every territory ever scanned, not just the latest run. Not the same scope as the run-specific figures above." />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="space-y-6">
-          <Panel title="Latest pipeline run">
+          <Panel title="Latest discovery run">
             {latestRun ? (
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-[14px] font-medium text-ink">
-                    {latestRun.run?.name ?? latestRun.runId} · {latestRun.run?.territoryInput ?? <NA />}
+                    {runName}{!territoryAlreadyInName && territory ? ` · ${territory}` : ""}
                   </div>
                   <div className="text-[12px] text-muted">
                     {latestRun.run?.createdAt ? new Date(latestRun.run.createdAt).toLocaleString("en-GB") : <NA />}
@@ -107,21 +144,12 @@ export default async function OverviewPage() {
               {sourceHealth.map((s) => (
                 <li key={s.id} className="flex items-center justify-between">
                   <span>{s.name}</span>
-                  <span className="flex items-center gap-2">
-                    <span className="text-[12px] text-muted">
-                      {s.recordsAvailable != null ? `${s.recordsAvailable} records` : <NA />}
-                    </span>
-                    <StatusBadge status={s.statusLabel ?? s.marketplaceStatus ?? "unknown"} />
-                  </span>
+                  <StatusBadge status={s.statusLabel ?? s.marketplaceStatus ?? "unknown"} />
                 </li>
               ))}
               <li className="flex items-center justify-between border-t border-bordergrey pt-1.5">
                 <span>Manual import</span>
                 <StatusBadge status={MANUAL_IMPORT_STATUS} />
-              </li>
-              <li className="flex items-center justify-between">
-                <span>Just Eat outlets (live count)</span>
-                <span className="font-semibold text-ink">{justEatOutletCount}</span>
               </li>
             </ul>
             <div className="mt-3 text-[12px]"><a href="/settings" className="underline text-muted">Full source registry</a></div>

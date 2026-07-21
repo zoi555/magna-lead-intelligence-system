@@ -76,8 +76,8 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
           <Row label="Raw observations" value={d.counts.rawObservations} />
           <Row label="Canonical observations" value={d.counts.canonicalObservations} />
           <Row label="Duplicate observations" value={d.counts.duplicateObservations} />
-          <Row label="Valid / in-area (geography gate)" value={d.counts.validGeography || d.counts.outOfScopeGeography ? d.counts.validGeography : "N/A — geography gate not run for this source"} />
-          <Row label="Rejected (out-of-scope geography)" value={d.counts.outOfScopeGeography} />
+          <Row label="Physically located in target territory" value={d.geographyValidationRan ? d.counts.validGeography : "Not evaluated — geography gate did not run for this run"} />
+          <Row label="Delivery-area-only / rejected geography" value={d.geographyValidationRan ? d.counts.outOfScopeGeography : "Not evaluated — geography gate did not run for this run"} />
           <Row label="Consolidated candidates" value={d.counts.consolidatedCandidates} />
         </div>
 

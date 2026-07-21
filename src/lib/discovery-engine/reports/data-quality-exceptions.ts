@@ -38,6 +38,19 @@ export interface DataQualityExceptions {
   duplicateObservations: { totalCanonical: number; totalDuplicates: number; sample: { sourceRecordId: string; duplicateOfId: string }[] };
   schemaFailures: { count: number; sample: { sourceRecordId: string; source: string; parseStatus: string }[] };
   phoneEnrichmentExceptions: PhoneEnrichmentException[];
+  /** Distinct restaurants (je_outlets rows) with at least one field-level exception
+   *  (missing phone/address/postcode/coordinates/rating, or a shared/duplicate phone) —
+   *  a restaurant missing 3 fields counts ONCE here, not 3 times. This is the number to
+   *  show when the question is "how many restaurants," never the summed field count. */
+  affectedRestaurantsCount: number;
+  /** The summed field-level count (today's homepage number) — kept, but always labelled
+   *  as fields, never restaurants. An outlet missing phone AND address contributes 2. */
+  totalFieldExceptionsCount: number;
+  /** Exceptions that need a human decision and have no automated resolution path yet:
+   *  unresolved phone-enrichment attempts + duplicate-phone conflicts. Distinct from
+   *  duplicate/schema-failure RAW OBSERVATIONS, which are a scrape-pipeline concept, not
+   *  a restaurant-record concept, and are never folded into this count. */
+  unresolvedManualReviewCount: number;
 }
 
 function toRef(r: Record<string, unknown>): OutletRef {
@@ -54,6 +67,7 @@ export async function fetchDataQualityExceptions(): Promise<DataQualityException
     duplicateObservations: { totalCanonical: 0, totalDuplicates: 0, sample: [] },
     schemaFailures: { count: 0, sample: [] },
     phoneEnrichmentExceptions: [],
+    affectedRestaurantsCount: 0, totalFieldExceptionsCount: 0, unresolvedManualReviewCount: 0,
   };
   if (!hasServiceCredentials()) return empty;
 
@@ -181,6 +195,12 @@ export async function fetchDataQualityExceptions(): Promise<DataQualityException
       };
     });
 
+  const affectedOutletIds = new Set<string>();
+  for (const list of [missingPhone, missingAddress, missingPostcode, missingCoordinates, missingRating]) {
+    for (const r of list) affectedOutletIds.add(String(r.id));
+  }
+  for (const c of duplicatePhoneConflicts) for (const o of c.outlets) affectedOutletIds.add(o.id);
+
   return {
     configured: true,
     totalOutlets: outlets.length,
@@ -205,5 +225,8 @@ export async function fetchDataQualityExceptions(): Promise<DataQualityException
       })),
     },
     phoneEnrichmentExceptions,
+    affectedRestaurantsCount: affectedOutletIds.size,
+    totalFieldExceptionsCount: missingPhone.length + missingAddress.length + missingPostcode.length + missingCoordinates.length + missingRating.length,
+    unresolvedManualReviewCount: phoneEnrichmentExceptions.length + duplicatePhoneConflicts.length,
   };
 }

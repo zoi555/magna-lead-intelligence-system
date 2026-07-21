@@ -88,8 +88,12 @@ async function main() {
     const { fetchHomepageOverview } = await import("../src/lib/discovery-engine/reports/homepage-overview");
     const overview = await fetchHomepageOverview();
     assert(overview.configured === true, "fetchHomepageOverview configured=true when credentials present");
-    assert(typeof overview.justEatOutletCount === "number", "Just Eat outlet count is a real number, not a placeholder");
-    assert(overview.dataQualityExceptionsTotal === "Not available" || typeof overview.dataQualityExceptionsTotal === "number", "data-quality total is a real number or the literal 'Not available'");
+    assert(typeof overview.justEat.totalCanonicalOutletsAllTime === "number", "Just Eat all-time outlet count is a real number, not a placeholder");
+    assert(overview.dataQuality.affectedRestaurants === "Not available" || typeof overview.dataQuality.affectedRestaurants === "number", "affected-restaurants count is a real number or the literal 'Not available'");
+    assert(overview.dataQuality.totalFieldExceptions === "Not available" || typeof overview.dataQuality.totalFieldExceptions === "number", "total-field-exceptions count is a real number or the literal 'Not available'");
+    if (overview.latestRun) {
+      assert(overview.justEat.physicallyInLatestRunTerritory === "Not evaluated" || overview.justEat.physicallyInLatestRunTerritory === "Not available" || typeof overview.justEat.physicallyInLatestRunTerritory === "number", "physically-in-target is a real number, 'Not evaluated', or 'Not available' — never a fabricated 0");
+    }
   }
 
   console.log(fails === 0 ? "\nAll homepage/nav assertions passed ✓" : `\n${fails} assertion(s) FAILED ✗`);
