@@ -58,7 +58,8 @@
     "test:create-new-run": "tsx scripts/test-create-new-run.ts",
     "test:auth-bootstrap": "tsx scripts/test-auth-bootstrap-playwright.ts",
     "test:auth-bootstrap-idempotency": "tsx scripts/test-owner-bootstrap-idempotency.ts",
-    "test:route-protection": "tsx scripts/test-route-protection-playwright.ts"
+    "test:route-protection": "tsx scripts/test-route-protection-playwright.ts",
+    "test:settings": "tsx scripts/test-settings-playwright.ts"
   },
   "dependencies": {
     "@expo-google-fonts/open-sans": "^0.4.2",

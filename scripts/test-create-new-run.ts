@@ -36,7 +36,7 @@ async function main() {
   for (const forbidden of ["territory_input", "planning.anchors", "run-draft", "GeographySelector", "AspectLeadMap"]) {
     assert(!settingsSrc.includes(forbidden), `settings/page.tsx does not import/reference "${forbidden}" (no per-run state)`);
   }
-  assert(settingsSrc.includes("SETTINGS_DEFAULTS"), "settings/page.tsx shows the read-only application defaults panel");
+  assert(settingsSrc.includes("EditableSettingsPanel"), "settings/page.tsx shows the real, persisted, audited settings panel");
 
   console.log("\nShared map component — one implementation, not two:");
   const coverageSrc = await read("src/app/coverage-map/page.tsx");

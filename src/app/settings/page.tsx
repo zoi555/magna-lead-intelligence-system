@@ -6,7 +6,7 @@ import { getCompaniesHouseConfig } from "@/lib/sources/companies-house";
 import { getGooglePlacesConfig } from "@/lib/sources/google-places";
 import { getDeliveryPlatformConfig } from "@/lib/sources/delivery-platforms";
 import { APP_FULL_NAME, TENANT_NAME, ENVIRONMENT_LABEL } from "@/lib/app-config";
-import { SETTINGS_DEFAULTS } from "@/lib/settings-defaults";
+import { EditableSettingsPanel } from "@/components/settings/EditableSettingsPanel";
 
 // Source-control / readiness dashboard. Env var presence only — never values.
 export const dynamic = "force-dynamic";
@@ -52,21 +52,7 @@ export default function SettingsPage() {
 
       <SourceRegistryPanel sources={SOURCE_REGISTRY} summary={summary} envPresent={envPresent} />
 
-      <div className="rounded-card border border-bordergrey bg-card p-4 shadow-soft">
-        <h2 className="mb-1 text-[15px] font-semibold text-ink">Defaults</h2>
-        <p className="mb-2 text-[12.5px] text-muted">
-          Persistent, application-wide defaults — not yet owner-editable from this screen (that is a
-          follow-up feature). Per-run territory, anchors, provider and spend belong to each run, set
-          in <a href="/pipeline-runs/new" className="text-actionblue hover:text-actionhover">Create New Run</a>, never here.
-        </p>
-        <dl className="grid grid-cols-1 gap-x-8 gap-y-1 text-[13px] md:grid-cols-2">
-          <div className="flex justify-between border-b border-bordergrey py-1.5"><dt className="text-muted">Default spend ceiling</dt><dd className="text-ink">{SETTINGS_DEFAULTS.defaultSpendCeilingGbp != null ? `£${SETTINGS_DEFAULTS.defaultSpendCeilingGbp}` : "none set"}</dd></div>
-          <div className="flex justify-between border-b border-bordergrey py-1.5"><dt className="text-muted">Default source(s)</dt><dd className="text-ink">{SETTINGS_DEFAULTS.defaultProviders.join(", ")}</dd></div>
-          <div className="flex justify-between border-b border-bordergrey py-1.5"><dt className="text-muted">Data retention</dt><dd className="text-ink">{SETTINGS_DEFAULTS.dataRetentionDays != null ? `${SETTINGS_DEFAULTS.dataRetentionDays} days` : "no policy set"}</dd></div>
-          <div className="flex justify-between border-b border-bordergrey py-1.5"><dt className="text-muted">Import defaults</dt><dd className="text-ink">{SETTINGS_DEFAULTS.importDefaults.defaultFormat.toUpperCase()} · checksum required: {SETTINGS_DEFAULTS.importDefaults.requireChecksumMatch ? "yes" : "no"}</dd></div>
-          <div className="flex justify-between py-1.5"><dt className="text-muted">Export defaults</dt><dd className="text-ink">{SETTINGS_DEFAULTS.exportDefaults.defaultFormat.toUpperCase()} · unverified fields: {SETTINGS_DEFAULTS.exportDefaults.includeUnverifiedFields ? "included" : "excluded"}</dd></div>
-        </dl>
-      </div>
+      <EditableSettingsPanel />
 
       <div className="rounded-card border border-bordergrey bg-card p-4 shadow-soft">
         <h2 className="mb-2 text-[15px] font-semibold text-ink">Adapter configuration <span className="text-[12px] font-normal text-muted">(server-side — values never shown)</span></h2>
