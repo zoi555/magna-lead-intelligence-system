@@ -138,4 +138,10 @@ export class MemoryRepository implements DiscoveryRepository {
     for (const [id, o] of this.observations) if (o.run_id === runId) this.observations.delete(id);
     // outlets/history/provenance are keyed differently; tests using cascade recreate as needed
   }
+
+  geographyValidations: { tenantId: string; runId: string | null; verdict: unknown }[] = [];
+  async persistGeographyValidations(args: { tenantId: string; runId: string | null; verdicts: { verdict: unknown }[] }) {
+    for (const v of args.verdicts) this.geographyValidations.push({ tenantId: args.tenantId, runId: args.runId, verdict: v.verdict });
+    return { inserted: args.verdicts.length };
+  }
 }

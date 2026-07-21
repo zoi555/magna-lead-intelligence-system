@@ -185,6 +185,20 @@ SQL
   check "the audit row's new_value reflects the change" \
     "select (new_value->>'default_spend_ceiling_gbp') from app_audit_log where tenant_id = '$TENANT_ID' and action = 'settings_update' and target_table = 'tenant_settings' order by created_at desc limit 1;" "42"
 
+  # --- 0029: provider_geography_validations survives its parent run being deleted ---
+  GEO_RUN_ID="$(psql -t -A -q -c "insert into discovery_runs (tenant_id, name, territory_input) values ('$TENANT_ID', 'geo-fk-test', 'UB1') returning id;")"
+  GEO_VAL_ID="$(psql -t -A -q -c "insert into provider_geography_validations (tenant_id, run_id, source, requested_country, status) values ('$TENANT_ID', '$GEO_RUN_ID', 'just_eat', 'GB', 'valid_geography') returning id;")"
+  psql -q -c "delete from discovery_runs where id = '$GEO_RUN_ID';" >/dev/null 2>&1
+  check "geography validation row survives its parent run being deleted" \
+    "select count(*) from provider_geography_validations where id = '$GEO_VAL_ID';" "1"
+  check "its run_id is nulled by the FK cascade (not left dangling)" \
+    "select (run_id is null) from provider_geography_validations where id = '$GEO_VAL_ID';" "t"
+  check "its status (real evidence) is untouched by the cascade" \
+    "select status from provider_geography_validations where id = '$GEO_VAL_ID';" "valid_geography"
+  psql -q -c "update provider_geography_validations set status = 'out_of_scope_geography' where id = '$GEO_VAL_ID';" >/dev/null 2>&1 || true
+  check "a direct attempt to change the verdict itself is still rejected" \
+    "select status from provider_geography_validations where id = '$GEO_VAL_ID';" "valid_geography"
+
   if [ "$ASSERT_FAIL" -eq 1 ]; then FAILED=1; fi
 fi
 

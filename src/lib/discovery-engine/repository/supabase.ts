@@ -173,4 +173,9 @@ export class SupabaseRepository implements DiscoveryRepository {
     const r = await this.db.from("discovery_runs").delete().eq("id", runId);
     if (r.error) throw new Error(`deleteRunCascade: ${JSON.stringify(r.error)}`);
   }
+
+  async persistGeographyValidations(args: Parameters<DiscoveryRepository["persistGeographyValidations"]>[0]) {
+    const { persistGeographyValidations } = await import("../geography/persist-geography");
+    return persistGeographyValidations(this.db, args);
+  }
 }

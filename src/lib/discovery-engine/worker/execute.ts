@@ -12,11 +12,29 @@
 import type { DiscoveryRepository } from "../repository/repository";
 import type { ExecutionRecord, RunRecord, ParsedOutlet } from "../types";
 import type { SourceAdapter, AdapterConfig } from "../adapter";
+import type { SourceOutlet } from "../consolidation/types";
 import { JustEatAdapter } from "../just-eat/adapter";
 import { extractResponseMeta } from "../just-eat/parse";
 import { contentHash } from "../hash";
 import { PARSER_VERSION, ADAPTER_VERSION, SCHEMA_VERSION, NORMALISATION_VERSION } from "../version";
 import { computeQualityReport } from "../quality/data-quality";
+import { partitionByGeography } from "../geography/provider-geography-gate";
+
+/** Just Eat's own parsed shape -> the provider-neutral SourceOutlet the geography gate
+ *  expects. Only postcode/latitude/longitude actually drive classification (JE has no
+ *  provider-country field to read) — the rest are filled honestly (null/empty), never
+ *  fabricated, since this object is never persisted itself, only fed through the gate. */
+function parsedOutletToSourceOutlet(o: ParsedOutlet, observedAt: string): SourceOutlet {
+  return {
+    source: "just_eat", source_outlet_id: o.je_outlet_id, source_url: null,
+    name: o.trading_name, brand: o.brand_name, address: o.address_first_line, postcode: o.postcode,
+    latitude: o.latitude, longitude: o.longitude, phone: o.telephone_e164,
+    rating: o.rating_average, review_count: o.rating_count, cuisines: o.cuisines,
+    is_delivery: o.open_for_delivery, is_collection: o.open_for_collection,
+    delivery_cost: null, minimum_order: null, eta_minutes: null, is_sponsored: null,
+    halal_flag: null, logo_url: null, observed_at: observedAt,
+  };
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const HEARTBEAT_EVERY = 25;   // heartbeat every N outlets within a query (lease keep-alive)
@@ -54,6 +72,7 @@ export async function executeJustEatRun(
   await repo.setExecutionPlan(execution.id, planned);
 
   const outletsByJeId = new Map<string, ParsedOutlet>();
+  const latestObservationIdByJeId = new Map<string, string>();
   let totalObservations = 0, duplicateObservations = 0, parseWarnings = 0;
   // continue counters from any prior attempt (resume), so nothing is double-counted
   let succeeded = execution.completed_queries || 0;
@@ -116,6 +135,7 @@ export async function executeJustEatRun(
 
       const outlet = await repo.upsertOutlet({ tenant_id: run.tenant_id, parsed: rec.outlet, latest_observation_id: obs.id });
       outletsByJeId.set(rec.outlet.je_outlet_id, rec.outlet);
+      latestObservationIdByJeId.set(rec.outlet.je_outlet_id, obs.id);
 
       await repo.insertRatingHistory({
         tenant_id: run.tenant_id, outlet_id: outlet.id, je_outlet_id: rec.outlet.je_outlet_id, raw_observation_id: obs.id,
@@ -137,6 +157,27 @@ export async function executeJustEatRun(
   // Lost the lease → another worker owns this execution. Do NOT finish or overwrite it.
   if (lostOwnership) {
     return { status: execution.status, completedQueries: succeeded, plannedQueries: planned, uniqueOutlets: outletsByJeId.size, totalObservations, duplicateObservations, parseWarnings, failedQueries: failed, cancelled: false, abortedNotOwned: true };
+  }
+
+  // Geography validation gate — the same provider-neutral gate already used by the Uber
+  // pilot scripts, now wired into a real execution path for the first time (never
+  // backfilled onto historical runs — see docs/09_DECISIONS.md / docs/16_METRIC_DEFINITIONS.md).
+  // Classifies every captured outlet against the run's own requested territory so
+  // "physically in target" vs "delivery-area-only" vs "rejected" become real, not "Not evaluated."
+  if (outletsByJeId.size > 0) {
+    const observedAt = new Date().toISOString();
+    const sourceOutlets = [...outletsByJeId.values()].map((o) => parsedOutletToSourceOutlet(o, observedAt));
+    const partition = partitionByGeography(sourceOutlets, {
+      requestedCountry: "GB",
+      geographySelection: run.territory_input ?? null,
+      resolvedQueryUnits: run.derived_query_units ?? [],
+    });
+    await repo.persistGeographyValidations({
+      tenantId: run.tenant_id, runId: run.id, executionId: execution.id, source: "just_eat",
+      ctx: { requestedCountry: "GB", geographySelection: run.territory_input ?? null, resolvedQueryUnits: run.derived_query_units ?? [] },
+      verdicts: partition.verdicts,
+      observationIdBySourceId: latestObservationIdByJeId,
+    });
   }
 
   const completedQueries = succeeded;

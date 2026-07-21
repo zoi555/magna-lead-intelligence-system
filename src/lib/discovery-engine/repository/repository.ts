@@ -8,6 +8,8 @@ import type {
   RawObservationInput, RawObservationRecord, OutletUpsert, OutletRecord,
   RatingHistoryInput, ProvenanceInput, QualityReport,
 } from "../types";
+import type { SourceOutlet } from "../consolidation/types";
+import type { GeographyRunContext, GeographyVerdict } from "../geography/provider-geography-gate";
 
 export interface ClaimResult { execution: ExecutionRecord | null }
 
@@ -61,4 +63,12 @@ export interface DiscoveryRepository {
 
   // test/maintenance
   deleteRunCascade(runId: string): Promise<void>;
+
+  // geography validation (the provider-neutral gate, wired into a real execution path —
+  // never backfilled onto historical data, see docs/09_DECISIONS.md)
+  persistGeographyValidations(args: {
+    tenantId: string; runId: string | null; executionId: string | null; source: string;
+    ctx: GeographyRunContext; verdicts: { outlet: SourceOutlet; verdict: GeographyVerdict }[];
+    observationIdBySourceId?: Map<string, string>;
+  }): Promise<{ inserted: number }>;
 }
