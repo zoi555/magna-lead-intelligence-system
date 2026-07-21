@@ -146,6 +146,28 @@ SQL
   check "rollback: record 1's raw observation was NOT left behind either" \
     "select count(*) from provider_raw_observations where source_record_id = 'bad-imp-1';" "0"
 
+  # --- 0025: auth bootstrap support + audit log ---
+  check "app_audit_log accepts an insert" \
+    "insert into app_audit_log (tenant_id, action, actor_email) values ('$TENANT_ID', 'owner_bootstrap', 'owner@example.test') returning action;" "owner_bootstrap"
+  AUDIT_ROW_ID="$(psql -t -A -q -c "select id from app_audit_log where tenant_id = '$TENANT_ID' order by created_at desc limit 1;")"
+  psql -q -c "update app_audit_log set reason = 'tampered' where id = '$AUDIT_ROW_ID';" >/dev/null 2>&1 || true
+  check "app_audit_log rejects UPDATE (append-only)" \
+    "select (reason is null) from app_audit_log where id = '$AUDIT_ROW_ID';" "t"
+  psql -q -c "delete from app_audit_log where id = '$AUDIT_ROW_ID';" >/dev/null 2>&1 || true
+  check "app_audit_log rejects DELETE (append-only)" \
+    "select count(*) from app_audit_log where id = '$AUDIT_ROW_ID';" "1"
+  check "app_has_tenant_role function exists and is callable" \
+    "select app_has_tenant_role('$TENANT_ID'::uuid, array['owner']);" "f"
+
+  TEST_USER_ID="$(psql -t -A -q -c "insert into auth.users default values returning id;")"
+  psql -q -c "insert into tenant_members (tenant_id, user_id, role) values ('$TENANT_ID', '$TEST_USER_ID', 'owner');" >/dev/null 2>&1
+  check "one owner per tenant: first owner insert succeeds" \
+    "select count(*) from tenant_members where tenant_id = '$TENANT_ID' and role = 'owner';" "1"
+  TEST_USER_ID_2="$(psql -t -A -q -c "insert into auth.users default values returning id;")"
+  psql -q -c "insert into tenant_members (tenant_id, user_id, role) values ('$TENANT_ID', '$TEST_USER_ID_2', 'owner');" >/dev/null 2>&1 || true
+  check "one owner per tenant: second owner insert is rejected by the unique index" \
+    "select count(*) from tenant_members where tenant_id = '$TENANT_ID' and role = 'owner';" "1"
+
   if [ "$ASSERT_FAIL" -eq 1 ]; then FAILED=1; fi
 fi
 
