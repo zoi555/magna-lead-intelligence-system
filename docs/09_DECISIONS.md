@@ -671,3 +671,21 @@ Router app — a well-known, error-prone thing to get right manually (expired-to
 attribute mismatches between client/server). `@supabase/ssr` is Supabase's own answer to
 exactly this, actively maintained, and small (no transitive framework lock-in beyond Supabase
 itself, which is already the project's database).
+
+## Retain migration 0030 (`candidate_source_links.je_raw_observation_id`) as an inert, unused field (2026-07-22)
+
+Migration 0030 was applied to production during the geography-consolidation hotfix
+(commit `fc5063b`) intended to let a candidate's source link reference its exact Just Eat raw
+observation. The hotfix's actual fix (`consolidateRun()`, and the `c301cbbc` repair) ended up
+joining `je_raw_observations.id` directly to `provider_geography_validations.observation_id` in
+application/SQL logic, without needing this column at all — so it shipped unused. Confirmed:
+3,285 `candidate_source_links` rows, 0 populated; no application code reads or writes it.
+
+**Decision: retain as-is.** Not rolled back, not populated, not read, during today's hotfix work.
+See ISS-0024 for the tracked follow-up.
+
+### Reason
+
+The column is additive and inert — no observed operational impact, and removing it isn't urgent
+enough to interrupt the same-day production repair it shipped alongside. Tracked as tech debt
+rather than actioned immediately.

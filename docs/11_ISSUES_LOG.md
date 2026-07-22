@@ -533,3 +533,26 @@ swap, not left as dead code).
 None — resolved. Full route-level classification in `docs/75_LIVE_DATA_AUDIT.md`. Wiring `/` and
 `/territories` off `mock-data.ts` onto real data remains open (unchanged from ISS-0020) but is now
 honestly labelled rather than silently misrepresented.
+
+## ISS-0024 — `candidate_source_links.je_raw_observation_id`: unused schema field from migration 0030
+
+Date: 2026-07-22
+Severity: Low (tech debt)
+Owner: Zoeb
+Status: Open — deferred
+
+### Problem
+
+Migration 0030 (applied alongside the geography-consolidation hotfix, commit `fc5063b`) added
+`candidate_source_links.je_raw_observation_id` (nullable, FK to `je_raw_observations`, indexed)
+for future exact-observation traceability. The hotfix's actual join logic did not end up needing
+it — `consolidateRun()` and the `c301cbbc` repair both resolve the exact observation via
+`je_raw_observations.id` / `provider_geography_validations.observation_id` directly. Confirmed
+in production: 3,285 `candidate_source_links` rows, 0 populated; no application code reads or
+writes the column. See `docs/09_DECISIONS.md` for the decision to retain it as-is for now.
+
+### Next action
+
+If still appropriate later, remove via a **new additive migration** (drop column + index) —
+never edit the already-applied 0030 file. Do this only after preview/staging testing confirms
+nothing has started depending on it in the meantime. Not urgent — no observed operational impact.
