@@ -66,7 +66,8 @@ export async function fetchHomepageOverview(tenantId?: string): Promise<Homepage
     fetchRecentRuns(1),
     fetchDataQualityExceptions(),
     db.from("je_outlets").select("id", { count: "exact", head: true }).eq("tenant_id", resolvedTenantId),
-    db.from("consolidated_candidates").select("id", { count: "exact", head: true }).eq("tenant_id", resolvedTenantId).gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
+    // Operational count: only geography-valid candidates (see run-detail.ts for the same rule).
+    db.from("consolidated_candidates").select("id", { count: "exact", head: true }).eq("tenant_id", resolvedTenantId).eq("geography_status", "valid_geography").gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()),
     db.from("import_batches").select("id,source,original_filename,accepted_count,status,imported_at").eq("tenant_id", resolvedTenantId).order("imported_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
 

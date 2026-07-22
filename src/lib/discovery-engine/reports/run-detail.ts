@@ -82,7 +82,10 @@ export async function fetchRunDetail(runId: string): Promise<RunDetail> {
     db.from("je_raw_observations").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("run_id", runId),
     db.from("je_raw_observations").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("run_id", runId).not("duplicate_of", "is", null),
     db.from("provider_geography_validations").select("status").eq("tenant_id", tenantId).eq("run_id", runId),
-    db.from("consolidated_candidates").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("run_id", runId),
+    // Operational count: only geography-valid candidates. consolidated_candidates.geography_status
+    // is the authoritative gate — never assume every persisted candidate is operational (a
+    // production run has shown that stamp can be wrong; see docs/10_BUGS_AND_FIXES.md).
+    db.from("consolidated_candidates").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("run_id", runId).eq("geography_status", "valid_geography"),
   ]);
 
   const executions = (execRes.data ?? []) as Record<string, unknown>[];

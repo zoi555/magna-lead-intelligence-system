@@ -25,10 +25,41 @@ function jeOutletRowToSourceOutlet(r: Record<string, any>): SourceOutlet {
 }
 
 export async function consolidateRun(db: SupabaseClient, tenantId: string, runId: string): Promise<{ outlets: number; candidates: number }> {
-  // canonical outlet ids observed in this run (duplicates excluded)
-  const obs = await db.from("je_raw_observations").select("source_record_id").eq("run_id", runId).is("duplicate_of", null);
+  // Canonical (non-duplicate) raw observations for this run, newest first, so the FIRST row
+  // seen per source_record_id is the run's own canonical (latest) capture of that outlet — the
+  // exact observation the geography gate itself classified (see worker/execute.ts, which builds
+  // its outletsByJeId map the same way: last-write-wins per outlet within one execution).
+  const obs = await db.from("je_raw_observations").select("id, source_record_id")
+    .eq("run_id", runId).is("duplicate_of", null).order("created_at", { ascending: false });
   if (obs.error) throw new Error(`consolidateRun.obs: ${JSON.stringify(obs.error)}`);
-  const ids = [...new Set((obs.data ?? []).map((o) => (o as { source_record_id: string }).source_record_id).filter(Boolean))];
+  const canonicalObservationBySourceId = new Map<string, string>(); // source_record_id -> its canonical observation id
+  for (const o of (obs.data ?? []) as { id: string; source_record_id: string }[]) {
+    if (o.source_record_id && !canonicalObservationBySourceId.has(o.source_record_id)) {
+      canonicalObservationBySourceId.set(o.source_record_id, o.id);
+    }
+  }
+  if (!canonicalObservationBySourceId.size) return { outlets: 0, candidates: 0 };
+
+  // Fail-closed, OBSERVATION-level geography gate: an outlet may only reach consolidation when
+  // its exact canonical observation (not merely "some row sharing this source_record_id") has a
+  // provider_geography_validations row for THIS run/tenant/source with status=valid_geography.
+  // Joining on observation_id — never on source_record_id/source_outlet_id alone — means a stale
+  // or cross-run observation of the same outlet can never lend its verdict to this run's outlet
+  // (see test:geography-consolidation-fix's same-source-record-id, different-observation case).
+  // Missing, rejected, or unverifiable evidence is excluded here — never treated as valid by absence.
+  const canonicalObservationIds = [...canonicalObservationBySourceId.values()];
+  const validObservationIds = new Set<string>();
+  for (let i = 0; i < canonicalObservationIds.length; i += 500) {
+    const r = await db.from("provider_geography_validations").select("observation_id")
+      .eq("run_id", runId).eq("tenant_id", tenantId).eq("source", "just_eat").eq("status", "valid_geography")
+      .in("observation_id", canonicalObservationIds.slice(i, i + 500));
+    if (r.error) throw new Error(`consolidateRun.validation: ${JSON.stringify(r.error)}`);
+    for (const v of (r.data ?? []) as { observation_id: string | null }[]) if (v.observation_id) validObservationIds.add(v.observation_id);
+  }
+  const ids: string[] = [];
+  for (const [sourceRecordId, observationId] of canonicalObservationBySourceId) {
+    if (validObservationIds.has(observationId)) ids.push(sourceRecordId);
+  }
   if (!ids.length) return { outlets: 0, candidates: 0 };
 
   const outletRows: Record<string, any>[] = [];

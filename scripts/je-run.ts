@@ -39,7 +39,6 @@ async function main() {
   const { saveRunFromPlan, queueJustEatExecution, getRunStatus } = await import("../src/lib/discovery-engine/run-service");
   const { SupabaseRepository } = await import("../src/lib/discovery-engine/repository/supabase");
   const { runWorkerOnce } = await import("../src/lib/discovery-engine/worker/loop");
-  const { consolidateRun } = await import("../src/lib/discovery-engine/consolidation/consolidate-run");
 
   const db = createServiceClient();
   const repo = new SupabaseRepository();
@@ -67,13 +66,16 @@ async function main() {
   const status = await getRunStatus(repo, run.id);
   const e = status?.executions[status.executions.length - 1];
   const q = status?.quality as Record<string, unknown> | null;
-  const cons = await consolidateRun(db, tenantId, run.id);
+  // Consolidation already ran inside executeJustEatRun() as part of the worker execution
+  // above — calling consolidateRun() again here would double-consolidate. Just read back
+  // what it produced.
+  const consCount = await db.from("consolidated_candidates").select("id", { count: "exact", head: true }).eq("run_id", run.id);
 
   console.log(`\n--- Result for "${input}" (${dur}s) ---`);
   console.log(`status=${e?.status} planned=${e?.planned_queries} completed=${e?.completed_queries} attempts=${e?.attempts}`);
   console.log(`metrics: ${JSON.stringify(e?.metrics)}`);
   if (q) console.log(`quality: raw=${q.total_raw_observations} canonical=${q.canonical_observations} unique=${q.unique_outlets} dupRate=${q.duplicate_rate} coords=${q.pct_coordinates} rating=${q.pct_review_score} cuisine=${q.pct_cuisine} halal=${q.pct_halal_evidence} phone=${q.pct_phone} menu=${q.pct_menu_data}`);
-  console.log(`consolidation: ${cons.outlets} outlets → ${cons.candidates} candidates`);
+  console.log(`consolidation: ${consCount.count ?? 0} candidates`);
   process.exit(0);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

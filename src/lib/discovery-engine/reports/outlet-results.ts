@@ -94,6 +94,7 @@ export async function fetchOutletResults(outcode: string, limit = 200): Promise<
     .from("consolidated_candidates")
     .select("id,name,brand,postcode,phone,latitude,longitude,last_seen,candidate_source_links!inner(source,source_outlet_id,source_url,rating,review_count,cuisines,is_delivery,is_collection,observed_at)")
     .eq("tenant_id", tenantId)
+    .eq("geography_status", "valid_geography")
     .ilike("postcode", `${oc}%`)
     .neq("candidate_source_links.source", "just_eat")
     .order("last_seen", { ascending: false })
