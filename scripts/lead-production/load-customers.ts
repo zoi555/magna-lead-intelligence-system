@@ -11,11 +11,15 @@ import type { CustomerRecord, StatusOutcome } from "./types";
 export const CUSTOMER_FIELD_SPECS: FieldSpec[] = [
   { key: "customerId", aliases: ["customer_code", "customer id", "account id", "account_id", "id", "customer_id"], required: true },
   { key: "status", aliases: ["active_inactive", "account status", "customer status"], required: true },
-  { key: "tradingName", aliases: ["trading_name", "trading as", "name"], required: true },
+  // "customer name" (NetSuite) added alongside the existing aliases — a real, unambiguous
+  // header this bridge previously failed to map, not a guess.
+  { key: "tradingName", aliases: ["trading_name", "trading as", "name", "customer name"], required: true },
   { key: "legalName", aliases: ["legal_name", "registered name", "company name", "registered_name"], required: false },
   { key: "companyNumber", aliases: ["company_number", "companies house number", "ch number", "company reg number"], required: false },
-  { key: "address", aliases: ["site address", "delivery address", "address1", "address_1"], required: true },
-  { key: "postcode", aliases: ["post code", "post_code", "site postcode"], required: true },
+  // "address line 1" and "billing address 1" (NetSuite) added alongside the existing aliases.
+  { key: "address", aliases: ["site address", "delivery address", "address1", "address_1", "address line 1", "billing address 1"], required: true },
+  // "billing zip" (NetSuite) added alongside the existing aliases.
+  { key: "postcode", aliases: ["post code", "post_code", "site postcode", "billing zip"], required: true },
   { key: "phone", aliases: ["telephone", "tel", "phone number", "contact number"], required: false },
   { key: "email", aliases: ["email address", "contact email"], required: false },
   { key: "parentGroupAccount", aliases: ["parent account", "group account", "parent_group", "parent/group", "parent group account"], required: false },

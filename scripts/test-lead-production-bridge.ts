@@ -13,7 +13,8 @@ import { notAssessedRejection } from "./lead-production/rejection-levels";
 import { processCandidates } from "./lead-production/process";
 import { loadAssignmentFile, DuplicateTerritoryOwnershipError } from "./lead-production/load-assignments";
 import { buildCustomerPreflight } from "./lead-production/preflight";
-import { loadCustomerFile, mapStatusOutcome } from "./lead-production/load-customers";
+import { loadCustomerFile, mapStatusOutcome, CUSTOMER_FIELD_SPECS } from "./lead-production/load-customers";
+import { mapColumns } from "./lead-production/column-mapping";
 import type { OperationalCandidate, CustomerRecord, GroupRegistryEntry, AssignmentRecord, GroupDefaultOutcome } from "./lead-production/types";
 
 let fails = 0;
@@ -279,6 +280,33 @@ async function main() {
     await fs.writeFile(okFile, "Salesperson,Role,Territory,Required Lead Count\nA. Rep,field_sales,North London,10\nB. Rep,telesales,North London,8\n");
     const ok = await loadAssignmentFile(okFile);
     assert(ok.assignments.length === 2, "the SAME territory with DIFFERENT roles (telesales + field_sales) is allowed, not a duplicate");
+  }
+
+  // === NetSuite customer-export column aliases (fix: support NetSuite customer export column aliases) ===
+  {
+    const map = (header: string[]) => mapColumns(header, CUSTOMER_FIELD_SPECS).mapping;
+
+    assert(map(["Customer ID", "Status", "Customer Name", "Address", "Postcode"]).tradingName === "Customer Name", "1. \"Customer Name\" maps to tradingName");
+    assert(map(["Customer ID", "Status", "Trading Name", "Address Line 1", "Postcode"]).address === "Address Line 1", "2. \"Address Line 1\" maps to address");
+    assert(map(["Customer ID", "Status", "Trading Name", "Billing Address 1", "Postcode"]).address === "Billing Address 1", "3. \"Billing Address 1\" maps to address");
+    assert(map(["Customer ID", "Status", "Trading Name", "Address", "Billing Zip"]).postcode === "Billing Zip", "4. \"Billing Zip\" maps to postcode");
+
+    assert(map(["Customer ID", "Status", "Trading Name", "Address", "Postcode"]).tradingName === "Trading Name", "5a. the pre-existing \"Trading Name\" alias still works");
+    assert(map(["Customer ID", "Status", "Name", "Site Address", "Post Code"]).address === "Site Address" && map(["Customer ID", "Status", "Name", "Site Address", "Post Code"]).postcode === "Post Code", "5b. pre-existing \"Site Address\"/\"Post Code\" aliases still work");
+    assert(map(["Customer ID", "Status", "Name", "Address1", "Post Code"]).address === "Address1", "5c. pre-existing \"Address1\" alias still works");
+
+    const unrelated = mapColumns(["Customer ID", "Status", "Trading Name", "Address", "Postcode", "Favourite Colour", "Notes About Delivery"], CUSTOMER_FIELD_SPECS);
+    assert(unrelated.unmappedColumns.includes("Favourite Colour") && unrelated.unmappedColumns.includes("Notes About Delivery"), "6. ambiguous/unrelated columns (\"Favourite Colour\", \"Notes About Delivery\") are reported as unmapped, never silently guessed onto a required field");
+
+    // 7: candidate #1-style (customer-list.csv) NetSuite header — required columns now map.
+    const candidate1Header = ["Inactive", "Internal ID", "ID", "Name", "Duplicate", "Category", "Company Name", "Is Individual", "Sales Rep", "Status", "Territory", "Phone", "Email", "Billing Address 1", "Billing Address 2", "Billing City", "Billing State/Province", "Billing Zip", "Billing Country"];
+    const c1 = mapColumns(candidate1Header, CUSTOMER_FIELD_SPECS);
+    assert(c1.missingRequired.length === 0, `7. candidate #1-style headers now pass required-column mapping (missing: ${c1.missingRequired.join(", ")})`);
+
+    // 8: candidate #4-style (customer_master.csv) NetSuite header — required columns now map.
+    const candidate4Header = ["Internal ID", "Customer ID", "Customer Name", "Duplicate Flag", "Category", "Business Type", "Sales Rep", "Account Manager", "Status", "Phone", "Office Phone", "Email", "Address Line 1", "Address Line 2", "City", "Postcode", "Shipping Postcode", "Country"];
+    const c4 = mapColumns(candidate4Header, CUSTOMER_FIELD_SPECS);
+    assert(c4.missingRequired.length === 0, `8. candidate #4-style headers now pass required-column mapping (missing: ${c4.missingRequired.join(", ")})`);
   }
 
   // === Preflight catches missing required columns ===
