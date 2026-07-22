@@ -62,7 +62,9 @@
     "test:settings": "tsx scripts/test-settings-playwright.ts",
     "test:create-new-run-playwright": "tsx scripts/test-create-new-run-playwright.ts",
     "live:je-proof": "tsx scripts/live-je-proof-playwright.ts",
-    "live:je-proof-verify": "tsx scripts/live-je-proof-verify-only.ts"
+    "live:je-proof-verify": "tsx scripts/live-je-proof-verify-only.ts",
+    "prod:auth-smoke-test": "tsx scripts/production-auth-full-proof.ts",
+    "prod:post-cleanup-proof": "tsx scripts/production-post-cleanup-proof.ts"
   },
   "dependencies": {
     "@expo-google-fonts/open-sans": "^0.4.2",
