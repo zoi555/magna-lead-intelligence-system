@@ -291,6 +291,43 @@ async function main() {
     assert(threw, "a customer file missing required columns (address, postcode) is rejected before preflight can even run");
   }
 
+  // === --preflight-only mode: real CLI subprocess proofs ===
+  {
+    const { spawnSync } = await import("node:child_process");
+    const cliPath = path.resolve(process.cwd(), "scripts/lead-production/run-comparison.ts");
+
+    // Structural: the preflight-only code path never references candidate/Supabase loading.
+    const text = await fs.readFile(cliPath, "utf8");
+    const fnMatch = text.match(/async function runPreflightOnly[\s\S]*?\n}\n/);
+    assert(!!fnMatch, "runPreflightOnly() function found in run-comparison.ts");
+    const fnBody = fnMatch ? fnMatch[0] : "";
+    assert(
+      !fnBody.includes("loadOperationalCandidates") && !fnBody.includes("createServiceClient") && !fnBody.includes("hasServiceCredentials")
+      && !fnBody.includes("loadAssignmentFile") && !fnBody.includes("loadGroupRegistry") && !fnBody.includes("processCandidates"),
+      "preflight-only mode never references candidate loading, Supabase, assignments, group registry, or matching",
+    );
+
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-preflight-only-"));
+
+    const goodFile = path.join(dir, "customers-good.csv");
+    await fs.writeFile(goodFile, "Customer ID,Status,Trading Name,Address,Postcode\nC1,Active,Alpha,1 Rd,UB1 1AA\nC2,Inactive,Beta,2 Rd,UB1 2AA\n");
+    const goodOut = path.join(dir, "out-good");
+    const goodRun = spawnSync("npx", ["tsx", cliPath, `--customers=${goodFile}`, `--out=${goodOut}`, "--preflight-only"], { encoding: "utf8" });
+    assert(goodRun.status === 0, `approved customer data exits 0 (got ${goodRun.status}, stderr: ${goodRun.stderr?.slice(0, 300)})`);
+    const goodOutFiles: string[] = await fs.readdir(goodOut).catch(() => [] as string[]);
+    assert(goodOutFiles.includes("customer-master-preflight.json"), "customer-master-preflight.json is created on a successful preflight-only run");
+    assert(!goodOutFiles.some((f) => f !== "customer-master-preflight.json"), `no comparison outputs are created in preflight-only mode (found: ${goodOutFiles.join(", ")})`);
+
+    const badFile = path.join(dir, "customers-bad.csv");
+    await fs.writeFile(badFile, "Customer ID,Status,Trading Name,Address,Postcode\nC1,Active,Alpha,1 Rd,UB1 1AA\nC2,Prospecting,Beta,2 Rd,UB1 2AA\nC3,,Gamma,3 Rd,UB1 3AA\n");
+    const badOut = path.join(dir, "out-bad");
+    const badRun = spawnSync("npx", ["tsx", cliPath, `--customers=${badFile}`, `--out=${badOut}`, "--preflight-only"], { encoding: "utf8" });
+    assert(badRun.status === 1, `blank or unknown status exits 1 (got ${badRun.status})`);
+    const badOutFiles: string[] = await fs.readdir(badOut).catch(() => [] as string[]);
+    assert(badOutFiles.includes("customer-master-preflight.json"), "customer-master-preflight.json is still created when validation fails");
+    assert(!badOutFiles.some((f) => f !== "customer-master-preflight.json"), "no comparison outputs are created even when preflight-only fails");
+  }
+
   // === Synthetic smoke-test output is labelled as test evidence only ===
   {
     const text = await fs.readFile(path.resolve(process.cwd(), "scripts/lead-production/run-comparison.ts"), "utf8");

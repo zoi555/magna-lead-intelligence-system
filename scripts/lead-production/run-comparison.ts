@@ -14,6 +14,15 @@
 // COMMERCIAL QUALIFICATION" notice — use it whenever the input files are placeholder/synthetic
 // fixtures rather than the real Magna customer master.
 //
+// Preflight-only mode (validate a customer export in isolation, nothing else):
+//   npx tsx scripts/lead-production/run-comparison.ts \
+//     --customers=<path.csv|.xlsx> --out=<output-dir> --preflight-only
+//
+// In this mode: only the customer file is loaded. No Supabase connection, no candidates, no
+// assignment file, no group registry, no customer matching, no candidate-result files — only
+// customer-master-preflight.json is produced. Exits 0 if the file is structurally approved
+// (no blocking errors), exits 1 otherwise.
+//
 // Reads real files only — never mock/sample/seeded/hardcoded customer data.
 
 import { promises as fs } from "node:fs";
@@ -39,14 +48,68 @@ function flag(name: string): boolean {
   return process.argv.includes(`--${name}`);
 }
 
+async function runPreflightOnly(customersPath: string, outArg: string | null): Promise<void> {
+  const { loadCustomerFile } = await import("./load-customers");
+  const { buildCustomerPreflight } = await import("./preflight");
+  const { writePreflightReport, fileHash } = await import("./audit-output");
+
+  console.log("=== Lead-production bridge: customer-master preflight ONLY ===");
+  console.log("(no Supabase connection, no candidates, no assignments, no group registry, no matching)");
+
+  const outDir = outArg ?? path.resolve(process.cwd(), "scripts/lead-production/output", `${new Date().toISOString().replace(/[:.]/g, "-")}-preflight-only`);
+
+  const customersLoaded = await loadCustomerFile(customersPath);
+  const customersHash = await fileHash(customersPath);
+  const preflight = buildCustomerPreflight(customersLoaded, customersHash);
+  await writePreflightReport(outDir, preflight);
+
+  console.log(`\nSource: ${customersPath}`);
+  console.log(`Hash: ${customersHash}`);
+  console.log(`Sheet: ${customersLoaded.sheetName ?? "n/a (CSV)"}`);
+  console.log(`Rows: ${preflight.sourceRowCount}`);
+  console.log(`Required columns found: ${preflight.requiredColumnsFound.join(", ") || "(none)"}`);
+  console.log(`Optional columns found: ${preflight.optionalColumnsFound.join(", ") || "(none)"}`);
+  console.log(`Unmapped columns: ${preflight.unmappedColumns.join(", ") || "(none)"}`);
+  console.log(`Status inventory: ${preflight.statusInventory.map((s) => `"${s.originalValue || "(blank)"}"→${s.mappedOutcome}${s.approved ? "" : " [UNAPPROVED]"} (${s.rowCount})`).join("; ") || "(no rows)"}`);
+  console.log(`Rows missing required values: ${preflight.rowsMissingRequiredValues.length}`);
+  console.log(`Duplicate customer IDs: ${preflight.duplicateCustomerIds.length}`);
+  console.log(`Duplicate phones: ${preflight.duplicateNormalisedPhones.length}`);
+  console.log(`Duplicate company numbers: ${preflight.duplicateCompanyNumbers.length}`);
+  console.log(`Duplicate postcode/name combinations: ${preflight.duplicatePostcodeNameCombinations.length}`);
+
+  if (preflight.nonBlockingWarnings.length) console.log(`\nNon-blocking warnings:\n  - ${preflight.nonBlockingWarnings.join("\n  - ")}`);
+
+  if (preflight.blockingWarnings.length) {
+    console.error(`\nBLOCKING preflight errors — file is NOT structurally approved:\n  - ${preflight.blockingWarnings.join("\n  - ")}`);
+    console.error(`\nFull report: ${path.join(outDir, "customer-master-preflight.json")}`);
+    process.exit(1);
+  }
+
+  console.log(`\nFile is structurally approved — no blocking errors.`);
+  console.log(`Full report: ${path.join(outDir, "customer-master-preflight.json")}`);
+  process.exit(0);
+}
+
 async function main() {
   await loadDotEnv();
 
-  const runId = arg("run");
   const customersPath = arg("customers");
+  const outArg = arg("out");
+  const preflightOnly = flag("preflight-only");
+
+  if (preflightOnly) {
+    if (!customersPath) {
+      console.error("Missing required argument: --customers=<path.csv|.xlsx>");
+      console.error("\nUsage: npx tsx scripts/lead-production/run-comparison.ts --customers=<file> --out=<dir> --preflight-only");
+      process.exit(1);
+    }
+    await runPreflightOnly(customersPath, outArg);
+    return;
+  }
+
+  const runId = arg("run");
   const assignmentsPath = arg("assignments");
   const groupsPath = arg("groups");
-  const outArg = arg("out");
   const syntheticTest = flag("synthetic-test");
 
   const missing = [
@@ -58,6 +121,7 @@ async function main() {
   if (missing.length) {
     console.error("Missing required argument(s):\n  " + missing.join("\n  "));
     console.error("\nUsage: npx tsx scripts/lead-production/run-comparison.ts --run=<id> --customers=<file> --assignments=<file> --groups=<file> [--out=<dir>] [--synthetic-test]");
+    console.error("   or: npx tsx scripts/lead-production/run-comparison.ts --customers=<file> --out=<dir> --preflight-only");
     process.exit(1);
   }
 
