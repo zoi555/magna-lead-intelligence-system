@@ -36,6 +36,8 @@
     "test:geography-consolidation-fix": "tsx scripts/test-geography-consolidation-fix.ts",
     "test:operational-candidates-query": "tsx scripts/test-operational-candidates-query.ts",
     "leads:export-operational": "tsx scripts/export-operational-leads.ts",
+    "test:lead-production-bridge": "tsx scripts/test-lead-production-bridge.ts",
+    "lead-production:compare": "tsx scripts/lead-production/run-comparison.ts",
     "test:apify-provenance": "tsx scripts/test-apify-provenance.ts",
     "test:borderline-provider": "tsx scripts/test-borderline-provider.ts",
     "test:ub1-benchmark": "tsx scripts/test-ub1-benchmark.ts",
@@ -80,7 +82,8 @@
     "next": "^16.2.10",
     "pmtiles": "^4.4.1",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "20.14.12",

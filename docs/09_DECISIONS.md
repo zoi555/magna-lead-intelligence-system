@@ -689,3 +689,18 @@ See ISS-0024 for the tracked follow-up.
 The column is additive and inert — no observed operational impact, and removing it isn't urgent
 enough to interrupt the same-day production repair it shipped alongside. Tracked as tech debt
 rather than actioned immediately.
+
+## New package: `xlsx` (SheetJS) (2026-07-22)
+
+Added `xlsx@0.18.5` (devDependency-equivalent, used only by the standalone
+`scripts/lead-production/` CLI, never imported by application code) to read real Magna customer
+export / salesperson-assignment files supplied as `.xlsx`, alongside CSV. No zero-dependency way
+to parse OOXML spreadsheet files exists; `xlsx` is the standard, widely-used library for this in
+Node and reads-only in this codebase (never writes `.xlsx`, only `.csv`/`.json` outputs).
+
+### Reason
+
+The lead-production bridge's customer/assignment inputs are real exports from external systems
+(NetSuite/Sales Pro-style), which are commonly `.xlsx`. Restricting to CSV-only would push manual
+re-export work onto the user for every run. This is scoped entirely to the offline CLI — no
+application runtime, bundle, or Vercel deployment is affected.

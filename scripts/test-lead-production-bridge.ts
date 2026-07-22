@@ -1,0 +1,364 @@
+// Fixture-driven proofs for the lead-production bridge (npm run test:lead-production-bridge).
+// Pure logic — no Supabase, no real files (except tiny temp files a few tests write to prove
+// real load-path validation). Brand names used for group-registry fixture tests live ONLY
+// here, never in scripts/lead-production/ source modules — see screen-large-groups.ts.
+
+import { promises as fs } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { matchCandidateToCustomers } from "./lead-production/match-customers";
+import { screenLargeGroups } from "./lead-production/screen-large-groups";
+import { derivePreliminaryStatus } from "./lead-production/preliminary-status";
+import { notAssessedRejection } from "./lead-production/rejection-levels";
+import { processCandidates } from "./lead-production/process";
+import { loadAssignmentFile, DuplicateTerritoryOwnershipError } from "./lead-production/load-assignments";
+import { buildCustomerPreflight } from "./lead-production/preflight";
+import { loadCustomerFile, mapStatusOutcome } from "./lead-production/load-customers";
+import type { OperationalCandidate, CustomerRecord, GroupRegistryEntry, AssignmentRecord, GroupDefaultOutcome } from "./lead-production/types";
+
+let fails = 0;
+const assert = (c: boolean, m: string) => { if (!c) { console.error("  ✗", m); fails++; } else console.log("  ✓", m); };
+
+let candSeq = 0;
+function mkCandidate(o: Partial<OperationalCandidate> = {}): OperationalCandidate {
+  candSeq++;
+  return {
+    id: o.id ?? `cand-${candSeq}`, name: o.name ?? `Candidate ${candSeq}`, brand: o.brand ?? null,
+    postcode: o.postcode ?? null, phone: o.phone ?? null, latitude: o.latitude ?? null, longitude: o.longitude ?? null,
+    companyNumber: o.companyNumber ?? null, website: o.website ?? null, sources: o.sources ?? [{ source: "just_eat", sourceOutletId: `oid-${candSeq}` }],
+  };
+}
+let custSeq = 0;
+function mkCustomer(o: Partial<CustomerRecord> = {}): CustomerRecord {
+  custSeq++;
+  const status = o.status ?? "Active";
+  const statusOutcome = o.statusOutcome ?? mapStatusOutcome(status);
+  return {
+    rowIndex: o.rowIndex ?? custSeq, customerId: o.customerId ?? `cust-${custSeq}`, status, statusOutcome,
+    isActive: o.isActive ?? (statusOutcome === "active" || statusOutcome === "excluded_non_prospect"),
+    tradingName: o.tradingName ?? `Customer ${custSeq}`, legalName: o.legalName ?? null,
+    companyNumber: o.companyNumber ?? null, address: o.address ?? null, postcode: o.postcode ?? null,
+    phone: o.phone ?? null, email: o.email ?? null, parentGroupAccount: o.parentGroupAccount ?? null,
+    lastOrderDate: o.lastOrderDate ?? null, assignedSalesperson: o.assignedSalesperson ?? null,
+  };
+}
+function mkGroupEntry(o: Partial<GroupRegistryEntry> & { groupName: string; classification: GroupRegistryEntry["classification"]; defaultOutcome: GroupDefaultOutcome }): GroupRegistryEntry {
+  return {
+    rowIndex: 1, brandName: null, aliases: [], parentCompany: null, companyNumbers: [], domains: [],
+    localPurchasingPossible: null, evidenceSource: null, effectiveDate: null, postcodePrefixes: [],
+    ...o,
+  };
+}
+function mkAssignment(o: Partial<AssignmentRecord> = {}): AssignmentRecord {
+  return {
+    rowIndex: 1, salesperson: o.salesperson ?? "A. Rep", role: o.role ?? "field_sales", territory: o.territory ?? "Test Territory",
+    requiredLeadCount: o.requiredLeadCount ?? 10, postcodePrefixes: o.postcodePrefixes ?? [], priorityBusinessTypes: o.priorityBusinessTypes ?? [],
+    excludedBusinessTypes: o.excludedBusinessTypes ?? [], importTemplate: o.importTemplate ?? null, notes: o.notes ?? null,
+  };
+}
+
+// Illustrative test fixture only — NOT verified real-world Companies House/domain data. Lives
+// only in this test file; screen-large-groups.ts and every other source module contain no
+// brand-name literals at all. Every known excluded high-street brand uses default_outcome
+// "exclude" — classification alone (excluded_national_supermarket / excluded_national_chain /
+// major_franchise) never controls the outcome; default_outcome does.
+function buildBrandFixtureRegistry(): GroupRegistryEntry[] {
+  const excludedSupermarket = (name: string, brand: string, domain: string, companyNumber: string, aliases: string[] = []): GroupRegistryEntry =>
+    mkGroupEntry({ groupName: name, brandName: brand, aliases, domains: [domain], companyNumbers: [companyNumber], classification: "excluded_national_supermarket", defaultOutcome: "exclude" });
+  const excludedChain = (name: string, brand: string, domain: string, companyNumber: string, aliases: string[] = []): GroupRegistryEntry =>
+    mkGroupEntry({ groupName: name, brandName: brand, aliases, domains: [domain], companyNumbers: [companyNumber], classification: "excluded_national_chain", defaultOutcome: "exclude" });
+  const excludedFranchise = (name: string, brand: string, domain: string, companyNumber: string, aliases: string[] = []): GroupRegistryEntry =>
+    mkGroupEntry({ groupName: name, brandName: brand, aliases, domains: [domain], companyNumbers: [companyNumber], classification: "major_franchise", defaultOutcome: "exclude" });
+
+  return [
+    excludedSupermarket("Tesco PLC", "Tesco", "tesco.com", "TEST00001"),
+    excludedSupermarket("Waitrose", "Waitrose", "waitrose.com", "TEST00002"),
+    excludedSupermarket("Sainsbury's", "Sainsburys", "sainsburys.co.uk", "TEST00003", ["sainsbury s"]),
+    excludedSupermarket("Asda Stores", "Asda", "asda.com", "TEST00004"),
+    excludedSupermarket("Morrisons", "Morrisons", "morrisons.com", "TEST00005"),
+    excludedSupermarket("Aldi Stores", "Aldi", "aldi.co.uk", "TEST00006"),
+    excludedSupermarket("Lidl GB", "Lidl", "lidl.co.uk", "TEST00007"),
+    excludedSupermarket("Iceland Foods", "Iceland", "iceland.co.uk", "TEST00008"),
+    excludedChain("Co-operative Group", "Co-op", "coop.co.uk", "TEST00009", ["coop", "the co operative"]),
+    excludedChain("Greggs PLC", "Greggs", "greggs.co.uk", "TEST00010"),
+    excludedFranchise("McDonald's Restaurants", "McDonald's", "mcdonalds.com", "TEST00011", ["mcdonalds", "maccies"]),
+    excludedFranchise("KFC Great Britain", "KFC", "kfc.co.uk", "TEST00012", ["kentucky fried chicken"]),
+    excludedFranchise("Burger King UK", "Burger King", "burgerking.co.uk", "TEST00013"),
+    excludedFranchise("Subway Franchisee UK", "Subway", "subway.com", "TEST00014"),
+    excludedFranchise("Domino's Pizza UK", "Domino's", "dominos.co.uk", "TEST00015", ["dominos"]),
+    excludedChain("Starbucks Coffee UK", "Starbucks", "starbucks.co.uk", "TEST00016"),
+    excludedChain("Costa Coffee", "Costa", "costa.co.uk", "TEST00017"),
+    excludedChain("Pret A Manger", "Pret", "pret.co.uk", "TEST00018", ["pret a manger"]),
+  ];
+}
+
+async function main() {
+  console.log("Lead-production bridge — fixture-driven proofs:\n");
+
+  // --- Customer-matching evidence (confirmed/probable/weak tiers) ---
+  {
+    const cand = mkCandidate({ name: "Zeta Foods", companyNumber: "01234567" });
+    const cust = mkCustomer({ tradingName: "Completely Different Trading Name", companyNumber: "1234567", status: "Active" });
+    const m = matchCandidateToCustomers(cand, [cust]);
+    assert(m.matchTier === "confirmed" && m.rulesTriggered.includes("exact_company_number"), "exact company number creates a confirmed match");
+    assert(m.outcome === "confirmed_active_customer", "confirmed match against an active customer -> confirmed_active_customer");
+  }
+  {
+    const cand = mkCandidate({ name: "Kebab House Southall", phone: "020 7946 0958" });
+    const cust = mkCustomer({ tradingName: "Kebab House", phone: "+442079460958", status: "Active" });
+    const m = matchCandidateToCustomers(cand, [cust]);
+    assert(m.matchTier === "confirmed" && m.rulesTriggered.includes("exact_normalised_telephone"), "exact telephone creates a confirmed match (labelled exact_normalised_telephone)");
+  }
+  {
+    const cand = mkCandidate({ name: "Test Diner", postcode: "UB1 1AA" });
+    const cust = mkCustomer({ tradingName: "Test Diner", postcode: "UB1 1AA", status: "Active" });
+    const m = matchCandidateToCustomers(cand, [cust]);
+    assert(m.matchTier === "confirmed" && m.rulesTriggered.includes("exact_postcode_exact_name"), "postcode + exact name creates a confirmed match");
+    assert(!m.rulesTriggered.some((r) => String(r).toLowerCase().includes("address")), "no evidence label describes this as an address match");
+  }
+  {
+    const cand = mkCandidate({ name: "Spice Corner", postcode: "UB1 9ZZ" });
+    const cust = mkCustomer({ tradingName: "Spice Corner Ltd", postcode: "SW1A 1AA", status: "Active" });
+    const m = matchCandidateToCustomers(cand, [cust]);
+    assert(m.matchTier === "weak" && m.rulesTriggered.includes("weak_name_similarity"), "similar name alone lands at the weak tier (weak_name_similarity), never confirmed/probable");
+    const group = screenLargeGroups(cand, [], 0);
+    const status = derivePreliminaryStatus(m.outcome, group);
+    const rejection = notAssessedRejection(m.outcome, status, group, true);
+    assert(status !== "active_customer" && status !== "excluded_large_group", "weak-similarity-only never becomes an exclusion status");
+    assert(rejection.level === "not_assessed", "even a weak match's rejection level is not_assessed, never a numeric level");
+  }
+  {
+    const parentCust = mkCustomer({ tradingName: "Big Group Southall", parentGroupAccount: "Big Group PLC", status: "Active" });
+    const cand = mkCandidate({ name: "Big Group PLC" });
+    const m = matchCandidateToCustomers(cand, [parentCust]);
+    assert(m.outcome === "branch_of_active_customer" && m.rulesTriggered.includes("verified_parent_branch_relationship"), "a parent/group-account match is a verified branch relationship, retained and traceable");
+    assert(m.matchedCustomerId === parentCust.customerId, "the branch is traceably linked to the parent customer record");
+  }
+
+  // === Customer-status handling: unknown/blank statuses BLOCK, never silently default ===
+  {
+    assert(mapStatusOutcome("Active") === "active" && mapStatusOutcome("Inactive") === "inactive" && mapStatusOutcome("Closed") === "excluded_non_prospect", "recognised statuses map to their explicit approved outcome");
+    assert(mapStatusOutcome("Prospecting") === "unapproved", "an unrecognised status maps to 'unapproved', not silently active/inactive");
+    assert(mapStatusOutcome("") === "unapproved", "a blank status maps to 'unapproved'");
+
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-status-block-"));
+    const file = path.join(dir, "customers.csv");
+    await fs.writeFile(file, "Customer ID,Status,Trading Name,Address,Postcode\nC1,Active,Alpha,1 Rd,UB1 1AA\nC2,Prospecting,Beta,2 Rd,UB1 2AA\nC3,,Gamma,3 Rd,UB1 3AA\n");
+    const loaded = await loadCustomerFile(file);
+    const preflight = buildCustomerPreflight(loaded, "testhash");
+
+    const inventory = preflight.statusInventory;
+    const activeRow = inventory.find((s) => s.originalValue === "Active");
+    const prospectingRow = inventory.find((s) => s.originalValue === "Prospecting");
+    const blankRow = inventory.find((s) => s.originalValue === "");
+    assert(!!activeRow && activeRow.approved && activeRow.mappedOutcome === "active" && activeRow.rowCount === 1, "status inventory reports the approved 'Active' status with its mapped outcome and row count");
+    assert(!!prospectingRow && !prospectingRow.approved && prospectingRow.mappedOutcome === "unapproved", "status inventory reports 'Prospecting' as unapproved");
+    assert(!!blankRow && !blankRow.approved, "status inventory reports the blank status as unapproved");
+    assert(preflight.blockingWarnings.some((w) => w.toLowerCase().includes("unrecognised customer status") || w.toLowerCase().includes("unrecognised")), "an unapproved/blank status produces a BLOCKING preflight warning");
+  }
+  {
+    // All-approved file -> no status-related blocking warning.
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-status-ok-"));
+    const file = path.join(dir, "customers.csv");
+    await fs.writeFile(file, "Customer ID,Status,Trading Name,Address,Postcode\nC1,Active,Alpha,1 Rd,UB1 1AA\nC2,Inactive,Beta,2 Rd,UB1 2AA\n");
+    const loaded = await loadCustomerFile(file);
+    const preflight = buildCustomerPreflight(loaded, "testhash");
+    assert(preflight.statusInventory.every((s) => s.approved), "a file using only approved statuses has a fully-approved status inventory");
+    assert(!preflight.blockingWarnings.some((w) => w.toLowerCase().includes("status")), "no status-related blocking warning when every status is approved");
+  }
+
+  {
+    const active = mkCustomer({ tradingName: "Alpha Diner", postcode: "UB2 1AA", status: "Active" });
+    const inactive = mkCustomer({ tradingName: "Beta Diner", postcode: "UB2 2AA", status: "Inactive" });
+    const candA = mkCandidate({ name: "Alpha Diner", postcode: "UB2 1AA" });
+    const candB = mkCandidate({ name: "Beta Diner", postcode: "UB2 2AA" });
+    assert(matchCandidateToCustomers(candA, [active, inactive]).outcome === "confirmed_active_customer", "active customer -> confirmed_active_customer");
+    assert(matchCandidateToCustomers(candB, [active, inactive]).outcome === "confirmed_inactive_customer", "inactive customer -> confirmed_inactive_customer (reactivation bucket)");
+  }
+
+  // === survivors are clear_for_enrichment, never Level 0; rejection level always unassessed ===
+  {
+    const cand = mkCandidate({ name: "Totally Independent Diner", postcode: "SW9 9ZZ" });
+    const m = matchCandidateToCustomers(cand, []);
+    const group = screenLargeGroups(cand, [], 0);
+    const status = derivePreliminaryStatus(m.outcome, group);
+    const rejection = notAssessedRejection(m.outcome, status, group, true);
+    assert(status === "clear_for_enrichment", "a clean surviving candidate is clear_for_enrichment");
+    assert(rejection.level === "not_assessed", "rejection level is exactly the literal 'not_assessed', never a number");
+  }
+
+  // === postcode alone cannot classify a group ===
+  {
+    const registry = [mkGroupEntry({ groupName: "Some Group", classification: "regional_group", defaultOutcome: "review", postcodePrefixes: ["UB1"] })];
+    const cand = mkCandidate({ name: "Unrelated Diner Ltd", postcode: "UB1 1AA" });
+    const result = screenLargeGroups(cand, registry, 0);
+    assert(result.classification === "independent_business" && result.defaultOutcome === null, "a postcode-prefix-only overlap does NOT classify a candidate into the registry's group — no primary identifier matched");
+    assert(!result.rulesTriggered.some((r) => r.startsWith("registry_")), "no registry match rule fired from postcode alone");
+  }
+
+  // === default_outcome controls the preliminary status; classification never overrides it ===
+  {
+    const registry = buildBrandFixtureRegistry();
+    const exclude = screenLargeGroups(mkCandidate({ name: "Tesco Express Southall" }), registry, 0);
+    assert(exclude.defaultOutcome === "exclude" && derivePreliminaryStatus("new_prospect", exclude) === "excluded_large_group", "a group entry with default_outcome=exclude becomes excluded_large_group");
+
+    const keyAccountEntry = mkGroupEntry({ groupName: "Regional Chain X", brandName: "Chain X", classification: "regional_group", defaultOutcome: "key_account" });
+    const keyAccount = screenLargeGroups(mkCandidate({ name: "Chain X Southall" }), [keyAccountEntry], 0);
+    assert(derivePreliminaryStatus("new_prospect", keyAccount) === "key_account_opportunity", "a regional group marked key_account becomes key_account_opportunity");
+
+    const reviewEntry = mkGroupEntry({ groupName: "Franchise Y", brandName: "Franchise Y", classification: "major_franchise", defaultOutcome: "review" });
+    const review = screenLargeGroups(mkCandidate({ name: "Franchise Y Southall" }), [reviewEntry], 0);
+    assert(derivePreliminaryStatus("new_prospect", review) === "ownership_unclear", "a major franchise marked review becomes ownership_unclear");
+
+    const continueEntry = mkGroupEntry({ groupName: "Chain Z", brandName: "Chain Z", classification: "excluded_national_chain", defaultOutcome: "continue" });
+    const cont = screenLargeGroups(mkCandidate({ name: "Chain Z Southall" }), [continueEntry], 0);
+    assert(derivePreliminaryStatus("new_prospect", cont) === "clear_for_enrichment", "classification alone (excluded_national_chain) never overrides default_outcome=continue");
+  }
+
+  // === False-positive proofs (point 3) ===
+  {
+    const registry = buildBrandFixtureRegistry();
+
+    const coopHit = screenLargeGroups(mkCandidate({ name: "The Co-operative Food" }), registry, 0);
+    assert(coopHit.classification === "excluded_national_chain" && coopHit.defaultOutcome === "exclude", "Co-op matches Co-op aliases");
+
+    const coopersMiss = screenLargeGroups(mkCandidate({ name: "Coopers Café" }), registry, 0);
+    assert(coopersMiss.matchedRegistryEntry === null, "\"Coopers Café\" does NOT match Co-op (token, not substring, matching)");
+
+    const kfc1 = screenLargeGroups(mkCandidate({ name: "KFC Southall Broadway" }), registry, 0);
+    const kfc2 = screenLargeGroups(mkCandidate({ name: "Kentucky Fried Chicken - Southall" }), registry, 0);
+    assert(kfc1.matchedRegistryEntry?.groupName === kfc2.matchedRegistryEntry?.groupName && kfc1.defaultOutcome === "exclude" && kfc2.defaultOutcome === "exclude", "KFC and \"Kentucky Fried Chicken\" match the same excluded group");
+
+    // A local legal operator trading publicly as KFC: the legal/trading name field is generic,
+    // but the separate `brand` field (as consolidated_candidates actually carries it) is "KFC"
+    // — brand-field matching must still catch it.
+    const localLegalKfc = screenLargeGroups(mkCandidate({ name: "J Patel Fast Food Enterprises Ltd", brand: "KFC" }), registry, 0);
+    assert(localLegalKfc.defaultOutcome === "exclude", "a local legal operator trading publicly as KFC (brand field = KFC) is excluded despite an unrelated legal name");
+
+    const subwayStation = screenLargeGroups(mkCandidate({ name: "The Old Subway Station Cafe" }), registry, 0);
+    assert(subwayStation.matchedRegistryEntry === null, "a business mentioning \"subway station\" in unrelated text is NOT classified as Subway (prefix matching, not token-anywhere)");
+
+    const domainExact = screenLargeGroups(mkCandidate({ name: "Unbranded", website: "https://www.kfc.co.uk/menu" }), registry, 0);
+    assert(domainExact.matchedRegistryEntry?.groupName.includes("KFC") ?? false, "an exact registrable-domain match (kfc.co.uk) detects the group");
+    const domainTrick = screenLargeGroups(mkCandidate({ name: "Unbranded", website: "https://www.totallykfc.co.uk/menu" }), registry, 0);
+    assert(domainTrick.matchedRegistryEntry === null, "domain matching is exact by registrable domain — \"totallykfc.co.uk\" does NOT loosely match \"kfc.co.uk\"");
+  }
+
+  // === Assignment schema: role and required_lead_count mandatory ===
+  {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-assign-"));
+    const fileNoRole = path.join(dir, "no-role.csv");
+    await fs.writeFile(fileNoRole, "Salesperson,Territory,Required Lead Count\nA. Rep,North,10\n");
+    let threw = false;
+    try { await loadAssignmentFile(fileNoRole); } catch { threw = true; }
+    assert(threw, "an assignment file missing the role column is rejected");
+
+    const fileBadRole = path.join(dir, "bad-role.csv");
+    await fs.writeFile(fileBadRole, "Salesperson,Role,Territory,Required Lead Count\nA. Rep,manager,North,10\n");
+    let badRoleThrew = false;
+    try { await loadAssignmentFile(fileBadRole); } catch { badRoleThrew = true; }
+    assert(badRoleThrew, "an invalid role value (not telesales/field_sales) is rejected");
+
+    const fileNoCount = path.join(dir, "no-count.csv");
+    await fs.writeFile(fileNoCount, "Salesperson,Role,Territory\nA. Rep,field_sales,North\n");
+    let noCountThrew = false;
+    try { await loadAssignmentFile(fileNoCount); } catch { noCountThrew = true; }
+    assert(noCountThrew, "an assignment file missing required_lead_count is rejected");
+  }
+
+  // === Duplicate territory ownership fails loudly ===
+  {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-dup-"));
+    const dupFile = path.join(dir, "dup.csv");
+    await fs.writeFile(dupFile, "Salesperson,Role,Territory,Required Lead Count\nA. Rep,field_sales,North London,10\nB. Rep,field_sales,North London,8\n");
+    let threw = false, isRightErrorType = false;
+    try { await loadAssignmentFile(dupFile); } catch (e) { threw = true; isRightErrorType = e instanceof DuplicateTerritoryOwnershipError; }
+    assert(threw && isRightErrorType, "two field_sales rows for the same territory fail loudly with DuplicateTerritoryOwnershipError");
+
+    const okFile = path.join(dir, "ok.csv");
+    await fs.writeFile(okFile, "Salesperson,Role,Territory,Required Lead Count\nA. Rep,field_sales,North London,10\nB. Rep,telesales,North London,8\n");
+    const ok = await loadAssignmentFile(okFile);
+    assert(ok.assignments.length === 2, "the SAME territory with DIFFERENT roles (telesales + field_sales) is allowed, not a duplicate");
+  }
+
+  // === Preflight catches missing required columns ===
+  {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-missingcol-"));
+    const file = path.join(dir, "customers.csv");
+    await fs.writeFile(file, "Customer ID,Status,Trading Name\nC1,Active,Alpha\n"); // no address, no postcode
+    let threw = false;
+    try { await loadCustomerFile(file); } catch { threw = true; }
+    assert(threw, "a customer file missing required columns (address, postcode) is rejected before preflight can even run");
+  }
+
+  // === Synthetic smoke-test output is labelled as test evidence only ===
+  {
+    const text = await fs.readFile(path.resolve(process.cwd(), "scripts/lead-production/run-comparison.ts"), "utf8");
+    assert(text.includes("synthetic-test") && text.includes("syntheticTestRun"), "the CLI supports --synthetic-test and stamps syntheticTestRun in the output metadata");
+    assert(text.toLowerCase().includes("test evidence only"), "the synthetic-test notice explicitly says \"test evidence only\"");
+  }
+
+  // === Structural: no enrichment call anywhere in the bridge ===
+  {
+    assert(screenLargeGroups.constructor.name !== "AsyncFunction", "screenLargeGroups() is synchronous (no network/enrichment call inside it)");
+    const dir = path.resolve(process.cwd(), "scripts/lead-production");
+    const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".ts"));
+    let violation: string | null = null;
+    for (const f of files) {
+      const text = await fs.readFile(path.join(dir, f), "utf8");
+      if (/fetch\(|http:\/\/|https:\/\//i.test(text.replace(/^\s*\/\/.*$/gm, ""))) { violation = f; break; }
+    }
+    assert(violation === null, `no network/enrichment call exists anywhere in scripts/lead-production/ (checked ${files.length} files)`);
+  }
+
+  // === Structural: no non-valid-geography candidate can enter the process ===
+  {
+    const dir = path.resolve(process.cwd(), "scripts/lead-production");
+    const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".ts"));
+    let directQuery = false, usesGatedFn = false;
+    for (const f of files) {
+      const text = await fs.readFile(path.join(dir, f), "utf8");
+      if (f !== "load-candidates.ts" && /\.from\(\s*["']consolidated_candidates["']\s*\)/.test(text)) directQuery = true;
+      if (f === "load-candidates.ts" && text.includes("fetchOperationalCandidatesForRun")) usesGatedFn = true;
+    }
+    assert(!directQuery, "nothing outside load-candidates.ts queries consolidated_candidates directly");
+    assert(usesGatedFn, "load-candidates.ts uses the app's geography_status='valid_geography'-gated reader");
+  }
+
+  // === Full-batch: evidence register completeness + mutually exclusive primary buckets ===
+  {
+    const customers: CustomerRecord[] = [
+      mkCustomer({ tradingName: "Confirmed Active Co", postcode: "N1 1AA", status: "Active" }),
+      mkCustomer({ tradingName: "Confirmed Inactive Co", postcode: "N1 2AA", status: "Inactive" }),
+    ];
+    const assignments: AssignmentRecord[] = [mkAssignment({ territory: "North London", salesperson: "A. Rep", postcodePrefixes: ["N1"] })];
+    const registry = buildBrandFixtureRegistry();
+    const candidates: OperationalCandidate[] = [
+      mkCandidate({ name: "Confirmed Active Co", postcode: "N1 1AA" }),
+      mkCandidate({ name: "Confirmed Inactive Co", postcode: "N1 2AA" }),
+      mkCandidate({ name: "Greggs Southall Branch", postcode: "E1 1AA" }), // excluded_large_group
+      mkCandidate({ name: "Totally Independent Diner", postcode: "SW9 9ZZ" }), // clear_for_enrichment
+    ];
+    const processed = processCandidates(candidates, customers, assignments, registry);
+
+    assert(processed.length === candidates.length, "the evidence register has exactly one row per input candidate");
+    const ids = new Set(processed.map((p) => p.match.candidate.id));
+    assert(ids.size === candidates.length, "every candidate id appears exactly once (no drops, no duplicates)");
+    assert(processed.every((p) => p.rejection.level === "not_assessed"), "every row's rejection level is not_assessed — none are numerically scored yet");
+
+    const buckets = {
+      active_excluded: processed.filter((p) => p.preliminaryStatus === "active_customer" || p.preliminaryStatus === "branch_of_active_customer").length,
+      inactive_reactivation: processed.filter((p) => p.preliminaryStatus === "inactive_customer" || p.preliminaryStatus === "branch_of_inactive_customer").length,
+      probable: processed.filter((p) => p.preliminaryStatus === "probable_customer_match").length,
+      clear_or_possible: processed.filter((p) => p.preliminaryStatus === "clear_for_enrichment" || p.preliminaryStatus === "possible_customer_match").length,
+      excluded_group: processed.filter((p) => p.preliminaryStatus === "excluded_large_group" || p.preliminaryStatus === "ownership_unclear").length,
+      key_account: processed.filter((p) => p.preliminaryStatus === "key_account_opportunity").length,
+    };
+    const bucketSum = Object.values(buckets).reduce((a, b) => a + b, 0);
+    assert(bucketSum === processed.length, `every candidate lands in exactly one preliminary-status bucket (sum=${bucketSum}, total=${processed.length}, buckets=${JSON.stringify(buckets)})`);
+  }
+
+  console.log(fails === 0 ? "\nAll lead-production-bridge assertions passed ✓" : `\n${fails} FAILED`);
+  process.exit(fails === 0 ? 0 : 1);
+}
+main().catch((e) => { console.error(e); process.exit(1); });
