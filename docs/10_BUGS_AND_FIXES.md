@@ -506,3 +506,38 @@ required for every lead-production test to genuinely pass before the pre-product
 certification could report GO.
 
 **See also:** `scripts/test-lead-production-google.ts` — this session's Milestone 6 commit.
+
+## Fix — orchestrator's phase1 stage never passed --assignments/--groups to run-comparison.ts (2026-07-24)
+
+**Bug:** found live, on the very first real (non-UB1) Phase 1 execution — RM1 discovery
+(Milestone 7). `run-full-territory.ts`'s `phase1` case only ever passed `--run`, `--customers`,
+`--out` to `run-comparison.ts`, but that script has always required `--assignments` and
+`--groups` too. Every prior Phase 1 checkpoint (UB1) was produced by a direct, manual
+`run-comparison.ts` invocation predating the orchestrator (commit `3114c86`) — the orchestrator's
+own phase1 branch had never actually been exercised end-to-end until this run. No live external
+call was made before this failure (it fails at argument validation), so no cost/data impact.
+
+**Fix:** added `assignments`/`groups` to the orchestrator's `Context`, reusing the existing
+(previously display-only) `--assignments` CLI flag and adding a new `--groups` flag, both
+plumbed into the `phase1` case's `run-comparison.ts` invocation. Regression-tested: full
+`test:lead-production-full-territory` suite unaffected (existing tests only exercise phase1 via
+checkpoint override, never a fresh execution).
+
+**See also:** `scripts/lead-production/run-full-territory.ts` — this session's Milestone 7 work.
+
+## Fix — run-fsa-stage.ts hardcoded a UB1-specific "expected 84 candidates" check (2026-07-24)
+
+**Bug:** found live during RM1's FSA stage. `run-fsa-stage.ts` printed
+`FSA population: 98 (expected 84)` and a spurious `WARNING: expected exactly 84 candidates,
+found 98` — "84" was UB1's own incidental Phase 1→FSA population count, hardcoded as a magic
+constant rather than derived per-territory. RM1's actual population (98 = 113 Phase 1 candidates
+minus 14 excluded-large-group minus 1 active-customer) was correct; the warning was simply
+wrong and would have fired on every future territory, undermining trust in genuine warnings.
+
+**Fix:** removed the hardcoded comparison; the population count is self-derived from the Phase 1
+checkpoint via `POPULATION_STATUSES` (already correct) and now logged honestly against the
+Phase 1 total rather than a fixed constant. Also removed the same hardcoded value from the
+stage's own summary JSON (`candidatesExpected: 84` → `phase1TotalCandidates`). Regression-tested:
+`test:lead-production-fsa` unaffected (no test referenced the removed field).
+
+**See also:** `scripts/lead-production/run-fsa-stage.ts` — this session's Milestone 7 work.

@@ -116,6 +116,8 @@ interface Context {
   territory: string;
   customers: string;
   registry: string;
+  assignments: string | null; // required only when phase1 must actually execute (no existing/overridden checkpoint)
+  groups: string | null; // same file as `registry` today — run-comparison.ts's own --groups arg, kept separate since its required-arg name differs
   live: boolean;
   requestPlanOnly: boolean;
   checkpointOverrides: Map<string, string>;
@@ -154,7 +156,10 @@ async function runStage(def: StageDefinition, ctx: Context, manifest: Orchestrat
       if (!ctx.discoveryRunId) {
         return { ok: false, log: `Stage "phase1" has no existing checkpoint and no --discovery-run-id was supplied — this orchestrator never triggers discovery itself (scripts/je-run.ts). Supply --checkpoint phase1=<existing dir> to resume from an already-completed Phase 1 checkpoint, or --discovery-run-id=<id> together with --live to run comparison against an already-discovered population.` };
       }
-      const r = runScript("scripts/lead-production/run-comparison.ts", [`--run=${ctx.discoveryRunId}`, `--customers=${ctx.customers}`, `--out=${outDir}`]);
+      if (!ctx.assignments || !ctx.groups) {
+        return { ok: false, log: `Stage "phase1" requires --assignments=<path> and --groups=<path> to execute run-comparison.ts (it never has a request-plan-only-safe default) — supply both, or --checkpoint phase1=<existing dir> to reuse an already-completed checkpoint.` };
+      }
+      const r = runScript("scripts/lead-production/run-comparison.ts", [`--run=${ctx.discoveryRunId}`, `--customers=${ctx.customers}`, `--assignments=${ctx.assignments}`, `--groups=${ctx.groups}`, `--out=${outDir}`]);
       return { ok: r.ok, log: r.stdout };
     }
     case "fsa": {
@@ -275,7 +280,9 @@ async function main() {
   const manifestPath = path.join(outArg, ".orchestrator-run-manifest.json");
   let manifest: OrchestratorManifest;
   const ctx: Context = {
-    territoryOutRoot: outArg, territory, customers: customers!, registry: registry!, live, requestPlanOnly, checkpointOverrides,
+    territoryOutRoot: outArg, territory, customers: customers!, registry: registry!,
+    assignments: assignmentsPath, groups: arg("groups"), // reuses the SAME --assignments CSV already loaded above for the display/manifest lookup — run-comparison.ts's own required --assignments/--groups args, previously never passed through at all
+    live, requestPlanOnly, checkpointOverrides,
     maxCalls: { google: arg("max-google-calls"), companiesHouse: arg("max-ch-calls"), companiesHouseDocuments: arg("max-ch-document-calls") },
     discoveryRunId, useV1Scoring, v1FinalScoringDirOverride, scoringRulesVersion,
   };

@@ -97,8 +97,7 @@ async function main() {
 
   const phase1Results = JSON.parse(await fs.readFile(path.join(phase1Dir!, "customer-match-results.json"), "utf8")) as any[];
   const population = phase1Results.filter((r) => POPULATION_STATUSES.has(r.preliminaryStatus));
-  console.log(`FSA population: ${population.length} (expected 84)`);
-  if (population.length !== 84) console.warn(`WARNING: expected exactly 84 candidates, found ${population.length}.`);
+  console.log(`FSA population: ${population.length} of ${phase1Results.length} Phase 1 candidates (excludes active-customer/excluded-group terminal buckets — territory-agnostic, no fixed expected count).`);
 
   // Reload the SAME customer master used in Phase 1 (read-only, reusing the existing, already
   // tested loader — never a second implementation) so matched customers' lifecycle/trading
@@ -169,7 +168,7 @@ async function main() {
 
   const summary = {
     phase1Dir, processingTimestamp: new Date().toISOString(),
-    candidatesExpected: 84, candidatesProcessed: population.length,
+    phase1TotalCandidates: phase1Results.length, candidatesProcessed: population.length,
     fsaOutcomeCounts,
     resolutionCounts,
     probableCustomerMatch: {
