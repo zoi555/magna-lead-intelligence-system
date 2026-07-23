@@ -862,3 +862,94 @@ export interface FinalGroupRescreenResult {
   evidenceSources: string[]; // which stage(s) contributed evidence — "google" | "companies_house" | "website" | "registry"
   evidenceTags: string[];
 }
+
+// ============================================================================
+// Final qualification and scoring (Phase 8, spec Phase E). This bridge's FIRST and ONLY point
+// at which a numeric score or a Level 0-4 outcome is ever assigned — every earlier stage in
+// this bridge (Phase 1 through Phase 7) is explicitly evidence-gathering only, enforced by the
+// "never a Level 0-4 score" structural tests on every prior module. Hard gates run BEFORE
+// scoring and are absolute: a hard-gate failure caps the candidate at Level 4 regardless of
+// score — "a hard failure cannot be rescued by points" (explicit instruction).
+// ============================================================================
+
+export interface HardGateCheck {
+  gate: string;
+  passed: boolean;
+  reason: string;
+}
+
+export interface HardGateResult {
+  candidateId: string;
+  allPassed: boolean;
+  checks: HardGateCheck[];
+  failedGates: string[];
+}
+
+export const SCORE_COMPONENT_KEYS = [
+  "targetBusinessTypeFit", "physicalAndTerritoryConfidence", "independentLocalPurchasingFit",
+  "tradingStatusConfidence", "fsaComplianceConfidence", "commercialAndFinancialPotential",
+  "demandRatingsPopularity", "dataCompletenessConfidence", "magnaProductCategoryFit",
+] as const;
+export type ScoreComponentKey = (typeof SCORE_COMPONENT_KEYS)[number];
+
+export const SCORE_COMPONENT_MAX_POINTS: Record<ScoreComponentKey, number> = {
+  targetBusinessTypeFit: 15, physicalAndTerritoryConfidence: 15, independentLocalPurchasingFit: 10,
+  tradingStatusConfidence: 10, fsaComplianceConfidence: 10, commercialAndFinancialPotential: 15,
+  demandRatingsPopularity: 10, dataCompletenessConfidence: 10, magnaProductCategoryFit: 5,
+};
+
+export interface ScoreComponentResult {
+  rawEvidence: string[];
+  ruleApplied: string;
+  pointsAwarded: number;
+  maxPoints: number;
+  confidence: "high" | "medium" | "low" | "not_available";
+  unavailableReason: string | null;
+}
+
+export interface ScoringResult {
+  candidateId: string;
+  components: Record<ScoreComponentKey, ScoreComponentResult>;
+  totalScore: number;
+  maxPossibleScore: number;
+}
+
+export type ChannelSuitability = "telesales_only" | "field_sales_only" | "both" | "neither";
+
+export interface ChannelSuitabilityResult {
+  candidateId: string;
+  telesalesScore: number;
+  telesalesFactors: Record<string, ScoreComponentResult>;
+  fieldSalesScore: number;
+  fieldSalesFactors: Record<string, ScoreComponentResult>;
+  suitability: ChannelSuitability;
+}
+
+export type RejectionLevel = "level_0" | "level_1" | "level_2" | "level_3" | "level_4";
+export type RejectionReasonTag = "campaign_rejection" | "territory_rejection" | "channel_rejection" | "global_rejection";
+
+export interface FinalOutcomeResult {
+  candidateId: string;
+  level: RejectionLevel;
+  levelReason: string;
+  reasonTags: RejectionReasonTag[];
+  hardGates: HardGateResult;
+  scoring: ScoringResult | null; // null only for candidates excluded before scoring (active/inactive customer, closed, excluded group)
+  channelSuitability: ChannelSuitabilityResult | null;
+}
+
+// The bucket every one of the ORIGINAL 94 candidates lands in exactly once — the top-level
+// reconciliation key for the final master evidence register (spec Phase G QA proof #1/#4).
+export type MasterOutcomeBucket =
+  | "active_customer_excluded"
+  | "inactive_customer_reactivation"
+  | "excluded_large_group"
+  | "permanently_closed"
+  | "temporarily_closed_held" // held, not discarded — explicit QA requirement; never merged into permanently_closed or scored
+  | "out_of_territory_reassignment"
+  | "probable_customer_match_unresolved"
+  | "level_0_sales_ready"
+  | "level_1_soft_gap"
+  | "level_2_promising_incomplete"
+  | "level_3_conflict"
+  | "level_4_hard_reject";

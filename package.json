@@ -50,6 +50,8 @@
     "test:lead-production-public-profile": "tsx scripts/test-lead-production-public-profile.ts",
     "lead-production:final-group-rescreen-stage": "tsx scripts/lead-production/run-final-group-rescreen-stage.ts",
     "test:lead-production-final-group-rescreen": "tsx scripts/test-lead-production-final-group-rescreen.ts",
+    "lead-production:final-scoring-stage": "tsx scripts/lead-production/run-final-scoring-stage.ts",
+    "test:lead-production-final-scoring": "tsx scripts/test-lead-production-final-scoring.ts",
     "test:apify-provenance": "tsx scripts/test-apify-provenance.ts",
     "test:borderline-provider": "tsx scripts/test-borderline-provider.ts",
     "test:ub1-benchmark": "tsx scripts/test-ub1-benchmark.ts",
