@@ -58,6 +58,8 @@
     "test:lead-production-full-territory": "tsx scripts/test-lead-production-full-territory.ts",
     "lead-production:sales-territory": "tsx scripts/lead-production/run-sales-territory.ts",
     "test:lead-production-territory-v2": "tsx scripts/test-lead-production-territory-v2.ts",
+    "lead-production:master-export": "tsx scripts/lead-production/generate-master-export.ts",
+    "test:lead-production-master-export": "tsx scripts/test-lead-production-master-export.ts",
     "test:apify-provenance": "tsx scripts/test-apify-provenance.ts",
     "test:borderline-provider": "tsx scripts/test-borderline-provider.ts",
     "test:ub1-benchmark": "tsx scripts/test-ub1-benchmark.ts",
