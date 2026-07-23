@@ -215,3 +215,75 @@ export interface ProcessedCandidate {
   assignedTerritory: string | null;
   assignedSalesperson: string | null;
 }
+
+// ============================================================================
+// FSA stage (Phase 2) — identity/premises verification via the Food Standards
+// Agency FHRS register. Reuses src/lib/sources/fsa.ts's searchFsaByAddress() as
+// the HTTP layer; everything below is new (per-candidate classification did not
+// exist anywhere in the repo — the legacy pipeline's fsa-legitimacy.ts computes
+// a single legitimacy score for an already-fanned-in record, not a discrete
+// match classification against a candidate).
+// ============================================================================
+
+export type FsaOutcome =
+  | "exact_fsa_match"
+  | "strong_probable_fsa_match"
+  | "multiple_fsa_matches"
+  | "fsa_name_conflict"
+  | "fsa_address_conflict"
+  | "no_fsa_match"
+  | "fsa_pending"
+  | "fsa_exempt"
+  | "fsa_api_failure";
+
+export const FSA_OUTCOMES: FsaOutcome[] = [
+  "exact_fsa_match", "strong_probable_fsa_match", "multiple_fsa_matches", "fsa_name_conflict",
+  "fsa_address_conflict", "no_fsa_match", "fsa_pending", "fsa_exempt", "fsa_api_failure",
+];
+
+export interface FsaEstablishmentEvidence {
+  fhrsId: string;
+  officialBusinessName: string;
+  fsaAddress: string;
+  fsaPostcode: string;
+  businessType: string;
+  hygieneRating: string;
+  ratingStatus: "rated" | "awaiting_inspection" | "exempt" | "unknown";
+  ratingDate: string | null;
+  localAuthority: string;
+  nameSimilarity: number;
+  postcodeAgreement: boolean;
+  addressAgreement: boolean | null; // null: candidate has no free-text address to compare (expected — see reports)
+  coordinateEvidence: { candidateDistanceMetres: number | null } | null; // supporting only, never a trigger
+}
+
+export interface FsaMatchResult {
+  candidateId: string;
+  candidateTradingName: string;
+  candidatePostcode: string | null;
+  outcome: FsaOutcome;
+  plausibleEstablishments: FsaEstablishmentEvidence[]; // every retained plausible result, never just "the first"
+  evidenceTags: string[];
+  retrievalTimestamp: string;
+  sourceResponseReference: string; // the exact query string sent to the FSA API
+  apiFailureReason: string | null;
+  apiAttempts: number;
+}
+
+export type NameOverlapCategory = "location_only_name_overlap" | "generic_name_token_overlap" | "business_name_overlap" | "no_overlap";
+
+export type CustomerResolutionOutcome =
+  | "confirmed_active_customer_after_fsa"
+  | "confirmed_inactive_customer_after_fsa"
+  | "clear_for_enrichment_after_fsa"
+  | "unresolved_customer_match";
+
+export interface CustomerResolutionResult {
+  candidateId: string;
+  priorPreliminaryStatus: PreliminaryStatus; // probable_customer_match | possible_customer_match
+  priorMatchedCustomerId: string | null;
+  priorOverlapCategory: NameOverlapCategory;
+  resolutionOutcome: CustomerResolutionOutcome;
+  evidenceUsed: string[];
+  fsaOutcome: FsaOutcome;
+}
