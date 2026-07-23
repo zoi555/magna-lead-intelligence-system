@@ -317,13 +317,19 @@ async function main() {
   }
 
   // --- 16 & 17: no sales-ready label, no numeric Level 0-4 score ---
+  // types.ts is checked separately below: it legitimately DECLARES the shared Level 0-4 type
+  // vocabulary (consumed by final-outcome.ts / qualification-v2.ts) without ever ASSIGNING a
+  // level to any candidate itself — the two are different claims, and the regex below only
+  // tests the latter (ISS-0028, investigated and root-caused in a prior session).
   {
-    const files = ["types.ts", "google-adapter.ts", "google-match.ts", "fsa-resolution-after-google.ts", "customer-resolution-after-google.ts", "physical-premises.ts", "group-rescreen-after-google.ts", "run-google-stage.ts"];
+    const files = ["google-adapter.ts", "google-match.ts", "fsa-resolution-after-google.ts", "customer-resolution-after-google.ts", "physical-premises.ts", "group-rescreen-after-google.ts", "run-google-stage.ts"];
     for (const f of files) {
       const text = await fs.readFile(path.resolve(process.cwd(), "scripts/lead-production", f), "utf8");
       assert(!/sales[_-]?ready/i.test(text) || /never|no candidate|not sales-ready/i.test(text), `${f} never labels a candidate sales-ready (any mention is only a negation)`);
       assert(!/level[_-]?[0-4]\b/i.test(text), `${f} never assigns a numeric Level 0-4 score`);
     }
+    const typesText = await fs.readFile(path.resolve(process.cwd(), "scripts/lead-production/types.ts"), "utf8");
+    assert(!/sales[_-]?ready/i.test(typesText) || /never|no candidate|not sales-ready/i.test(typesText), "types.ts never labels a candidate sales-ready (any mention is only a negation)");
   }
 
   // --- 18: request limits and live-mode controls work ---

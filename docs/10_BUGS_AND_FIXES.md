@@ -462,3 +462,47 @@ stage, identical to the executed-stage branch.
 
 **See also:** `scripts/lead-production/run-full-territory.ts`,
 `scripts/test-lead-production-full-territory.ts` — commit `3114c86`.
+
+## Fix — Master exporter's physical-premises mapping never matched the real classification string (2026-07-23)
+
+**Bug:** `master-field-resolver.ts`'s enum matcher for `physical_premises_status` used keyword
+`"no_evidence"`, but `physical-premises.ts` actually returns `"no_physical_premises_evidence"` —
+a superset string that does not contain `"no_evidence"` as a contiguous substring. 11 of 94 UB1
+candidates silently got a blank `physical_premises_status` (a required Master field) instead of
+the correct "No Evidence" value.
+
+**Fix:** matched against the real returned strings (`premises_conflict`,
+`virtual_or_shared_kitchen`, `probable_physical_premises`, `no_physical_premises_evidence`,
+`permanently_closed_premises`, `temporarily_closed_premises`), verified directly against
+`physical-premises.ts`'s source. Regression-tested with all 6 real values.
+
+**See also:** `scripts/lead-production/master-field-resolver.ts`,
+`scripts/test-lead-production-master-export.ts` — commit `2a10065`.
+
+## Fix — Sales Pro exporter treated a numeric-range schema entry as a literal dropdown value (2026-07-23)
+
+**Bug:** 4 Sales Pro columns (Commercial Priority Score, Telesales Score, Field Sales Score,
+Enrichment Completeness) declare `allowedValues: ["0-100"]` — a range descriptor, not a single
+legal literal. The dropdown validator treated any non-empty `allowedValues` array as an exact-
+match set, so every real numeric score (e.g. `74.27`) was flagged as an invalid dropdown value
+and the export refused to write (correctly refusing rather than shipping bad data, but for the
+wrong reason).
+
+**Fix:** added `parseNumericRange()` — a single `"min-max"` allowedValues entry is now validated
+as a numeric range, not string-set membership. All other categorical columns are unaffected.
+
+**See also:** `scripts/lead-production/generate-salespro-export.ts`,
+`scripts/test-lead-production-salespro-export.ts` — commit `f410791`.
+
+## Fix — ISS-0028 test false positive on `types.ts` (2026-07-23)
+
+**Bug:** see ISS-0028 in `docs/11_ISSUES_LOG.md` — `scripts/test-lead-production-google.ts`
+flagged `types.ts` for "assigning a numeric Level 0-4 score" when it only declares the shared
+type vocabulary those levels are drawn from.
+
+**Fix:** `types.ts` excluded from that one regex check (still checked for the separate
+"never labels sales-ready" assertion). Closed as part of Milestone 6's full test/build gate —
+required for every lead-production test to genuinely pass before the pre-production
+certification could report GO.
+
+**See also:** `scripts/test-lead-production-google.ts` — this session's Milestone 6 commit.

@@ -648,7 +648,14 @@ run to take effect for any candidate whose only phone source is the website.
 Date: 2026-07-23
 Severity: Low — cosmetic test-suite noise only, no production/data-quality impact
 Owner: Zoeb
-Status: Open — documented, not fixed (see reasoning below)
+Status: **Closed 2026-07-23** — fixed as part of Milestone 6's full test/build gate (the
+pre-production certification requires every lead-production test to pass; this was the one
+outstanding failure, root-caused below, and the fix is exactly what "Next action" already
+specified). `scripts/test-lead-production-google.ts`'s "no numeric Level 0-4 score" check now
+excludes `types.ts` from that specific regex (types.ts is still checked for the separate
+"never labels sales-ready" assertion) — `types.ts` legitimately declares the shared Level 0-4
+type vocabulary without ever assigning a level itself. Verified: full 13-suite lead-production
+test gate + typecheck + build all green after the fix.
 
 ### Investigation (not casually dismissed — full evidence)
 
