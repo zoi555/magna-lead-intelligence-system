@@ -5,7 +5,12 @@
 Date: 2026-07-09  
 Severity: Critical  
 Owner: Zoeb  
-Status: Blocked
+Status: **Superseded 2026-07-23** — the NetSuite customer master actually in use throughout the
+lead-production bridge (`load-customers.ts`) carries a real `postcode` column, used directly for
+customer-match materiality (exact-postcode-and-identity tier) and territory reconciliation.
+Marked superseded, not formally closed, in case the owner is aware of a genuine remaining gap
+this session's evidence doesn't cover — flagged explicitly in the Milestone 6 certification
+rather than silently dropped.
 
 ### Problem
 
@@ -13,14 +18,18 @@ Existing customer records need completed postcode data for accurate deduplicatio
 
 ### Next action
 
-Return/upload the completed missing-postcode file.
+Return/upload the completed missing-postcode file. **If the owner confirms the current customer
+master's postcode coverage is sufficient, this can be formally closed.**
 
 ## ISS-0002 — Delivery postcode list missing
 
 Date: 2026-07-09  
 Severity: Critical  
 Owner: Zoeb  
-Status: Blocked
+Status: **Superseded 2026-07-23** — this is exactly what `config/lead-production/sales-territories-v2.json`
+now is: the approved 13-representative / 112-Postcode-District assignment, the current source of
+truth for in-area vs out-of-area decisions. Marked superseded rather than closed for the same
+reason as ISS-0001 — flagged explicitly in the Milestone 6 certification.
 
 ### Problem
 
@@ -28,14 +37,20 @@ The system needs the approved delivery postcode boundary before deciding in-area
 
 ### Next action
 
-Upload inner and outer delivery postcode list.
+Upload inner and outer delivery postcode list. **If the owner confirms `sales-territories-v2.json`
+supersedes this need, this can be formally closed.**
 
 ## ISS-0003 — CTO field validation against Magna Sales Pro
 
 Date: 2026-07-09  
 Severity: Critical  
 Owner: CTO  
-Status: Outstanding
+Status: **Superseded 2026-07-23** — `config/lead-production/salespro-schema-v1.json` (108
+columns, 20 existing CTO fields exact label/order + 88 new, cross-validated against the CTO's
+own `CTO_Lead_Import_Template.xlsx`) is exactly this validation, now built and exporter-tested
+(Milestones 3-5). The original ask was framed as a CTO confirmation task; this session's
+evidence is the schema itself, not a CTO sign-off — flagged explicitly in the Milestone 6
+certification as a distinction worth the owner's attention.
 
 ### Problem
 
@@ -44,6 +59,8 @@ The 102-field schema must be validated against Magna Sales Pro API/import constr
 ### Next action
 
 CTO confirms accepted fields, rejected fields, required transformations, and import format.
+**The schema and exporter now exist and are tested; what may still be missing is the CTO's own
+sign-off/import-side confirmation, not the schema-building work itself.**
 
 ## ISS-0004 — MVP territory conflict
 

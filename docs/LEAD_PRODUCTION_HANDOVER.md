@@ -127,10 +127,12 @@ re-verify at any point.
 | 95 | 07-23 | 5711941 | Refactor — extract shared candidate-dossier module (verified byte-identical) |
 | 96 | 07-23 | 2a10065 | Milestone 3 — 107-field Master exporter |
 | 97 | 07-23 | f410791 | Milestone 4 — 108-column Magna Sales Pro exporter |
-| 98 | 07-23 | (pending) | Milestone 5 — UB1 export proof (docs only; no code change) |
+| 98 | 07-23 | 386112a | Milestone 5 — UB1 export proof (docs only; no code change) |
+| 99 | 07-23 | d3fe76e | Milestone 6 (1/2) — close ISS-0028, full 13-suite test/build gate green |
+| 100 | 07-23 | (pending) | Milestone 6 (2/2) — pre-production certification doc, GO_FOR_RM1_LIVE |
 
-**Next dependency:** Milestone 6 (full test/build gate + pre-production certification) depends
-on Milestones 2-5 all being green, which they are as of commit f410791.
+**Next dependency:** Milestone 7 (first real regional proof — Nauman's RM1-RM14) is certified
+GO per `docs/LEAD_PRODUCTION_PREPRODUCTION_CERTIFICATION.md`.
 
 ## Accepted UB1 checkpoints (outside repo)
 
