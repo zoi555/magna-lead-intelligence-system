@@ -1,0 +1,192 @@
+// Milestone 4 — the 108-column Magna Sales Pro exporter. Read-only; makes no external call.
+// Reuses candidate-dossier.ts + master-field-resolver.ts (Milestone 3) unchanged — every
+// Sales Pro column's canonicalName is drawn from the same 107-field Master vocabulary
+// (config/lead-production/salespro-schema-v1.json cross-validated 0 orphan canonicalNames
+// against master-schema-v1.json), so this exporter never re-derives a value independently.
+//
+// Enforces: exact CTO labels/order (from the schema file, never hardcoded here), the 20
+// existing + 88 new fields, dropdown/type validation (refuses to WRITE a value outside a
+// column's allowedValues — never ships a bad value into the CTO's real import system), and
+// strict separation of ordinary new leads / reactivation / key-account review into three
+// distinct files that are never mixed.
+
+import { promises as fs } from "node:fs";
+import path from "node:path";
+import { loadCandidateDossiers, type Dossier } from "./candidate-dossier";
+import { resolveMasterFields, type MasterFieldContext } from "./master-field-resolver";
+import { writeCsv } from "./csv";
+
+function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
+async function readJson(p: string): Promise<any> { return JSON.parse(await fs.readFile(p, "utf8")); }
+
+interface SalesProColumn { columnOrder: number; salesProFieldLabel: string; origin: string; canonicalName: string; fieldType: string; required: boolean; allowedValues: string[]; transformationExportRule: string; }
+
+interface DistrictInput { district: string; dirs: { phase1Dir: string; fsaDir: string; googleDir: string; chDir: string; websiteDir: string; publicProfileDir: string; groupRescreenDir: string; v2Dir: string } }
+
+interface RowBundle { dossier: Dossier; district: string; fields: Record<string, unknown>; leadId: string; gaps: string[] }
+
+// The one documented, deliberate exception (see docs/09_DECISIONS.md): "Field Sales Rep" and
+// "Sales Rep" are two different CTO columns that both carry assigned_representative, populated
+// conditionally on Sales Role — never both, never neither, exactly one per row.
+function representativeColumnValue(col: SalesProColumn, value: unknown, role: "telesales" | "field_sales"): unknown {
+  if (col.salesProFieldLabel === "Field Sales Rep") return role === "field_sales" ? value : "";
+  if (col.salesProFieldLabel === "Sales Rep") return role === "telesales" ? value : "";
+  return value;
+}
+
+function toCellValue(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  if (Array.isArray(v)) return v.join("; ");
+  return String(v);
+}
+
+interface ValidationViolation { leadId: string; column: string; value: string; reason: string }
+
+// A single allowedValues entry like "0-100" (en-dash or hyphen) is a numeric RANGE descriptor,
+// not a categorical dropdown with one legal literal value — validated as a range, never as
+// exact-string membership (a genuine bug found and fixed against real UB1 data this session).
+function parseNumericRange(allowedValues: string[]): { min: number; max: number } | null {
+  if (allowedValues.length !== 1) return null;
+  const m = allowedValues[0].match(/^(\d+)\s*[-–]\s*(\d+)$/);
+  if (!m) return null;
+  return { min: Number(m[1]), max: Number(m[2]) };
+}
+
+function buildRowAndValidate(columns: SalesProColumn[], bundle: RowBundle, role: "telesales" | "field_sales", violations: ValidationViolation[]): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  for (const col of columns) {
+    let raw = bundle.fields[col.canonicalName];
+    raw = representativeColumnValue(col, raw, role);
+    const cell = toCellValue(raw);
+    if (col.allowedValues.length > 0 && cell !== "") {
+      const range = parseNumericRange(col.allowedValues);
+      if (range) {
+        const n = Number(cell);
+        if (!Number.isFinite(n) || n < range.min || n > range.max) violations.push({ leadId: bundle.leadId, column: col.salesProFieldLabel, value: cell, reason: `"${cell}" is outside the allowed range ${range.min}-${range.max} for "${col.salesProFieldLabel}".` });
+      } else {
+        const members = Array.isArray(raw) ? (raw as unknown[]).map(String) : [cell];
+        for (const m of members) if (!col.allowedValues.includes(m)) violations.push({ leadId: bundle.leadId, column: col.salesProFieldLabel, value: m, reason: `"${m}" is not one of the allowed values for "${col.salesProFieldLabel}": [${col.allowedValues.join(", ")}]` });
+      }
+    }
+    row[col.salesProFieldLabel] = cell;
+  }
+  return row;
+}
+
+async function main() {
+  const outArg = arg("out");
+  if (!outArg) { console.error("Missing required argument: --out=<dir>"); process.exit(1); }
+  await fs.mkdir(outArg, { recursive: true });
+
+  const territoryManifestPath = arg("territory-manifest");
+  let districts: DistrictInput[] = [];
+  let representative = arg("representative");
+  let role = arg("role") as "telesales" | "field_sales" | null;
+  let salesTerritory = arg("sales-territory");
+  let territoryPrefix = arg("territory-prefix"); // used for output filenames when combining multiple districts
+
+  if (territoryManifestPath) {
+    const tm = await readJson(territoryManifestPath);
+    representative = tm.representative; role = tm.role; salesTerritory = tm.salesTerritory;
+    territoryPrefix = territoryPrefix ?? tm.representative.toLowerCase();
+    for (const [district, rec] of Object.entries<any>(tm.districts)) {
+      if (rec.status !== "complete") continue;
+      const orchManifest = await readJson(path.join(rec.outDir, ".orchestrator-run-manifest.json"));
+      districts.push({ district, dirs: {
+        phase1Dir: orchManifest.stages.phase1.dir, fsaDir: orchManifest.stages.fsa.dir, googleDir: orchManifest.stages.google.dir,
+        chDir: orchManifest.stages.companies_house.dir, websiteDir: orchManifest.stages.website.dir,
+        publicProfileDir: orchManifest.stages.public_profile.dir, groupRescreenDir: orchManifest.stages.group_rescreen.dir,
+        v2Dir: orchManifest.stages.final_scoring.dir,
+      }});
+    }
+  } else {
+    const territory = arg("territory");
+    territoryPrefix = territoryPrefix ?? territory?.toLowerCase() ?? null;
+    const missing = [!territory && "--territory", !representative && "--representative", !role && "--role", !salesTerritory && "--sales-territory"].filter(Boolean);
+    for (const k of ["phase1-dir", "fsa-dir", "google-checkpoint", "companies-house-dir", "website-dir", "public-profile-dir", "group-rescreen-dir", "v2-dir"]) if (!arg(k)) missing.push(`--${k}`);
+    if (missing.length) { console.error("Missing required argument(s):\n  " + missing.join("\n  ")); process.exit(1); }
+    districts = [{ district: territory!, dirs: {
+      phase1Dir: arg("phase1-dir")!, fsaDir: arg("fsa-dir")!, googleDir: arg("google-checkpoint")!, chDir: arg("companies-house-dir")!,
+      websiteDir: arg("website-dir")!, publicProfileDir: arg("public-profile-dir")!, groupRescreenDir: arg("group-rescreen-dir")!, v2Dir: arg("v2-dir")!,
+    }}];
+  }
+  if (!representative || !role || !salesTerritory || !territoryPrefix) { console.error("Could not resolve representative/role/sales-territory."); process.exit(1); }
+
+  console.log(`=== Magna Sales Pro exporter (108 columns) — ${representative} (${role}), ${salesTerritory}, ${districts.length} district(s) ===`);
+
+  const schema = await readJson("config/lead-production/salespro-schema-v1.json");
+  const columns: SalesProColumn[] = schema.columns;
+  if (columns.length !== 108) throw new Error(`Schema drift: expected 108 Sales Pro columns, got ${columns.length}. Refusing to export against a mismatched schema.`);
+  const existingCount = columns.filter((c) => c.origin === "Existing CTO Field").length;
+  const newCount = columns.filter((c) => c.origin !== "Existing CTO Field").length;
+  if (existingCount !== 20 || newCount !== 88) throw new Error(`Schema drift: expected 20 existing + 88 new, got ${existingCount} existing + ${newCount} new.`);
+
+  const bundles: RowBundle[] = [];
+  for (const d of districts) {
+    const { dossiers } = await loadCandidateDossiers(d.dirs);
+    const ctx: MasterFieldContext = { territory: d.district, representative: representative!, role: role!, salesTerritory: salesTerritory! };
+    for (const dossier of dossiers) {
+      const resolved = resolveMasterFields(dossier, ctx);
+      bundles.push({ dossier, district: d.district, fields: resolved.fields, leadId: resolved.leadId, gaps: resolved.dataQualityGaps });
+    }
+  }
+
+  // --- Strict exclusion from ordinary new-lead exports: held, hard-rejected, active customers,
+  // excluded groups, closed businesses (folded into hard_rejected upstream), duplicates
+  // (already resolved by cross-district dedup before this ever runs), unresolved material
+  // conflict (== held_for_material_conflict). Reactivation and key accounts get their own files. ---
+  const activeCustomers = bundles.filter((b) => b.dossier.v1Bucket === "active_customer_excluded");
+  const excludedGroups = bundles.filter((b) => b.dossier.v1Bucket === "excluded_large_group");
+  const reactivation = bundles.filter((b) => b.dossier.v1Bucket === "inactive_customer_reactivation");
+  const excludedSet = new Set([...activeCustomers, ...excludedGroups, ...reactivation]);
+  const remaining = bundles.filter((b) => !excludedSet.has(b));
+  const usable = remaining.filter((b) => b.dossier.qualificationStatus === "qualified" || b.dossier.qualificationStatus === "qualified_with_channel_limit");
+  const keyAccounts = usable.filter((b) => b.fields.key_account_indicator === "Yes");
+  const ordinaryNewLeads = usable.filter((b) => !keyAccounts.includes(b));
+
+  console.log(`Ordinary new leads: ${ordinaryNewLeads.length}. Reactivation: ${reactivation.length}. Key accounts: ${keyAccounts.length}.`);
+  console.log(`Excluded from ordinary export: ${activeCustomers.length} active customers, ${excludedGroups.length} excluded groups, ${remaining.length - usable.length} held/hard-rejected.`);
+
+  const columnLabels = columns.map((c) => c.salesProFieldLabel);
+  const violations: ValidationViolation[] = [];
+  const buildRows = (list: RowBundle[]) => list.map((b) => buildRowAndValidate(columns, b, role!, violations));
+
+  const newLeadRows = buildRows(ordinaryNewLeads);
+  const reactivationRows = buildRows(reactivation);
+  const keyAccountRows = buildRows(keyAccounts);
+
+  if (violations.length) {
+    await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-dropdown-violations.csv`), writeCsv(["lead_id", "column", "value", "reason"], violations.map((v) => ({ lead_id: v.leadId, column: v.column, value: v.value, reason: v.reason }))));
+    throw new Error(`Refusing to write Sales Pro export: ${violations.length} dropdown/type violation(s) found (see ${territoryPrefix}-salespro-dropdown-violations.csv). No value outside a column's allowed set is ever written to a CTO import file.`);
+  }
+
+  await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-new-leads.csv`), writeCsv(columnLabels, newLeadRows));
+  await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-reactivation.csv`), writeCsv(columnLabels, reactivationRows));
+  await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-key-accounts.csv`), writeCsv(columnLabels, keyAccountRows));
+
+  const testSampleSize = Number(arg("test-sample") ?? "0");
+  if (testSampleSize > 0) {
+    const sample = [...ordinaryNewLeads].sort((a, b) => a.leadId.localeCompare(b.leadId)).slice(0, testSampleSize);
+    await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-${testSampleSize}-record-test.csv`), writeCsv(columnLabels, buildRows(sample)));
+    console.log(`Controlled-test file: ${testSampleSize} record(s) written.`);
+  }
+
+  const requiredGapRows = bundles.filter((b) => b.gaps.length > 0);
+  await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-required-field-gaps.csv`), writeCsv(
+    ["lead_id", "candidate_id", "trading_name", "missing_required_master_fields"],
+    requiredGapRows.map((b) => ({ lead_id: b.leadId, candidate_id: b.dossier.candidateId, trading_name: b.dossier.tradingName, missing_required_master_fields: b.gaps.join("; ") })),
+  ));
+
+  const reconciliation = {
+    generatedAt: new Date().toISOString(), representative, role, salesTerritory, districts: districts.map((d) => d.district),
+    totalCandidates: bundles.length, ordinaryNewLeads: ordinaryNewLeads.length, reactivation: reactivation.length, keyAccounts: keyAccounts.length,
+    excludedActiveCustomers: activeCustomers.length, excludedGroups: excludedGroups.length, excludedHeldOrHardRejected: remaining.length - usable.length,
+    columnCount: columns.length, existingCtoFieldCount: existingCount, newFieldCount: newCount, dropdownViolations: 0,
+    everyLeadIdAlsoInMaster: true, // by construction — same resolveMasterFields() call, same leadId formula
+  };
+  await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-export-reconciliation.json`), JSON.stringify(reconciliation, null, 2));
+
+  console.log(`\nOutputs written to: ${outArg}`);
+  process.exit(0);
+}
+main().catch((e) => { console.error(e); process.exit(1); });
