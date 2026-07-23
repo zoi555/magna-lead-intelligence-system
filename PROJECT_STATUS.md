@@ -471,3 +471,29 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
 - **Next task**: get sign-off to run the orchestrator live for RM1 and/or KT1 (field-sales,
   map required) as the first real reuse beyond UB1 — orchestrator itself has not yet been run
   live against any territory other than UB1's replay.
+
+### Qualification/scoring rules v2 locked, orchestrator wired to v2, RM1 dry-run — 2026-07-23 (follow-up)
+
+- **v2 accepted as canonical** (commit `52c124a`): reconciliation re-proven via candidate-ID set
+  arithmetic (94 = 47 usable + 11 held + 36 hard-rejected, zero overlap). Hard-gate reasons now
+  always render as explicit `passed_*`/`failed_*` labels. Final 14-file operational release
+  package built with programmatic safety checks (zero violations across all 47 usable
+  candidates). `rules-versions.ts` locks 8 independently-versioned rule components;
+  `rulesetVersion: "v2"` is the default for every new territory run going forward.
+- **Orchestrator completed**: `run-full-territory.ts`'s `final_scoring` stage now calls v2 by
+  default (v1 untouched, available only via `--use-v1-scoring`). Added real config-hash
+  invalidation (customer-master/group-registry/scoring-version) on `--resume`, proven end-to-end
+  against real fixtures. Fixed a genuine gap found while testing: v2 previously required a v1
+  baseline to even run — a brand-new territory (RM1, TW1-20) had no v1 history and would have
+  failed; terminal-exclusion buckets are now derived independently. UB1 replay still reproduces
+  the accepted output byte-for-byte after every change.
+- **RM1 dry-run**: assignment correctly resolved (Nauman, field_sales, map required);
+  `--request-plan-only` correctly refuses at Phase 1 — RM1 has no discovery checkpoint yet, and
+  this orchestrator never triggers discovery itself. No live RM1/KT1/TW work started.
+- One pre-existing test failure (`types.ts` Level-0-4 naming regex) properly investigated (not
+  dismissed) and logged as ISS-0028 — traced to two specific commits, confirmed unrelated to any
+  of this session's or the prior calibration session's changes.
+- Commit `89c3be3`, pushed to `feature/mvp-vertical-slice-001`.
+- **Next task**: owner decision on whether to start live Phase 1 discovery for RM1 (the first
+  territory with an actual assignment + map requirement) as the real first-use proof of the
+  now-complete orchestrator, ahead of the full TW1-20 rollout.

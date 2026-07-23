@@ -777,3 +777,56 @@ per instruction):
   started; the orchestrator has been proven correct only via the UB1 checkpoint replay and two
   synthetic-territory smoke tests — it has not yet been run live end-to-end against a real new
   territory. That is the recommended next step, gated on explicit sign-off.
+
+## Session: 2026-07-23 — Lock qualification/scoring rules v2, wire orchestrator, RM1 dry-run
+
+Human request: accept commit `52c124a`'s qualification/scoring rules v2 as canonical; final
+file-level reconciliation of the v2 output; clean pass/fail hard-gate terminology; investigate
+(not dismiss) the one remaining pre-existing test failure; produce the final UB1 operational
+release package; lock v2 as the reusable standard; resume and complete the paused
+`run-full-territory.ts` orchestrator wired to v2 by default with config-hash invalidation;
+orchestrator tests; RM1 dry-run request plan. No v2 philosophy/threshold change unless a new
+deterministic defect was proven (none was).
+
+- **Reconciliation proven** (candidate-ID set arithmetic, not aggregate counts): 94 unique
+  candidates = 47 usable + 11 held + 36 hard-rejected, zero overlap.
+- **Test failure investigated properly**: `types.ts never assigns a numeric Level 0-4 score`
+  traced via `git log -S` to two commits (`74bd669` added the assertion before Level 0-4 types
+  existed; `adfa1d7` later legitimately added them) — a stale test regex, unrelated to
+  normalisation/customer-matching/scoring/orchestration. Documented as ISS-0028 with full
+  evidence rather than silently dismissed or silently patched.
+- **Clean gate terminology**: every hard-gate reason now renders as `passed_<gate>` or
+  `failed_<gate>` (two given the owner's exact requested labels), never a bare gate name.
+- **Final release package** (`generate-release-package-v2.ts`, 14 files): full per-candidate
+  dossier for all 94 candidates, programmatic release-safety checks (territory, hard gates, no
+  terminal exclusion, telesales phone, field-sales coordinates) that fail closed on any
+  violation — zero found for all 47 usable candidates.
+- **Rules locked**: `rules-versions.ts` — single source of truth for 8 independently-versioned
+  rule components; `rulesetVersion: "v2"` is now the default for every new territory run.
+- **Orchestrator resumed and completed**: `run-full-territory.ts`'s `final_scoring` stage now
+  calls `run-final-scoring-stage-v2.ts` by default (v1 untouched, available via
+  `--use-v1-scoring` for explicit historical replay only). Real config-input invalidation added:
+  a changed `--customers`/`--registry`/`--scoring-rules-version` hash invalidates the stage(s)
+  that depend on it and every later pipeline stage on `--resume`; stages pinned by
+  `--checkpoint` (tracked persistently in the manifest) are never invalidated. Found and fixed a
+  real bug during testing: `--v1-final-scoring-dir` was a hard requirement in
+  `run-final-scoring-stage-v2.ts`, meaning a brand-new territory with no prior v1 run could
+  never be scored — terminal exclusions (active/inactive customer, excluded group, closed) are
+  now derived independently from Phase1/FSA/Google evidence exactly as v1's own script derives
+  them, so v2 works standalone for RM1/TW1-20 with no v1 history required.
+- **Verified**: orchestrator's UB1 replay (`public_profile → final_scoring`, zero live calls)
+  reproduces the accepted v2 output byte-for-byte, both before and after every change this
+  session. New regression suite covers config-hash invalidation cascades end-to-end against real
+  fixture checkpoints (not mocked), plus the no-v1-baseline scoring path.
+- **RM1 dry-run**: `--request-plan-only` for territory RM1 (salesperson Nauman, field_sales,
+  map_required=true — correctly resolved from the assignment file) correctly refuses at Phase 1
+  (`ok: false` for every stage) because RM1 has no existing Phase 1 checkpoint and no
+  `--discovery-run-id` was supplied — this orchestrator never triggers discovery itself, exactly
+  as designed. No live discovery was started for RM1 or any other of the 22 territories.
+  Estimated request counts/cost for RM1 cannot be honestly stated until Phase 1 discovery has
+  run and produced a real candidate population — reported as such, not guessed.
+- Commits: `52c124a` (calibration fixes, prior turn), `89c3be3` (rules-lock + orchestrator wiring
+  + release package + tests), pushed to `feature/mvp-vertical-slice-001`.
+- **Not done**: no live RM1/KT1/TW discovery; FSA/Companies House reclassification with the
+  fixed `normaliseName()` (still only Google is reclassified, documented in
+  `scoring-rules-v2.json`'s `notApplied` list).
