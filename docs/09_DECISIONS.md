@@ -733,3 +733,31 @@ real script, not a parallel reimplementation. Verified faithful by replaying UB1
 checkpoints end-to-end with zero live calls and diffing the result against the original output —
 zero field-level differences across all 94 candidates (see `docs/15_AI_WORK_LOG.md`, session
 2026-07-23, and ISS-0025).
+
+## Qualification/scoring rules v2 replaces v1 as the default for all future lead-production runs (2026-07-23)
+
+`scripts/lead-production/rules-versions.ts` is now the single source of truth for every
+independently-versioned rule component (`qualificationRulesVersion`, `scoringRulesVersion`,
+`hardGateVersion`, `customerMatchMaterialityVersion`, `groupRegistryVersion`,
+`normalisationVersion`, `channelRuleVersion`, `outputSchemaVersion`). `rulesetVersion: "v2"` is
+the default for every new territory run going forward (`run-full-territory.ts`'s
+`--scoring-rules-version` default and its `final_scoring` stage call both point at
+`run-final-scoring-stage-v2.ts`).
+
+**v1 remains fully reproducible.** `run-final-scoring-stage.ts`, `hard-gates.ts`, `scoring.ts`,
+`channel-suitability.ts`, and `final-outcome.ts` are unchanged by the v2 work — v2 is a separate
+script (`run-final-scoring-stage-v2.ts`) that imports and reuses those same v1 modules unchanged,
+only swapping in corrected inputs (Google reclassification via the fixed `normaliseName()`,
+customer-match materiality) plus a new qualification layer
+(`qualification-v2.ts`) that decouples release-eligibility from the numeric score. Running v1's
+own script against the same checkpoints today still reproduces the original UB1 output exactly.
+
+### Reason
+
+The 2026-07-23 UB1 calibration audit (see `docs/15_AI_WORK_LOG.md`) found four real model
+defects in v1's candidate-matching and qualification logic (apostrophe/`"T/A"` name-similarity
+tokenisation, un-decoded HTML entities in the customer master, non-corroborated customer-match
+holds treated as blocking, and score used as a hidden qualification gate) — fixed in v2, proven
+zero-new-external-call and reusable across territories, and explicitly accepted by the project
+owner (commit `52c124a`) as the canonical model. v1 is kept, not deleted, so any historical run's
+exact original output remains independently reproducible for audit purposes.

@@ -129,6 +129,30 @@ async function main() {
     await fs.rm(tmpRoot, { recursive: true, force: true });
   }
 
+  // --- A brand-new territory with NO prior v1 run (--v1-final-scoring-dir omitted entirely)
+  // must still produce a correct, complete qualification pass — this is the real-world RM1/
+  // TW1-20 case: v2 is the only scoring pass that will ever run for those territories. ---
+  {
+    const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "final-scoring-v2-nobaseline-test-"));
+    const dirs = await genFixtureTerritory(tmpRoot, "ZZ2");
+    const outDir = path.join(tmpRoot, "zz2-v2-out");
+    const r = spawnSync("npx", [
+      "tsx", "scripts/lead-production/run-final-scoring-stage-v2.ts",
+      `--phase1-dir=${dirs.phase1}`, `--fsa-dir=${dirs.fsa}`, `--google-checkpoint=${dirs.google}`,
+      `--companies-house-dir=${dirs.ch}`, `--website-dir=${dirs.website}`, `--public-profile-dir=${dirs.publicProfile}`,
+      `--group-rescreen-dir=${dirs.groupRescreen}`, `--customers=${dirs.customers}`, `--territory=ZZ2`, `--out=${outDir}`,
+      // deliberately no --v1-final-scoring-dir
+    ], { cwd: path.resolve(__dirname, ".."), encoding: "utf8" });
+    assert(r.status === 0, `no-v1-baseline run exits 0 with --v1-final-scoring-dir entirely omitted (stderr: ${(r.stderr ?? "").slice(0, 500)})`);
+    const master = JSON.parse(await fs.readFile(path.join(outDir, "zz2-v2-authoritative-master.json"), "utf8").catch(() => "[]"));
+    assert(Array.isArray(master) && master.length === 1, "still produces a full master row for the fixture candidate with no v1 baseline");
+    if (Array.isArray(master) && master.length === 1) {
+      assert(master[0].qualificationStatus === "qualified", `the fixture candidate is still correctly qualified with no v1 baseline (got ${master[0].qualificationStatus})`);
+      assert(master[0].v1Bucket === "not_applicable_no_v1_baseline", "v1Bucket is explicitly marked not_applicable rather than a fabricated value");
+    }
+    await fs.rm(tmpRoot, { recursive: true, force: true });
+  }
+
   console.log(`\n${fails === 0 ? "All proofs passed." : `${fails} proof(s) FAILED.`}`);
   process.exit(fails === 0 ? 0 : 1);
 }

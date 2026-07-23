@@ -43,6 +43,21 @@ async function md5(filePath: string): Promise<string | null> { try { return crea
 async function exists(p: string): Promise<boolean> { try { await fs.access(p); return true; } catch { return false; } }
 async function readJson(p: string): Promise<any> { return JSON.parse(await fs.readFile(p, "utf8")); }
 
+// A leading "*" in an anchorFile pattern (e.g. "*-v2-authoritative-master.json") resolves to
+// whatever file in that directory ends with the given suffix — the final-scoring stage's
+// own output files are territory-prefixed (ub1-v2-..., rm1-v2-...), never a fixed literal name,
+// so the anchor check must resolve the same way rather than hardcoding one territory's prefix.
+async function resolveAnchorPath(dir: string, anchorFile: string): Promise<string> {
+  if (!anchorFile.startsWith("*")) return path.join(dir, anchorFile);
+  const suffix = anchorFile.slice(1);
+  try {
+    const match = (await fs.readdir(dir)).find((e) => e.endsWith(suffix));
+    return path.join(dir, match ?? anchorFile.slice(1));
+  } catch {
+    return path.join(dir, anchorFile.slice(1));
+  }
+}
+
 type StageKey = "phase1" | "fsa" | "google" | "companies_house" | "website" | "public_profile" | "group_rescreen" | "final_scoring";
 
 interface StageDefinition {
@@ -62,7 +77,7 @@ const STAGES: StageDefinition[] = [
   { key: "website", order: 5, label: "Website enrichment + product-fit", requiresLiveExternalCalls: true, anchorFile: "website-results.json", dirSuffix: "website-stage" },
   { key: "public_profile", order: 6, label: "Decision-maker public-profile resolution", requiresLiveExternalCalls: false, anchorFile: "public-profile-results.json", dirSuffix: "public-profile-stage" },
   { key: "group_rescreen", order: 7, label: "Final ownership/group rescreen", requiresLiveExternalCalls: false, anchorFile: "final-group-rescreen-results.json", dirSuffix: "final-group-rescreen-stage" },
-  { key: "final_scoring", order: 8, label: "Hard gates + 100-point scoring + channel suitability + Level 0-4 + master/rep outputs", requiresLiveExternalCalls: false, anchorFile: "ub1-authoritative-master.json", dirSuffix: "final-scoring-stage" },
+  { key: "final_scoring", order: 8, label: "Qualification v2 + scoring v2 + channel eligibility + final level + master/rep outputs", requiresLiveExternalCalls: false, anchorFile: "*-v2-authoritative-master.json", dirSuffix: "final-scoring-stage" },
 ];
 
 interface OrchestratorManifest {
@@ -72,8 +87,18 @@ interface OrchestratorManifest {
   codeCommitSha: string;
   rulesVersion: string;
   assignment: { salesperson: string; role: string; mapRequired: boolean } | null;
-  stages: Record<string, { dir: string; anchorChecksum: string | null; completedAt: string; requestsMade?: number; requestCap?: number; liveExternalCallsMade: boolean }>;
+  stages: Record<string, { dir: string; anchorChecksum: string | null; completedAt: string; requestsMade?: number; requestCap?: number; liveExternalCallsMade: boolean; configHashes?: Record<string, string>; isOverride?: boolean }>;
 }
+
+// Which external config inputs each stage's OWN behaviour actually depends on, beyond its own
+// upstream-stage checkpoint chain — customer-master and group-registry versioning per stage
+// requirement (Section 6/8). A changed hash here invalidates this stage AND every later stage
+// in the linear pipeline (never just this one — a stale customer comparison would poison every
+// downstream customer-resolution decision too).
+const STAGE_CONFIG_DEPENDENCIES: Record<StageKey, Array<"customers" | "registry" | "scoring_version">> = {
+  phase1: ["customers"], fsa: ["customers"], google: ["customers"], companies_house: ["customers", "registry"],
+  website: ["registry"], public_profile: [], group_rescreen: ["registry"], final_scoring: ["customers", "scoring_version"],
+};
 
 function stamp(): string {
   const iso = new Date().toISOString();
@@ -96,6 +121,18 @@ interface Context {
   checkpointOverrides: Map<string, string>;
   maxCalls: Record<string, string | null>; // per-source cap overrides, passed straight through to the relevant stage
   discoveryRunId: string | null;
+  useV1Scoring: boolean; // default false — qualification/scoring rules v2 is the default ruleset for every new run; v1 remains available (unchanged) only for explicit historical replay/audit
+  scoringRulesVersion: string; // explicit version label, independent of which script executes — a provenance/config-hash input, not a code-path switch
+  v1FinalScoringDirOverride: string | null; // optional: when scoring with v2, also produce the before/after comparison against this prior v1 (or v2) run
+}
+
+async function computeConfigHashes(def: StageDefinition, ctx: Context): Promise<Record<string, string>> {
+  const deps = STAGE_CONFIG_DEPENDENCIES[def.key];
+  const hashes: Record<string, string> = {};
+  if (deps.includes("customers")) hashes.customers = (await md5(ctx.customers)) ?? "missing";
+  if (deps.includes("registry")) hashes.registry = (await md5(ctx.registry)) ?? "missing";
+  if (deps.includes("scoring_version")) hashes.scoring_version = ctx.scoringRulesVersion;
+  return hashes;
 }
 
 async function stageDirFor(ctx: Context, def: StageDefinition, manifest: OrchestratorManifest): Promise<string> {
@@ -151,11 +188,25 @@ async function runStage(def: StageDefinition, ctx: Context, manifest: Orchestrat
       return { ok: r.ok, log: r.stdout };
     }
     case "final_scoring": {
-      const r = runScript("scripts/lead-production/run-final-scoring-stage.ts", [
+      // Qualification/scoring rules v2 is the default for every new run (locked 2026-07-23,
+      // commit 52c124a — see docs/09_DECISIONS.md and scripts/lead-production/rules-versions.ts).
+      // v1's own script remains available, byte-for-byte unchanged, only for explicit
+      // --use-v1-scoring historical replay/audit.
+      if (ctx.useV1Scoring) {
+        const r = runScript("scripts/lead-production/run-final-scoring-stage.ts", [
+          `--phase1-dir=${dirs.phase1}`, `--fsa-dir=${dirs.fsa}`, `--google-checkpoint=${dirs.google}`, `--companies-house-dir=${dirs.companies_house}`,
+          `--website-dir=${dirs.website}`, `--public-profile-dir=${dirs.public_profile}`, `--group-rescreen-dir=${dirs.group_rescreen}`,
+          `--territory=${ctx.territory}`, `--out=${outDir}`,
+        ]);
+        return { ok: r.ok, log: r.stdout };
+      }
+      const v2Args = [
         `--phase1-dir=${dirs.phase1}`, `--fsa-dir=${dirs.fsa}`, `--google-checkpoint=${dirs.google}`, `--companies-house-dir=${dirs.companies_house}`,
         `--website-dir=${dirs.website}`, `--public-profile-dir=${dirs.public_profile}`, `--group-rescreen-dir=${dirs.group_rescreen}`,
-        `--territory=${ctx.territory}`, `--out=${outDir}`,
-      ]);
+        `--customers=${ctx.customers}`, `--territory=${ctx.territory}`, `--out=${outDir}`,
+      ];
+      if (ctx.v1FinalScoringDirOverride) v2Args.push(`--v1-final-scoring-dir=${ctx.v1FinalScoringDirOverride}`);
+      const r = runScript("scripts/lead-production/run-final-scoring-stage-v2.ts", v2Args);
       return { ok: r.ok, log: r.stdout };
     }
   }
@@ -188,6 +239,10 @@ async function main() {
   const toStageArg = arg("to-stage");
   const requestPlanOnly = flag("request-plan-only");
   const discoveryRunId = arg("discovery-run-id");
+  const useV1Scoring = flag("use-v1-scoring"); // escape hatch for explicit historical replay/audit only — v2 is the default
+  const { RULES_VERSIONS } = await import("./rules-versions");
+  const scoringRulesVersion = arg("scoring-rules-version") ?? (useV1Scoring ? "v1" : RULES_VERSIONS.rulesetVersion);
+  const v1FinalScoringDirOverride = arg("v1-final-scoring-dir");
 
   const missing = [!customers && "--customers=<path>", !registry && "--registry=<path>"].filter(Boolean);
   if (missing.length) { console.error("Missing required argument(s):\n  " + missing.join("\n  ")); process.exit(1); }
@@ -219,6 +274,12 @@ async function main() {
   await fs.mkdir(outArg, { recursive: true });
   const manifestPath = path.join(outArg, ".orchestrator-run-manifest.json");
   let manifest: OrchestratorManifest;
+  const ctx: Context = {
+    territoryOutRoot: outArg, territory, customers: customers!, registry: registry!, live, requestPlanOnly, checkpointOverrides,
+    maxCalls: { google: arg("max-google-calls"), companiesHouse: arg("max-ch-calls"), companiesHouseDocuments: arg("max-ch-document-calls") },
+    discoveryRunId, useV1Scoring, v1FinalScoringDirOverride, scoringRulesVersion,
+  };
+
   if (resume && (await exists(manifestPath))) {
     manifest = await readJson(manifestPath);
     console.log(`Resumed manifest: ${Object.keys(manifest.stages).length} stage(s) previously recorded.`);
@@ -226,11 +287,37 @@ async function main() {
     for (const def of STAGES) {
       const rec = manifest.stages[def.key];
       if (!rec) continue;
-      const currentChecksum = await md5(path.join(rec.dir, def.anchorFile));
+      const currentChecksum = await md5(await resolveAnchorPath(rec.dir, def.anchorFile));
       if (currentChecksum !== rec.anchorChecksum) {
         console.error(`REFUSING TO RESUME: stage "${def.key}"'s checkpoint at ${rec.dir} has changed since it was recorded (checksum mismatch) — a checkpoint must never be modified after being recorded. Investigate before retrying.`);
         process.exit(1);
       }
+    }
+    // Config-input invalidation: a changed customer-master/group-registry/scoring-version hash
+    // is an INTENTIONAL trigger to rerun (not a corruption error like the anchor check above) —
+    // invalidate this stage and every later stage in the linear pipeline, since a stale upstream
+    // decision (e.g. customer comparison) would otherwise poison every downstream stage that
+    // consumes it, even ones that don't read the changed config file directly.
+    let invalidateFromOrder: number | null = null;
+    for (const def of STAGES) {
+      const rec = manifest.stages[def.key];
+      if (!rec) continue;
+      // A stage originally recorded via --checkpoint (tracked persistently, not just on THIS
+      // invocation's flags — a --resume call is not expected to re-supply every override) is
+      // explicit user intent to use exactly that checkpoint regardless of config drift. It is
+      // validated, never regenerated, so it can never be "invalidated" by a config-hash change
+      // — there is nothing to rerun it INTO without a freshly supplied override.
+      if (rec.isOverride) continue;
+      const currentConfigHashes = await computeConfigHashes(def, ctx);
+      const recordedConfigHashes = rec.configHashes ?? {};
+      const changedKeys = Object.keys(currentConfigHashes).filter((k) => currentConfigHashes[k] !== recordedConfigHashes[k]);
+      if (changedKeys.length && (invalidateFromOrder === null || def.order < invalidateFromOrder)) {
+        console.log(`Config input changed for stage "${def.key}" (${changedKeys.join(", ")}) — invalidating this stage and every later stage.`);
+        invalidateFromOrder = def.order;
+      }
+    }
+    if (invalidateFromOrder !== null) {
+      for (const def of STAGES) if (def.order >= invalidateFromOrder) delete manifest.stages[def.key];
     }
   } else {
     manifest = { territory, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), codeCommitSha: gitCommitSha(), rulesVersion: RULES_VERSION, assignment, stages: {} };
@@ -239,12 +326,6 @@ async function main() {
   const fromOrder = fromStageArg ? STAGES.find((s) => s.key === fromStageArg)?.order ?? 1 : 1;
   const toOrder = toStageArg ? STAGES.find((s) => s.key === toStageArg)?.order ?? STAGES.length : STAGES.length;
   const inRange = STAGES.filter((s) => s.order >= fromOrder && s.order <= toOrder);
-
-  const ctx: Context = {
-    territoryOutRoot: outArg, territory, customers: customers!, registry: registry!, live, requestPlanOnly, checkpointOverrides,
-    maxCalls: { google: arg("max-google-calls"), companiesHouse: arg("max-ch-calls"), companiesHouseDocuments: arg("max-ch-document-calls") },
-    discoveryRunId,
-  };
 
   // --- Resolve directories for every stage up front (checkpoint overrides / already-resumed /
   // freshly-timestamped) so downstream stages can reference upstream dirs regardless of range. ---
@@ -265,9 +346,9 @@ async function main() {
     const overridden = ctx.checkpointOverrides.has(def.key);
     if (rec && !overridden) { console.log(`\n[${def.order}/${STAGES.length}] ${def.label} — already complete (resumed), skipping.`); continue; }
     if (overridden) {
-      const checksum = await md5(path.join(dirs[def.key], def.anchorFile));
+      const checksum = await md5(await resolveAnchorPath(dirs[def.key], def.anchorFile));
       if (!checksum) { console.error(`REFUSING TO PROCEED: --checkpoint ${def.key}=${dirs[def.key]} does not contain the expected anchor file (${def.anchorFile}) — not a valid checkpoint for this stage.`); process.exit(1); }
-      manifest.stages[def.key] = { dir: dirs[def.key], anchorChecksum: checksum, completedAt: new Date().toISOString(), liveExternalCallsMade: false };
+      manifest.stages[def.key] = { dir: dirs[def.key], anchorChecksum: checksum, completedAt: new Date().toISOString(), liveExternalCallsMade: false, configHashes: await computeConfigHashes(def, ctx), isOverride: true };
       manifest.updatedAt = new Date().toISOString();
       await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
       console.log(`\n[${def.order}/${STAGES.length}] ${def.label} — using supplied checkpoint override (validated, not regenerated): ${dirs[def.key]}`);
@@ -288,8 +369,8 @@ async function main() {
       console.log(`  (dry-run preflight only — not recorded as a completed checkpoint)`);
       continue;
     }
-    const checksum = await md5(path.join(dirs[def.key], def.anchorFile));
-    manifest.stages[def.key] = { dir: dirs[def.key], anchorChecksum: checksum, completedAt: new Date().toISOString(), liveExternalCallsMade: def.requiresLiveExternalCalls && live };
+    const checksum = await md5(await resolveAnchorPath(dirs[def.key], def.anchorFile));
+    manifest.stages[def.key] = { dir: dirs[def.key], anchorChecksum: checksum, completedAt: new Date().toISOString(), liveExternalCallsMade: def.requiresLiveExternalCalls && live, configHashes: await computeConfigHashes(def, ctx), isOverride: false };
     manifest.updatedAt = new Date().toISOString();
     await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2));
     console.log(`  ✓ complete: ${dirs[def.key]}`);

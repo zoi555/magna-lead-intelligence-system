@@ -642,3 +642,56 @@ cause) to URL-decode href content and validate the result looks like a real UK p
 before treating it as high-confidence evidence. Not applied this session — a code change to an
 already-accepted, immutable-checkpoint-producing stage requires separate approval and a fresh
 run to take effect for any candidate whose only phone source is the website.
+
+## ISS-0028 — `test:lead-production-google` false-positive assertion on `types.ts`
+
+Date: 2026-07-23
+Severity: Low — cosmetic test-suite noise only, no production/data-quality impact
+Owner: Zoeb
+Status: Open — documented, not fixed (see reasoning below)
+
+### Investigation (not casually dismissed — full evidence)
+
+- **Test name:** `types.ts never assigns a numeric Level 0-4 score`, in
+  `scripts/test-lead-production-google.ts` (assertion block "16 & 17", line 325):
+  `assert(!/level[_-]?[0-4]\b/i.test(text), ...)`.
+- **Expected value:** the regex `/level[_-]?[0-4]\b/i` finds no match anywhere in
+  `scripts/lead-production/types.ts` (assertion is `true` when `text` contains no such
+  substring).
+- **Actual value:** the regex DOES match — `types.ts` legitimately contains the type unions
+  `RejectionLevel = "level_0" | "level_1" | "level_2" | "level_3" | "level_4"` and
+  `MasterOutcomeBucket`'s `"level_0_sales_ready" | "level_1_soft_gap" | ... |
+  "level_4_hard_reject"` members (`scripts/lead-production/types.ts:928,951-955`).
+- **First commit where it fails:** `git log -S'"level_0"' -- scripts/lead-production/types.ts`
+  shows these type members were added in `adfa1d7` ("feat: add final qualification, scoring,
+  and UB1 output stage"). `git log -S'never assigns a numeric Level 0-4 score' --
+  scripts/test-lead-production-google.ts` shows the assertion itself was added earlier, in
+  `74bd669` ("feat: add Google Places identity/premises stage") — before the Level 0-4 types
+  existed. The assertion passed correctly at the time it was written; it became a false
+  positive the moment `adfa1d7` legitimately introduced the shared Level-0-4 vocabulary that
+  every downstream stage (hard-gates.ts, scoring.ts, final-outcome.ts, and now
+  qualification-v2.ts) imports from `types.ts` by design.
+- **Connection to normaliseName()/customer-matching/scoring/territory-orchestration:** none.
+  `types.ts` was not touched by any of this session's or the 2026-07-23 calibration session's
+  changes (confirmed: not present in either session's diff). The regex is a pure static-text
+  content check on one file, unrelated to runtime behaviour, name normalisation, customer
+  matching, or the v2 qualification/scoring/orchestrator work.
+
+### Why it does not block lead production
+
+`types.ts` never actually assigns a Level 0-4 score to a candidate — it only *declares the
+shared type vocabulary* that the one legitimate scoring stage (`final-outcome.ts`, and now the
+v2 equivalent) uses to assign a level. The assertion's real intent — "no early evidence-
+gathering stage (Google/FSA/website/etc.) pre-judges sales-readiness" — remains fully true and
+is separately verified for every OTHER file in the same test loop (`google-adapter.ts`,
+`google-match.ts`, `fsa-resolution-after-google.ts`, `customer-resolution-after-google.ts`,
+`physical-premises.ts`, `group-rescreen-after-google.ts`, `run-google-stage.ts` — all pass).
+Only the shared type-definitions file itself trips the regex, which is definitionally
+impossible to avoid once the project has ANY Level 0-4 concept at all.
+
+### Next action
+
+The regex in `scripts/test-lead-production-google.ts` line 325 should be narrowed to exclude
+`types.ts`'s own type-definition lines (or scoped to only the other 7 files in that loop) in a
+future, separately-approved test-suite maintenance pass — not applied this session per
+instruction to document rather than silently patch a test outside the current work's scope.

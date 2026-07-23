@@ -31,6 +31,7 @@ import { calculateChannelSuitability } from "./channel-suitability";
 import { assignFinalOutcome } from "./final-outcome";
 import { assessCustomerMatchMateriality } from "./customer-match-materiality";
 import { classifyQualificationV2 } from "./qualification-v2";
+import { RULES_VERSIONS } from "./rules-versions";
 import { loadCustomerFile } from "./load-customers";
 import type { MasterOutcomeBucket, FinalOutcomeResult, GooglePlaceEvidence, GoogleOutcome } from "./types";
 
@@ -50,7 +51,7 @@ type DecisionCategory = "genuine_hard_failure" | "channel_specific_failure" | "s
 
 interface MasterRowV2 {
   candidateId: string; tradingName: string; postcode: string | null; phone: string | null; website: string | null;
-  v1Bucket: MasterOutcomeBucket; v1Level: string | null; v1Channel: string | null; v1Score: number | null;
+  v1Bucket: MasterOutcomeBucket | "not_applicable_no_v1_baseline"; v1Level: string | null; v1Channel: string | null; v1Score: number | null;
   v1FailedGates: string[]; v1ReasonTags: string[]; v1LevelReason: string | null;
   decisionCategory: DecisionCategory | null;
   qualificationStatus: string; channelEligibility: string; enrichmentCompletenessBand: string; enrichmentCompletenessFraction: number;
@@ -74,7 +75,10 @@ async function main() {
   const outArg = arg("out");
   const territory = arg("territory") ?? "UB1";
 
-  const missing = [!phase1Dir && "--phase1-dir", !fsaDir && "--fsa-dir", !googleDir && "--google-checkpoint", !chDir && "--companies-house-dir", !websiteDir && "--website-dir", !publicProfileDir && "--public-profile-dir", !groupRescreenDir && "--group-rescreen-dir", !v1Dir && "--v1-final-scoring-dir", !customersPath && "--customers", !outArg && "--out"].filter(Boolean);
+  // --v1-final-scoring-dir is OPTIONAL: when supplied (as for the UB1 calibration audit), every
+  // row also carries a before/after comparison against that prior run. A brand-new territory
+  // with no prior run at all supplies nothing here — v2 is simply THE scoring pass, not a diff.
+  const missing = [!phase1Dir && "--phase1-dir", !fsaDir && "--fsa-dir", !googleDir && "--google-checkpoint", !chDir && "--companies-house-dir", !websiteDir && "--website-dir", !publicProfileDir && "--public-profile-dir", !groupRescreenDir && "--group-rescreen-dir", !customersPath && "--customers", !outArg && "--out"].filter(Boolean);
   if (missing.length) { console.error("Missing required argument(s):\n  " + missing.map((m) => `${m}=<path>`).join("\n  ")); process.exit(1); }
 
   const outDir = outArg!;
@@ -124,8 +128,8 @@ async function main() {
   const groupRescreenResults = (await readJson(path.join(groupRescreenDir!, "final-group-rescreen-results.json"))) as any[];
   const groupRescreenByCandidate = new Map(groupRescreenResults.map((r) => [r.candidateId, r]));
 
-  const v1MasterFile = await findFile(v1Dir!, "-authoritative-master.json");
-  const v1Master = (await readJson(v1MasterFile)) as any[];
+  const v1MasterFile = v1Dir ? await findFile(v1Dir, "-authoritative-master.json") : null;
+  const v1Master = v1MasterFile ? ((await readJson(v1MasterFile)) as any[]) : [];
   const v1ByCandidate = new Map(v1Master.map((r) => [r.candidateId, r]));
 
   const customersLoaded = await loadCustomerFile(customersPath!);
@@ -142,27 +146,39 @@ async function main() {
     const postcode = p1.normalisedPostcode?.candidateOriginal ?? null;
     const v1Row = v1ByCandidate.get(candidateId);
 
-    // Terminal exclusions (active/inactive customer, excluded group, closed) are IDENTICAL to
-    // v1 — none of this session's fixes touch those decisions, and none of the corroborating
-    // evidence changes them (an active-customer confirmation is already a DECISIVE match, not
-    // an unresolved one, so materiality reprocessing is a no-op there by construction).
-    if (!eligibleSet.has(candidateId) || v1Row?.finalOutcome == null) {
-      // Terminal exclusions decided before scoring (active/inactive customer, excluded group,
-      // permanently/temporarily closed) are never reopened by this session's fixes — none of
-      // them involve google reclassification or customer-hold materiality (an active-customer
-      // confirmation is already DECISIVE, not an unresolved hold). All map to hard_rejected —
-      // the only one of the four v2 statuses meaning "not releasable" — with the true reason
-      // preserved verbatim in v1_bucket/v1 bucketReason, never collapsed into a misleading
-      // "material_conflict" label for what is actually a closure or an already-decided status.
+    // Terminal exclusions (active/inactive customer, excluded group, closed) are derived
+    // INDEPENDENTLY from the same Phase1/FSA/Google checkpoint evidence v1's own
+    // run-final-scoring-stage.ts uses (mirrored exactly, not reimplemented differently) — v2
+    // never depends on a prior v1 run existing at all, so a brand-new territory with no v1
+    // history works identically to a reprocessed one. None of this session's fixes touch these
+    // decisions: an active-customer confirmation is already a DECISIVE match, not an unresolved
+    // one, so materiality reprocessing is a no-op here by construction.
+    const fsaCustRes0 = fsaCustResByCandidate.get(candidateId);
+    const googleCustRes0 = googleCustResByCandidate.get(candidateId);
+    const google0 = googleByCandidate.get(candidateId);
+    let terminalBucket: MasterOutcomeBucket | null = null;
+    let terminalReason: string | null = null;
+    if (p1.preliminaryStatus === "active_customer") { terminalBucket = "active_customer_excluded"; terminalReason = "Confirmed active Magna customer at Phase 1."; }
+    else if (p1.preliminaryStatus === "inactive_customer") { terminalBucket = "inactive_customer_reactivation"; terminalReason = "Confirmed inactive Magna customer at Phase 1 (reactivation candidate)."; }
+    else if (p1.preliminaryStatus === "excluded_large_group") { terminalBucket = "excluded_large_group"; terminalReason = "Excluded large national group/chain at Phase 1."; }
+    else if (fsaCustRes0?.resolution_outcome === "confirmed_active_customer_after_fsa") { terminalBucket = "active_customer_excluded"; terminalReason = "Confirmed active Magna customer after FSA evidence."; }
+    else if (fsaCustRes0?.resolution_outcome === "confirmed_inactive_customer_after_fsa") { terminalBucket = "inactive_customer_reactivation"; terminalReason = "Confirmed inactive Magna customer after FSA evidence."; }
+    else if (googleCustRes0?.resolution_outcome === "confirmed_active_customer_after_google") { terminalBucket = "active_customer_excluded"; terminalReason = "Confirmed active Magna customer after Google evidence."; }
+    else if (googleCustRes0?.resolution_outcome === "confirmed_inactive_customer_after_google") { terminalBucket = "inactive_customer_reactivation"; terminalReason = "Confirmed inactive Magna customer after Google evidence."; }
+    else if (google0?.outcome === "permanently_closed") { terminalBucket = "permanently_closed"; terminalReason = "Google evidence confirms permanent closure."; }
+    else if (google0?.outcome === "temporarily_closed") { terminalBucket = "temporarily_closed_held"; terminalReason = "Google evidence confirms temporary closure — held, not discarded."; }
+    else if (!eligibleSet.has(candidateId)) { terminalBucket = "probable_customer_match_unresolved"; terminalReason = "Excluded from the Companies House-eligible population by an exclusion reason not explicitly enumerated above — held for manual review rather than silently dropped."; }
+
+    if (terminalBucket) {
       masterRows.push({
         candidateId, tradingName, postcode, phone: null, website: null,
-        v1Bucket: v1Row?.bucket ?? "probable_customer_match_unresolved", v1Level: null, v1Channel: v1Row?.channel ?? null, v1Score: null,
-        v1FailedGates: [], v1ReasonTags: [], v1LevelReason: v1Row?.bucketReason ?? null, decisionCategory: "not_applicable_terminal_exclusion",
+        v1Bucket: v1Row?.bucket ?? terminalBucket, v1Level: null, v1Channel: v1Row?.channel ?? null, v1Score: null,
+        v1FailedGates: [], v1ReasonTags: [], v1LevelReason: v1Row?.bucketReason ?? terminalReason, decisionCategory: "not_applicable_terminal_exclusion",
         qualificationStatus: "hard_rejected",
         channelEligibility: "neither", enrichmentCompletenessBand: "minimal", enrichmentCompletenessFraction: 0,
         commercialPriorityScore: null, maxPossibleScore: null, finalOutcome: null,
         googleReclassified: false, googleOutcomeBefore: null, googleOutcomeAfter: null,
-        customerConflictMaterialityChanged: false, hasUnresolvedCustomerConflictBefore: false, hasUnresolvedCustomerConflictAfter: false, customerConflictReason: v1Row?.bucketReason ?? null,
+        customerConflictMaterialityChanged: false, hasUnresolvedCustomerConflictBefore: false, hasUnresolvedCustomerConflictAfter: false, customerConflictReason: terminalReason,
         outcomeChanged: false, changeReason: null,
       });
       continue;
@@ -287,8 +303,10 @@ async function main() {
     if (customerConflictMaterialityChanged) changeReasonParts.push(`Customer-match hold materiality: ${materiality.reason}`);
 
     // Section 2's required "why not released" classification, judged against the ORIGINAL v1
-    // outcome (what actually blocked this candidate before this session's fixes).
-    const v1Level = v1Row.finalOutcome?.level ?? null;
+    // outcome when one exists (what actually blocked this candidate before this session's
+    // fixes). A brand-new territory with no v1 baseline has nothing to classify against — v2 is
+    // simply the (only) scoring pass, and decisionCategory stays null.
+    const v1Level = v1Row?.finalOutcome?.level ?? null;
     let decisionCategory: DecisionCategory | null = null;
     if (v1Level === "level_4") decisionCategory = googleReclassified ? "suspected_model_defect" : "genuine_hard_failure";
     else if (v1Level === "level_3") decisionCategory = customerConflictMaterialityChanged ? "suspected_model_defect" : hasUnresolvedCustomerConflictAfter ? "significant_conflict" : "scoring_only_weakness";
@@ -298,8 +316,8 @@ async function main() {
 
     masterRows.push({
       candidateId, tradingName, postcode, phone, website: website?.officialDomain ?? null,
-      v1Bucket: v1Row.bucket, v1Level, v1Channel: v1Row.channel ?? null, v1Score: v1Row.finalOutcome?.scoring?.totalScore ?? null,
-      v1FailedGates: v1Row.finalOutcome?.hardGates?.failedGates ?? [], v1ReasonTags: v1Row.finalOutcome?.reasonTags ?? [], v1LevelReason: v1Row.bucketReason ?? null, decisionCategory,
+      v1Bucket: v1Row?.bucket ?? "not_applicable_no_v1_baseline", v1Level, v1Channel: v1Row?.channel ?? null, v1Score: v1Row?.finalOutcome?.scoring?.totalScore ?? null,
+      v1FailedGates: v1Row?.finalOutcome?.hardGates?.failedGates ?? [], v1ReasonTags: v1Row?.finalOutcome?.reasonTags ?? [], v1LevelReason: v1Row?.bucketReason ?? null, decisionCategory,
       qualificationStatus: qualification.qualificationStatus, channelEligibility: qualification.channelEligibility,
       enrichmentCompletenessBand: qualification.enrichmentCompletenessBand, enrichmentCompletenessFraction: Math.round(qualification.enrichmentCompletenessFraction * 100) / 100,
       commercialPriorityScore: scoring.totalScore, maxPossibleScore: scoring.maxPossibleScore, finalOutcome,
@@ -315,7 +333,7 @@ async function main() {
   if (uniqueIds.size !== phase1Results.length) throw new Error(`v2 master evidence register has duplicate or missing candidate IDs (${uniqueIds.size} unique of ${phase1Results.length} expected).`);
   console.log(`Reconciliation: ${masterRows.length} v2 master rows, ${uniqueIds.size} unique candidate IDs, matches ${phase1Results.length} original Phase 1 candidates. ✓`);
 
-  await writeOutputs(outDir, territory, masterRows, { phase1Dir: phase1Dir!, phase1Checksum, fsaDir: fsaDir!, googleDir: googleDir!, chDir: chDir!, websiteDir: websiteDir!, publicProfileDir: publicProfileDir!, groupRescreenDir: groupRescreenDir!, v1Dir: v1Dir! });
+  await writeOutputs(outDir, territory, masterRows, { phase1Dir: phase1Dir!, phase1Checksum, fsaDir: fsaDir!, googleDir: googleDir!, chDir: chDir!, websiteDir: websiteDir!, publicProfileDir: publicProfileDir!, groupRescreenDir: groupRescreenDir!, v1Dir: v1Dir ?? "none (no v1 baseline supplied — this territory has no prior v1 run to compare against)" });
 
   const changedCount = masterRows.filter((r) => r.outcomeChanged).length;
   console.log(`\nCandidates with a changed google/customer-conflict input: ${changedCount} of ${masterRows.length}.`);
@@ -337,6 +355,10 @@ async function writeOutputs(outDir: string, territory: string, rows: MasterRowV2
 
   await fs.writeFile(path.join(outDir, `${prefix}-v2-complete-evidence-register.csv`), writeCsv([...MASTER_COLUMNS], rows.map(masterRow)));
   await fs.writeFile(path.join(outDir, `${prefix}-v2-authoritative-master.csv`), writeCsv([...MASTER_COLUMNS], rows.map(masterRow)));
+  // Full per-candidate detail (hard-gate checks, scoring components, channel factor breakdown,
+  // decision category) as JSON — the CSV above deliberately keeps only a thin summary, mirroring
+  // v1's own CSV+JSON dual-output convention. Additive only; no rule or threshold changes.
+  await fs.writeFile(path.join(outDir, `${prefix}-v2-authoritative-master.json`), JSON.stringify(rows, null, 2));
 
   const usable = rows.filter((r) => r.qualificationStatus === "qualified" || r.qualificationStatus === "qualified_with_channel_limit");
   const premiumLevel0 = usable.filter((r) => r.qualificationStatus === "qualified" && (r.commercialPriorityScore ?? 0) >= 65);
@@ -433,7 +455,7 @@ async function writeOutputs(outDir: string, territory: string, rows: MasterRowV2
   await fs.writeFile(path.join(outDir, "scoring-rules-v2.json"), JSON.stringify(scoringRulesV2, null, 2));
 
   const manifest = {
-    generatedAt: new Date().toISOString(), territory, rulesVersion: RULES_VERSION_V2, codeCommitSha: gitCommitSha(),
+    generatedAt: new Date().toISOString(), territory, rulesVersion: RULES_VERSION_V2, rulesVersions: RULES_VERSIONS, codeCommitSha: gitCommitSha(),
     sourceCheckpoints: checkpoints, liveExternalCallsMade: false,
   };
   await fs.writeFile(path.join(outDir, `${prefix}-v2-final-run-manifest.json`), JSON.stringify(manifest, null, 2));

@@ -140,6 +140,7 @@ async function main() {
     const webDir = path.join(tmpRoot, "zz1-web-fixture");
     await writeJson(path.join(webDir, "website-extracted-data.json"), []);
     await writeJson(path.join(webDir, "product-fit-results.json"), []);
+    await writeCsvFile(path.join(webDir, "website-extracted-data.csv"), ["candidate_id", "franchise_group_clues"], []);
 
     const googleDir = path.join(tmpRoot, "zz1-google-fixture");
     // Self-derive the google population, then treat it as if the (skipped, out-of-scope-for-this-proof)
@@ -182,6 +183,57 @@ async function main() {
     } else {
       assert(false, `expected anchor file not found for corruption test: ${anchorFile}`);
     }
+  }
+
+  // --- Config-input invalidation: a changed customer-master/group-registry/scoring-version
+  // hash invalidates the stage(s) that actually depend on it, and every later stage in the
+  // pipeline (never the stages ahead of it). Reuses the same chDir/webDir/googleDir fixtures. ---
+  {
+    const chDir = path.join(tmpRoot, "zz1-ch-fixture");
+    const webDir = path.join(tmpRoot, "zz1-web-fixture");
+    const googleDir = path.join(tmpRoot, "zz1-google-fixture");
+    const groupRescreenDir = path.join(tmpRoot, "zz1-gr-fixture");
+    await writeJson(path.join(groupRescreenDir, "final-group-rescreen-results.json"), []);
+
+    const invOut = path.join(tmpRoot, "zz1-invalidation-out");
+    const commonArgs = [
+      "--territory=ZZ1", `--customers=${customersCsv}`, `--registry=${registryJson}`, `--out=${invOut}`,
+      `--checkpoint=phase1=${zz1.phase1Dir}`, `--checkpoint=fsa=${zz1.fsaDir}`, `--checkpoint=google=${googleDir}`,
+      `--checkpoint=companies_house=${chDir}`, `--checkpoint=website=${webDir}`,
+      "--from-stage=public_profile", "--to-stage=final_scoring", "--live",
+    ];
+    const first = run(commonArgs);
+    assert(first.ok, `full public_profile->final_scoring run exits 0 (stderr: ${first.stderr.slice(0, 600)})`);
+    const manifestPath = path.join(invOut, ".orchestrator-run-manifest.json");
+    const before = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+    assert(!!before.stages?.final_scoring && !!before.stages?.group_rescreen, "final_scoring and group_rescreen both recorded after the full run");
+
+    // Customer-master hash change: only final_scoring (the only truly-executed stage that
+    // depends on --customers here) should be invalidated and rerun; group_rescreen must survive.
+    const customersCsv2 = path.join(tmpRoot, "customers-v2.csv");
+    await writeCsvFile(customersCsv2, ["customer_id", "trading_name", "postcode", "status"], [{ customer_id: "C2", trading_name: "A Different Customer Ltd", postcode: "ZZ8 8ZZ", status: "CUSTOMER-Closed Won" }]);
+    const afterCustomerChange = run(["--territory=ZZ1", `--customers=${customersCsv2}`, `--registry=${registryJson}`, `--out=${invOut}`, `--checkpoint=phase1=${zz1.phase1Dir}`, `--checkpoint=fsa=${zz1.fsaDir}`, `--checkpoint=google=${googleDir}`, `--checkpoint=companies_house=${chDir}`, `--checkpoint=website=${webDir}`, "--from-stage=public_profile", "--to-stage=final_scoring", "--resume", "--live"]);
+    assert(afterCustomerChange.ok, `resume after a customer-master change exits 0 (stderr: ${afterCustomerChange.stderr.slice(0, 600)})`);
+    assert(/Config input changed for stage "final_scoring"/.test(afterCustomerChange.stdout), "changed customer-master hash is detected and invalidates final_scoring");
+    assert(afterCustomerChange.stdout.includes("group_rescreen") === false || !/Config input changed for stage "group_rescreen"/.test(afterCustomerChange.stdout), "group_rescreen (which does not depend on --customers) is NOT invalidated by a customer-master change");
+    const afterCustomerManifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+    assert(afterCustomerManifest.stages.final_scoring.configHashes.customers !== before.stages.final_scoring.configHashes.customers, "final_scoring's recorded customer-master hash was actually updated after the rerun");
+
+    // Group-registry hash change: group_rescreen AND final_scoring (later in the pipeline) must
+    // both be invalidated and rerun, even though final_scoring itself doesn't read --registry.
+    const registryJson2 = path.join(tmpRoot, "registry-v2.json");
+    await writeJson(registryJson2, [{ brandName: "Some Registered Brand" }]);
+    const afterRegistryChange = run(["--territory=ZZ1", `--customers=${customersCsv2}`, `--registry=${registryJson2}`, `--out=${invOut}`, `--checkpoint=phase1=${zz1.phase1Dir}`, `--checkpoint=fsa=${zz1.fsaDir}`, `--checkpoint=google=${googleDir}`, `--checkpoint=companies_house=${chDir}`, `--checkpoint=website=${webDir}`, "--from-stage=public_profile", "--to-stage=final_scoring", "--resume", "--live"]);
+    assert(afterRegistryChange.ok, `resume after a group-registry change exits 0 (stderr: ${afterRegistryChange.stderr.slice(0, 600)})`);
+    assert(/Config input changed for stage "group_rescreen"/.test(afterRegistryChange.stdout), "changed group-registry hash is detected and invalidates group_rescreen");
+    const afterRegistryManifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+    assert(!!afterRegistryManifest.stages.final_scoring && afterRegistryManifest.stages.final_scoring.completedAt !== afterCustomerManifest.stages.final_scoring.completedAt, "final_scoring (downstream of group_rescreen) was also rerun even though it does not read --registry directly");
+
+    // Scoring-version change (--scoring-rules-version flips the recorded scoring_version hash):
+    // invalidates ONLY final_scoring — the sole stage depending on scoring_version.
+    const afterScoringVersionChange = run(["--territory=ZZ1", `--customers=${customersCsv2}`, `--registry=${registryJson2}`, `--out=${invOut}`, `--checkpoint=phase1=${zz1.phase1Dir}`, `--checkpoint=fsa=${zz1.fsaDir}`, `--checkpoint=google=${googleDir}`, `--checkpoint=companies_house=${chDir}`, `--checkpoint=website=${webDir}`, "--from-stage=public_profile", "--to-stage=final_scoring", "--resume", "--live", "--scoring-rules-version=qualification-v2-test-bump"]);
+    assert(!/Config input changed for stage "group_rescreen"/.test(afterScoringVersionChange.stdout), "a scoring-version-only change does NOT invalidate group_rescreen (it has no scoring_version dependency)");
+    assert(/Config input changed for stage "final_scoring"/.test(afterScoringVersionChange.stdout), "a scoring-version change is detected and invalidates final_scoring");
   }
 
   // --- Duplicate active territory ownership is rejected (reused, already-tested loader). ---
