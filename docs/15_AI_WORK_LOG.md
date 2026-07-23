@@ -1,5 +1,74 @@
 # AI Work Log — Magna Lead Intelligence System
 
+## Session: 2026-07-23 (overnight) — lead-production bridge: Companies House through final UB1 scoring
+
+Tool used: Claude Code, autonomous overnight execution mode (explicit user directive, bounded
+request caps, listed stop conditions).
+Human request: complete the Companies House stage of the offline `scripts/lead-production/`
+bridge (legal-entity matching, filed accounts/financials, directors/PSC, related-company/group
+analysis, customer-match resolution, decision-maker candidates), then continue autonomously
+through website enrichment, decision-maker public-profile resolution, final group rescreen, and
+final hard-gate qualification/scoring — producing the complete UB1 master evidence register and
+Level 0-4 outputs, reconciled to the original 94 Phase-1 candidates.
+
+**Built and live-executed, in order** (each stage: audited existing code first, reused where
+solid, typecheck + new fixture tests + `test:lead-production-bridge` + build all green before
+commit, dry-run before live where a live external call was involved):
+- **Companies House stage** (`companies-house-adapter.ts`, `-match.ts`, `-population.ts`,
+  `officers-and-psc.ts`, `financial-extraction-after-companies-house.ts` (reuses the existing
+  `accounts-document-parser.ts`/`financial-analysis.ts` unchanged), `group-analysis-after-
+  companies-house.ts`, `customer-resolution-after-companies-house.ts`,
+  `decision-maker-candidates.ts`, `run-companies-house-stage.ts`). Eligible population (71 of 83)
+  derived by real candidate-ID set operations, exclusion overlaps unioned not summed. Live run:
+  185/600 combined + 12/250 document requests.
+- **Website enrichment stage** — new (nothing existed before): bounded crawl (5 pages/domain, 3
+  concurrent, real `robots.txt` fetched and honoured, 20s timeout + 1 retry, no login/CAPTCHA
+  code anywhere), field extraction never guesses email/phone/halal-status, Magna product-fit
+  indicators. Live: 36 domains, 30 crawled successfully, 1 correctly blocked by its own
+  `robots.txt`.
+- **Decision-maker public-profile stage** — ran on official-website evidence only (no lawful
+  external search connector was budgeted this run — the spec's own explicit safe-fallback path,
+  not a shortcut); 23 candidates checked, 0 matched.
+- **Final group rescreen** — consolidates Google/Companies-House/website group signals into one
+  classification; registry `default_outcome` remains the sole operational decision.
+- **Final qualification/scoring stage** — the first and only point in this whole bridge where a
+  numeric score or Level 0-4 is assigned (every earlier stage structurally tested to never do
+  this). 14 hard-gate concepts, 9-component/100-point score, telesales (phone-gated)/field-sales
+  (premises+postcode+coordinates-gated) channel suitability, Level 0-4 assignment. Traces every
+  ORIGINAL Phase-1 candidate (not just the CH-eligible subset) through every checkpoint's
+  exclusion evidence and refuses to write output if the final count doesn't reconcile to 94.
+
+**Three real defects found in live data and fixed** (each: root-caused, fixed, regression test
+added, and — where no new API calls were needed to correct already-fetched data — reprocessed
+with a dedicated zero-new-calls script rather than re-spending budget):
+1. A strong legal-name match whose registered office sat in a different postal district (a
+   real, common pattern — registered office = accountant's/formation agent's address) was
+   mislabelled `company_name_conflict`; fixed to `registered_address_conflict` (the name
+   matched fine — the address is what conflicts). 30 of 71 live candidates relabelled, zero new
+   Companies House calls.
+2. The final-scoring stage let a NON-decisive Companies House match's status (an unrelated,
+   unconfirmed company that happened to be dissolved) leak in as if it were the candidate's own
+   trading status, wrongly hard-gating 10 candidates to Level 4. Fixed with
+   `trustworthyCompaniesHouseStatus()` — only exact/strong-probable matches and the two conflict
+   outcomes that specifically fire at the candidate's own postcode are ever trusted.
+3. (Earlier the same night, Google-stage carryover) Two defects in the prior Google Places live
+   run were found and fixed before Companies House began — see `docs/10_BUGS_AND_FIXES.md`.
+
+**Result:** UB1's full 94-candidate population reconciled through Level 0-4: 14 sales-ready
+(Level 0), 7 soft-gap (Level 1), 0 promising-incomplete (Level 2), 35 held for controlled review
+(Level 3 — mostly unresolved genuine customer-name-overlap conflicts, deliberately never forced
+to a score-based level), 15 hard-rejected (Level 4), plus 10 active-customer/3 inactive-customer/
+5 excluded-group/2 permanently-closed/3 temporarily-closed (held, not discarded) accounted for
+separately. Full detail, live request counts, top/bottom scored leads, and the exact next-owner
+decisions: `/Users/homemac/Data/aspectlead-lead-production/OVERNIGHT_PROGRESS_2026-07-23.md`
+(outside the repo — contains real UB1 business names).
+
+**Not done tonight** (explicit, reasoned scope stop, not an oversight): Phase H (the reusable
+multi-territory orchestrator) was not built — the user's own instructions gate the 22-territory
+rollout (Phase J) behind Phase H's tests passing, so Phase J was correctly never attempted.
+Every stage built tonight is already territory-agnostic (checkpoint-path + `--territory` args,
+no hardcoded UB1 ID) — only the top-level chaining/resumption script remains.
+
 ## Session: 2026-07-16 (later still) — Geography Standard v1.0 (platform-wide)
 
 Tool used: Claude Code

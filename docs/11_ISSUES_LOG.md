@@ -556,3 +556,53 @@ writes the column. See `docs/09_DECISIONS.md` for the decision to retain it as-i
 If still appropriate later, remove via a **new additive migration** (drop column + index) —
 never edit the already-applied 0030 file. Do this only after preview/staging testing confirms
 nothing has started depending on it in the meantime. Not urgent — no observed operational impact.
+
+## ISS-0025 — lead-production bridge: reusable multi-territory orchestrator (Phase H) not yet built
+
+Date: 2026-07-23
+Severity: Medium — blocks the 22-territory rollout
+Owner: Zoeb
+Status: Open — deferred
+
+### Problem
+
+The offline `scripts/lead-production/` bridge now has a complete, tested, live-verified UB1
+pipeline (Phase 1 comparison → FSA → Google Places → Companies House → website enrichment →
+decision-maker public-profile → final group rescreen → final qualification/scoring), reconciled
+to the original 94 UB1 candidates. Every individual stage script is already territory-agnostic
+(takes checkpoint directory paths + a `--territory` flag, never a hardcoded candidate ID), but
+there is no single top-level orchestrator that chains them with checkpoint resumption, per-stage
+manifests, and automatic reconciliation for a NEW territory. The user's own overnight directive
+explicitly gates the 22-territory rollout (RM1/KT1/TW1-20) behind this orchestrator's own tests
+passing — so the rollout was correctly not attempted, independent of any other consideration.
+
+### Next action
+
+Build `scripts/lead-production/run-full-territory.ts` — dry-run mode, resume mode, tests proving
+the same configuration works for a different postcode district. See
+`/Users/homemac/Data/aspectlead-lead-production/OVERNIGHT_PROGRESS_2026-07-23.md` for full
+context.
+
+## ISS-0026 — lead-production bridge: two known evidence gaps carried into UB1 scoring
+
+Date: 2026-07-23
+Severity: Low — documented, does not block current output
+Owner: Zoeb
+Status: Open — deferred
+
+### Problem
+
+1. Website-selection tier 3 ("strong tied candidate" via name+postcode+phone) is not
+   implemented in `website-selection.ts` — no lawful discovery mechanism (e.g. a live web
+   search) was budgeted for the website-enrichment stage. Only Google-verified and group-
+   registry-verified domains are used; candidates without either are recorded as
+   `no_website_available`, never a guessed domain.
+2. `netAssetGrowth`/`turnoverGrowth` in `financial-extraction-after-companies-house.ts` are
+   unconditionally `not_available` — only the latest filed-accounts period is fetched per
+   company (a second, prior-year document fetch would double the per-company document-API cost,
+   out of scope for the bounded overnight run).
+
+### Next action
+
+Both are intentional, documented scope decisions, not bugs — revisit only if/when a lawful
+public-search connector and/or a larger document-API budget are explicitly approved.

@@ -366,3 +366,66 @@ name), causing a cascade of unrelated-looking assertion failures in that test.
 **Takeaway:** when manually creating+queueing a test run outside the normal worker flow, delete its
 full cascade (`repo.deleteRunCascade`) once the proof is captured — don't just cancel and leave the
 row — if there's any chance another test or the real worker could claim it first.
+
+## Fix — Google Places postcode agreement always false; FSA-name query pollution (2026-07-23)
+
+**Bug (1):** the live UB1 Google Places run's first pass returned zero exact/probable matches
+out of 83 real candidates — an implausible result that triggered investigation instead of being
+reported. Root cause: Places API (New) Text Search never populated `places.addressComponents`
+in any of 83 real responses despite it being in the field mask (a real, undocumented API
+behaviour) — postcode agreement was computed as always `false`, misclassifying 48 of 49 genuine
+exact matches as conflicts.
+
+**Fix:** added a `formattedAddress` regex fallback (standard UK postcode pattern) when
+`addressComponents` is empty. Reprocessed the already-retrieved live data with a dedicated
+zero-new-calls script — 49 outcomes corrected without spending any additional Google Places
+budget.
+
+**Bug (2):** the query builder was appending an FSA establishment's name even when the FSA
+outcome was `multiple_fsa_matches` (ambiguous — the array's first entry is not a chosen best
+match), polluting several Google queries with an unrelated business's name at the same dense
+postcode and plausibly contributing to genuine `no_google_match` results.
+
+**Fix:** `fsaOfficialNameForQuery()` only offers a name when the FSA outcome was itself decisive
+(exact/strong-probable). A bounded, separately-approved supplemental live run (32 candidates,
+the exact `no_google_match` bucket, `--no-fsa-name-in-query` + a `UK` locality hint) recovered 8
+exact + 12 probable + 5 conflict matches from what had been 32 unresolved no-matches.
+
+**See also:** `scripts/lead-production/google-adapter.ts`, `google-match.ts`,
+`reprocess-google-results.ts`, `run-google-stage.ts` — commits `c9e7c89`, `f55ce66`, `68398d1`.
+
+## Fix — Companies House company_name_conflict/registered_address_conflict mislabel (2026-07-23)
+
+**Bug:** a STRONG legal-name match whose registered office sat in a different postal district (a
+real, common pattern for small UK businesses — registered office = accountant's/formation
+agent's address, unrelated to the trading premises) was labelled `company_name_conflict`, even
+though its own evidence tag literally said `NAME_MATCHES_...` — the conflict is the address, not
+the name. Affected 36 of 71 live UB1 candidates' primary Companies House outcome.
+
+**Fix:** both the same-district and different-district strong-name/mismatched-address branches
+now correctly return `registered_address_conflict`; `company_name_conflict` is reserved for the
+opposite evidence pattern (address agrees, name does not). Reprocessed the already-retrieved
+live data with zero new Companies House calls — 30 of 71 candidates relabelled (6 of the
+original 36 were genuine `company_name_conflict` cases and correctly left unchanged).
+
+**See also:** `scripts/lead-production/companies-house-match.ts`,
+`reprocess-companies-house-results.ts` — commits `3a48839`, `4358f75`.
+
+## Fix — non-decisive Companies House status leaking into the final hard gate (2026-07-23)
+
+**Bug:** the final-scoring stage's `company_not_dissolved_or_in_liquidation` hard gate read
+`companiesHouseStatus` directly off the Companies House result regardless of whether the match
+itself was decisive. For a `registered_address_conflict` outcome — an UNRELATED, unconfirmed
+company at a different registered address — that company's own status (e.g. `dissolved`) was
+being treated as if it were the candidate's own trading status, wrongly hard-gating 10 of the
+first live run's 25 Level-4 rejections (40%).
+
+**Fix:** added `trustworthyCompaniesHouseStatus()` — a status is only trusted as the candidate's
+own when the CH outcome genuinely identifies (exact/strong-probable match) or strongly
+implicates (`dissolved_company_conflict`/`dormant_company_conflict`, which specifically fire on
+a strong match at the candidate's OWN postcode) the same real business. Re-ran the final-scoring
+stage (pure consolidation of already-fetched checkpoint data, zero new calls of any kind) —
+Level 4 dropped from 25 to 15; Level 0 rose from 13 to 14.
+
+**See also:** `scripts/lead-production/hard-gates.ts`, `run-final-scoring-stage.ts` — commit
+`9b87f14`.
