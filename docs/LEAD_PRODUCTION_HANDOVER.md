@@ -123,11 +123,14 @@ re-verify at any point.
 | 92 | 07-23 | d67279b | Record v2 lock, orchestrator completion, RM1 dry-run session (docs) |
 
 | 93 | 07-23 | a9b419a | Milestone 1 — schemas and assignment version |
-| 94 | 07-23 | (pending) | Milestone 2 — district and Sales Territory orchestration |
+| 94 | 07-23 | d09bd66 | Milestone 2 — district and Sales Territory orchestration |
+| 95 | 07-23 | 5711941 | Refactor — extract shared candidate-dossier module (verified byte-identical) |
+| 96 | 07-23 | 2a10065 | Milestone 3 — 107-field Master exporter |
+| 97 | 07-23 | f410791 | Milestone 4 — 108-column Magna Sales Pro exporter |
+| 98 | 07-23 | (pending) | Milestone 5 — UB1 export proof (docs only; no code change) |
 
-**Next dependency:** Milestone 3 (Master exporter, 107 fields) depends on Milestone 2's
-`run-sales-territory.ts` / `.orchestrator-run-manifest.json` shape for its per-district and
-per-territory input.
+**Next dependency:** Milestone 6 (full test/build gate + pre-production certification) depends
+on Milestones 2-5 all being green, which they are as of commit f410791.
 
 ## Accepted UB1 checkpoints (outside repo)
 
@@ -213,9 +216,37 @@ supplied `--discovery-run-id`.
 
 ## Exporter status
 
-**Not started.** Sections 8 (Master exporter, 107 fields) and 9 (Sales Pro exporter, 108
-columns) have no code yet — only the versioned schema configs they will read from exist. UB1
-validation (Section 10) cannot run until both exporters exist.
+**Milestones 3, 4, and 5 complete.** `scripts/lead-production/candidate-dossier.ts` (extracted
+from the accepted UB1 release-package generator, verified byte-identical) joins every upstream
+checkpoint into one Dossier per candidate. `scripts/lead-production/master-field-resolver.ts`
+maps a Dossier + Sales Territory context to all 107 canonical Master fields — honestly: a field
+is populated only when genuine pipeline evidence exists, otherwise left `null` and recorded in
+a `dataQualityGaps` list, never guessed. `scripts/lead-production/generate-master-export.ts`
+writes the 14-tab combined campaign workbook and 9-sheet per-representative workbook (xlsx).
+`scripts/lead-production/generate-salespro-export.ts` writes the 108-column Sales Pro CSVs
+(new-leads / reactivation / key-accounts, strictly separated), enforcing exact CTO label/order
+and refusing to write any value outside a column's allowed dropdown/range set.
+
+Two real bugs were found and fixed while validating against UB1: (1) the physical-premises enum
+matcher didn't recognise `physical-premises.ts`'s actual `"no_physical_premises_evidence"`
+string, silently leaving candidates' premises status blank; (2) the Sales Pro dropdown validator
+initially treated `"0-100"` (a numeric-range descriptor on 4 score columns) as a literal
+categorical value, flagging every real score as a violation. Both fixed and regression-tested
+against the real values.
+
+**UB1 export proof (Milestone 5)**, generated at
+`/Users/homemac/Data/aspectlead-lead-production/output/ub1/2026-07-23T23-00-00Z-milestone5-export-proof/`
+(outside the repo — no lead data is ever committed): combined + representative Master
+workbooks, all 3 Sales Pro files, a 5-record controlled-test file, and
+`ub1-export-reconciliation-report.md` proving every required count (94/47/30/17/11/36), full
+Lead ID linkage both ways, exact 107/108 field counts, and zero dropdown violations. Automated,
+repeatable versions of every check: `scripts/test-lead-production-master-export.ts`,
+`scripts/test-lead-production-salespro-export.ts`.
+
+**Not yet done:** the exporters have only ever been run in single-district (ad-hoc explicit
+checkpoint dirs) mode against UB1. The `--territory-manifest` mode (reading a
+`run-sales-territory.ts` output) is implemented but unproven — no real multi-district territory
+has completed live discovery yet to test it against.
 
 ## Geography hotfix — already resolved, not re-opened
 
