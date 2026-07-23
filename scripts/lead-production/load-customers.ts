@@ -14,6 +14,22 @@ import { loadTabularFile } from "./file-loader";
 import { mapColumns, ColumnMappingError, type FieldSpec } from "./column-mapping";
 import type { CustomerRecord, StatusOutcome, LifecycleSource } from "./types";
 
+// Model-defect fix (2026-07-23, UB1 calibration audit): the real Magna customer master export
+// carries un-decoded HTML entities in trading names (519 occurrences of "&apos;" alone in one
+// real export — e.g. "Ali Baba&apos;s Ltd T/A Ali Baba&apos;s"). Left undecoded, every
+// name-similarity comparison against this customer's trading name is computed against garbage
+// tokens ("apos"/"s" fragments) instead of the real name, corrupting both customer-match
+// materiality assessment and any other name comparison that reads this file. Only the small,
+// standard named/numeric entity set is decoded — never a general HTML-stripping pass.
+const HTML_NAMED_ENTITIES: Record<string, string> = { apos: "'", amp: "&", quot: '"', lt: "<", gt: ">", nbsp: " " };
+export function decodeHtmlEntities(raw: string): string {
+  if (!raw || !raw.includes("&")) return raw;
+  return raw
+    .replace(/&([a-zA-Z]+);/g, (m, name) => HTML_NAMED_ENTITIES[name.toLowerCase()] ?? m)
+    .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_m, code) => String.fromCharCode(Number.parseInt(code, 16)));
+}
+
 // Required: customer/account ID and trading name — without these a row cannot be matched or
 // even identified. address/postcode are NOT required columns any more — see row-validation.ts;
 // AspectLead candidates carry no free-text address pre-enrichment, so address cannot be a
@@ -106,7 +122,7 @@ export async function loadCustomerFile(filePath: string): Promise<LoadedCustomer
   const get = (row: Record<string, string>, key: string): string | null => {
     const col = mapping[key];
     if (!col) return null;
-    const v = (row[col] ?? "").trim();
+    const v = decodeHtmlEntities((row[col] ?? "").trim());
     return v || null;
   };
 

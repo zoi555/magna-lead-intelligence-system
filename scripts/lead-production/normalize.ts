@@ -12,9 +12,26 @@ const SUFFIX_WORDS = new Set([
   "restaurants", "takeaway", "takeaways",
 ]);
 
-/** Lowercase, strip punctuation, drop common legal/generic suffix words, collapse whitespace. */
+/** Lowercase, strip punctuation, drop common legal/generic suffix words, collapse whitespace.
+ *
+ *  Apostrophes/possessive marks (straight ' and curly ’) are REMOVED, not replaced with a
+ *  space, before the general punctuation strip. Model-defect fix (2026-07-23, UB1 calibration
+ *  audit): treating "Mando's" as two tokens "mando"+"s" — because the apostrophe became a space
+ *  — made it fail to token-match "Mandos" (one token), which systematically deflated
+ *  nameSimilarity() for every apostrophe-containing business name matched against a source that
+ *  spells it without one (or vice versa; Google Places commonly omits it). Confirmed against
+ *  real UB1 evidence: "Mando's Pizza" vs Google's "Mandos Pizza" scored nameSimilarity 0.25 at
+ *  the candidate's own exact postcode with matching phone/website — should have been decisive.
+ *
+ *  The "t/a" ("trading as") abbreviation, extremely common in the Magna customer master
+ *  ("Rahdan Ltd T/A Oodles Chinese Southall"), is stripped as a whole phrase for the same
+ *  reason — left alone, the general punctuation strip turns "T/A" into two spurious
+ *  single-character tokens "t" and "a" that dilute the Jaccard similarity denominator.
+ *  Model-defect fix (2026-07-23): "Rahdan Ltd T/A Oodles Chinese Southall" vs "Oodles Wok -
+ *  Southall" (same exact postcode) scored 0.29 — just under the 0.3 identity floor — purely
+ *  from those two junk tokens, not a genuine difference in the real trading names. */
 export function normaliseName(raw: string | null | undefined): string {
-  const s = (raw ?? "").toString().toLowerCase().replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
+  const s = (raw ?? "").toString().toLowerCase().replace(/['’]/g, "").replace(/\bt\/a\b|\btrading as\b/g, " ").replace(/[^a-z0-9\s]/g, " ").replace(/\s+/g, " ").trim();
   if (!s) return "";
   const tokens = s.split(" ").filter((t) => t && !SUFFIX_WORDS.has(t));
   return tokens.join(" ").trim();

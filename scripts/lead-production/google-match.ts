@@ -92,6 +92,69 @@ function toRawSummary(e: GooglePlaceEvidence): GoogleRawResultSummary {
   return { placeId: e.placeId, officialName: e.officialName, formattedAddress: e.formattedAddress, businessStatus: e.businessStatus, nameSimilarity: e.nameSimilarity, postcodeAgreement: e.postcodeAgreement };
 }
 
+/** The identity-classification decision itself, factored out of classifyGoogleMatch() so it can
+ *  be reused for deterministic reprocessing against already-persisted evidence (e.g. re-scoring
+ *  nameSimilarity after a normaliseName() fix, with zero new Google Places calls) without
+ *  duplicating this logic. Takes the already-built per-place evidence array (not raw API
+ *  responses) plus the candidate's own postcode and how many raw results Google originally
+ *  returned (only used for the no-match evidence-tag wording). */
+export function deriveGoogleOutcome(evidence: GooglePlaceEvidence[], candidatePostcode: string | null, rawResultsReturnedCount: number): { outcome: GoogleOutcome; plausibleResults: GooglePlaceEvidence[]; evidenceTags: string[] } {
+  // Closure status is checked ahead of identity classification and ahead of postcode/name
+  // filtering — a permanently/temporarily closed premises is reported as such regardless of
+  // how strong its identity match is; sales-readiness questions never apply to it.
+  const permanentlyClosed = evidence.filter((e) => e.businessStatus === "CLOSED_PERMANENTLY");
+  const temporarilyClosed = evidence.filter((e) => e.businessStatus === "CLOSED_TEMPORARILY");
+  const postcodeExactAll = evidence.filter((e) => e.postcodeAgreement);
+  if (postcodeExactAll.some((e) => e.businessStatus === "CLOSED_PERMANENTLY")) {
+    return { outcome: "permanently_closed", plausibleResults: postcodeExactAll.filter((e) => e.businessStatus === "CLOSED_PERMANENTLY"), evidenceTags: ["GOOGLE_BUSINESS_STATUS_CLOSED_PERMANENTLY"] };
+  }
+  if (postcodeExactAll.some((e) => e.businessStatus === "CLOSED_TEMPORARILY")) {
+    return { outcome: "temporarily_closed", plausibleResults: postcodeExactAll.filter((e) => e.businessStatus === "CLOSED_TEMPORARILY"), evidenceTags: ["GOOGLE_BUSINESS_STATUS_CLOSED_TEMPORARILY"] };
+  }
+  // No postcode-agreeing result at all, but every result returned happens to be closed —
+  // still worth surfacing rather than reporting a bare no-match.
+  if (postcodeExactAll.length === 0 && evidence.length > 0 && permanentlyClosed.length === evidence.length) {
+    return { outcome: "permanently_closed", plausibleResults: permanentlyClosed, evidenceTags: ["GOOGLE_BUSINESS_STATUS_CLOSED_PERMANENTLY", "NO_POSTCODE_AGREEMENT"] };
+  }
+  if (postcodeExactAll.length === 0 && evidence.length > 0 && temporarilyClosed.length === evidence.length) {
+    return { outcome: "temporarily_closed", plausibleResults: temporarilyClosed, evidenceTags: ["GOOGLE_BUSINESS_STATUS_CLOSED_TEMPORARILY", "NO_POSTCODE_AGREEMENT"] };
+  }
+
+  const postcodeExact = postcodeExactAll.filter((e) => e.businessStatus !== "CLOSED_PERMANENTLY" && e.businessStatus !== "CLOSED_TEMPORARILY");
+  const candOutward = normalisePostcode(candidatePostcode).outward;
+
+  if (postcodeExact.length === 0) {
+    const nameOnly = evidence.filter((e) => e.nameSimilarity >= CONFLICT_ADDRESS_NAME_SIM && e.businessStatus !== "CLOSED_PERMANENTLY" && e.businessStatus !== "CLOSED_TEMPORARILY");
+    if (nameOnly.length > 0) {
+      // Distinguish an address-level conflict (same postal district, different building — the
+      // premises likely just moved a few doors down) from a genuine postcode conflict (a
+      // materially different postal district entirely, casting real doubt on identity).
+      const sameDistrict = nameOnly.filter((e) => {
+        const placeOutward = e.postcode ? normalisePostcode(e.postcode).outward : null;
+        return !!candOutward && !!placeOutward && candOutward === placeOutward;
+      });
+      if (sameDistrict.length > 0) {
+        return { outcome: "google_address_conflict", plausibleResults: sameDistrict, evidenceTags: ["NAME_MATCHES_SAME_DISTRICT_DIFFERENT_POSTCODE"] };
+      }
+      return { outcome: "google_postcode_conflict", plausibleResults: nameOnly, evidenceTags: ["NAME_MATCHES_DIFFERENT_POSTAL_DISTRICT"] };
+    }
+    return { outcome: "no_google_match", plausibleResults: [], evidenceTags: rawResultsReturnedCount ? ["RESULTS_RETURNED_NONE_AT_CANDIDATE_POSTCODE"] : ["NO_RESULTS_RETURNED"] };
+  }
+
+  if (postcodeExact.length > 1) {
+    return { outcome: "multiple_google_matches", plausibleResults: postcodeExact, evidenceTags: ["MULTIPLE_PLACES_AT_SAME_POSTCODE"] };
+  }
+
+  const only = postcodeExact[0];
+  if (only.nameSimilarity >= EXACT_NAME_SIM) {
+    return { outcome: "exact_google_match", plausibleResults: [only], evidenceTags: ["POSTCODE_EXACT", "NAME_STRONG"] };
+  }
+  if (only.nameSimilarity >= 0.3) {
+    return { outcome: "strong_probable_google_match", plausibleResults: [only], evidenceTags: ["POSTCODE_EXACT", "NAME_MODERATE"] };
+  }
+  return { outcome: "google_name_conflict", plausibleResults: [only], evidenceTags: ["POSTCODE_EXACT", "NAME_WEAK_OR_ABSENT"] };
+}
+
 export function classifyGoogleMatch(candidate: OperationalCandidate, queryResult: GoogleQueryResult): GoogleMatchResult {
   const base = {
     candidateId: candidate.id, candidateTradingName: candidate.name, candidatePostcode: candidate.postcode,
@@ -113,60 +176,8 @@ export function classifyGoogleMatch(candidate: OperationalCandidate, queryResult
   const rawEvidenceFields = { resultCount: queryResult.places.length, zeroResults: queryResult.places.length === 0, allReturnedResults: evidence.map(toRawSummary) };
   const withRawEvidence = { ...base, ...rawEvidenceFields };
 
-  // Closure status is checked ahead of identity classification and ahead of postcode/name
-  // filtering — a permanently/temporarily closed premises is reported as such regardless of
-  // how strong its identity match is; sales-readiness questions never apply to it.
-  const permanentlyClosed = evidence.filter((e) => e.businessStatus === "CLOSED_PERMANENTLY");
-  const temporarilyClosed = evidence.filter((e) => e.businessStatus === "CLOSED_TEMPORARILY");
-  const postcodeExactAll = evidence.filter((e) => e.postcodeAgreement);
-  if (postcodeExactAll.some((e) => e.businessStatus === "CLOSED_PERMANENTLY")) {
-    return { ...withRawEvidence, outcome: "permanently_closed", plausibleResults: postcodeExactAll.filter((e) => e.businessStatus === "CLOSED_PERMANENTLY"), evidenceTags: ["GOOGLE_BUSINESS_STATUS_CLOSED_PERMANENTLY"], apiFailureReason: null };
-  }
-  if (postcodeExactAll.some((e) => e.businessStatus === "CLOSED_TEMPORARILY")) {
-    return { ...withRawEvidence, outcome: "temporarily_closed", plausibleResults: postcodeExactAll.filter((e) => e.businessStatus === "CLOSED_TEMPORARILY"), evidenceTags: ["GOOGLE_BUSINESS_STATUS_CLOSED_TEMPORARILY"], apiFailureReason: null };
-  }
-  // No postcode-agreeing result at all, but every result returned happens to be closed —
-  // still worth surfacing rather than reporting a bare no-match.
-  if (postcodeExactAll.length === 0 && evidence.length > 0 && permanentlyClosed.length === evidence.length) {
-    return { ...withRawEvidence, outcome: "permanently_closed", plausibleResults: permanentlyClosed, evidenceTags: ["GOOGLE_BUSINESS_STATUS_CLOSED_PERMANENTLY", "NO_POSTCODE_AGREEMENT"], apiFailureReason: null };
-  }
-  if (postcodeExactAll.length === 0 && evidence.length > 0 && temporarilyClosed.length === evidence.length) {
-    return { ...withRawEvidence, outcome: "temporarily_closed", plausibleResults: temporarilyClosed, evidenceTags: ["GOOGLE_BUSINESS_STATUS_CLOSED_TEMPORARILY", "NO_POSTCODE_AGREEMENT"], apiFailureReason: null };
-  }
-
-  const postcodeExact = postcodeExactAll.filter((e) => e.businessStatus !== "CLOSED_PERMANENTLY" && e.businessStatus !== "CLOSED_TEMPORARILY");
-  const candOutward = normalisePostcode(candidate.postcode).outward;
-
-  if (postcodeExact.length === 0) {
-    const nameOnly = evidence.filter((e) => e.nameSimilarity >= CONFLICT_ADDRESS_NAME_SIM && e.businessStatus !== "CLOSED_PERMANENTLY" && e.businessStatus !== "CLOSED_TEMPORARILY");
-    if (nameOnly.length > 0) {
-      // Distinguish an address-level conflict (same postal district, different building — the
-      // premises likely just moved a few doors down) from a genuine postcode conflict (a
-      // materially different postal district entirely, casting real doubt on identity).
-      const sameDistrict = nameOnly.filter((e) => {
-        const placeOutward = e.postcode ? normalisePostcode(e.postcode).outward : null;
-        return !!candOutward && !!placeOutward && candOutward === placeOutward;
-      });
-      if (sameDistrict.length > 0) {
-        return { ...withRawEvidence, outcome: "google_address_conflict", plausibleResults: sameDistrict, evidenceTags: ["NAME_MATCHES_SAME_DISTRICT_DIFFERENT_POSTCODE"], apiFailureReason: null };
-      }
-      return { ...withRawEvidence, outcome: "google_postcode_conflict", plausibleResults: nameOnly, evidenceTags: ["NAME_MATCHES_DIFFERENT_POSTAL_DISTRICT"], apiFailureReason: null };
-    }
-    return { ...withRawEvidence, outcome: "no_google_match", plausibleResults: [], evidenceTags: queryResult.places.length ? ["RESULTS_RETURNED_NONE_AT_CANDIDATE_POSTCODE"] : ["NO_RESULTS_RETURNED"], apiFailureReason: null };
-  }
-
-  if (postcodeExact.length > 1) {
-    return { ...withRawEvidence, outcome: "multiple_google_matches", plausibleResults: postcodeExact, evidenceTags: ["MULTIPLE_PLACES_AT_SAME_POSTCODE"], apiFailureReason: null };
-  }
-
-  const only = postcodeExact[0];
-  if (only.nameSimilarity >= EXACT_NAME_SIM) {
-    return { ...withRawEvidence, outcome: "exact_google_match", plausibleResults: [only], evidenceTags: ["POSTCODE_EXACT", "NAME_STRONG"], apiFailureReason: null };
-  }
-  if (only.nameSimilarity >= 0.3) {
-    return { ...withRawEvidence, outcome: "strong_probable_google_match", plausibleResults: [only], evidenceTags: ["POSTCODE_EXACT", "NAME_MODERATE"], apiFailureReason: null };
-  }
-  return { ...withRawEvidence, outcome: "google_name_conflict", plausibleResults: [only], evidenceTags: ["POSTCODE_EXACT", "NAME_WEAK_OR_ABSENT"], apiFailureReason: null };
+  const decision = deriveGoogleOutcome(evidence, candidate.postcode, queryResult.places.length);
+  return { ...withRawEvidence, outcome: decision.outcome, plausibleResults: decision.plausibleResults, evidenceTags: decision.evidenceTags, apiFailureReason: null };
 }
 
 export const GOOGLE_MATCH_THRESHOLDS = { EXACT_NAME_SIM, CONFLICT_ADDRESS_NAME_SIM };
