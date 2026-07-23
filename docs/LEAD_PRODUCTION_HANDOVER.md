@@ -129,10 +129,12 @@ re-verify at any point.
 | 97 | 07-23 | f410791 | Milestone 4 — 108-column Magna Sales Pro exporter |
 | 98 | 07-23 | 386112a | Milestone 5 — UB1 export proof (docs only; no code change) |
 | 99 | 07-23 | d3fe76e | Milestone 6 (1/2) — close ISS-0028, full 13-suite test/build gate green |
-| 100 | 07-23 | (pending) | Milestone 6 (2/2) — pre-production certification doc, GO_FOR_RM1_LIVE |
+| 100 | 07-23 | 3c93e09 | Milestone 6 (2/2) — pre-production certification doc, GO_FOR_RM1_LIVE |
+| 101 | 07-24 | ed56cbf | Milestone 7 — 2 deterministic defects found/fixed on first live RM1 run |
 
-**Next dependency:** Milestone 7 (first real regional proof — Nauman's RM1-RM14) is certified
-GO per `docs/LEAD_PRODUCTION_PREPRODUCTION_CERTIFICATION.md`.
+**Next dependency:** RM1 is live, complete, and district-accepted (see
+`/Users/homemac/Data/aspectlead-lead-production/output/rm1/2026-07-23T23-19-07Z-live/RM1-DISTRICT-VERIFICATION-REPORT.md`,
+outside the repo). RM2 requires explicit owner authorisation per-district, same as RM1.
 
 ## Accepted UB1 checkpoints (outside repo)
 
@@ -298,10 +300,25 @@ npx tsx scripts/lead-production/generate-release-package-v2.ts \
   --final-scoring-dir=/Users/homemac/Data/aspectlead-lead-production/output/ub1/2026-07-23T13-00-00Z-v2-calibration-with-json
 ```
 
+## RM1 — live, complete, district-accepted (2026-07-24)
+
+Discovery run `e3f8e455-14bd-41cd-93a0-716147de5b4f` (tenant `magna`): 688 raw → 135 geography-
+valid + 553 rejected (688 total, zero missing) → 113 consolidated candidates. Full 8-stage
+pipeline run live end-to-end (FSA 98 calls, Google 98/800, Companies House 235/600 combined +
+16/250 documents, website 55 domains) — all within certified caps, zero integrity failures.
+Final reconciliation: 113 Phase 1 candidates = 113 final-scoring rows (self-verified). Master/
+Sales Pro exports generated for Nauman (60 usable: 33 premium, 27 releasable L1, 3 key
+accounts). Full detail:
+`/Users/homemac/Data/aspectlead-lead-production/output/rm1/2026-07-23T23-19-07Z-live/RM1-DISTRICT-VERIFICATION-REPORT.md`
+(outside the repo, not committed).
+
+Two real deterministic defects found and fixed live (commit `ed56cbf`) — both were latent gaps
+never exercised before this run (the orchestrator's phase1 branch had never run against a fresh
+non-UB1 territory).
+
 ## Single genuine owner decision still open
 
-None required to continue engineering work. The one decision that will become live once
-district-level orchestration (Section 4) and both exporters (Sections 8/9) exist is: **whether
-to authorise live discovery spend for RM1–RM14 (Nauman's territory)**, since that is real money
-and real data collection on live UK businesses via only-just-built orchestrator code — explicitly
-not triggered this session pending that engineering work being complete and tested.
+RM2–RM14: each district requires the same explicit, scoped owner authorisation RM1 received
+(live discovery is a real-cost, real-data action) — the orchestrator does not proceed to a new
+district without it. See the RM1 verification report's "Proposed next command" for the exact
+RM2 discovery command.

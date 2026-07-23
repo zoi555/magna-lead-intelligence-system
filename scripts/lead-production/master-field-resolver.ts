@@ -81,9 +81,9 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext): 
   ]) ?? "Unresolved";
 
   // Matched against the exact strings physical-premises.ts actually returns: premises_conflict,
-  // virtual_or_shared_kitchen, probable_physical_premises, no_physical_premises_evidence,
-  // permanently_closed_premises, temporarily_closed_premises. "Verified" is a schema-allowed
-  // value with no producing code path today (never fabricated as a result here).
+  // virtual_or_shared_kitchen, probable_physical_premises, verified_physical_premises (an exact
+  // Google match), no_physical_premises_evidence, permanently_closed_premises,
+  // temporarily_closed_premises. Confirmed live against RM1 discovery 2026-07-24.
   const premisesStatus = matchEnum(f.physical_premises_classification as string, [
     ["conflict", "Conflict"], ["virtual", "Virtual / Shared Kitchen"], ["shared", "Virtual / Shared Kitchen"],
     ["probable", "Probable"], ["verified", "Verified"], ["no_physical_premises_evidence", "No Evidence"],
