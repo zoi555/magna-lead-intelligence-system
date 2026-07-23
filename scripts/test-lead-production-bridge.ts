@@ -13,8 +13,10 @@ import { notAssessedRejection } from "./lead-production/rejection-levels";
 import { processCandidates } from "./lead-production/process";
 import { loadAssignmentFile, DuplicateTerritoryOwnershipError } from "./lead-production/load-assignments";
 import { buildCustomerPreflight } from "./lead-production/preflight";
-import { loadCustomerFile, mapStatusOutcome, CUSTOMER_FIELD_SPECS } from "./lead-production/load-customers";
+import { loadCustomerFile, mapStatusOutcome, mapLifecycleFlag, CUSTOMER_FIELD_SPECS } from "./lead-production/load-customers";
 import { mapColumns } from "./lead-production/column-mapping";
+import { evaluateCustomerRowUsability, splitUsableAndQuarantined } from "./lead-production/row-validation";
+import { writeRejectedRowsReport } from "./lead-production/audit-output";
 import type { OperationalCandidate, CustomerRecord, GroupRegistryEntry, AssignmentRecord, GroupDefaultOutcome } from "./lead-production/types";
 
 let fails = 0;
@@ -36,6 +38,7 @@ function mkCustomer(o: Partial<CustomerRecord> = {}): CustomerRecord {
   const statusOutcome = o.statusOutcome ?? mapStatusOutcome(status);
   return {
     rowIndex: o.rowIndex ?? custSeq, customerId: o.customerId ?? `cust-${custSeq}`, status, statusOutcome,
+    lifecycleSource: o.lifecycleSource ?? "status_field", lifecycleRawValue: o.lifecycleRawValue ?? status,
     isActive: o.isActive ?? (statusOutcome === "active" || statusOutcome === "excluded_non_prospect"),
     tradingName: o.tradingName ?? `Customer ${custSeq}`, legalName: o.legalName ?? null,
     companyNumber: o.companyNumber ?? null, address: o.address ?? null, postcode: o.postcode ?? null,
@@ -136,36 +139,137 @@ async function main() {
     assert(m.matchedCustomerId === parentCust.customerId, "the branch is traceably linked to the parent customer record");
   }
 
-  // === Customer-status handling: unknown/blank statuses BLOCK, never silently default ===
+  // === Customer-status handling: unknown/blank statuses quarantine the ROW, never silently default ===
   {
     assert(mapStatusOutcome("Active") === "active" && mapStatusOutcome("Inactive") === "inactive" && mapStatusOutcome("Closed") === "excluded_non_prospect", "recognised statuses map to their explicit approved outcome");
     assert(mapStatusOutcome("Prospecting") === "unapproved", "an unrecognised status maps to 'unapproved', not silently active/inactive");
     assert(mapStatusOutcome("") === "unapproved", "a blank status maps to 'unapproved'");
 
+    // No Inactive column here -> lifecycle falls back to the Status field (status_field source).
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-status-block-"));
     const file = path.join(dir, "customers.csv");
     await fs.writeFile(file, "Customer ID,Status,Trading Name,Address,Postcode\nC1,Active,Alpha,1 Rd,UB1 1AA\nC2,Prospecting,Beta,2 Rd,UB1 2AA\nC3,,Gamma,3 Rd,UB1 3AA\n");
     const loaded = await loadCustomerFile(file);
     const preflight = buildCustomerPreflight(loaded, "testhash");
 
-    const inventory = preflight.statusInventory;
+    assert(loaded.lifecycleSource === "status_field", "with no Inactive column, lifecycle falls back to the Status field");
+    const inventory = preflight.lifecycleInventory;
     const activeRow = inventory.find((s) => s.originalValue === "Active");
     const prospectingRow = inventory.find((s) => s.originalValue === "Prospecting");
     const blankRow = inventory.find((s) => s.originalValue === "");
-    assert(!!activeRow && activeRow.approved && activeRow.mappedOutcome === "active" && activeRow.rowCount === 1, "status inventory reports the approved 'Active' status with its mapped outcome and row count");
-    assert(!!prospectingRow && !prospectingRow.approved && prospectingRow.mappedOutcome === "unapproved", "status inventory reports 'Prospecting' as unapproved");
-    assert(!!blankRow && !blankRow.approved, "status inventory reports the blank status as unapproved");
-    assert(preflight.blockingWarnings.some((w) => w.toLowerCase().includes("unrecognised customer status") || w.toLowerCase().includes("unrecognised")), "an unapproved/blank status produces a BLOCKING preflight warning");
+    assert(!!activeRow && activeRow.approved && activeRow.mappedOutcome === "active" && activeRow.rowCount === 1, "lifecycle inventory reports the approved 'Active' status with its mapped outcome and row count");
+    assert(!!prospectingRow && !prospectingRow.approved && prospectingRow.mappedOutcome === "unapproved", "lifecycle inventory reports 'Prospecting' as unapproved");
+    assert(!!blankRow && !blankRow.approved, "lifecycle inventory reports the blank status as unapproved");
+    // An unapproved/blank status QUARANTINES the affected rows, not the whole file — one
+    // usable row (C1) remains, so this file is NOT blocked.
+    assert(preflight.blockingWarnings.length === 0, "unapproved/blank statuses do not block the file while usable rows remain");
+    assert(preflight.usableRowCount === 1 && preflight.quarantinedRowCount === 2, "the two unapproved/blank-status rows are quarantined, the one approved row remains usable");
   }
   {
-    // All-approved file -> no status-related blocking warning.
+    // All-approved file -> no quarantined rows.
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-status-ok-"));
     const file = path.join(dir, "customers.csv");
     await fs.writeFile(file, "Customer ID,Status,Trading Name,Address,Postcode\nC1,Active,Alpha,1 Rd,UB1 1AA\nC2,Inactive,Beta,2 Rd,UB1 2AA\n");
     const loaded = await loadCustomerFile(file);
     const preflight = buildCustomerPreflight(loaded, "testhash");
-    assert(preflight.statusInventory.every((s) => s.approved), "a file using only approved statuses has a fully-approved status inventory");
-    assert(!preflight.blockingWarnings.some((w) => w.toLowerCase().includes("status")), "no status-related blocking warning when every status is approved");
+    assert(preflight.lifecycleInventory.every((s) => s.approved), "a file using only approved statuses has a fully-approved lifecycle inventory");
+    assert(preflight.quarantinedRowCount === 0 && preflight.usableRowCount === 2, "no rows quarantined when every status is approved and every row has a matching identifier");
+  }
+  {
+    // File blocks ONLY when every row ends up quarantined.
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-all-quarantined-"));
+    const file = path.join(dir, "customers.csv");
+    await fs.writeFile(file, "Customer ID,Status,Trading Name,Address,Postcode\nC1,Prospecting,Alpha,1 Rd,UB1 1AA\nC2,Renewal,Beta,2 Rd,UB1 2AA\n");
+    const loaded = await loadCustomerFile(file);
+    const preflight = buildCustomerPreflight(loaded, "testhash");
+    assert(preflight.usableRowCount === 0 && preflight.quarantinedRowCount === 2, "every row is quarantined (both statuses unapproved)");
+    assert(preflight.blockingWarnings.some((w) => w.toLowerCase().includes("no usable customer rows remain")), "the file blocks when NO usable rows remain");
+  }
+
+  // === Lifecycle-flag preference + row-level usability (fix: use NetSuite inactive flag for customer lifecycle) ===
+  {
+    // 1 & 5: Inactive column present + a pipeline-stage "Status" value that would be
+    // unapproved if consulted — lifecycle must come from Inactive, Status is metadata only.
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-inactive-pref-"));
+    const file = path.join(dir, "customers.csv");
+    await fs.writeFile(
+      file,
+      "Customer ID,Inactive,Status,Trading Name,Postcode\n" +
+      "C1,No,CUSTOMER-Closed Won,Active Co,UB1 1AA\n" +
+      "C2,Yes,CUSTOMER-Closed Won,Inactive Co,UB1 2AA\n",
+    );
+    const loaded = await loadCustomerFile(file);
+    assert(loaded.lifecycleSource === "inactive_flag" && loaded.lifecycleSourceColumn === "Inactive", "1. the Inactive column is preferred over the pipeline Status column as the lifecycle source");
+    const c1 = loaded.customers.find((c) => c.customerId === "C1")!;
+    const c2 = loaded.customers.find((c) => c.customerId === "C2")!;
+    assert(c1.statusOutcome === "active" && c1.status === "CUSTOMER-Closed Won", "5a. C1's lifecycle is 'active' (from Inactive=No), even though its pipeline Status ('CUSTOMER-Closed Won') is retained as metadata and would itself be unapproved");
+    assert(c2.statusOutcome === "inactive" && c2.status === "CUSTOMER-Closed Won", "5b. C2's lifecycle is 'inactive' (from Inactive=Yes), never derived from the pipeline Status field");
+
+    const preflight = buildCustomerPreflight(loaded, "testhash");
+    assert(preflight.pipelineStatusMetadata.some((s) => s.value === "CUSTOMER-Closed Won" && s.rowCount === 2), "the pipeline Status value is retained as informational metadata in the preflight report");
+    assert(preflight.lifecycleInventory.every((s) => s.originalValue === "No" || s.originalValue === "Yes"), "the lifecycle inventory is built from the Inactive column's own values, not the Status column's");
+  }
+
+  // 2, 3, 4: the binary lifecycle-flag vocabulary.
+  {
+    assert(mapLifecycleFlag("false") === "active" && mapLifecycleFlag("No") === "active" && mapLifecycleFlag("f") === "active" && mapLifecycleFlag("0") === "active", "2. false/no/f/0 map to active");
+    assert(mapLifecycleFlag("true") === "inactive" && mapLifecycleFlag("Yes") === "inactive" && mapLifecycleFlag("t") === "inactive" && mapLifecycleFlag("1") === "inactive", "3. true/yes/t/1 map to inactive");
+    assert(mapLifecycleFlag("Maybe") === "unapproved" && mapLifecycleFlag("") === "unapproved", "4. unknown or blank Inactive values are not approved");
+  }
+
+  // 6, 7, 8, 9: row-level usability — address optional, at least one of postcode/phone/companyNumber required.
+  {
+    const noAddress = mkCustomer({ postcode: "UB1 1AA", address: null });
+    assert(evaluateCustomerRowUsability(noAddress).usable, "6. a missing address alone does not reject a customer row (postcode alone is sufficient)");
+
+    const phoneOnly = mkCustomer({ postcode: null, phone: "020 7946 0958", companyNumber: null });
+    assert(evaluateCustomerRowUsability(phoneOnly).usable, "7. a row with phone but no postcode may still be usable");
+
+    const companyNumberOnly = mkCustomer({ postcode: null, phone: null, companyNumber: "01234567" });
+    assert(evaluateCustomerRowUsability(companyNumberOnly).usable, "8. a row with company number but no phone/postcode may still be usable");
+
+    const noIdentifiers = mkCustomer({ postcode: null, phone: null, companyNumber: null });
+    const noIdResult = evaluateCustomerRowUsability(noIdentifiers);
+    assert(!noIdResult.usable && noIdResult.reasons.includes("NO_USABLE_MATCHING_IDENTIFIER"), "9. a row lacking all matching identifiers (postcode/phone/companyNumber) is quarantined");
+  }
+
+  // 10: quarantined rows never enter customer matching.
+  {
+    const usableCust = mkCustomer({ tradingName: "Zephyr Kitchens", postcode: "UB1 5AA", customerId: "U1" });
+    const quarantinedCust = mkCustomer({ tradingName: "Quibble Munch Traders", postcode: null, phone: null, companyNumber: null, customerId: "U2" });
+    const { usable, quarantined } = splitUsableAndQuarantined([usableCust, quarantinedCust]);
+    assert(usable.length === 1 && usable[0].customerId === "U1", "10a. splitUsableAndQuarantined keeps only the usable customer for matching");
+    assert(quarantined.length === 1 && quarantined[0].customer.customerId === "U2", "10b. the quarantined customer is retained separately, not silently dropped");
+
+    const candidateMatchingQuarantined = mkCandidate({ name: "Quibble Munch Traders" });
+    const matchResult = matchCandidateToCustomers(candidateMatchingQuarantined, usable); // exactly as run-comparison.ts wires it
+    assert(matchResult.outcome === "new_prospect", "10c. a candidate that would have matched the quarantined customer gets no match at all — the quarantined row never entered matching");
+  }
+
+  // 11: preflight reports usable and quarantined row counts explicitly.
+  {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-usable-counts-"));
+    const file = path.join(dir, "customers.csv");
+    await fs.writeFile(file, "Customer ID,Status,Trading Name,Postcode\nC1,Active,Alpha,UB1 1AA\nC2,Active,Beta,\n");
+    const loaded = await loadCustomerFile(file);
+    const preflight = buildCustomerPreflight(loaded, "testhash");
+    assert(preflight.usableRowCount === 1 && preflight.quarantinedRowCount === 1, "11. preflight reports exact usable (1) and quarantined (1, no matching identifier) row counts");
+    assert(preflight.quarantinedReasonCounts.NO_USABLE_MATCHING_IDENTIFIER === 1, "11b. quarantine reason counts are broken down explicitly");
+  }
+
+  // 12: customer-master-rejected-rows.csv is generated only when needed.
+  {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-rejected-rows-"));
+    const quarantinedCust = mkCustomer({ customerId: "Q1", tradingName: "Quarantined Co", postcode: null, phone: null, companyNumber: null });
+    const { quarantined } = splitUsableAndQuarantined([quarantinedCust]);
+    await writeRejectedRowsReport(dir, quarantined);
+    const content = await fs.readFile(path.join(dir, "customer-master-rejected-rows.csv"), "utf8");
+    assert(content.includes("Q1") && content.includes("NO_USABLE_MATCHING_IDENTIFIER"), "12a. customer-master-rejected-rows.csv is generated with the customer ID and rejection reason when rows are quarantined");
+
+    const emptyDir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-no-rejected-rows-"));
+    await writeRejectedRowsReport(emptyDir, []);
+    const emptyDirFiles = await fs.readdir(emptyDir).catch(() => [] as string[]);
+    assert(!emptyDirFiles.includes("customer-master-rejected-rows.csv"), "12b. no rejected-rows file is written when nothing is quarantined");
   }
 
   {
@@ -309,14 +413,32 @@ async function main() {
     assert(c4.missingRequired.length === 0, `8. candidate #4-style headers now pass required-column mapping (missing: ${c4.missingRequired.join(", ")})`);
   }
 
-  // === Preflight catches missing required columns ===
+  // === Preflight catches missing required columns; address/postcode are no longer mandatory ===
   {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "lp-missingcol-"));
-    const file = path.join(dir, "customers.csv");
-    await fs.writeFile(file, "Customer ID,Status,Trading Name\nC1,Active,Alpha\n"); // no address, no postcode
-    let threw = false;
-    try { await loadCustomerFile(file); } catch { threw = true; }
-    assert(threw, "a customer file missing required columns (address, postcode) is rejected before preflight can even run");
+
+    const noId = path.join(dir, "no-id.csv");
+    await fs.writeFile(noId, "Status,Trading Name,Postcode\nActive,Alpha,UB1 1AA\n");
+    let threwNoId = false;
+    try { await loadCustomerFile(noId); } catch { threwNoId = true; }
+    assert(threwNoId, "a customer file missing the customer ID column is rejected");
+
+    const noName = path.join(dir, "no-name.csv");
+    await fs.writeFile(noName, "Customer ID,Status,Postcode\nC1,Active,UB1 1AA\n");
+    let threwNoName = false;
+    try { await loadCustomerFile(noName); } catch { threwNoName = true; }
+    assert(threwNoName, "a customer file missing the trading name column is rejected");
+
+    const noAddressOrPostcode = path.join(dir, "no-address-postcode.csv");
+    await fs.writeFile(noAddressOrPostcode, "Customer ID,Status,Trading Name,Phone\nC1,Active,Alpha,020 7946 0958\n");
+    const loaded = await loadCustomerFile(noAddressOrPostcode); // must NOT throw — address/postcode are optional columns now
+    assert(loaded.customers.length === 1, "a customer file with neither an address nor a postcode column loads successfully (phone is a sufficient matching identifier)");
+
+    const noLifecycleColumn = path.join(dir, "no-lifecycle.csv");
+    await fs.writeFile(noLifecycleColumn, "Customer ID,Trading Name,Postcode\nC1,Alpha,UB1 1AA\n"); // no Status, no Inactive
+    let threwNoLifecycle = false;
+    try { await loadCustomerFile(noLifecycleColumn); } catch { threwNoLifecycle = true; }
+    assert(threwNoLifecycle, "a customer file with neither a Status nor an Inactive column is rejected — the lifecycle cannot be interpreted at all");
   }
 
   // === --preflight-only mode: real CLI subprocess proofs ===
@@ -346,14 +468,18 @@ async function main() {
     assert(goodOutFiles.includes("customer-master-preflight.json"), "customer-master-preflight.json is created on a successful preflight-only run");
     assert(!goodOutFiles.some((f) => f !== "customer-master-preflight.json"), `no comparison outputs are created in preflight-only mode (found: ${goodOutFiles.join(", ")})`);
 
+    // Every row has an unapproved/blank status -> zero usable rows -> the file BLOCKS (an
+    // individual unapproved status alone would only quarantine that row, not the file — see
+    // the dedicated lifecycle tests above).
     const badFile = path.join(dir, "customers-bad.csv");
-    await fs.writeFile(badFile, "Customer ID,Status,Trading Name,Address,Postcode\nC1,Active,Alpha,1 Rd,UB1 1AA\nC2,Prospecting,Beta,2 Rd,UB1 2AA\nC3,,Gamma,3 Rd,UB1 3AA\n");
+    await fs.writeFile(badFile, "Customer ID,Status,Trading Name,Address,Postcode\nC1,Prospecting,Alpha,1 Rd,UB1 1AA\nC2,Renewal,Beta,2 Rd,UB1 2AA\nC3,,Gamma,3 Rd,UB1 3AA\n");
     const badOut = path.join(dir, "out-bad");
     const badRun = spawnSync("npx", ["tsx", cliPath, `--customers=${badFile}`, `--out=${badOut}`, "--preflight-only"], { encoding: "utf8" });
-    assert(badRun.status === 1, `blank or unknown status exits 1 (got ${badRun.status})`);
+    assert(badRun.status === 1, `blank or unknown status on every row (no usable rows remain) exits 1 (got ${badRun.status})`);
     const badOutFiles: string[] = await fs.readdir(badOut).catch(() => [] as string[]);
     assert(badOutFiles.includes("customer-master-preflight.json"), "customer-master-preflight.json is still created when validation fails");
-    assert(!badOutFiles.some((f) => f !== "customer-master-preflight.json"), "no comparison outputs are created even when preflight-only fails");
+    assert(badOutFiles.includes("customer-master-rejected-rows.csv"), "customer-master-rejected-rows.csv is created listing the quarantined rows");
+    assert(!badOutFiles.some((f) => f !== "customer-master-preflight.json" && f !== "customer-master-rejected-rows.csv"), "no comparison outputs are created even when preflight-only fails");
   }
 
   // === Synthetic smoke-test output is labelled as test evidence only ===

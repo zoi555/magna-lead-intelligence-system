@@ -17,15 +17,24 @@ export interface OperationalCandidate {
 
 // The ONLY three approved operational outcomes a customer status may map to, plus the sentinel
 // "unapproved" for anything blank/unrecognised/not covered by the approved mapping (see
-// load-customers.ts's APPROVED_STATUS_MAP). "unapproved" must never be silently treated as
-// active, inactive, or a clear prospect — its presence on any row blocks the run at preflight.
+// load-customers.ts's APPROVED_STATUS_MAP / LIFECYCLE_FLAG_MAP). "unapproved" must never be
+// silently treated as active, inactive, or a clear prospect.
 export type StatusOutcome = "active" | "inactive" | "excluded_non_prospect" | "unapproved";
+
+// Which column actually decided a row's lifecycle. A true binary Inactive/lifecycle flag
+// column, when present in the file, is ALWAYS preferred over the pipeline-style Status field —
+// see load-customers.ts's header comment for why (NetSuite "Status" here is a sales/deal-stage
+// label like "CUSTOMER-Closed Won", not a customer active/inactive indicator).
+export type LifecycleSource = "inactive_flag" | "status_field";
 
 export interface CustomerRecord {
   rowIndex: number;
   customerId: string;
-  status: string; // raw status string, e.g. "active" | "inactive" | "lapsed" | "closed"
-  statusOutcome: StatusOutcome; // explicit mapped outcome — see APPROVED_STATUS_MAP
+  status: string; // raw "Status" column value — RETAINED AS METADATA ONLY, never used to
+                   // derive lifecycle when an inactive_flag column is present (see below).
+  lifecycleSource: LifecycleSource;
+  lifecycleRawValue: string; // the raw value of whichever column actually decided statusOutcome
+  statusOutcome: StatusOutcome;
   // Derived for matching convenience: true for "active" AND "excluded_non_prospect" (a
   // customer known to be permanently non-prospect — e.g. ceased trading — must be treated at
   // LEAST as conservatively as an active customer for exclusion purposes, never softened into
@@ -41,6 +50,11 @@ export interface CustomerRecord {
   parentGroupAccount: string | null;
   lastOrderDate: string | null;
   assignedSalesperson: string | null;
+}
+
+export interface RowValidationResult {
+  usable: boolean;
+  reasons: string[]; // empty when usable
 }
 
 export type SalespersonRole = "telesales" | "field_sales";

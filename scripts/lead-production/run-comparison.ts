@@ -51,7 +51,8 @@ function flag(name: string): boolean {
 async function runPreflightOnly(customersPath: string, outArg: string | null): Promise<void> {
   const { loadCustomerFile } = await import("./load-customers");
   const { buildCustomerPreflight } = await import("./preflight");
-  const { writePreflightReport, fileHash } = await import("./audit-output");
+  const { writePreflightReport, writeRejectedRowsReport, fileHash } = await import("./audit-output");
+  const { splitUsableAndQuarantined } = await import("./row-validation");
 
   console.log("=== Lead-production bridge: customer-master preflight ONLY ===");
   console.log("(no Supabase connection, no candidates, no assignments, no group registry, no matching)");
@@ -62,6 +63,8 @@ async function runPreflightOnly(customersPath: string, outArg: string | null): P
   const customersHash = await fileHash(customersPath);
   const preflight = buildCustomerPreflight(customersLoaded, customersHash);
   await writePreflightReport(outDir, preflight);
+  const { quarantined } = splitUsableAndQuarantined(customersLoaded.customers);
+  await writeRejectedRowsReport(outDir, quarantined);
 
   console.log(`\nSource: ${customersPath}`);
   console.log(`Hash: ${customersHash}`);
@@ -70,8 +73,11 @@ async function runPreflightOnly(customersPath: string, outArg: string | null): P
   console.log(`Required columns found: ${preflight.requiredColumnsFound.join(", ") || "(none)"}`);
   console.log(`Optional columns found: ${preflight.optionalColumnsFound.join(", ") || "(none)"}`);
   console.log(`Unmapped columns: ${preflight.unmappedColumns.join(", ") || "(none)"}`);
-  console.log(`Status inventory: ${preflight.statusInventory.map((s) => `"${s.originalValue || "(blank)"}"→${s.mappedOutcome}${s.approved ? "" : " [UNAPPROVED]"} (${s.rowCount})`).join("; ") || "(no rows)"}`);
-  console.log(`Rows missing required values: ${preflight.rowsMissingRequiredValues.length}`);
+  console.log(`Lifecycle source: ${preflight.lifecycleSource} (column: "${preflight.lifecycleSourceColumn}")`);
+  console.log(`Lifecycle inventory: ${preflight.lifecycleInventory.map((s) => `"${s.originalValue || "(blank)"}"→${s.mappedOutcome}${s.approved ? "" : " [UNAPPROVED]"} (${s.rowCount})`).join("; ") || "(no rows)"}`);
+  console.log(`Pipeline "Status" metadata (informational only, never used for lifecycle when an inactive-flag column is present): ${preflight.pipelineStatusMetadata.map((s) => `"${s.value || "(blank)"}" (${s.rowCount})`).join("; ") || "(no rows)"}`);
+  console.log(`Usable rows: ${preflight.usableRowCount}`);
+  console.log(`Quarantined rows: ${preflight.quarantinedRowCount} — reasons: ${JSON.stringify(preflight.quarantinedReasonCounts)}`);
   console.log(`Duplicate customer IDs: ${preflight.duplicateCustomerIds.length}`);
   console.log(`Duplicate phones: ${preflight.duplicateNormalisedPhones.length}`);
   console.log(`Duplicate company numbers: ${preflight.duplicateCompanyNumbers.length}`);
@@ -134,7 +140,8 @@ async function main() {
   const { loadGroupRegistry } = await import("./load-group-registry");
   const { buildCustomerPreflight } = await import("./preflight");
   const { processCandidates } = await import("./process");
-  const { writeAuditOutputs, writePreflightReport, fileHash, sha256File } = await import("./audit-output");
+  const { writeAuditOutputs, writePreflightReport, writeRejectedRowsReport, fileHash, sha256File } = await import("./audit-output");
+  const { splitUsableAndQuarantined } = await import("./row-validation");
   const { MATCHING_RULE_VERSION } = await import("./version");
 
   const db = createServiceClient();
@@ -165,6 +172,10 @@ async function main() {
   const candidates = await loadOperationalCandidates(tenantId, runId!);
   console.log(`Operational (geography_status='valid_geography') candidates: ${candidates.length}`);
 
+  const { usable: usableCustomers, quarantined } = splitUsableAndQuarantined(customersLoaded.customers);
+  await writeRejectedRowsReport(outDir, quarantined);
+  console.log(`Customer rows: ${customersLoaded.customers.length} total, ${usableCustomers.length} usable, ${quarantined.length} quarantined (see customer-master-rejected-rows.csv).`);
+
   const warnings: string[] = [];
   const unmappedColumns: Record<string, string[]> = {};
   if (customersLoaded.unmappedColumns.length) { unmappedColumns.customers = customersLoaded.unmappedColumns; warnings.push(`Customer file has ${customersLoaded.unmappedColumns.length} unmapped column(s): ${customersLoaded.unmappedColumns.join(", ")}`); }
@@ -176,7 +187,8 @@ async function main() {
   const groupRegistry = await loadGroupRegistry(groupsPath!);
   console.log(`Group registry entries loaded: ${groupRegistry.entries.length} (from ${groupsPath})`);
 
-  const processed = processCandidates(candidates, customersLoaded.customers, assignmentsLoaded.assignments, groupRegistry.entries);
+  // Only USABLE customer rows ever reach matching — quarantined rows are structurally excluded.
+  const processed = processCandidates(candidates, usableCustomers, assignmentsLoaded.assignments, groupRegistry.entries);
 
   const statusCounts: Record<string, number> = {};
   for (const p of processed) statusCounts[p.preliminaryStatus] = (statusCounts[p.preliminaryStatus] ?? 0) + 1;
@@ -198,7 +210,7 @@ async function main() {
     runId: runId!, tenantId, processingTimestamp: new Date().toISOString(), matchingRuleVersion: MATCHING_RULE_VERSION,
     groupRegistryVersion: sha256File(await fs.readFile(groupsPath!)),
     sourceFileHashes: { customers: customersHash, assignments: assignmentsHash, groupRegistry: groupsHash },
-    inputCounts: { candidates: candidates.length, customers: customersLoaded.customers.length, assignments: assignmentsLoaded.assignments.length, groupRegistryEntries: groupRegistry.entries.length },
+    inputCounts: { candidates: candidates.length, customers: customersLoaded.customers.length, customersUsable: usableCustomers.length, customersQuarantined: quarantined.length, assignments: assignmentsLoaded.assignments.length, groupRegistryEntries: groupRegistry.entries.length },
     outputCounts, warnings, unmappedColumns,
     syntheticTestRun: syntheticTest,
     notice: syntheticTest

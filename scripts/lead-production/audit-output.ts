@@ -10,6 +10,7 @@ import path from "node:path";
 import { writeCsv } from "./csv";
 import type { ProcessedCandidate } from "./types";
 import type { CustomerPreflightReport } from "./preflight";
+import type { QuarantinedCustomerRow } from "./row-validation";
 
 export function sha256File(content: string | Buffer): string {
   return createHash("sha256").update(content).digest("hex");
@@ -18,6 +19,24 @@ export function sha256File(content: string | Buffer): string {
 export async function fileHash(filePath: string): Promise<string> {
   const buf = await fs.readFile(filePath);
   return sha256File(buf);
+}
+
+const REJECTED_ROW_COLUMNS = [
+  "source_row_number", "customer_id", "trading_name", "raw_lifecycle_value", "postcode", "phone",
+  "company_number", "missing_or_invalid_fields", "rejection_reasons",
+] as const;
+
+/** customer-master-rejected-rows.csv — quarantined rows, retained (never deleted), with
+ *  explicit per-row rejection reasons. Written whenever any row is quarantined. */
+export async function writeRejectedRowsReport(outDir: string, quarantined: QuarantinedCustomerRow[]): Promise<void> {
+  if (!quarantined.length) return;
+  await fs.mkdir(outDir, { recursive: true });
+  const rows = quarantined.map(({ customer: c, reasons }) => ({
+    source_row_number: c.rowIndex, customer_id: c.customerId, trading_name: c.tradingName,
+    raw_lifecycle_value: c.lifecycleRawValue, postcode: c.postcode ?? "", phone: c.phone ?? "",
+    company_number: c.companyNumber ?? "", missing_or_invalid_fields: reasons.join(";"), rejection_reasons: reasons.join(";"),
+  }));
+  await fs.writeFile(path.join(outDir, "customer-master-rejected-rows.csv"), writeCsv([...REJECTED_ROW_COLUMNS], rows));
 }
 
 export async function writePreflightReport(outDir: string, report: CustomerPreflightReport): Promise<void> {
@@ -64,7 +83,7 @@ export interface RunMetadata {
   matchingRuleVersion: string;
   groupRegistryVersion: string;
   sourceFileHashes: Record<string, string>;
-  inputCounts: { candidates: number; customers: number; assignments: number; groupRegistryEntries: number };
+  inputCounts: { candidates: number; customers: number; customersUsable: number; customersQuarantined: number; assignments: number; groupRegistryEntries: number };
   outputCounts: Record<string, number>;
   warnings: string[];
   unmappedColumns: Record<string, string[]>;
