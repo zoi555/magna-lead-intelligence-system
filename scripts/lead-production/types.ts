@@ -287,3 +287,124 @@ export interface CustomerResolutionResult {
   evidenceUsed: string[];
   fsaOutcome: FsaOutcome;
 }
+
+// ============================================================================
+// Google Places stage (Phase 3) — reuses src/lib/sources/google-places.ts's config/gating
+// (getGooglePlacesConfig, isGooglePlacesEnabled) UNCHANGED. Does NOT reuse
+// GooglePlacesRunner.enrich() itself — its private searchText() is hardcoded to
+// maxResultCount:1, which cannot satisfy "retain every plausible result, never select the
+// first blindly" (see google-adapter.ts header comment for the full reasoning). Everything
+// below is new — no equivalent classification exists anywhere in the repo.
+// ============================================================================
+
+export type GoogleOutcome =
+  | "exact_google_match"
+  | "strong_probable_google_match"
+  | "multiple_google_matches"
+  | "google_name_conflict"
+  | "google_address_conflict"
+  | "google_postcode_conflict"
+  | "no_google_match"
+  | "temporarily_closed"
+  | "permanently_closed"
+  | "google_api_failure";
+
+export const GOOGLE_OUTCOMES: GoogleOutcome[] = [
+  "exact_google_match", "strong_probable_google_match", "multiple_google_matches", "google_name_conflict",
+  "google_address_conflict", "google_postcode_conflict", "no_google_match", "temporarily_closed",
+  "permanently_closed", "google_api_failure",
+];
+
+export interface GooglePlaceEvidence {
+  placeId: string;
+  officialName: string;
+  formattedAddress: string;
+  addressComponents: string[]; // raw component text, unparsed — Google (New) returns these separately from the caller's field-mask choice
+  postcode: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  phone: string | null;
+  website: string | null;
+  businessStatus: string; // OPERATIONAL | CLOSED_TEMPORARILY | CLOSED_PERMANENTLY | "" (unknown)
+  openingHours: string[]; // raw weekday text rows, if returned
+  primaryCategory: string | null;
+  additionalCategories: string[];
+  rating: number | null;
+  reviewCount: number | null;
+  nameSimilarity: number;
+  postcodeAgreement: boolean;
+  distanceFromCandidateMetres: number | null; // supporting evidence only
+}
+
+export interface GoogleMatchResult {
+  candidateId: string;
+  candidateTradingName: string;
+  candidatePostcode: string | null;
+  outcome: GoogleOutcome;
+  plausibleResults: GooglePlaceEvidence[]; // every retained plausible result, never just "the first"
+  evidenceTags: string[];
+  retrievalTimestamp: string;
+  sourceResponseReference: string; // the exact query text sent to Google
+  apiFailureReason: string | null;
+  apiAttempts: number;
+}
+
+export type FsaResolutionOutcome =
+  | "fsa_resolved_exact"
+  | "fsa_resolved_probable"
+  | "fsa_still_multiple"
+  | "fsa_google_conflict"
+  | "no_corresponding_fsa_record";
+
+export interface FsaResolutionAfterGoogle {
+  candidateId: string;
+  priorFsaOutcome: FsaOutcome;
+  resolution: FsaResolutionOutcome;
+  topFsaCandidateFhrsId: string | null;
+  topFsaCandidateName: string | null;
+  topFsaScore: number | null;
+  secondFsaCandidateFhrsId: string | null;
+  secondFsaCandidateName: string | null;
+  secondFsaScore: number | null;
+  scoreMargin: number | null;
+  evidenceResponsible: string[];
+}
+
+export type CustomerResolutionAfterGoogleOutcome =
+  | "confirmed_active_customer_after_google"
+  | "confirmed_inactive_customer_after_google"
+  | "released_from_customer_hold_after_google"
+  | "unresolved_customer_match_after_google";
+
+export interface CustomerResolutionAfterGoogle {
+  candidateId: string;
+  priorResolution: CustomerResolutionOutcome | "n/a"; // FSA-stage outcome, or n/a for originally-clear candidates
+  priorMatchedCustomerId: string | null;
+  resolutionOutcome: CustomerResolutionAfterGoogleOutcome;
+  evidenceUsed: string[];
+  googleOutcome: GoogleOutcome;
+}
+
+export type PhysicalPremisesResult =
+  | "verified_physical_premises"
+  | "probable_physical_premises"
+  | "virtual_or_shared_kitchen"
+  | "premises_conflict"
+  | "no_physical_premises_evidence"
+  | "permanently_closed_premises"
+  | "temporarily_closed_premises";
+
+export interface PhysicalPremisesAssessment {
+  candidateId: string;
+  result: PhysicalPremisesResult;
+  evidenceTags: string[];
+}
+
+export interface NewlyDetectedGroup {
+  candidateId: string;
+  candidateTradingName: string;
+  signal: "google_category" | "google_domain" | "google_name_pattern" | "repeated_across_batch";
+  classification: GroupClassification;
+  defaultOutcome: GroupDefaultOutcome | null; // null: detected but not yet in the approved registry — needs a human decision, never auto-excluded
+  evidenceTags: string[];
+}

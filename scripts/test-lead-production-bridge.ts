@@ -489,17 +489,28 @@ async function main() {
     assert(text.toLowerCase().includes("test evidence only"), "the synthetic-test notice explicitly says \"test evidence only\"");
   }
 
-  // === Structural: no enrichment call anywhere in the bridge ===
+  // === Structural: no enrichment call anywhere in the Phase 1 comparison/matching/screening
+  // logic. fsa-adapter.ts and google-adapter.ts are explicitly EXCLUDED from this check — they
+  // are each a later stage's approved, single-purpose external-source adapter (FSA stage /
+  // Google Places stage respectively), not part of the network-free comparison bridge this
+  // check protects. Their own test suites (test-lead-production-fsa.ts,
+  // test-lead-production-google.ts) verify each calls ONLY its own named external API and
+  // never falls back to fabricated data. ===
   {
     assert(screenLargeGroups.constructor.name !== "AsyncFunction", "screenLargeGroups() is synchronous (no network/enrichment call inside it)");
     const dir = path.resolve(process.cwd(), "scripts/lead-production");
-    const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".ts"));
+    const EXTERNAL_ADAPTER_FILES = new Set(["fsa-adapter.ts", "google-adapter.ts"]);
+    const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".ts") && !EXTERNAL_ADAPTER_FILES.has(f));
     let violation: string | null = null;
     for (const f of files) {
       const text = await fs.readFile(path.join(dir, f), "utf8");
-      if (/fetch\(|http:\/\/|https:\/\//i.test(text.replace(/^\s*\/\/.*$/gm, ""))) { violation = f; break; }
+      // An actual outbound call, not a bare "https://..." string literal — run-google-stage.ts
+      // legitimately documents the Google endpoint it will call (once approved) in its preflight
+      // report text without calling it here itself (the call lives in google-adapter.ts, which
+      // is excluded above).
+      if (/fetch\(/i.test(text.replace(/^\s*\/\/.*$/gm, ""))) { violation = f; break; }
     }
-    assert(violation === null, `no network/enrichment call exists anywhere in scripts/lead-production/ (checked ${files.length} files)`);
+    assert(violation === null, `no network/enrichment call exists anywhere in scripts/lead-production/ outside the approved external-source adapters (checked ${files.length} files, excluded ${EXTERNAL_ADAPTER_FILES.size})`);
   }
 
   // === Structural: no non-valid-geography candidate can enter the process ===

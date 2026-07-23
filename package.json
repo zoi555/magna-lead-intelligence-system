@@ -40,6 +40,8 @@
     "lead-production:compare": "tsx scripts/lead-production/run-comparison.ts",
     "lead-production:fsa-stage": "tsx scripts/lead-production/run-fsa-stage.ts",
     "test:lead-production-fsa": "tsx scripts/test-lead-production-fsa.ts",
+    "lead-production:google-stage": "tsx scripts/lead-production/run-google-stage.ts",
+    "test:lead-production-google": "tsx scripts/test-lead-production-google.ts",
     "test:apify-provenance": "tsx scripts/test-apify-provenance.ts",
     "test:borderline-provider": "tsx scripts/test-borderline-provider.ts",
     "test:ub1-benchmark": "tsx scripts/test-ub1-benchmark.ts",
