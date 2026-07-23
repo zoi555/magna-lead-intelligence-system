@@ -9,7 +9,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
 import { writeCsv, parseCsvObjects } from "./csv";
-import { evaluateHardGates } from "./hard-gates";
+import { evaluateHardGates, trustworthyCompaniesHouseStatus } from "./hard-gates";
 import { calculateScore } from "./scoring";
 import { calculateChannelSuitability } from "./channel-suitability";
 import { assignFinalOutcome } from "./final-outcome";
@@ -157,12 +157,16 @@ async function main() {
     const identityConfidence: "high" | "medium" | "low" | "not_available" = googleDecisive && chDecisive ? "high" : googleDecisive || chDecisive ? "medium" : fsaDecisive ? "low" : "not_available";
     const decisionMakerConfidence: "high" | "medium" | "low" | "not_available" = publicProfile?.outcome === "official_website_profile_only" ? "medium" : decisionMaker ? "low" : "not_available";
 
+    // See hard-gates.ts's trustworthyCompaniesHouseStatus() header for why this is necessary —
+    // a non-decisive CH outcome's status must never leak in as if it were this candidate's own.
+    const trustworthyChStatus = trustworthyCompaniesHouseStatus(chResult?.outcome ?? null, chResult?.companiesHouseStatus ?? null);
+
     const gates = evaluateHardGates({
       candidateId, territory,
       physicalPremises: physicalPremises as any,
       googleOutcome: (google?.outcome ?? "no_google_match") as any,
       companiesHouseOutcome: (chResult?.outcome ?? "no_company_record") as any,
-      companiesHouseStatus: chResult?.companiesHouseStatus ?? null,
+      companiesHouseStatus: trustworthyChStatus,
       customerResolutionOutcome: (chCustRes?.resolution_outcome ?? "unresolved_customer_match_after_companies_house") as any,
       finalGroupClassification: (groupRescreen?.classification ?? "ownership_unresolved") as any,
       finalGroupDefaultOutcome: (groupRescreen?.defaultOutcome ?? null) as any,
@@ -177,7 +181,7 @@ async function main() {
       googleRating: googleDecisive ? google.plausibleResults[0]?.rating ?? null : null,
       googleReviewCount: googleDecisive ? google.plausibleResults[0]?.reviewCount ?? null : null,
       physicalPremises, fsaOutcome: fsa?.outcome ?? "no_fsa_match", fsaResolution: (fsaResAfterGoogle?.resolution ?? "n/a") as any,
-      companiesHouseOutcome: chResult?.outcome ?? "no_company_record", companiesHouseStatus: chResult?.companiesHouseStatus ?? null,
+      companiesHouseOutcome: chResult?.outcome ?? "no_company_record", companiesHouseStatus: trustworthyChStatus,
       financialStrengthBand: finCalc?.financialStrengthBand_result && finCalc.financialStrengthBand_result !== "not_available" ? finCalc.financialStrengthBand_result : null,
       companySizeBand: finCalc?.companySizeBand_result && finCalc.companySizeBand_result !== "not_available" ? finCalc.companySizeBand_result : null,
       likelyPurchasingCapacityBand: finCalc?.likelyPurchasingCapacityBand_result && finCalc.likelyPurchasingCapacityBand_result !== "not_available" ? finCalc.likelyPurchasingCapacityBand_result : null,

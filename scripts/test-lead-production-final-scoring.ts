@@ -1,6 +1,6 @@
 // Fixture-driven proofs for the final qualification/scoring stage (npm run test:lead-production-final-scoring).
 
-import { evaluateHardGates } from "./lead-production/hard-gates";
+import { evaluateHardGates, trustworthyCompaniesHouseStatus } from "./lead-production/hard-gates";
 import { calculateScore } from "./lead-production/scoring";
 import { calculateChannelSuitability } from "./lead-production/channel-suitability";
 import { assignFinalOutcome } from "./lead-production/final-outcome";
@@ -46,6 +46,22 @@ async function main() {
   {
     const gates = evaluateHardGates(mkGateInput({ finalGroupDefaultOutcome: "exclude" as any }));
     assert(!gates.allPassed && gates.failedGates.includes("not_an_excluded_supermarket_chain_or_group"), "a registry exclude default_outcome fails the group hard gate");
+  }
+
+  // --- Regression: real live-run defect — a registered_address_conflict candidate's status
+  // (from an UNRELATED, unconfirmed company at a different registered address) must never leak
+  // in as if it were this candidate's own status. Found in the first live UB1 run: 10
+  // registered_address_conflict candidates incorrectly failed the dissolved/liquidation hard
+  // gate because that unrelated company happened to be dissolved. ---
+  {
+    assert(trustworthyCompaniesHouseStatus("registered_address_conflict" as any, "dissolved" as any) === null, "a registered_address_conflict outcome's status is never trusted as this candidate's own — the matched company is at a different, unrelated address");
+    assert(trustworthyCompaniesHouseStatus("company_name_conflict" as any, "dissolved" as any) === null, "a company_name_conflict outcome's status is likewise never trusted — the name did not match");
+    assert(trustworthyCompaniesHouseStatus("multiple_company_matches" as any, "dissolved" as any) === null, "an ambiguous multiple_company_matches outcome's status is never trusted — no single company was confirmed");
+    assert(trustworthyCompaniesHouseStatus("exact_company_match" as any, "active" as any) === "active", "an exact_company_match outcome's status IS trusted — this candidate's own confirmed company");
+    assert(trustworthyCompaniesHouseStatus("dissolved_company_conflict" as any, "dissolved" as any) === "dissolved", "dissolved_company_conflict's status IS trusted — it specifically fires on a strong match at the candidate's OWN postcode");
+
+    const gates = evaluateHardGates(mkGateInput({ companiesHouseOutcome: "registered_address_conflict" as any, companiesHouseStatus: trustworthyCompaniesHouseStatus("registered_address_conflict" as any, "dissolved" as any) }));
+    assert(gates.checks.find((c) => c.gate === "company_not_dissolved_or_in_liquidation")?.passed === true, "end-to-end: a registered_address_conflict candidate with an unrelated dissolved match passes the hard gate once the status is correctly filtered out");
   }
 
   // --- Sole trader (no decisive CH record) is never automatically hard-gated ---

@@ -12,7 +12,24 @@
 // company record must not automatically reject a likely sole trader or partnership" — explicit
 // instruction) — it feeds into data-completeness confidence and Level assignment instead.
 
-import type { PhysicalPremisesResult, CompanyLegalIdentityOutcome, GoogleOutcome, FinalGroupClassification, GroupDefaultOutcome, CustomerResolutionAfterCompaniesHouseOutcome, HardGateResult, HardGateCheck } from "./types";
+import type { PhysicalPremisesResult, CompanyLegalIdentityOutcome, GoogleOutcome, FinalGroupClassification, GroupDefaultOutcome, CustomerResolutionAfterCompaniesHouseOutcome, CompaniesHouseStatus, HardGateResult, HardGateCheck } from "./types";
+
+// A Companies House status is only trustworthy as THIS candidate's own trading status when the
+// CH outcome genuinely identifies (or strongly implicates) the same real-world business —
+// exact/strong-probable matches, and dissolved/dormant_company_conflict (which specifically
+// fire on a strong name+postcode match at the CANDIDATE's OWN postcode). For every other
+// outcome (registered_address_conflict, company_name_conflict, multiple_company_matches,
+// no_company_record, probable_sole_trader_or_partnership, companies_house_api_failure) the
+// "matched" company is unconfirmed or explicitly NOT this candidate's business — its status
+// says nothing real about this candidate. Found as a real defect in the first live UB1 run: 10
+// registered_address_conflict candidates (a strong name match at an unrelated accountant's/
+// formation-agent's registered address) failed the dissolved/liquidation hard gate purely
+// because THAT unrelated company happened to be dissolved.
+const CH_STATUS_TRUSTWORTHY_OUTCOMES = new Set<CompanyLegalIdentityOutcome>(["exact_company_match", "strong_probable_company_match", "dissolved_company_conflict", "dormant_company_conflict"]);
+export function trustworthyCompaniesHouseStatus(outcome: CompanyLegalIdentityOutcome | null, status: CompaniesHouseStatus | string | null): string | null {
+  if (!outcome || !CH_STATUS_TRUSTWORTHY_OUTCOMES.has(outcome)) return null;
+  return status;
+}
 
 export interface HardGateInput {
   candidateId: string;
