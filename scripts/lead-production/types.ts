@@ -786,3 +786,43 @@ export interface ProductFitResult {
   candidateId: string;
   indicators: Record<MagnaProductCategory, ProductFitIndicator>;
 }
+
+// ============================================================================
+// Decision-maker / public-profile stage (Phase 6, spec Phase C). No LinkedIn login automation,
+// no access-control bypass, ever. This run uses ONLY official-website evidence (the safe
+// fallback the spec itself authorises: "If no lawful public search mechanism is configured,
+// build and test this stage, use official website evidence only, and mark external profiles
+// not_verified") — no external public-search connector was budgeted for this run, so
+// verified_linkedin_profile/strong_probable_public_profile are never assigned; only
+// official_website_profile_only or profile_not_verified are ever produced this run. The
+// remaining outcomes exist in the type for when a lawful search connector IS configured in a
+// future run — never fabricated here.
+// ============================================================================
+
+export type PublicProfileOutcome =
+  | "verified_linkedin_profile"
+  | "strong_probable_public_profile"
+  | "official_website_profile_only"
+  | "profile_not_verified"
+  | "ambiguous_same_name"
+  | "no_public_profile_found";
+
+export const PUBLIC_PROFILE_OUTCOMES: PublicProfileOutcome[] = [
+  "verified_linkedin_profile", "strong_probable_public_profile", "official_website_profile_only",
+  "profile_not_verified", "ambiguous_same_name", "no_public_profile_found",
+];
+
+export interface PublicProfileResult {
+  candidateId: string;
+  personName: string;
+  verifiedCompany: string | null;
+  verifiedRole: string | null;
+  profileUrl: string | null;
+  profileSource: "official_website" | "public_search" | "none";
+  companyAgreement: boolean | null;
+  roleAgreement: boolean | null;
+  locationAgreement: boolean | null;
+  outcome: PublicProfileOutcome;
+  confidence: "high" | "medium" | "low" | "not_available";
+  evidenceTags: string[];
+}

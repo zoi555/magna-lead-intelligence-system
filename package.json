@@ -46,6 +46,8 @@
     "test:lead-production-companies-house": "tsx scripts/test-lead-production-companies-house.ts",
     "lead-production:website-stage": "tsx scripts/lead-production/run-website-stage.ts",
     "test:lead-production-website": "tsx scripts/test-lead-production-website.ts",
+    "lead-production:public-profile-stage": "tsx scripts/lead-production/run-public-profile-stage.ts",
+    "test:lead-production-public-profile": "tsx scripts/test-lead-production-public-profile.ts",
     "test:apify-provenance": "tsx scripts/test-apify-provenance.ts",
     "test:borderline-provider": "tsx scripts/test-borderline-provider.ts",
     "test:ub1-benchmark": "tsx scripts/test-ub1-benchmark.ts",
