@@ -56,6 +56,8 @@
     "test:lead-production-final-scoring-v2": "tsx scripts/test-lead-production-final-scoring-v2.ts",
     "lead-production:full-territory": "tsx scripts/lead-production/run-full-territory.ts",
     "test:lead-production-full-territory": "tsx scripts/test-lead-production-full-territory.ts",
+    "lead-production:sales-territory": "tsx scripts/lead-production/run-sales-territory.ts",
+    "test:lead-production-territory-v2": "tsx scripts/test-lead-production-territory-v2.ts",
     "test:apify-provenance": "tsx scripts/test-apify-provenance.ts",
     "test:borderline-provider": "tsx scripts/test-borderline-provider.ts",
     "test:ub1-benchmark": "tsx scripts/test-ub1-benchmark.ts",

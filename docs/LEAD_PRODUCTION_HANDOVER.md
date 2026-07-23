@@ -122,10 +122,12 @@ re-verify at any point.
 | 91 | 07-23 | 89c3be3 | Lock qualification/scoring rules v2, wire into orchestrator |
 | 92 | 07-23 | d67279b | Record v2 lock, orchestrator completion, RM1 dry-run session (docs) |
 
-**Next dependency:** commit #93 will be "Milestone 1 — schemas and assignment version"
-(this session's `config/lead-production/*.json`, `docs/77_LEAD_SCHEMA_V1_SUMMARY.md`,
-`docs/BRANCH_REGISTER.md`, this handover doc), per the 7-milestone commit plan in
-`docs/09_DECISIONS.md`.
+| 93 | 07-23 | a9b419a | Milestone 1 — schemas and assignment version |
+| 94 | 07-23 | (pending) | Milestone 2 — district and Sales Territory orchestration |
+
+**Next dependency:** Milestone 3 (Master exporter, 107 fields) depends on Milestone 2's
+`run-sales-territory.ts` / `.orchestrator-run-manifest.json` shape for its per-district and
+per-territory input.
 
 ## Accepted UB1 checkpoints (outside repo)
 
@@ -183,14 +185,31 @@ final-scoring-stage-v1 (unchanged), hard-gates-v1 (unchanged), customer-match-ma
 
 ## Orchestrator status
 
-`scripts/lead-production/run-full-territory.ts` runs one *territory* end-to-end (all its stages,
-v2 scoring, config-hash invalidation cascade on resume) but does **not yet** do the district-
-level expansion, per-district checkpointing, or cross-district combination/dedup required by
-Section 4 of the current instruction. The RM1 `--request-plan-only` dry run above confirms the
-orchestrator can be invoked for RM1 today, but every stage reports `ok: false` because there is
-no Phase 1 discovery checkpoint for RM1 yet (discovery has only ever been run for UB1 and a few
-earlier calibration territories). **District-level orchestration (Section 4) is the next
-substantial engineering task, not yet started this session.**
+**Milestone 2 complete.** `scripts/lead-production/run-full-territory.ts` (unchanged) runs one
+*Postcode District* end-to-end through all 8 stages. New this milestone:
+`scripts/lead-production/territory-assignment-v2.ts` natively loads and validates
+`sales-territories-v2.json` (inclusive range expansion, non-contiguous district lists, global
+representative-ownership uniqueness, map-required-only-for-field-sales). New
+`scripts/lead-production/run-sales-territory.ts` expands one representative's Sales Territory
+into its Postcode Districts and runs `run-full-territory.ts` once per district (own run ID, own
+immutable checkpoint dir) sequentially — an isolated district failure is recorded as
+`held_for_source_failure` and does not stop or corrupt any other district. After all districts
+are attempted it reconciles: per-district population invariant (raw/canonical vs. final-outcome
+row count must match exactly), cross-district tiered-identity dedup (reuses the same
+company-number/phone/domain/postcode+identity hierarchy as customer-match-materiality.ts, new
+`scripts/lead-production/district-reconciliation.ts`), and derives one of the 6 required
+territory statuses. Writes `district-summary.csv`, `district-reconciliation.csv`,
+`territory-summary.csv`, `territory-reconciliation.csv`, `territory-run-manifest.json`,
+`source-request-summary.csv`, `data-quality-warnings.csv`. Supports `--resume`,
+`--request-plan-only` (zero live calls, proven via a real 5-district Hassan/EN1-EN5 smoke test),
+and per-source request caps passed through to every district. 60+ assertions in
+`scripts/test-lead-production-territory-v2.ts` cover all 112 districts/13 reps individually, the
+range-expansion utility (incl. HA0, Wajahat's non-contiguous set), 4 synthetic
+validation-failure modes, dedup tiers, invariant checking, and status-precedence rules.
+**Not yet done:** live discovery has never been triggered by this orchestrator for any of the
+112 districts — Phase 1 checkpoints only exist for UB1 and earlier calibration territories, so a
+real (non-request-plan-only) run against, e.g., RM1 will still refuse at Phase 1 without a
+supplied `--discovery-run-id`.
 
 ## Exporter status
 
