@@ -93,6 +93,20 @@ export function buildQueryString(candidateName: string, postcode: string | null,
   return parts.filter(Boolean).join(" ");
 }
 
+/** Only offer the FSA official name to the query when the FSA stage was itself decisive
+ *  (exact/strong-probable). For multiple_fsa_matches — the common case at dense UB1 postcodes —
+ *  plausibleEstablishments[0] is one of several ambiguous candidates in an arbitrary array
+ *  position, not a chosen best match; appending it risks steering the Google search toward the
+ *  WRONG business sharing the same postcode. Trading name + postcode alone is safer than a
+ *  query polluted with a guessed FSA name. Found as a real live-run defect: several candidates
+ *  came back no_google_match because the query was built from an unrelated FSA establishment's
+ *  name at the same postcode. */
+export function fsaOfficialNameForQuery(fsa: { outcome: string; plausibleEstablishments: { officialBusinessName: string }[] } | null): string | null {
+  if (!fsa) return null;
+  const decisive = fsa.outcome === "exact_fsa_match" || fsa.outcome === "strong_probable_fsa_match";
+  return decisive ? (fsa.plausibleEstablishments[0]?.officialBusinessName ?? null) : null;
+}
+
 export async function queryGooglePlaces(
   candidateName: string, postcode: string | null, fsaOfficialName: string | null, budget: GoogleRequestBudget,
 ): Promise<GoogleQueryResult> {

@@ -28,6 +28,18 @@ function postcodeFromAddressComponents(components: any[]): string | null {
   return pc?.longText ?? pc?.shortText ?? null;
 }
 
+// Places API (New) Text Search does not reliably populate places.addressComponents even when
+// requested in the field mask (observed empirically: 0 of 53 real UB1 live results returned any
+// address component, despite the field mask including it and formattedAddress being fully
+// populated) — a real, undocumented behaviour of that endpoint, not a mapping bug on this side.
+// Fall back to extracting the postcode directly from the always-populated formattedAddress text
+// via a standard UK postcode pattern. addressComponents is still tried first when present.
+const UK_POSTCODE_PATTERN = /\b([A-Z]{1,2}\d[A-Z\d]?)\s*(\d[A-Z]{2})\b/i;
+function postcodeFromFormattedAddress(formattedAddress: string): string | null {
+  const m = UK_POSTCODE_PATTERN.exec(formattedAddress || "");
+  return m ? `${m[1].toUpperCase()} ${m[2].toUpperCase()}` : null;
+}
+
 function toEvidence(candidate: OperationalCandidate, place: Record<string, any>): GooglePlaceEvidence {
   const candNameNorm = normaliseName(candidate.name);
   const placeName = place.displayName?.text ?? "";
@@ -36,7 +48,7 @@ function toEvidence(candidate: OperationalCandidate, place: Record<string, any>)
 
   const rawComponents: any[] = Array.isArray(place.addressComponents) ? place.addressComponents : [];
   const addressComponents = rawComponents.map((c) => c?.longText ?? c?.shortText ?? "").filter(Boolean);
-  const placePostcodeRaw = postcodeFromAddressComponents(rawComponents);
+  const placePostcodeRaw = postcodeFromAddressComponents(rawComponents) ?? postcodeFromFormattedAddress(place.formattedAddress ?? "");
   const placePostcode = normalisePostcode(placePostcodeRaw).canonical;
   const postcodeAgreement = !!candPostcode && !!placePostcode && candPostcode === placePostcode;
 

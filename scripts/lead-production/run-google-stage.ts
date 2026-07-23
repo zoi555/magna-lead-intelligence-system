@@ -135,7 +135,7 @@ async function main() {
   }
 
   const { getGooglePlacesConfig, isGooglePlacesEnabled } = await import("../../src/lib/sources/google-places");
-  const { queryGooglePlaces, newBudget, buildQueryString, GOOGLE_STAGE_FIELD_MASK } = await import("./google-adapter");
+  const { queryGooglePlaces, newBudget, buildQueryString, fsaOfficialNameForQuery, GOOGLE_STAGE_FIELD_MASK } = await import("./google-adapter");
   const { classifyGoogleMatch } = await import("./google-match");
   const { resolveFsaMatchAfterGoogle } = await import("./fsa-resolution-after-google");
   const { resolveCustomerMatchAfterGoogle } = await import("./customer-resolution-after-google");
@@ -193,7 +193,7 @@ async function main() {
   const dryRunRequestPlan = candidates.map((c) => {
     const p = populationRaw.find((r) => r.candidateId === c.id);
     const fsa = fsaByCandidate.get(c.id) ?? null;
-    const fsaOfficialName = fsa?.plausibleEstablishments[0]?.officialBusinessName ?? null;
+    const fsaOfficialName = fsaOfficialNameForQuery(fsa);
     return { candidateId: c.id, candidateName: c.name, postcode: c.postcode, phase2SourceBucket: p?.phase2SourceBucket ?? null, queryString: buildQueryString(c.name, c.postcode, fsaOfficialName) };
   });
 
@@ -246,7 +246,7 @@ async function main() {
   for (let i = 0; i < candidates.length; i++) {
     const c = candidates[i];
     const fsa = fsaByCandidate.get(c.id) ?? null;
-    const fsaOfficialName = fsa?.plausibleEstablishments[0]?.officialBusinessName ?? null;
+    const fsaOfficialName = fsaOfficialNameForQuery(fsa);
     const queryResult = await queryGooglePlaces(c.name, c.postcode, fsaOfficialName, budget);
     const classified = classifyGoogleMatch(c, queryResult);
     googleResults.push(classified);

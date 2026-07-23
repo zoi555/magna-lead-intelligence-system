@@ -9,7 +9,7 @@ import { classifyGoogleMatch, GOOGLE_MATCH_THRESHOLDS } from "./lead-production/
 import { resolveFsaMatchAfterGoogle } from "./lead-production/fsa-resolution-after-google";
 import { resolveCustomerMatchAfterGoogle } from "./lead-production/customer-resolution-after-google";
 import { assessPhysicalPremises } from "./lead-production/physical-premises";
-import { buildQueryString, newBudget, budgetRemaining, queryGooglePlaces } from "./lead-production/google-adapter";
+import { buildQueryString, newBudget, budgetRemaining, queryGooglePlaces, fsaOfficialNameForQuery } from "./lead-production/google-adapter";
 import { classifyFsaMatch } from "./lead-production/fsa-match";
 import type { OperationalCandidate, CustomerRecord, FsaMatchResult, GoogleMatchResult } from "./lead-production/types";
 import type { GoogleQueryResult } from "./lead-production/google-adapter";
@@ -93,6 +93,34 @@ async function main() {
     const q = buildQueryString("Roosters Piri Piri", "UB1 2NP", null);
     assert(q.includes("Roosters Piri Piri") && q.includes("UB1 2NP"), "buildQueryString includes both the trading name and the postcode");
     assert(q.trim() !== "UB1 2NP", "the query string is never postcode alone");
+  }
+
+  // --- Regression: real live-run defect #1 — Places API (New) Text Search does not reliably
+  // populate places.addressComponents (confirmed empirically: 0/53 real UB1 results returned
+  // any component), so postcode agreement must fall back to extracting the postcode from the
+  // always-populated formattedAddress text. ---
+  {
+    const place = mkPlace({ name: "Test Diner", formattedAddress: "1 Test Street, Southall UB1 1AA, UK", addressComponents: [] });
+    const r = classifyGoogleMatch(mkCandidate({ name: "Test Diner", postcode: "UB1 1AA" }), mkQueryResult(true, [place]));
+    assert(place.addressComponents.length === 0, "fixture sanity check: addressComponents is empty, mirroring the real API behaviour observed live");
+    assert(r.outcome === "exact_google_match", `postcode is correctly recovered from formattedAddress when addressComponents is empty (got ${r.outcome})`);
+    assert(r.plausibleResults[0]?.postcodeAgreement === true, "postcodeAgreement is true once the formattedAddress fallback recovers the postcode");
+  }
+
+  // --- Regression: real live-run defect #2 — an ambiguous FSA result (multiple_fsa_matches)
+  // must never have its arbitrary top establishment name appended to the Google query; only a
+  // decisive FSA outcome (exact/strong-probable) may contribute a name. ---
+  {
+    const ambiguousFsa = classifyFsaMatch(mkCandidate({ name: "Khans Snacks", postcode: "UB1 1LP" }), mkFsaQuery(true, [
+      mkFsaEstablishment({ fhrsId: "A", businessName: "Al-Haad", postcode: "UB1 1LP" }),
+      mkFsaEstablishment({ fhrsId: "B", businessName: "Khans Snacks", postcode: "UB1 1LP" }),
+    ]));
+    assert(ambiguousFsa.outcome === "multiple_fsa_matches", `fixture sanity check: FSA outcome is multiple_fsa_matches (got ${ambiguousFsa.outcome})`);
+    assert(fsaOfficialNameForQuery(ambiguousFsa) === null, "an ambiguous (multiple_fsa_matches) FSA result never contributes a name to the Google query — the array's first entry is not a chosen best match");
+
+    const decisiveFsa = classifyFsaMatch(mkCandidate({ name: "Khans Snacks", postcode: "UB1 1LP" }), mkFsaQuery(true, [mkFsaEstablishment({ fhrsId: "A", businessName: "Khans Snacks Ltd", postcode: "UB1 1LP" })]));
+    assert(decisiveFsa.outcome === "exact_fsa_match", `fixture sanity check: FSA outcome is exact_fsa_match (got ${decisiveFsa.outcome})`);
+    assert(fsaOfficialNameForQuery(decisiveFsa) === "Khans Snacks Ltd", "a decisive (exact/strong-probable) FSA result DOES contribute its official name to the Google query");
   }
 
   // --- 4: first Google result not blindly selected ---
