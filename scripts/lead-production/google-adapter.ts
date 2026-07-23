@@ -6,8 +6,13 @@
 // `maxResultCount: 1`, built for a single-best-match phone-enrichment use case. This stage
 // needs the opposite — every plausible result retained, "do not select the first Google result
 // blindly" — so a bounded multi-result search is required. The retry-once-on-transient-error
-// and never-throws philosophy is mirrored exactly from the existing runner for consistency, and
-// budget is reserved via the SAME semantics (before each call, cap enforced, retries free).
+// and never-throws philosophy is mirrored from the existing runner, with one deliberate
+// tightening for live production runs: EVERY individual HTTP request — the initial attempt AND
+// its retry — is reserved against the SAME shared run-wide budget before it is made. If a retry
+// would push the running total past the caller-supplied cap, the retry is skipped and the
+// candidate is reported as google_api_failure instead. This is stricter than the existing
+// GooglePlacesRunner precedent (which treats one retry as "free") — a deliberate, explicit
+// control for this run: the absolute ceiling counts real outbound calls, not billed candidates.
 //
 // Never falls back to mock/fabricated data on failure — a failure is always reported as
 // google_api_failure with the real error retained, exactly like the FSA stage.
@@ -108,7 +113,7 @@ export async function queryGooglePlaces(
   // (the phone-enrichment mask) when unset, which is not this stage's default.
   const fieldMask = process.env.GOOGLE_PLACES_FIELD_MASK || GOOGLE_STAGE_FIELD_MASK;
 
-  budget.callsMade += 1; // reserved up front — a retry does not consume additional budget
+  budget.callsMade += 1; // reserves the initial attempt
 
   let attempts = 1;
   try {
@@ -117,6 +122,13 @@ export async function queryGooglePlaces(
   } catch (e) {
     const transient = e && typeof e === "object" && "transient" in e ? Boolean((e as any).transient) : true;
     if (transient) {
+      if (budgetRemaining(budget) <= 0) {
+        // The retry itself would exceed the run-wide cap — stop this candidate rather than
+        // overshoot. Recorded distinctly so the run report can separate this from a genuine
+        // Google-side error.
+        return { ok: false, places: [], attempts, errorMessage: "Retry skipped — would exceed the run-wide Google Places request cap.", queryString, retrievedAt, disabledReason: null };
+      }
+      budget.callsMade += 1; // reserves the retry attempt — counted against the SAME shared cap
       attempts = 2;
       try {
         const places = await searchTextMultiple(queryString, fieldMask, apiKey, config.baseUrl);

@@ -200,7 +200,7 @@ async function main() {
   const preflight = {
     generatedAt: new Date().toISOString(),
     candidateCount: candidates.length,
-    maxSearchRequests: candidates.length, // one Text Search call per candidate; a transient retry reuses the same reserved budget slot, never an extra one
+    maxSearchRequests: candidates.length, // one Text Search call per candidate under normal conditions; a transient retry reserves a SECOND slot from the same shared run-wide cap (see google-adapter.ts) — if the cap is already exhausted, the retry is skipped and the candidate is reported as google_api_failure rather than exceeding it
     endpointPlan: "POST https://places.googleapis.com/v1/places:searchText — Places API (New), Text Search, maxResultCount=5 per call (bounded, never unbounded pagination)",
     fieldMaskPlan: GOOGLE_STAGE_FIELD_MASK.split(","),
     skuNote: "Approximate SKU tier only (exact SKU-to-field boundaries are set by Google's own billing docs, not independently verifiable offline): the requested fields correspond to Google's Text Search Pro + Enterprise tiers (id/displayName/formattedAddress/addressComponents/location/businessStatus/types/primaryType = Pro; regularOpeningHours/rating/userRatingCount = Enterprise). No Atmosphere-tier fields (reviews, photos) are requested.",

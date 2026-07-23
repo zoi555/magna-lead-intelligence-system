@@ -249,6 +249,25 @@ async function main() {
     assert(budgetRemaining(exhausted) === 0, "budget correctly reports zero remaining once the cap is reached");
     const exhaustedResult = await queryGooglePlaces("Test Diner", "UB1 1AA", null, exhausted);
     assert(exhaustedResult.ok === false && !!exhaustedResult.disabledReason, "queryGooglePlaces refuses to call the network once the per-run budget is exhausted");
+
+    // A transient failure's retry must consume from the SAME shared run-wide budget, and must
+    // be skipped (never exceeding the cap) once that budget is down to its last slot.
+    const savedFetch = globalThis.fetch;
+    process.env.GOOGLE_PLACES_API_KEY = "test-key-not-real";
+    process.env.GOOGLE_PLACES_ENABLED = "true";
+    process.env.GOOGLE_PLACES_MAX_CALLS_PER_RUN = "1";
+    let fetchCalls = 0;
+    (globalThis as any).fetch = async () => { fetchCalls++; return { ok: false, status: 503 } as any; };
+    const singleSlotBudget = newBudget(1); // exactly one slot for the whole call, including any retry
+    const retryCapped = await queryGooglePlaces("Test Diner", "UB1 1AA", null, singleSlotBudget);
+    assert(fetchCalls === 1, `a transient failure's retry is skipped once the run-wide cap has no slot left for it — exactly one real HTTP request was made (got ${fetchCalls})`);
+    assert(retryCapped.ok === false && retryCapped.attempts === 1, `the candidate is reported as a failure without a second attempt when the cap would be exceeded (attempts=${retryCapped.attempts})`);
+    assert(singleSlotBudget.callsMade <= singleSlotBudget.maxCalls, `budget.callsMade (${singleSlotBudget.callsMade}) never exceeds the run-wide cap (${singleSlotBudget.maxCalls}), even across a retry`);
+
+    globalThis.fetch = savedFetch;
+    if (savedKey !== undefined) process.env.GOOGLE_PLACES_API_KEY = savedKey; else delete process.env.GOOGLE_PLACES_API_KEY;
+    if (savedEnabled !== undefined) process.env.GOOGLE_PLACES_ENABLED = savedEnabled; else delete process.env.GOOGLE_PLACES_ENABLED;
+    if (savedCap !== undefined) process.env.GOOGLE_PLACES_MAX_CALLS_PER_RUN = savedCap; else delete process.env.GOOGLE_PLACES_MAX_CALLS_PER_RUN;
   }
 
   console.log(fails === 0 ? "\nAll Google-stage assertions passed ✓" : `\n${fails} FAILED`);
