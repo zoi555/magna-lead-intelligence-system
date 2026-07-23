@@ -497,3 +497,38 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
 - **Next task**: owner decision on whether to start live Phase 1 discovery for RM1 (the first
   territory with an actual assignment + map requirement) as the real first-use proof of the
   now-complete orchestrator, ahead of the full TW1-20 rollout.
+
+### Schemas + assignment v2 versioned; full lead-production handover written — 2026-07-23 (Milestone 1)
+
+- **Git continuity audit**: `docs/BRANCH_REGISTER.md` written — 3 branches (feature branch
+  current/active, `main` stale 12+ days, `design/aspectlead-branding` superseded/parked, none
+  deleted), full merged/ahead-behind status, "commits are not branches" made explicit.
+- **Schema versioning**: located and converted all 4 CTO-approved spreadsheets
+  (`~/Downloads`) into version-controlled JSON, validated exhaustively against the
+  spreadsheets' own redundant columns: `config/lead-production/master-schema-v1.json` (107
+  fields), `salespro-schema-v1.json` (108 columns, 20 existing CTO labels/order preserved
+  verbatim + 88 new appended), `cto-existing-field-mapping-v1.json` (20 fields), plus
+  human-readable `docs/77_LEAD_SCHEMA_V1_SUMMARY.md`. One genuine, deliberate spreadsheet
+  feature found and correctly handled (not treated as an error): `assigned_representative`
+  legitimately maps from both "Field Sales Rep" and "Sales Rep" CTO columns.
+- **Assignment v2**: `config/lead-production/sales-territories-v2.json` — 13 representatives,
+  112 postcode districts, matching the owner-supplied table exactly (incl. Wajahat's
+  non-contiguous six districts, HA0 included). Old 22-rep CSV kept, not deleted, marked via a
+  `.SUPERSEDED.md` companion file (confirmed zero code references first).
+- **Honest gaps recorded, not hidden**: `load-assignments.ts` does not yet read
+  `sales-territories-v2.json` natively (still reads tabular CSV/Excel) — wiring that in is
+  required before district-level orchestration can run against the v2 structure. District-level
+  orchestration itself (per-district checkpoints, cross-district dedup/combination), both
+  exporters (Master 107-field, Sales Pro 108-column), and UB1 exporter validation are none of
+  them started yet.
+- **`docs/LEAD_PRODUCTION_HANDOVER.md`** written — full continuation record: 92-commit register
+  (SHA/date/purpose per commit), accepted UB1 checkpoint paths, locked v2 ruleset detail,
+  schema/assignment versions, honest orchestrator/exporter status, unresolved issues, exact
+  continuation commands. Also confirms a stale plan-mode artifact surfaced this session
+  describing a Just Eat geography-consolidation hotfix — that work is already complete and
+  accepted (commits `fc5063b`/`d3f2dfc`/`3b80cfb`, 2026-07-22); no action was taken on the stale
+  artifact.
+- **Next task**: wire `load-assignments.ts` (or its caller) to consume
+  `sales-territories-v2.json` directly, then build district-level expansion in the discovery
+  orchestrator (raw Sales Territory → Postcode Districts → per-district discovery/checkpoint →
+  cross-district combine/dedup).

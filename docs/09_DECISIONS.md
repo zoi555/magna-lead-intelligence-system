@@ -761,3 +761,25 @@ holds treated as blocking, and score used as a hidden qualification gate) — fi
 zero-new-external-call and reusable across territories, and explicitly accepted by the project
 owner (commit `52c124a`) as the canonical model. v1 is kept, not deleted, so any historical run's
 exact original output remains independently reproducible for audit purposes.
+
+## Master/Sales Pro schema and sales-territory assignment versioned as config (v1 / v2) — 2026-07-23
+
+### Decision
+
+Convert the CTO-approved spreadsheets (`Lead_Data_Schema_and_SalesPro_Mapping_v1.xlsx`,
+`CTO_New_Fields_To_Add_v1.xlsx`/`.csv`, `CTO_Lead_Import_Template.xlsx`) into version-controlled
+JSON under `config/lead-production/`: `master-schema-v1.json` (107 fields),
+`salespro-schema-v1.json` (108 columns), `cto-existing-field-mapping-v1.json` (20 fields), and
+supersede the old 22-representative assignment CSV with `sales-territories-v2.json` (13 reps,
+112 postcode districts) — old CSV marked historical via a `.SUPERSEDED.md` companion, not
+deleted.
+
+### Reason
+
+The project must not depend permanently on local spreadsheets on the owner's machine — the repo
+needs a durable, diffable, version-controlled source of truth for the schema the exporters will
+be built against. The CTO's existing 20 field labels/order are preserved exactly as supplied;
+any future CTO change must land as a new versioned mapping (e.g. `v1.1`), never an overwrite of
+this file. Full field-level validation (uniqueness, count, cross-sheet consistency) was run
+against the source spreadsheets before conversion; see `docs/77_LEAD_SCHEMA_V1_SUMMARY.md` for
+the summary and `docs/LEAD_PRODUCTION_HANDOVER.md` for full continuation detail.

@@ -1,0 +1,255 @@
+# Lead Production — Handover
+
+Generated: 2026-07-23. This document is the single continuation record for the lead-production
+project so work can resume without reconstructing context from terminal archaeology. Update it
+after every milestone (see `docs/09_DECISIONS.md` for the commit discipline this follows).
+
+## Active branch and current HEAD
+
+- **Branch:** `feature/mvp-vertical-slice-001` (per explicit instruction: do not create another
+  branch, do not merge to `main`, do not deploy). See `docs/BRANCH_REGISTER.md` for the full
+  branch audit — commits are not branches; this is 92 commits on one branch, not 92 branches.
+- **Local HEAD at last push:** `d67279b7b1442cb4fe8a13d7356b3a58738885d0` — "docs: record v2 lock,
+  orchestrator completion, and RM1 dry-run session" (2026-07-23 21:29).
+- **Working tree at time of writing this document:** 4 new untracked paths not yet committed —
+  `config/` (the 4 new schema/assignment JSON files, this session), `docs/77_LEAD_SCHEMA_V1_SUMMARY.md`,
+  `docs/BRANCH_REGISTER.md`, plus this file. Two pre-existing untracked files remain deliberately
+  uncommitted (`scripts/export-operational-leads.ts` — pre-existing, not part of this work;
+  `scripts/lead-production/generate-release-review.ts` — v1-era, superseded by
+  `generate-release-package-v2.ts`).
+
+## Commit register (all 92 commits on this branch, oldest → newest)
+
+Full purpose/detail is in each commit's own message (`git log --oneline main..HEAD`); this
+register gives the reconstruction anchor points. Tests/build status: this branch's own commit
+discipline required a passing typecheck/test/build before each commit (see individual commit
+messages and `docs/15_AI_WORK_LOG.md` session entries for command/output records) — not
+re-tabulated per-row here to keep this table usable; see "Continuation commands" below to
+re-verify at any point.
+
+| # | Date | SHA (short) | Purpose |
+|---|---|---|---|
+| 1 | 07-12 | 8d6919f | Monitored FSA pipeline, animated flow network, reusable map engine |
+| 2 | 07-12 | 62c94bf | Refine lead quality scoring and customer matching |
+| 3 | 07-12 | 75eb76b | Source registry and settings readiness dashboard |
+| 4 | 07-12 | 7d386e9 | Source adapter readiness for enrichment/platform evidence |
+| 5 | 07-12 | dd435bc | Refine pipeline monitoring, map usability, telesales-safe exports |
+| 6 | 07-12 | 31ab4da | Final MVP validation report (docs) |
+| 7 | 07-13 | 03afe34 | High-coverage acquisition infrastructure, national data model |
+| 8 | 07-13 | 1309f74 | Google Places enrichment, source lineage reporting |
+| 9 | 07-13 | bd97bcd | TW platform-first lead generation run |
+| 10 | 07-13 | 31a47c9 | TW platform-first lead generation run (continued) |
+| 11 | 07-14 | 2c0bf18 | Discovery run builder, portable geospatial foundation |
+| 12 | 07-15 | db1e3a2 | Consume independent geospatial platform (refactor) |
+| 13 | 07-15 | 1810951 | MapLibre from npm, drop /vendor dependency (geospatial v0.1.1) |
+| 14 | 07-15 | d910c17 | Map functional interaction pass (@geospatial/map v0.1.2) |
+| 15 | 07-16 | 2d694d8 | Just Eat Discovery Stage 1 (canonical Supabase persistence) |
+| 16 | 07-16 | 8dc3418 | Fix worker UUID crash on empty queue + observation-delete FK |
+| 17 | 07-16 | 4d7fd6d | Fix execution progress counter + lease-expiry double-processing |
+| 18 | 07-16 | d11d6c8 | Geography Standard v1.0 (platform-wide) |
+| 19 | 07-16 | 374801f | De-duplicate generic geography (refactor Part 1.4) |
+| 20 | 07-17 | b0f0596 | Multi-source foundation — Uber Eats + Deliveroo adapters, consolidation |
+| 21 | 07-17 | 388cd91 | Discovery package v0.3.0, provider decision pack, consolidation persistence |
+| 22 | 07-17 | 238bc5c | OS Open Names place ingestion + place-aware run planning (A1) |
+| 23 | 07-17 | 34c8ebe | JE 96-field parser, canonical duplicates, 3 live geography runs |
+| 24 | 07-17 | 7bcf968 | Uber Eats pilot ready (Apify), guarded not executed |
+| 25 | 07-17 | cb45798 | Calibrate Uber Eats parser to real Apify output |
+| 26 | 07-18 | 790a253 | Quarantine provider geography mismatches |
+| 27 | 07-18 | 282dccf | Persist Apify actor execution provenance |
+| 28 | 07-18 | 34d23a3 | provider_executions timestamps, resume-safe pilot |
+| 29 | 07-18 | db61cfa | Bounded replacement discovery provider (Uber) |
+| 30 | 07-18 | af580de | Calibrate replacement actor payload |
+| 31 | 07-18 | 1fb5d95 | Support broad borderline discovery (Uber) |
+| 32 | 07-18 | b135db2 | Broad borderline diagnostic — UB1 recall incomplete (docs) |
+| 33 | 07-18 | 5970442 | Consume geospatial package from GitHub Packages (build fix) |
+| 34 | 07-18 | 2d6f4fb | Log GitHub Packages migration, Vercel status, ISS-0019 (docs) |
+| 35 | 07-18 | bb2e268 | Record dual Vercel deployment topology (docs) |
+| 36 | 07-18 | 8575514 | Distinguish district-localisation precision from recall (Uber) |
+| 37 | 07-18 | 7389898 | Research discovery actors, define bounded UB1 benchmark (docs) |
+| 38 | 07-18 | aab8764 | End-of-session update — Vercel topology + Uber wrap-up (docs) |
+| 39 | 07-18 | a938900 | Reconcile Vercel deployment IDs (docs) |
+| 40 | 07-18 | e44ad9d | Correct UB1 benchmark recall + actor prioritisation |
+| 41 | 07-18 | cf463c4 | Make storefront entity signals evidence-based |
+| 42 | 07-21 | e329a79 | Canonical marketplace contract, JE UB1 proof, Uber import path |
+| 43 | 07-21 | 72990dc | Additive migration for canonical contract, JE phone enrichment |
+| 44 | 07-21 | 0ba0f25 | Apply canonical-contract migration to prod, JE phone batch, import screen |
+| 45 | 07-21 | d6fa38a | Honest internal-beta interface, real import persistence, Deliveroo pilot |
+| 46 | 07-21 | ea85689 | Honest source status labels, homepage real-data finish-out |
+| 47 | 07-21 | e5636d5 | Create New Run wizard (conflict/override/draft-reopen) |
+| 48 | 07-21 | f8a5e02 | One shared AspectLeadMap component |
+| 49 | 07-21 | 17bd008 | Settings defaults panel, Create New Run tests, derived_query_units fix |
+| 50 | 07-21 | d0cae9c | Additive migration for auth bootstrap + shared audit log |
+| 51 | 07-21 | 31a33e8 | Fix app_audit_log inert INSERT grant (missing RLS policy) |
+| 52 | 07-21 | 266c2c6 | Supabase Auth Stage 1 — login, callback, bootstrap |
+| 53 | 07-21 | da4ce16 | Auth Stage 2 route protection (proven with real browser sessions) |
+| 54 | 07-22 | d97e89c | Additive migration for persisted, audited tenant settings |
+| 55 | 07-22 | 1aba6e6 | Real, persisted, RLS-backed Settings (GET/PATCH + UI) |
+| 56 | 07-22 | 08d23c2 | je-run.ts no longer silently defaults to 'magna' tenant |
+| 57 | 07-22 | d8967b7 | Correct homepage/run-detail metric semantics |
+| 58 | 07-22 | f811307 | Wire geography-validation gate into live Just Eat worker |
+| 59 | 07-22 | e71ab83 | Map shows literal "Boundary geometry unavailable" message |
+| 60 | 07-22 | 3b0911a | Full real-browser proof of Create New Run + mobile overflow fix |
+| 61 | 07-22 | b686a4b | Wire consolidation into real execution-completion path; live JE proof run |
+| 62 | 07-22 | b2f5ae4 | Update test-create-new-run.ts for protected APIs |
+| 63 | 07-22 | f8ccd8b | Step 20 — production auth proof, bootstrap-path cleanup |
+| 64 | 07-22 | fc5063b | **Enforce run-scoped geography before operational consolidation** (geography hotfix) |
+| 65 | 07-22 | d3f2dfc | Geography hotfix handover (commit fc5063b, audit event 4be92d93) (docs) |
+| 66 | 07-22 | 3b80cfb | Record geography hotfix rollback and migration debt (docs) |
+| 67 | 07-22 | 15ee4c3 | Add audited lead customer-comparison bridge |
+| 68 | 07-22 | fca4a80 | Customer-master preflight-only mode |
+| 69 | 07-22 | e43124a | Support NetSuite customer export column aliases |
+| 70 | 07-23 | 57ddb0b | Use NetSuite inactive flag for customer lifecycle |
+| 71 | 07-23 | 8728c52 | Add FSA identity/premises verification stage |
+| 72 | 07-23 | 74bd669 | Add Google Places identity/premises stage |
+| 73 | 07-23 | e9753c8 | Count Google Places retries against run-wide request cap |
+| 74 | 07-23 | c9e7c89 | Two real defects found in live UB1 Google Places run |
+| 75 | 07-23 | f55ce66 | Zero-new-calls reprocessing pass for Google-stage postcode fix |
+| 76 | 07-23 | 68398d1 | Retain Google zero-result evidence |
+| 77 | 07-23 | 6be3706 | Google-stage checkpoint merge for supplemental no-match rerun |
+| 78 | 07-23 | ed3890c | Add Companies House stage |
+| 79 | 07-23 | 3a48839 | Correct company_name_conflict/registered_address_conflict mislabel |
+| 80 | 07-23 | 4358f75 | Zero-new-calls reprocessing pass for Companies House relabel fix |
+| 81 | 07-23 | 198f987 | Add website enrichment stage |
+| 82 | 07-23 | 510a14e | Add decision-maker public-profile stage |
+| 83 | 07-23 | bd3b019 | Add final ownership/group rescreen stage |
+| 84 | 07-23 | adfa1d7 | Add final qualification, scoring, and UB1 output stage |
+| 85 | 07-23 | 9b87f14 | Never trust Companies House status from a non-decisive match |
+| 86 | 07-23 | 73d94ab | Record overnight lead-production bridge session (docs) |
+| 87 | 07-23 | 24a8727 | Self-derive Google-stage population from FSA checkpoint |
+| 88 | 07-23 | 3114c86 | Add reusable full-territory lead-production orchestrator |
+| 89 | 07-23 | 411f5cc | Record UB1 release audit + full-territory orchestrator session (docs) |
+| 90 | 07-23 | 52c124a | **Calibrate lead qualification and scoring rules (v2 baseline, accepted canonical)** |
+| 91 | 07-23 | 89c3be3 | Lock qualification/scoring rules v2, wire into orchestrator |
+| 92 | 07-23 | d67279b | Record v2 lock, orchestrator completion, RM1 dry-run session (docs) |
+
+**Next dependency:** commit #93 will be "Milestone 1 — schemas and assignment version"
+(this session's `config/lead-production/*.json`, `docs/77_LEAD_SCHEMA_V1_SUMMARY.md`,
+`docs/BRANCH_REGISTER.md`, this handover doc), per the 7-milestone commit plan in
+`docs/09_DECISIONS.md`.
+
+## Accepted UB1 checkpoints (outside repo)
+
+Located under `/Users/homemac/Data/aspectlead-lead-production/output/ub1/` (not committed —
+generated operational data):
+
+- `2026-07-23T12-00-00Z-v2-calibration/` — historically accepted v2 run (11 files).
+- `2026-07-23T13-00-00Z-v2-calibration-with-json/` — byte-identical rerun + full JSON master.
+- `2026-07-23T13-30-00Z-release-package-v2/` — **the accepted UB1 v2 release package** (14 files;
+  this is the package referenced as canonical UB1 evidence for exporter validation, Section 10).
+- `2026-07-23T14-00-00Z-orchestrator-v2-replay/` and
+  `2026-07-23T14-30-00Z-orchestrator-v2-replay-final/` — orchestrator-driven replays, verified
+  byte-identical to the accepted historical output.
+- `/Users/homemac/Data/aspectlead-lead-production/output/rm1/2026-07-23T15-00-00Z-request-plan-dry-run/`
+  — RM1 (Nauman's first district) `--request-plan-only` dry run; every stage `ok: false` because
+  RM1 has no Phase 1 checkpoint yet and no live discovery has been run for it.
+
+## Qualification rules v2
+
+`rulesetVersion: "v2"` is locked as canonical (commit `52c124a`, explicitly confirmed by the
+project owner as the accepted baseline — "do not alter the v2 qualification philosophy or
+thresholds unless a new deterministic defect is proven"). Full version identifiers live in
+`scripts/lead-production/rules-versions.ts` (`RULES_VERSIONS`): qualification-v2-2026-07-23,
+final-scoring-stage-v1 (unchanged), hard-gates-v1 (unchanged), customer-match-materiality-v1-
+2026-07-23, normalize-v2-2026-07-23, channel-suitability-v1 (unchanged), output-schema-v2-
+2026-07-23. `run-full-territory.ts` defaults its `final_scoring` stage to
+`run-final-scoring-stage-v2.ts` unless `--use-v1-scoring` is explicitly passed.
+
+## Schema versions (this session)
+
+- `config/lead-production/master-schema-v1.json` — 107 canonical master fields.
+- `config/lead-production/salespro-schema-v1.json` — 108-column Magna Sales Pro schema (20
+  existing CTO columns unchanged + 88 new, approved order).
+- `config/lead-production/cto-existing-field-mapping-v1.json` — the CTO's 20-column import
+  template, verbatim labels.
+- Human-readable summary: `docs/77_LEAD_SCHEMA_V1_SUMMARY.md`.
+- **Not yet built:** the actual exporter code that reads these config files and produces the
+  Master workbook / Sales Pro CSV (Sections 8/9 of the current instruction — not started).
+
+## Assignment version
+
+- `config/lead-production/sales-territories-v2.json` — 13 representatives, 112 postcode
+  districts (Nauman RM1–RM14, Manraj KT1–KT24, Ayesha NW1–NW10, Kunz TW1–TW10, Meer TW11–TW20,
+  Naseh UB1–UB5, Saad UB6–UB11, Saif HA0–HA5, Shahzaib HA6–HA10, Tahira WD3–WD7, Wajahat
+  WD17/18/19/23/24/25, Hassan EN1–EN5, Haleema EN6–EN11). `assignmentVersion: "v2"`.
+- Historical predecessor (22-representative table) marked, not deleted:
+  `/Users/homemac/Data/aspectlead-lead-production/input/territory-assignments-tonight.csv` +
+  companion `.SUPERSEDED.md` marker.
+- **Important, honest status:** `scripts/lead-production/load-assignments.ts` (the module the
+  orchestrator actually calls) still reads a tabular CSV/Excel assignment file, NOT
+  `sales-territories-v2.json` directly — the new JSON config exists and is fully validated, but
+  the orchestrator has not yet been wired to consume it natively. This is required, un-started
+  work before Section 4 (district-level orchestration) can run against the v2 assignment
+  structure. Flagged here rather than left implicit.
+
+## Orchestrator status
+
+`scripts/lead-production/run-full-territory.ts` runs one *territory* end-to-end (all its stages,
+v2 scoring, config-hash invalidation cascade on resume) but does **not yet** do the district-
+level expansion, per-district checkpointing, or cross-district combination/dedup required by
+Section 4 of the current instruction. The RM1 `--request-plan-only` dry run above confirms the
+orchestrator can be invoked for RM1 today, but every stage reports `ok: false` because there is
+no Phase 1 discovery checkpoint for RM1 yet (discovery has only ever been run for UB1 and a few
+earlier calibration territories). **District-level orchestration (Section 4) is the next
+substantial engineering task, not yet started this session.**
+
+## Exporter status
+
+**Not started.** Sections 8 (Master exporter, 107 fields) and 9 (Sales Pro exporter, 108
+columns) have no code yet — only the versioned schema configs they will read from exist. UB1
+validation (Section 10) cannot run until both exporters exist.
+
+## Geography hotfix — already resolved, not re-opened
+
+A stale plan-mode artifact for a "Just Eat geography consolidation hotfix" surfaced in this
+session's environment; it describes exactly the work already completed and accepted in commits
+`fc5063b`/`d3f2dfc`/`3b80cfb` (2026-07-22) — `consolidateRun()` now intersects against
+`provider_geography_validations` scoped to `run_id`, `je-run.ts`'s redundant explicit
+consolidation call was removed, and the production repair of run `c301cbbc` was applied (94 of
+646 candidates retained as genuinely `valid_geography`; see
+`docs/HANDOVER_GEOGRAPHY_HOTFIX_2026-07-22.md` and `docs/09_DECISIONS.md`/`docs/11_ISSUES_LOG.md`
+for the accepted rollback SQL and migration debt). **No action taken on this stale artifact —
+the work it describes is already done.**
+
+## Unresolved issues (see `docs/11_ISSUES_LOG.md` for full detail)
+
+- **ISS-0027** — website `tel:`/`mailto:` href decoding follow-up (open, non-blocking).
+- **ISS-0028** — pre-existing `scripts/test-lead-production-google.ts` line-325 regex false
+  positive on `types.ts` (documented, non-blocking, narrowly scoped fix deferred to a separately-
+  approved test-maintenance pass — see full root-cause writeup in `docs/11_ISSUES_LOG.md`).
+- Migration debt recorded from the geography hotfix (see `docs/09_DECISIONS.md`) — not reopened
+  this session, tracked there.
+
+## Continuation commands
+
+Typecheck / full lead-production test suite / build (run from repo root):
+
+```
+npx tsc --noEmit
+npx tsx scripts/test-lead-production-final-scoring-v2.ts
+npx tsx scripts/test-lead-production-full-territory.ts
+npm run build
+```
+
+Re-run the RM1 request-plan dry run (no live calls, safe):
+
+```
+npx tsx scripts/lead-production/run-full-territory.ts \
+  --territory=RM1 --request-plan-only
+```
+
+Regenerate the accepted UB1 v2 release package (zero new external calls, reads existing
+checkpoints only):
+
+```
+npx tsx scripts/lead-production/generate-release-package-v2.ts \
+  --territory=ub1 \
+  --final-scoring-dir=/Users/homemac/Data/aspectlead-lead-production/output/ub1/2026-07-23T13-00-00Z-v2-calibration-with-json
+```
+
+## Single genuine owner decision still open
+
+None required to continue engineering work. The one decision that will become live once
+district-level orchestration (Section 4) and both exporters (Sections 8/9) exist is: **whether
+to authorise live discovery spend for RM1–RM14 (Nauman's territory)**, since that is real money
+and real data collection on live UK businesses via only-just-built orchestrator code — explicitly
+not triggered this session pending that engineering work being complete and tested.

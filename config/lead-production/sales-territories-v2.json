@@ -1,0 +1,245 @@
+{
+  "assignmentVersion": "v2",
+  "generatedAt": "2026-07-23T22:00:00Z",
+  "supersedes": "territory-assignments-tonight.csv (the previous 22-representative table) - marked historical/inactive, not deleted",
+  "totalRepresentatives": 13,
+  "totalDistricts": 112,
+  "terminology": {
+    "postcodeArea": "The letter prefix of a postcode district, e.g. RM, KT, TW.",
+    "postcodeDistrict": "One area + district number, e.g. RM1, KT4, TW14 - the unit this pipeline runs discovery/enrichment against.",
+    "salesTerritory": "The full collection of postcode districts assigned to one representative, e.g. Nauman's RM1-RM14.",
+    "salesRegion": "A broader management grouping spanning multiple sales territories - not used in this version; only defined if/when the business explicitly groups territories that way.",
+    "fullPostcode": "A complete UK postcode including the inward code, e.g. RM1 1AA - captured per-candidate during enrichment, never assigned at the territory level."
+  },
+  "representatives": [
+    {
+      "representative": "Nauman",
+      "role": "field_sales",
+      "salesTerritory": "RM1\u2013RM14",
+      "postcodeDistricts": [
+        "RM1",
+        "RM2",
+        "RM3",
+        "RM4",
+        "RM5",
+        "RM6",
+        "RM7",
+        "RM8",
+        "RM9",
+        "RM10",
+        "RM11",
+        "RM12",
+        "RM13",
+        "RM14"
+      ],
+      "districtCount": 14,
+      "mapsRequired": true
+    },
+    {
+      "representative": "Manraj",
+      "role": "field_sales",
+      "salesTerritory": "KT1\u2013KT24",
+      "postcodeDistricts": [
+        "KT1",
+        "KT2",
+        "KT3",
+        "KT4",
+        "KT5",
+        "KT6",
+        "KT7",
+        "KT8",
+        "KT9",
+        "KT10",
+        "KT11",
+        "KT12",
+        "KT13",
+        "KT14",
+        "KT15",
+        "KT16",
+        "KT17",
+        "KT18",
+        "KT19",
+        "KT20",
+        "KT21",
+        "KT22",
+        "KT23",
+        "KT24"
+      ],
+      "districtCount": 24,
+      "mapsRequired": true
+    },
+    {
+      "representative": "Ayesha",
+      "role": "field_sales",
+      "salesTerritory": "NW1\u2013NW10",
+      "postcodeDistricts": [
+        "NW1",
+        "NW2",
+        "NW3",
+        "NW4",
+        "NW5",
+        "NW6",
+        "NW7",
+        "NW8",
+        "NW9",
+        "NW10"
+      ],
+      "districtCount": 10,
+      "mapsRequired": true
+    },
+    {
+      "representative": "Kunz",
+      "role": "telesales",
+      "salesTerritory": "TW1\u2013TW10",
+      "postcodeDistricts": [
+        "TW1",
+        "TW2",
+        "TW3",
+        "TW4",
+        "TW5",
+        "TW6",
+        "TW7",
+        "TW8",
+        "TW9",
+        "TW10"
+      ],
+      "districtCount": 10,
+      "mapsRequired": false
+    },
+    {
+      "representative": "Meer",
+      "role": "telesales",
+      "salesTerritory": "TW11\u2013TW20",
+      "postcodeDistricts": [
+        "TW11",
+        "TW12",
+        "TW13",
+        "TW14",
+        "TW15",
+        "TW16",
+        "TW17",
+        "TW18",
+        "TW19",
+        "TW20"
+      ],
+      "districtCount": 10,
+      "mapsRequired": false
+    },
+    {
+      "representative": "Naseh",
+      "role": "telesales",
+      "salesTerritory": "UB1\u2013UB5",
+      "postcodeDistricts": [
+        "UB1",
+        "UB2",
+        "UB3",
+        "UB4",
+        "UB5"
+      ],
+      "districtCount": 5,
+      "mapsRequired": false
+    },
+    {
+      "representative": "Saad",
+      "role": "telesales",
+      "salesTerritory": "UB6\u2013UB11",
+      "postcodeDistricts": [
+        "UB6",
+        "UB7",
+        "UB8",
+        "UB9",
+        "UB10",
+        "UB11"
+      ],
+      "districtCount": 6,
+      "mapsRequired": false
+    },
+    {
+      "representative": "Saif",
+      "role": "telesales",
+      "salesTerritory": "HA0\u2013HA5",
+      "postcodeDistricts": [
+        "HA0",
+        "HA1",
+        "HA2",
+        "HA3",
+        "HA4",
+        "HA5"
+      ],
+      "districtCount": 6,
+      "mapsRequired": false
+    },
+    {
+      "representative": "Shahzaib",
+      "role": "telesales",
+      "salesTerritory": "HA6\u2013HA10",
+      "postcodeDistricts": [
+        "HA6",
+        "HA7",
+        "HA8",
+        "HA9",
+        "HA10"
+      ],
+      "districtCount": 5,
+      "mapsRequired": false
+    },
+    {
+      "representative": "Tahira",
+      "role": "telesales",
+      "salesTerritory": "WD3\u2013WD7",
+      "postcodeDistricts": [
+        "WD3",
+        "WD4",
+        "WD5",
+        "WD6",
+        "WD7"
+      ],
+      "districtCount": 5,
+      "mapsRequired": false
+    },
+    {
+      "representative": "Wajahat",
+      "role": "telesales",
+      "salesTerritory": "WD17, WD18, WD19, WD23, WD24, WD25",
+      "postcodeDistricts": [
+        "WD17",
+        "WD18",
+        "WD19",
+        "WD23",
+        "WD24",
+        "WD25"
+      ],
+      "districtCount": 6,
+      "mapsRequired": false
+    },
+    {
+      "representative": "Hassan",
+      "role": "telesales",
+      "salesTerritory": "EN1\u2013EN5",
+      "postcodeDistricts": [
+        "EN1",
+        "EN2",
+        "EN3",
+        "EN4",
+        "EN5"
+      ],
+      "districtCount": 5,
+      "mapsRequired": false
+    },
+    {
+      "representative": "Haleema",
+      "role": "telesales",
+      "salesTerritory": "EN6\u2013EN11",
+      "postcodeDistricts": [
+        "EN6",
+        "EN7",
+        "EN8",
+        "EN9",
+        "EN10",
+        "EN11"
+      ],
+      "districtCount": 6,
+      "mapsRequired": false
+    }
+  ]
+}
