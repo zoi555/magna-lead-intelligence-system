@@ -701,3 +701,88 @@ export interface DecisionMakerCandidate {
   evidenceTags: string[];
   sourceType: "officer" | "psc";
 }
+
+// ============================================================================
+// Website enrichment stage (Phase 5) — public official-website crawl + product-fit indicators.
+// No paid provider, no login, no robots.txt evasion, no CAPTCHA bypass. Genuinely new — no
+// website-crawling adapter exists anywhere in the repo (confirmed by audit before building).
+// ============================================================================
+
+export type WebsiteSelectionTier = "verified_google_website" | "verified_official_domain_from_evidence" | "strong_tied_candidate" | "no_website_available";
+
+export interface WebsiteSelection {
+  candidateId: string;
+  selectedDomain: string | null;
+  selectionTier: WebsiteSelectionTier;
+  evidenceTags: string[];
+}
+
+export interface CrawledPage {
+  url: string;
+  ok: boolean;
+  statusCode: number | null;
+  pageType: "home" | "contact" | "about" | "menu" | "locations" | "other";
+  retrievalTimestamp: string;
+  errorMessage: string | null;
+}
+
+export interface WebsiteCrawlResult {
+  candidateId: string;
+  domain: string | null;
+  pagesRequested: number;
+  pagesRetrieved: number;
+  pages: CrawledPage[];
+  robotsDisallowedPaths: string[];
+  crawlOutcome: "crawled" | "no_website" | "robots_fully_disallowed" | "unreachable" | "crawl_failed";
+  retrievalTimestamp: string;
+}
+
+// Every extracted field carries its own evidence — never a bare value. `value` is null when
+// nothing was found (never guessed/invented — see module header: no guessed emails, no
+// invented contacts, no inferred halal status without explicit evidence, no inferred turnover).
+export interface WebsiteEvidenceField<T> {
+  value: T | null;
+  sourceUrl: string | null;
+  evidenceText: string | null; // the raw matched snippet, for audit
+  confidence: "high" | "medium" | "low" | "not_available";
+}
+
+export interface WebsiteExtractedData {
+  candidateId: string;
+  officialDomain: string | null;
+  phone: WebsiteEvidenceField<string>;
+  email: WebsiteEvidenceField<string>;
+  hasContactForm: WebsiteEvidenceField<boolean>;
+  address: WebsiteEvidenceField<string>;
+  openingHours: WebsiteEvidenceField<string>;
+  menuUrl: WebsiteEvidenceField<string>;
+  cuisineTags: string[];
+  serviceModel: { delivery: WebsiteEvidenceField<boolean>; collection: WebsiteEvidenceField<boolean>; dineIn: WebsiteEvidenceField<boolean>; catering: WebsiteEvidenceField<boolean> };
+  productRangeTags: string[];
+  halalEvidence: WebsiteEvidenceField<boolean>; // true ONLY on explicit "halal" evidence — never inferred
+  branchList: string[];
+  socialLinks: string[];
+  franchiseGroupClues: string[];
+  centralPurchasingClues: string[];
+  likelyMagnaProductRequirements: string[];
+  publicTeamNames: string[]; // clearly-stated team/contact names only — never scraped from unrelated pages
+  retrievalTimestamp: string;
+}
+
+export const MAGNA_PRODUCT_CATEGORIES = [
+  "poultry", "frozenFoods", "chipsAndSides", "sauces", "cheeseAndDairy",
+  "pizzaIngredients", "kebabProducts", "bakeryAndDessert", "beverages", "packaging", "ambientGroceries",
+] as const;
+export type MagnaProductCategory = (typeof MAGNA_PRODUCT_CATEGORIES)[number];
+
+export interface ProductFitIndicator {
+  evidence: string[];
+  sourceUrl: string | null;
+  confidence: "high" | "medium" | "low" | "not_available";
+  reason: string;
+}
+
+export interface ProductFitResult {
+  candidateId: string;
+  indicators: Record<MagnaProductCategory, ProductFitIndicator>;
+}
