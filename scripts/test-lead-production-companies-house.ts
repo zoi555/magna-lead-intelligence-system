@@ -133,6 +133,20 @@ async function main() {
     assert(rM.outcome === "dormant_company_conflict" && rM.companiesHouseStatus === "dormant", `a dormant strong match is reported as dormant_company_conflict (got ${rM.outcome})`);
   }
 
+  // --- Regression: real live-run defect — a STRONG name match whose registered office is in a
+  // different postal district (a very common real pattern: registered office = accountant's/
+  // formation agent's address, unrelated to the trading premises) was mislabelled
+  // company_name_conflict, even though the tag itself said "NAME_MATCHES..." — the conflict is
+  // the ADDRESS, not the name. Must be registered_address_conflict regardless of whether the
+  // mismatched district is adjacent or far away. ---
+  {
+    const search = mkSearchResult([{ companyName: "Test Diner Ltd", legalNameSimilarity: 0.9, postcodeAgreement: false, companyStatus: "active" }]);
+    const profile = mkProfile({ registeredPostcode: "SW1A 1AA" }); // a totally different postal district to the candidate's UB1
+    const r = classifyCompanyMatch("cand-1", "Test Diner", "UB1 1AA", search, ["q"], "12345678", profile);
+    assert(r.outcome === "registered_address_conflict", `a strong name match with a registered office in a different postal district is registered_address_conflict, never company_name_conflict — the name matched fine (got ${r.outcome})`);
+    assert(r.evidenceTags.includes("REGISTERED_OFFICE_LIKELY_ACCOUNTANT_OR_FORMATION_AGENT"), "the evidence explicitly notes the common real-world explanation (registered office likely an accountant/formation agent, unrelated to the trading premises)");
+  }
+
   // Financial-extraction tests below construct their OWN disabled runner (env vars forced off)
   // so fetchAndComputeFinancials() never makes a real network call — it exercises the
   // no-filing-history-retrievable path, which is exactly what "absent values stay unavailable"

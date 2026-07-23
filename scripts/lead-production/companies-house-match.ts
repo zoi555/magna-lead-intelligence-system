@@ -101,11 +101,18 @@ export function classifyCompanyMatch(
   if (liveAtPostcode.length === 0) {
     const nameOnly = evidence.filter((e) => e.legalNameSimilarity >= CONFLICT_NAME_SIM && !genericQuery);
     if (nameOnly.length > 0) {
+      // Both branches below are a REGISTERED-ADDRESS conflict, not a name conflict — the name
+      // matched strongly (that's exactly why we're here); what's wrong is the address. A small
+      // food-service business very commonly uses an accountant's/formation agent's address as
+      // its registered office, entirely disconnected from the trading premises postcode — this
+      // is a real, common, non-buggy pattern, not evidence the identity itself is wrong.
+      // company_name_conflict is reserved for the OPPOSITE evidence pattern (postcode/address
+      // agrees, name does not) — see the final branch of this function.
       const sameDistrict = nameOnly.filter((e) => { const rOutward = e.registeredPostcode ? normalisePostcode(e.registeredPostcode).outward : null; return !!candOutward && !!rOutward && candOutward === rOutward; });
       if (sameDistrict.length > 0) {
         return { ...base, outcome: "registered_address_conflict", companiesHouseStatus: mapStatus(sameDistrict[0].companyStatus), plausibleCompanies: sameDistrict, evidenceTags: ["NAME_MATCHES_SAME_DISTRICT_DIFFERENT_REGISTERED_ADDRESS"], apiFailureReason: null };
       }
-      return { ...base, outcome: "company_name_conflict", companiesHouseStatus: mapStatus(nameOnly[0].companyStatus), plausibleCompanies: nameOnly, evidenceTags: ["NAME_MATCHES_DIFFERENT_REGISTERED_ADDRESS"], apiFailureReason: null };
+      return { ...base, outcome: "registered_address_conflict", companiesHouseStatus: mapStatus(nameOnly[0].companyStatus), plausibleCompanies: nameOnly, evidenceTags: ["NAME_MATCHES_DIFFERENT_POSTAL_DISTRICT_REGISTERED_ADDRESS", "REGISTERED_OFFICE_LIKELY_ACCOUNTANT_OR_FORMATION_AGENT"], apiFailureReason: null };
     }
     // No decisive company record — a real food-service business with no CH record is very
     // plausibly a sole trader or unincorporated partnership, which never requires a company
