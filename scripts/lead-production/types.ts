@@ -826,3 +826,39 @@ export interface PublicProfileResult {
   confidence: "high" | "medium" | "low" | "not_available";
   evidenceTags: string[];
 }
+
+// ============================================================================
+// Final ownership/group rescreen (Phase 7, spec Phase D). Consolidates Google-stage,
+// Companies-House-stage, and website-stage group/franchise signals into ONE final
+// classification per candidate. Never reopens an already-excluded national group (those
+// candidates never enter this population to begin with — enforced by construction, not by a
+// runtime check here).
+// ============================================================================
+
+export type FinalGroupClassification =
+  | "independent_single_site"
+  | "independent_multi_site"
+  | "acceptable_local_franchise"
+  | "regional_group"
+  | "major_franchise"
+  | "national_chain"
+  | "supermarket"
+  | "wholesale_group"
+  | "shared_kitchen"
+  | "virtual_brand"
+  | "key_account_opportunity"
+  | "ownership_unresolved";
+
+export const FINAL_GROUP_CLASSIFICATIONS: FinalGroupClassification[] = [
+  "independent_single_site", "independent_multi_site", "acceptable_local_franchise", "regional_group",
+  "major_franchise", "national_chain", "supermarket", "wholesale_group", "shared_kitchen",
+  "virtual_brand", "key_account_opportunity", "ownership_unresolved",
+];
+
+export interface FinalGroupRescreenResult {
+  candidateId: string;
+  classification: FinalGroupClassification;
+  defaultOutcome: GroupDefaultOutcome | null;
+  evidenceSources: string[]; // which stage(s) contributed evidence — "google" | "companies_house" | "website" | "registry"
+  evidenceTags: string[];
+}
