@@ -562,7 +562,8 @@ nothing has started depending on it in the meantime. Not urgent — no observed 
 Date: 2026-07-23
 Severity: Medium — blocks the 22-territory rollout
 Owner: Zoeb
-Status: Open — deferred
+Status: **Resolved 2026-07-23** — orchestrator built, tested, and UB1-replay-verified; rollout
+itself remains gated on separate explicit sign-off (see "Next action" below).
 
 ### Problem
 
@@ -576,12 +577,23 @@ manifests, and automatic reconciliation for a NEW territory. The user's own over
 explicitly gates the 22-territory rollout (RM1/KT1/TW1-20) behind this orchestrator's own tests
 passing — so the rollout was correctly not attempted, independent of any other consideration.
 
+### Resolution
+
+Built `scripts/lead-production/run-full-territory.ts` + `scripts/test-lead-production-full-
+territory.ts` (20 proofs). Fixed two real bugs found while building it (see
+`docs/10_BUGS_AND_FIXES.md`): `run-google-stage.ts`'s population self-derivation gap, and the
+orchestrator's own manifest-not-written-on-override-only-run bug. Validated by replaying UB1's
+own accepted checkpoints through `public_profile → final_scoring` (zero live calls) — reproduces
+`ub1-authoritative-master.json` and `ub1-scoring-breakdown.json` exactly, all 94 candidates, zero
+field-level differences — and by two synthetic-territory smoke tests (2 and 3 candidates).
+Commits `24a8727`, `3114c86`. Full detail: `docs/15_AI_WORK_LOG.md` (session 2026-07-23).
+
 ### Next action
 
-Build `scripts/lead-production/run-full-territory.ts` — dry-run mode, resume mode, tests proving
-the same configuration works for a different postcode district. See
-`/Users/homemac/Data/aspectlead-lead-production/OVERNIGHT_PROGRESS_2026-07-23.md` for full
-context.
+The orchestrator itself has never been run live against a real new territory (only UB1's replay
+and synthetic fixtures). Get explicit sign-off before the first live run — recommended: RM1 or
+KT1 (field-sales, small `required_lead_count` scope) as the first real-world proof, ahead of the
+full TW1-20 telesales rollout.
 
 ## ISS-0026 — lead-production bridge: two known evidence gaps carried into UB1 scoring
 
@@ -606,3 +618,27 @@ Status: Open — deferred
 
 Both are intentional, documented scope decisions, not bugs — revisit only if/when a lawful
 public-search connector and/or a larger document-API budget are explicitly approved.
+
+## ISS-0027 — `website-extraction.ts` does not validate/decode `tel:`/`mailto:` href content
+
+Date: 2026-07-23
+Severity: Low — caught and corrected at the release-audit layer, not blocking
+Owner: Zoeb
+Status: Open — deferred
+
+### Problem
+
+Found during the UB1 release audit: `website-extraction.ts`'s `extractPhone()` takes a `tel:`
+href's contents verbatim without validating it looks like a real phone number or URL-decoding
+it first. 2 of 14 UB1 Level 0 candidates had a malformed value as a result (e.g.
+`+44%2078854%2003976` — un-decoded percent-encoding; `+65.4566743` — non-UK garbage). Both
+candidates already had a clean, independently-verified Google Places phone, used instead in the
+release pack with the substitution explicitly noted. No enrichment checkpoint was modified.
+
+### Next action
+
+Fix `extractPhone()` (and the equivalent `mailto:` handling, unchecked but likely the same root
+cause) to URL-decode href content and validate the result looks like a real UK phone number
+before treating it as high-confidence evidence. Not applied this session — a code change to an
+already-accepted, immutable-checkpoint-producing stage requires separate approval and a fresh
+run to take effect for any candidate whose only phone source is the website.

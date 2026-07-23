@@ -704,3 +704,32 @@ The lead-production bridge's customer/assignment inputs are real exports from ex
 (NetSuite/Sales Pro-style), which are commonly `.xlsx`. Restricting to CSV-only would push manual
 re-export work onto the user for every run. This is scoped entirely to the offline CLI — no
 application runtime, bundle, or Vercel deployment is affected.
+
+## New pattern: reusable full-territory orchestrator, CLI-spawn-chained (no in-process reimplementation) (2026-07-23)
+
+Added `scripts/lead-production/run-full-territory.ts`, the first top-level orchestrator in the
+`lead-production/` bridge. It sequences the existing 8 stage CLI scripts (`run-comparison.ts`
+through `run-final-scoring-stage.ts`) for any territory via `spawnSync("npx", ["tsx",
+<stage-script>, ...args])` — it never imports or reimplements a stage's logic in-process. Adds:
+one immutable timestamped output directory per stage; a `.orchestrator-run-manifest.json`
+recording each stage's directory, anchor-file checksum, code commit SHA, and rules version;
+checksum-verified `--resume`; `--checkpoint=<stage>=<dir>` overrides (validated, never
+regenerated); `--from-stage`/`--to-stage` ranges; `--request-plan-only` (zero live external
+calls, chains every in-range live-calling stage's own preflight mode).
+
+### Reason
+
+The individual stage scripts were already territory-agnostic (directory-path + `--territory`
+flag arguments, no hardcoded candidate data), but UB1 was run by hand, stage-by-stage, via
+directly-invoked npm scripts with manually-tracked directory paths. The user's overnight
+directive explicitly required a single reusable entry point, gated behind its own tests, before
+any of the 22 assigned territories (RM1/KT1/TW1-20) could be started. Chaining real CLI
+invocations (rather than importing stage modules into one process) was chosen deliberately: it
+guarantees the orchestrator can never silently diverge from what a manual, stage-by-stage run
+would produce — each stage remains independently runnable and independently tested exactly as
+before, and "replay" for the two accepted-checkpoint stages (`public_profile`, `group_rescreen`,
+`final_scoring` — genuinely zero external calls at any time) means literally re-executing the
+real script, not a parallel reimplementation. Verified faithful by replaying UB1's own accepted
+checkpoints end-to-end with zero live calls and diffing the result against the original output —
+zero field-level differences across all 94 candidates (see `docs/15_AI_WORK_LOG.md`, session
+2026-07-23, and ISS-0025).

@@ -700,3 +700,80 @@ customer comparison.
   retry against the same site after a challenge — explicitly excluded); Deliveroo production
   automation not authorised; mobile-width visual verification and Preview-deployment smoke test
   still blocked by no connected browser session (unchanged limitation, ISS-0019).
+
+## Session: 2026-07-23 — UB1 release audit + reusable full-territory orchestrator
+
+Tool used: Claude Code, continuation of the same day's overnight session (`73d94ab`).
+Human request, two parts: (1) a release-quality audit of the completed UB1 pipeline before any
+real business is contacted — full reconciliation proof, per-candidate Level 0/Level 1 audit
+against explicit removal/promotion criteria, a release pack in a new immutable directory, no
+contact/external send; (2) a reusable `run-full-territory.ts` orchestrator that runs the same
+8-stage pipeline for any territory (never hardcoding UB1), with resume/checkpoint-override/
+request-plan-only/stage-range support, validated by replaying UB1's own existing checkpoints
+(no live calls) and two synthetic-territory smoke tests. Hard constraints: do not restart any
+completed enrichment stage; do not make new live API calls; treat all accepted checkpoints as
+immutable; do not start live RM1/KT1/TW discovery.
+
+**Part 1 — UB1 release audit** (all outputs written outside this repo, under
+`/Users/homemac/Data/aspectlead-lead-production/output/ub1/2026-07-23T10-30-57Z-release-audit/`,
+per instruction):
+- Reconciled all 94 original Phase 1 candidates into the 9 expected buckets with zero
+  duplicates and zero cross-bucket contamination (`UB1_RELEASE_VALIDATION.json`).
+- Audited all 14 Level 0 candidates against every stated removal criterion — 14/14 released, 0
+  downgraded. Found and corrected (at the audit-output layer only, no checkpoint touched) a
+  real data-quality issue: 2 candidates' website-extracted phone was an un-decoded `tel:` href
+  artifact; both already had a clean, independently-verified Google Places phone, used instead
+  in the release-facing files with the correction explicitly noted. Filed a follow-up
+  recommendation to fix `website-extraction.ts`'s `tel:`/`mailto:` href decoding (not applied —
+  out of scope for tonight's release).
+- Audited all 7 Level 1 candidates — 0/7 promotable (none had an unresolved
+  customer/ownership/identity conflict, which would have made them Level 2/3 candidates, not
+  Level 1). Flagged "Queens Pharmacy" for exclusion — Google's own category evidence identifies
+  it as non-food-service, likely upstream Just Eat discovery noise.
+- Wrote the full 6-file release pack plus the 2 retained (unchanged) system-import files. Did
+  not generate the external-system import file (schema still not supplied, per instruction).
+- Final decision: 14 Level 0 released, 0 downgraded, 0/7 Level 1 promotable, 7/7 held,
+  telesales-ready 14, field-sales-ready 13, both-channels 13, neither 0. No candidate
+  contacted; no file sent externally.
+
+**Part 2 — reusable orchestrator**:
+- Built `scripts/lead-production/run-full-territory.ts` (8-stage sequencer, spawns each
+  existing already-tested CLI script — never reimplements stage logic) and
+  `scripts/test-lead-production-full-territory.ts` (20 integration proofs spawning the real
+  CLI against synthetic ZZ1/KT9 fixtures).
+- While testing `--request-plan-only` across a chained stage range, found a real architectural
+  gap: `run-google-stage.ts` required an externally pre-placed population file rather than
+  self-deriving from the upstream checkpoint like every other stage. Fixed with `--phase1-dir`
+  + `derivePopulationFromFsaCheckpoint()` — confirmed working against both synthetic
+  territories (2 and 3 candidates respectively) before and after wiring the orchestrator to
+  pass the new flag.
+- The orchestrator's own test suite then surfaced a second real bug: the run manifest was never
+  written to disk when every in-range stage was a `--checkpoint` override (no stage actually
+  executed) — fixed by writing the manifest in that branch too. Both bugs documented in
+  `docs/10_BUGS_AND_FIXES.md`.
+- **UB1 replay validation** (the required proof that the orchestrator is faithful to the real
+  pipeline): ran the orchestrator from `public_profile` through `final_scoring` with
+  `--checkpoint` overrides pointing at UB1's own accepted phase1/fsa/google/companies_house/
+  website directories (per `ub1-final-run-manifest.json`'s recorded `sourceCheckpoints`) —
+  zero live external calls (these three stages make none, live or not). Diffed the resulting
+  `ub1-authoritative-master.json` and `ub1-scoring-breakdown.json` against the original
+  2026-07-23T04-51-13Z-final-ub1 checkpoint: **zero field-level differences across all 94
+  candidates** (bucket counts, channel classifications, and every scoring-breakdown field
+  identical).
+- Validated `territory-assignments-tonight.csv` directly against the orchestrator's own
+  `load-assignments.ts` loading path: 22 rows, 22 unique territories, RM1→Nauman (field_sales,
+  map_required=true), KT1→Manraj (field_sales, map_required=true), all 20 TW territories
+  individually to telesales, TW15→Sharyar Ali, `required_lead_count=0` on all 22 rows.
+- **Verified:** `npm run typecheck`, `npm run build`, all lead-production test suites
+  (companies-house, website, public-profile, final-group-rescreen, final-scoring, bridge, fsa,
+  google, and the new full-territory suite) green. One pre-existing failure in
+  `test:lead-production-google` (`types.ts` legitimately contains the string `level_0`..
+  `level_4` as `RejectionLevel`/bucket enum members, tripping a naming-convention regex check)
+  confirmed present on the base commit via `git stash` before these changes — not caused by,
+  and not fixed as part of, this session's work.
+- Commits `24a8727` (google-stage self-derivation fix) and `3114c86` (orchestrator + tests),
+  pushed to `feature/mvp-vertical-slice-001`.
+- **Not done / explicitly out of scope this session:** no live RM1, KT1, or TW discovery was
+  started; the orchestrator has been proven correct only via the UB1 checkpoint replay and two
+  synthetic-territory smoke tests — it has not yet been run live end-to-end against a real new
+  territory. That is the recommended next step, gated on explicit sign-off.

@@ -426,3 +426,48 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
 - **Backup wording corrected**: "WAL archiving verified; restore capability not independently
   proven" (not overclaimed as a confirmed backup).
 - Verified: typecheck, build, 21 test suites green (incl. a live end-to-end persistence test).
+
+### UB1 release audit + reusable full-territory orchestrator — 2026-07-23
+
+- **UB1 release audit** (all 94 candidates reconciled, no duplicates, no cross-bucket
+  contamination): all 14 Level 0 candidates recommended for release (0 downgraded); one
+  audit-layer data-quality correction (2 candidates had a malformed website-extracted phone —
+  a raw un-decoded `tel:` href — corrected to the already-verified Google phone in the
+  release-facing outputs only; no checkpoint re-run or modified). 0 of 7 Level 1 candidates
+  promotable (all held; "Queens Pharmacy" flagged for exclusion — Google's own category
+  evidence identifies it as non-food-service). Telesales-ready 14, field-sales-ready 13, both
+  13. Release pack: `/Users/homemac/Data/aspectlead-lead-production/output/ub1/2026-07-23T10-30-57Z-release-audit/`
+  (outside this repo, per instruction — no external system-import file generated, schema not
+  yet supplied). No candidate contacted; no file sent externally.
+- **New reusable orchestrator**: `scripts/lead-production/run-full-territory.ts` — sequences
+  the same 8-stage pipeline for any territory (never hardcodes UB1), one immutable timestamped
+  directory per stage, checksum-verified `--resume`, `--checkpoint=<stage>=<dir>` overrides,
+  `--from-stage`/`--to-stage` ranges, `--request-plan-only` (zero live calls), reuses
+  `load-assignments.ts`'s duplicate-ownership rejection. `scripts/test-lead-production-full-territory.ts`
+  (20 proofs, spawns the real CLI against synthetic ZZ1/KT9 fixtures) — territory-agnosticism,
+  resume/corruption rejection, plan-only-makes-no-calls, duplicate-ownership rejection, stage
+  ranges.
+- **Fixed** (see `docs/10_BUGS_AND_FIXES.md`): `run-google-stage.ts` required an externally
+  pre-placed population file, blocking reuse for any new territory — now self-derives from the
+  FSA checkpoint via `--phase1-dir`. Orchestrator manifest was never written to disk when every
+  in-range stage was a `--checkpoint` override (no stage actually executed).
+- **UB1 replay validated**: orchestrator re-run of `public_profile → final_scoring` against
+  UB1's own accepted checkpoints (via `--checkpoint` overrides, zero live calls) reproduces
+  `ub1-authoritative-master.json` and `ub1-scoring-breakdown.json` with zero field-level
+  differences across all 94 candidates.
+- **Territory-assignments file validated**: `territory-assignments-tonight.csv` — 22 rows, 22
+  unique territories, RM1→Nauman (field_sales, map required), KT1→Manraj (field_sales, map
+  required), all 20 TW territories individually to telesales, TW15→Sharyar Ali,
+  `required_lead_count=0` on all 22 rows.
+- Verified: typecheck, build, all lead-production test suites green (one pre-existing,
+  unrelated failure in `test:lead-production-google` — `types.ts` contains the literal string
+  `level_0`..`level_4` as enum member names, confirmed present before this session's changes
+  via `git stash`; not touched here).
+- **No live RM1/KT1/TW discovery was started.** No new live API calls of any kind were made
+  outside the UB1-checkpoint replay (which itself makes none — public_profile/group_rescreen/
+  final_scoring are pure consolidation stages).
+- Commits: `24a8727` (google-stage fix), `3114c86` (orchestrator + tests), pushed to
+  `feature/mvp-vertical-slice-001`.
+- **Next task**: get sign-off to run the orchestrator live for RM1 and/or KT1 (field-sales,
+  map required) as the first real reuse beyond UB1 — orchestrator itself has not yet been run
+  live against any territory other than UB1's replay.

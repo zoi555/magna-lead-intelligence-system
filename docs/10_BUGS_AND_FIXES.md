@@ -429,3 +429,36 @@ Level 4 dropped from 25 to 15; Level 0 rose from 13 to 14.
 
 **See also:** `scripts/lead-production/hard-gates.ts`, `run-final-scoring-stage.ts` — commit
 `9b87f14`.
+
+## Fix — Google stage required a pre-placed population file, blocking territory reuse (2026-07-23)
+
+**Bug:** `run-google-stage.ts` was the only lead-production stage that could not derive its own
+input population from the upstream checkpoint. It required `google-input-population.json` to
+already exist in `--out` (originally written by a one-off manual extraction script during the
+first UB1 run) — `run-fsa-stage.ts` and `run-companies-house-stage.ts` both already self-derive
+their own populations. This silently blocked the new reusable orchestrator
+(`run-full-territory.ts`) from processing the Google stage for any territory other than UB1.
+
+**Fix:** added `--phase1-dir` and `derivePopulationFromFsaCheckpoint()`, which reads the Phase 1
+population and excludes only candidates the FSA stage itself confirmed as an active Magna
+customer (mirroring the FSA stage's own filter). Population resolution order is unchanged for
+UB1: `--population` override, then an existing `google-input-population.json` in `--out`, then
+self-derivation. UB1's existing checkpoint was never touched.
+
+**See also:** `scripts/lead-production/run-google-stage.ts` — commit `24a8727`.
+
+## Fix — orchestrator manifest never written when every in-range stage was a checkpoint override (2026-07-23)
+
+**Bug:** `run-full-territory.ts`'s per-stage loop wrote `.orchestrator-run-manifest.json` to disk
+only in the branch that actually executes a stage script. The `--checkpoint=<stage>=<dir>`
+override branch updated the in-memory manifest object and logged success, but never called
+`fs.writeFile`. A run whose entire `--from-stage`/`--to-stage` range consisted of overridden
+stages (e.g. validating a supplied `phase1`/`fsa` checkpoint with no other stage in range) exited
+0, printed a manifest path, but left no manifest file on disk — silently breaking `--resume` for
+that run. Found via the new orchestrator test suite's stage-range proof.
+
+**Fix:** the override branch now writes the manifest to disk immediately after recording the
+stage, identical to the executed-stage branch.
+
+**See also:** `scripts/lead-production/run-full-territory.ts`,
+`scripts/test-lead-production-full-territory.ts` — commit `3114c86`.
