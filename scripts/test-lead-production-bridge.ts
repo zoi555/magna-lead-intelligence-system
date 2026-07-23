@@ -499,7 +499,7 @@ async function main() {
   {
     assert(screenLargeGroups.constructor.name !== "AsyncFunction", "screenLargeGroups() is synchronous (no network/enrichment call inside it)");
     const dir = path.resolve(process.cwd(), "scripts/lead-production");
-    const EXTERNAL_ADAPTER_FILES = new Set(["fsa-adapter.ts", "google-adapter.ts"]);
+    const EXTERNAL_ADAPTER_FILES = new Set(["fsa-adapter.ts", "google-adapter.ts", "companies-house-adapter.ts"]);
     const files = (await fs.readdir(dir)).filter((f) => f.endsWith(".ts") && !EXTERNAL_ADAPTER_FILES.has(f));
     let violation: string | null = null;
     for (const f of files) {

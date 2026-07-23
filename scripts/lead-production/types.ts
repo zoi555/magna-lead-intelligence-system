@@ -431,3 +431,273 @@ export interface NewlyDetectedGroup {
   defaultOutcome: GroupDefaultOutcome | null; // null: detected but not yet in the approved registry — needs a human decision, never auto-excluded
   evidenceTags: string[];
 }
+
+// ============================================================================
+// Companies House stage (Phase 4) — legal-entity matching, company profile, filed accounts,
+// financial calculations, directors/PSC, related-company/group analysis, customer-match
+// resolution, decision-maker candidates. Everything below is new — no equivalent classification
+// exists anywhere in the repo (see the companies-house-*.ts module headers for what IS reused
+// from any pre-existing Companies House client).
+// ============================================================================
+
+export type CompanyLegalIdentityOutcome =
+  | "exact_company_match"
+  | "strong_probable_company_match"
+  | "multiple_company_matches"
+  | "company_name_conflict"
+  | "registered_address_conflict"
+  | "dissolved_company_conflict"
+  | "dormant_company_conflict"
+  | "no_company_record"
+  | "probable_sole_trader_or_partnership"
+  | "companies_house_api_failure";
+
+export const COMPANY_LEGAL_IDENTITY_OUTCOMES: CompanyLegalIdentityOutcome[] = [
+  "exact_company_match", "strong_probable_company_match", "multiple_company_matches", "company_name_conflict",
+  "registered_address_conflict", "dissolved_company_conflict", "dormant_company_conflict", "no_company_record",
+  "probable_sole_trader_or_partnership", "companies_house_api_failure",
+];
+
+// The exact source status string as Companies House returns it (never re-derived/guessed) —
+// "other" is the honest fallback for any status value this bridge doesn't have a named case for,
+// rather than silently dropping or misclassifying it.
+export type CompaniesHouseStatus = "active" | "dissolved" | "dormant" | "liquidation" | "administration" | "strike_off_pending" | "other";
+
+export interface CompanySearchCandidateEvidence {
+  companyNumber: string;
+  companyName: string;
+  companyStatus: string; // raw CH status string
+  companyType: string | null;
+  registeredOfficeAddress: string | null;
+  registeredPostcode: string | null;
+  previousNames: string[];
+  legalNameSimilarity: number;
+  tradingNameSimilarity: number;
+  registeredAddressAgreement: boolean;
+  postcodeAgreement: boolean;
+  sicCodes: string[];
+  incorporationDate: string | null;
+  dissolutionDate: string | null;
+}
+
+export interface CompanyLegalIdentityResult {
+  candidateId: string;
+  candidateTradingName: string;
+  candidatePostcode: string | null;
+  outcome: CompanyLegalIdentityOutcome;
+  companiesHouseStatus: CompaniesHouseStatus | null; // the winning/best candidate's status, when one exists
+  plausibleCompanies: CompanySearchCandidateEvidence[]; // every retained plausible result, never just "the first"
+  evidenceTags: string[];
+  searchQueriesUsed: string[]; // the ordered evidence-priority queries actually attempted for this candidate
+  retrievalTimestamp: string;
+  apiFailureReason: string | null;
+  apiAttempts: number;
+}
+
+export interface CompanyProfile {
+  candidateId: string;
+  companyNumber: string;
+  companyName: string;
+  previousNames: string[];
+  companyStatus: string;
+  companyType: string | null;
+  incorporationDate: string | null;
+  cessationDate: string | null;
+  registeredOfficeAddress: string | null;
+  registeredPostcode: string | null;
+  sicCodes: string[];
+  natureOfBusinessDescriptions: string[];
+  accountsReferenceDate: string | null;
+  lastAccountsPeriodEnd: string | null;
+  nextAccountsDueDate: string | null;
+  accountsOverdue: boolean | null;
+  confirmationStatementDate: string | null;
+  nextConfirmationStatementDue: string | null;
+  confirmationStatementOverdue: boolean | null;
+  hasInsolvencyHistory: boolean | null;
+  hasCharges: boolean | null;
+  parentCompanyEvidence: string | null;
+  branchOrMultiSiteIndicator: boolean | null;
+  retrievalTimestamp: string;
+  sourceReference: string;
+}
+
+// Every financial figure and every calculation shares this shape — the spec requires each one
+// to carry its own formula/source/confidence regardless of whether it's a directly-reported
+// filed-accounts value or a derived ratio. `result` is deliberately `string | number | null`
+// so the SAME shape covers numeric ratios (currentRatio: 1.8) and qualitative bands
+// (financialStrengthBand: "moderate") without a parallel, near-duplicate interface.
+export type FinancialValueSource = "directly_reported" | "calculated" | "not_available";
+export type FinancialConfidence = "high" | "medium" | "low" | "not_available";
+
+export interface FinancialResult {
+  result: string | number | null; // null (never 0, never a guessed band) when unavailable
+  currency: string | null; // only set for monetary results
+  formula: string; // e.g. "current_assets / current_liabilities" or "directly reported: turnover"
+  sourceFields: string[];
+  sourcePeriods: string[]; // accounting period end date(s) the value/inputs came from
+  sourceConcept: string | null; // iXBRL tag / accounts line-item name, for directly-reported values only
+  sourceDocument: string | null; // filing reference, for directly-reported values only
+  valueSource: FinancialValueSource;
+  confidence: FinancialConfidence;
+  unavailableReason: string | null; // required whenever result is null
+}
+
+export const FILED_ACCOUNTS_FIELDS = [
+  "turnover", "grossProfit", "operatingProfit", "profitOrLoss", "cashAndCashEquivalents",
+  "currentAssets", "currentLiabilities", "netCurrentAssetsLiabilities", "fixedAssets", "totalAssets",
+  "totalLiabilities", "creditors", "netAssets", "shareholdersFunds", "employeeCount",
+] as const;
+export type FiledAccountsField = (typeof FILED_ACCOUNTS_FIELDS)[number];
+
+export interface FiledAccountsData {
+  candidateId: string;
+  companyNumber: string;
+  accountsType: string | null; // micro-entity / abbreviated / full / dormant / group, etc. — as filed
+  reportingPeriodStart: string | null;
+  reportingPeriodEnd: string | null;
+  values: Record<FiledAccountsField, FinancialResult>;
+  sourceDocumentReference: string | null;
+  retrievalTimestamp: string;
+}
+
+export const FINANCIAL_CALCULATION_FIELDS = [
+  "companyAgeYears", "daysSinceLastAccounts", "accountsFilingRecency", "currentRatio", "workingCapital",
+  "liabilitiesToAssetsRatio", "netAssetValue", "netAssetGrowth", "turnoverGrowth", "profitMargin",
+  "revenuePerEmployee", "financialStrengthBand", "companySizeBand", "likelyPurchasingCapacityBand",
+] as const;
+export type FinancialCalculationField = (typeof FINANCIAL_CALCULATION_FIELDS)[number];
+
+export interface FinancialRiskFlag {
+  flag: string;
+  sourceFields: string[];
+  sourcePeriods: string[];
+}
+
+export interface FinancialCalculations {
+  candidateId: string;
+  companyNumber: string;
+  calculations: Record<FinancialCalculationField, FinancialResult>;
+  financialRiskFlags: FinancialRiskFlag[];
+  financialDataCompleteness: FinancialResult; // fraction (0-1) of filed-accounts fields actually available
+  financialDataConfidence: FinancialConfidence;
+}
+
+// Deliberately excludes date of birth (even partial) and residential address — see module
+// header. Only fields legitimately needed for rep-facing decision-maker identification and
+// operational judgement are retained.
+export interface OfficerRecord {
+  candidateId: string;
+  companyNumber: string;
+  fullName: string;
+  officerRole: string; // raw CH role string, e.g. "director", "secretary", "llp-member"
+  appointedDate: string | null;
+  resignedDate: string | null;
+  status: "current" | "resigned";
+  nationality: string | null; // only where legitimately returned AND operationally necessary
+  occupation: string | null;
+  currentAppointmentsCount: number | null;
+  resignedAppointmentsCount: number | null;
+  associatedCompanyNumbers: string[];
+  associatedCompanyNames: string[];
+  sharedDirectorFlag: boolean; // appears as an officer at more than one company within this run
+  likelyOwnerDirectorIndicator: boolean;
+  likelyOperationalDecisionMakerIndicator: boolean;
+  sourceReference: string;
+  retrievalTimestamp: string;
+}
+
+export interface PscRecord {
+  candidateId: string;
+  companyNumber: string;
+  pscName: string;
+  pscType: "individual" | "corporate";
+  notifiedDate: string | null;
+  ceasedDate: string | null;
+  status: "current" | "ceased";
+  natureOfControl: string[];
+  ownershipPercentageBand: string | null; // the explicit CH-supplied band only (e.g. "25-50%") — never a fabricated precise percentage
+  votingRightsBand: string | null;
+  appointmentRemovalRights: boolean | null;
+  isCorporateController: boolean;
+  linkedCompanyNumber: string | null;
+  sourceReference: string;
+  retrievalTimestamp: string;
+}
+
+export type RelatedCompanyCategory =
+  | "independent_single_site_company"
+  | "independent_multi_site_company"
+  | "common_control_group"
+  | "parent_subsidiary_relationship"
+  | "franchise_operator"
+  | "national_chain_operator"
+  | "regional_group"
+  | "shared_director_group"
+  | "shared_psc_group"
+  | "shared_registered_office_only"
+  | "possible_accountant_or_formation_agent_address"
+  | "key_account_opportunity"
+  | "ownership_unresolved";
+
+export const RELATED_COMPANY_CATEGORIES: RelatedCompanyCategory[] = [
+  "independent_single_site_company", "independent_multi_site_company", "common_control_group",
+  "parent_subsidiary_relationship", "franchise_operator", "national_chain_operator", "regional_group",
+  "shared_director_group", "shared_psc_group", "shared_registered_office_only",
+  "possible_accountant_or_formation_agent_address", "key_account_opportunity", "ownership_unresolved",
+];
+
+// A shared registered office ALONE is never sufficient evidence of common ownership, and a
+// shared director/PSC ALONE is never sufficient either — both require accompanying business or
+// control evidence (see group-analysis-after-companies-house.ts). This is enforced in code, not
+// just documented here.
+export interface RelatedCompanyAnalysis {
+  candidateId: string;
+  companyNumber: string | null;
+  category: RelatedCompanyCategory;
+  relatedCompanyNumbers: string[];
+  relatedCompanyNames: string[];
+  sharedDirectorNames: string[];
+  sharedPscNames: string[];
+  evidenceTags: string[];
+}
+
+export type CustomerResolutionAfterCompaniesHouseOutcome =
+  | "confirmed_active_customer_after_companies_house"
+  | "confirmed_inactive_customer_after_companies_house"
+  | "released_from_customer_hold_after_companies_house"
+  | "unresolved_customer_match_after_companies_house";
+
+export interface CustomerResolutionAfterCompaniesHouse {
+  candidateId: string;
+  priorResolution: CustomerResolutionAfterGoogleOutcome | "n/a";
+  priorMatchedCustomerId: string | null;
+  resolutionOutcome: CustomerResolutionAfterCompaniesHouseOutcome;
+  evidenceUsed: string[];
+  companiesHouseOutcome: CompanyLegalIdentityOutcome;
+}
+
+export type DecisionMakerLikelyRole =
+  | "owner_director"
+  | "founder"
+  | "managing_director"
+  | "operations_director"
+  | "purchasing_procurement_decision_maker"
+  | "company_secretary"
+  | "corporate_controller"
+  | "unclear";
+
+export const DECISION_MAKER_LIKELY_ROLES: DecisionMakerLikelyRole[] = [
+  "owner_director", "founder", "managing_director", "operations_director",
+  "purchasing_procurement_decision_maker", "company_secretary", "corporate_controller", "unclear",
+];
+
+export interface DecisionMakerCandidate {
+  candidateId: string;
+  companyNumber: string | null;
+  fullName: string;
+  likelyRole: DecisionMakerLikelyRole;
+  rank: number; // 1 = most likely primary decision-maker for this candidate
+  evidenceTags: string[];
+  sourceType: "officer" | "psc";
+}
