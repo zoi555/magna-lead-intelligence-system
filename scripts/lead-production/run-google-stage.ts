@@ -65,6 +65,10 @@ const GOOGLE_COLUMNS = [
   "best_place_id", "best_official_name", "best_formatted_address", "best_postcode", "best_latitude", "best_longitude",
   "best_phone", "best_website", "best_business_status", "best_primary_category", "best_additional_categories",
   "best_rating", "best_review_count", "best_name_similarity", "best_postcode_agreement", "best_distance_m",
+  // Full raw-evidence audit columns — independent of the "plausible" classification filter
+  // above, so a zero-result response, a weak-match response, and an API failure are each
+  // independently provable from this CSV alone (see types.ts's GoogleMatchResult header).
+  "result_count", "zero_results", "all_returned_place_ids", "all_returned_names",
   "evidence_tags", "retrieval_timestamp", "source_response_reference", "api_failure_reason", "api_attempts",
 ] as const;
 
@@ -80,6 +84,9 @@ function googleRow(g: GoogleMatchResult): Record<string, unknown> {
     best_rating: best?.rating ?? "", best_review_count: best?.reviewCount ?? "",
     best_name_similarity: best ? best.nameSimilarity.toFixed(3) : "", best_postcode_agreement: best?.postcodeAgreement ?? "",
     best_distance_m: best?.distanceFromCandidateMetres ?? "",
+    result_count: g.resultCount ?? "", zero_results: g.zeroResults,
+    all_returned_place_ids: g.allReturnedResults.map((r) => r.placeId).join(";"),
+    all_returned_names: g.allReturnedResults.map((r) => r.officialName).join(";"),
     evidence_tags: g.evidenceTags.join(";"), retrieval_timestamp: g.retrievalTimestamp, source_response_reference: g.sourceResponseReference,
     api_failure_reason: g.apiFailureReason ?? "", api_attempts: g.apiAttempts,
   };
@@ -127,6 +134,10 @@ async function main() {
   const outArg = arg("out");
   const live = flag("live");
   const maxCallsOverride = arg("max-calls") ? Number.parseInt(arg("max-calls")!, 10) : null;
+  const candidateIdsPath = arg("candidate-ids"); // optional: restrict to a supplemental subset of the population
+  const populationOverridePath = arg("population"); // optional: read the population JSON from elsewhere (supplemental runs use a fresh --out dir with no population file of its own yet)
+  const noFsaNameInQuery = flag("no-fsa-name-in-query"); // supplemental runs: never append an FSA name, even a decisive one
+  const localityHint = arg("locality-hint"); // e.g. "UK" — appended after the postcode
 
   const missing = [!fsaDir && "--fsa-dir=<path>", !customersPath && "--customers=<path>", !registryPath && "--registry=<path>", !outArg && "--out=<path>"].filter(Boolean);
   if (missing.length) {
@@ -135,7 +146,7 @@ async function main() {
   }
 
   const { getGooglePlacesConfig, isGooglePlacesEnabled } = await import("../../src/lib/sources/google-places");
-  const { queryGooglePlaces, newBudget, buildQueryString, fsaOfficialNameForQuery, GOOGLE_STAGE_FIELD_MASK } = await import("./google-adapter");
+  const { queryGooglePlaces, newBudget, buildQueryString, resolveFsaNameForQuery, selectPopulationByIds, GOOGLE_STAGE_FIELD_MASK } = await import("./google-adapter");
   const { classifyGoogleMatch } = await import("./google-match");
   const { resolveFsaMatchAfterGoogle } = await import("./fsa-resolution-after-google");
   const { resolveCustomerMatchAfterGoogle } = await import("./customer-resolution-after-google");
@@ -152,11 +163,26 @@ async function main() {
 
   // --- Load read-only inputs. Checksummed on read so the report can prove the FSA-stage
   // checkpoint files were not modified by this run. ---
-  const inputPopulationPath = await resolveGoogleInputPopulationPath(outDir, fsaDir!);
-  const populationRaw = JSON.parse(await fs.readFile(inputPopulationPath, "utf8")) as any[];
+  const inputPopulationPath = populationOverridePath ?? await resolveGoogleInputPopulationPath(outDir, fsaDir!);
+  const fullPopulationRaw = JSON.parse(await fs.readFile(inputPopulationPath, "utf8")) as any[];
   const populationChecksum = await md5(inputPopulationPath);
-  console.log(`Google-stage population: ${populationRaw.length} candidates (expected 83) — ${path.basename(inputPopulationPath)} md5=${populationChecksum}`);
-  if (populationRaw.length !== 83) console.warn(`WARNING: expected exactly 83 candidates, found ${populationRaw.length}.`);
+  console.log(`Google-stage source population: ${fullPopulationRaw.length} candidates — ${path.basename(inputPopulationPath)} md5=${populationChecksum}`);
+
+  let populationRaw = fullPopulationRaw;
+  let candidateIds: string[] | null = null;
+  if (candidateIdsPath) {
+    candidateIds = JSON.parse(await fs.readFile(candidateIdsPath, "utf8")) as string[];
+    const idSet = new Set(candidateIds);
+    if (idSet.size !== candidateIds.length) throw new Error(`--candidate-ids contains duplicate IDs (${candidateIds.length} entries, ${idSet.size} unique).`);
+    populationRaw = selectPopulationByIds(fullPopulationRaw, candidateIds);
+    if (populationRaw.length !== candidateIds.length) {
+      const found = new Set(populationRaw.map((r) => r.candidateId));
+      const missing = candidateIds.filter((id) => !found.has(id));
+      throw new Error(`--candidate-ids: ${missing.length} requested ID(s) not found in the source population: ${missing.join(", ")}`);
+    }
+    console.log(`Restricted to supplemental candidate-ids subset: ${populationRaw.length}/${candidateIds.length} requested candidates found and selected.`);
+  }
+  console.log(`Google-stage population for this run: ${populationRaw.length} candidates`);
 
   const fsaResultsPath = path.join(fsaDir!, "fsa-results.json");
   const fsaResultsRaw = JSON.parse(await fs.readFile(fsaResultsPath, "utf8")) as FsaMatchResult[];
@@ -193,8 +219,8 @@ async function main() {
   const dryRunRequestPlan = candidates.map((c) => {
     const p = populationRaw.find((r) => r.candidateId === c.id);
     const fsa = fsaByCandidate.get(c.id) ?? null;
-    const fsaOfficialName = fsaOfficialNameForQuery(fsa);
-    return { candidateId: c.id, candidateName: c.name, postcode: c.postcode, phase2SourceBucket: p?.phase2SourceBucket ?? null, queryString: buildQueryString(c.name, c.postcode, fsaOfficialName) };
+    const fsaOfficialName = resolveFsaNameForQuery(fsa, noFsaNameInQuery);
+    return { candidateId: c.id, candidateName: c.name, postcode: c.postcode, phase2SourceBucket: p?.phase2SourceBucket ?? null, queryString: buildQueryString(c.name, c.postcode, fsaOfficialName, localityHint) };
   });
 
   const preflight = {
@@ -246,8 +272,8 @@ async function main() {
   for (let i = 0; i < candidates.length; i++) {
     const c = candidates[i];
     const fsa = fsaByCandidate.get(c.id) ?? null;
-    const fsaOfficialName = fsaOfficialNameForQuery(fsa);
-    const queryResult = await queryGooglePlaces(c.name, c.postcode, fsaOfficialName, budget);
+    const fsaOfficialName = resolveFsaNameForQuery(fsa, noFsaNameInQuery);
+    const queryResult = await queryGooglePlaces(c.name, c.postcode, fsaOfficialName, budget, localityHint);
     const classified = classifyGoogleMatch(c, queryResult);
     googleResults.push(classified);
     if ((i + 1) % 10 === 0 || i === candidates.length - 1) console.log(`  Google queried ${i + 1}/${candidates.length} (budget used ${budget.callsMade}/${budget.maxCalls})`);

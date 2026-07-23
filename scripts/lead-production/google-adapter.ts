@@ -85,11 +85,13 @@ async function searchTextMultiple(textQuery: string, fieldMask: string, apiKey: 
 }
 
 /** Query strategy: candidate trading name + locality/postcode + (optionally) the resolved FSA
- *  establishment's official name, when available — never postcode alone. */
-export function buildQueryString(candidateName: string, postcode: string | null, fsaOfficialName: string | null): string {
+ *  establishment's official name, when available + (optionally) a trailing locality/country
+ *  hint (e.g. "UK") — never postcode alone. */
+export function buildQueryString(candidateName: string, postcode: string | null, fsaOfficialName: string | null, localityHint: string | null = null): string {
   const parts = [candidateName];
   if (fsaOfficialName && fsaOfficialName.toLowerCase() !== candidateName.toLowerCase()) parts.push(fsaOfficialName);
   if (postcode) parts.push(postcode);
+  if (localityHint) parts.push(localityHint);
   return parts.filter(Boolean).join(" ");
 }
 
@@ -107,11 +109,34 @@ export function fsaOfficialNameForQuery(fsa: { outcome: string; plausibleEstabli
   return decisive ? (fsa.plausibleEstablishments[0]?.officialBusinessName ?? null) : null;
 }
 
+/** Wraps fsaOfficialNameForQuery() with a hard per-run override — used by supplemental runs
+ *  where the operator has decided NO FSA name should ever be offered to the query, regardless
+ *  of decisiveness (e.g. because the population being re-queried was specifically selected for
+ *  having produced no_google_match results, and the safest corrected query strategy is
+ *  candidate name + postcode + locality only). */
+export function resolveFsaNameForQuery(
+  fsa: { outcome: string; plausibleEstablishments: { officialBusinessName: string }[] } | null,
+  forceNull: boolean,
+): string | null {
+  return forceNull ? null : fsaOfficialNameForQuery(fsa);
+}
+
+/** Pure selection function — restricts a population array to exactly the requested candidate
+ *  IDs, preserving the requested order. Used by run-google-stage.ts's --candidate-ids
+ *  supplemental-run mode; exported here (rather than from run-google-stage.ts, which runs its
+ *  CLI main() as an unconditional module side-effect on import) for direct, side-effect-free
+ *  unit testing. Does not validate completeness itself — the caller checks the returned length
+ *  against the requested count and reports the specific missing IDs. */
+export function selectPopulationByIds(population: any[], ids: string[]): any[] {
+  const byId = new Map(population.map((r) => [r.candidateId, r]));
+  return ids.map((id) => byId.get(id)).filter((r): r is any => r !== undefined);
+}
+
 export async function queryGooglePlaces(
-  candidateName: string, postcode: string | null, fsaOfficialName: string | null, budget: GoogleRequestBudget,
+  candidateName: string, postcode: string | null, fsaOfficialName: string | null, budget: GoogleRequestBudget, localityHint: string | null = null,
 ): Promise<GoogleQueryResult> {
   const retrievedAt = new Date().toISOString();
-  const queryString = buildQueryString(candidateName, postcode, fsaOfficialName);
+  const queryString = buildQueryString(candidateName, postcode, fsaOfficialName, localityHint);
 
   if (!isGooglePlacesEnabled()) {
     return { ok: false, places: [], attempts: 0, errorMessage: null, queryString, retrievedAt, disabledReason: "Google Places disabled (key/enabled/cap gate) — no call attempted." };

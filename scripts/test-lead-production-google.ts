@@ -9,7 +9,7 @@ import { classifyGoogleMatch, GOOGLE_MATCH_THRESHOLDS } from "./lead-production/
 import { resolveFsaMatchAfterGoogle } from "./lead-production/fsa-resolution-after-google";
 import { resolveCustomerMatchAfterGoogle } from "./lead-production/customer-resolution-after-google";
 import { assessPhysicalPremises } from "./lead-production/physical-premises";
-import { buildQueryString, newBudget, budgetRemaining, queryGooglePlaces, fsaOfficialNameForQuery } from "./lead-production/google-adapter";
+import { buildQueryString, newBudget, budgetRemaining, queryGooglePlaces, fsaOfficialNameForQuery, resolveFsaNameForQuery, selectPopulationByIds } from "./lead-production/google-adapter";
 import { classifyFsaMatch } from "./lead-production/fsa-match";
 import type { OperationalCandidate, CustomerRecord, FsaMatchResult, GoogleMatchResult } from "./lead-production/types";
 import type { GoogleQueryResult } from "./lead-production/google-adapter";
@@ -68,6 +68,74 @@ function noGoogleMatch(candidateId = "cand-1"): GoogleMatchResult {
 
 async function main() {
   console.log("Google-stage — fixture-driven proofs:\n");
+
+  // --- Supplemental-run proof 1: a zero-result Google response is preserved as raw evidence ---
+  {
+    const r = classifyGoogleMatch(mkCandidate({ name: "Nonexistent Business" }), mkQueryResult(true, []));
+    assert(r.resultCount === 0, `a genuine zero-result response records resultCount === 0 (got ${r.resultCount})`);
+    assert(r.zeroResults === true, "zeroResults is explicitly true for a genuine zero-result response");
+    assert(Array.isArray(r.allReturnedResults) && r.allReturnedResults.length === 0, "allReturnedResults is an empty array (not missing/undefined) — the zero-result state itself is the retained evidence");
+    assert(r.evidenceTags.includes("NO_RESULTS_RETURNED"), "an explicit NO_RESULTS_RETURNED tag distinguishes a true zero-result call from a call with unqualified results");
+  }
+
+  // --- Supplemental-run proof 2: an empty result is distinguishable from an API failure ---
+  {
+    const zero = classifyGoogleMatch(mkCandidate(), mkQueryResult(true, []));
+    const failure = classifyGoogleMatch(mkCandidate(), mkQueryResult(false, [], "Google Places HTTP 500"));
+    assert(zero.resultCount === 0 && zero.zeroResults === true && zero.apiFailureReason === null, "a zero-result success: resultCount=0, zeroResults=true, no failure reason");
+    assert(failure.resultCount === null && failure.zeroResults === false && failure.apiFailureReason === "Google Places HTTP 500", "an API failure: resultCount=null (never 0 — no data was ever returned), zeroResults=false, a real failure reason retained");
+    assert(zero.outcome === "no_google_match" && failure.outcome === "google_api_failure", "the two states also produce distinct primary outcomes — never conflated");
+  }
+
+  // --- Supplemental-run proof 3: ambiguous FSA names are not appended to the supplemental query ---
+  {
+    const ambiguousFsa = classifyFsaMatch(mkCandidate({ name: "Khans Snacks", postcode: "UB1 1LP" }), mkFsaQuery(true, [
+      mkFsaEstablishment({ fhrsId: "A", businessName: "Al-Haad", postcode: "UB1 1LP" }),
+      mkFsaEstablishment({ fhrsId: "B", businessName: "Khans Snacks", postcode: "UB1 1LP" }),
+    ]));
+    const decisiveFsa = classifyFsaMatch(mkCandidate({ name: "Khans Snacks", postcode: "UB1 1LP" }), mkFsaQuery(true, [mkFsaEstablishment({ fhrsId: "A", businessName: "Khans Snacks Ltd", postcode: "UB1 1LP" })]));
+    assert(resolveFsaNameForQuery(ambiguousFsa, false) === null, "without the supplemental override, an ambiguous FSA result already contributes no name (normal behaviour)");
+    assert(resolveFsaNameForQuery(decisiveFsa, false) === "Khans Snacks Ltd", "without the override, a decisive FSA result normally WOULD contribute its name");
+    assert(resolveFsaNameForQuery(decisiveFsa, true) === null, "the supplemental --no-fsa-name-in-query override forces null even for an otherwise-decisive FSA result — the hard 'never append any FSA name' rule for this run");
+    assert(resolveFsaNameForQuery(ambiguousFsa, true) === null, "the override is a no-op (still null) for an already-ambiguous FSA result");
+    const q = buildQueryString("Khans Snacks", "UB1 1LP", resolveFsaNameForQuery(decisiveFsa, true), "UK");
+    assert(!q.includes("Khans Snacks Ltd"), `the supplemental query never contains any FSA official name, even a decisive one (got "${q}")`);
+    assert(q === "Khans Snacks UB1 1LP UK", `the supplemental query is built ONLY from trading name + postcode + locality hint (got "${q}")`);
+  }
+
+  // --- Supplemental-run proof 4: one candidate produces no more than one live Text Search call
+  // under normal (non-retry) conditions ---
+  {
+    const savedFetch = globalThis.fetch;
+    const savedKey = process.env.GOOGLE_PLACES_API_KEY, savedEnabled = process.env.GOOGLE_PLACES_ENABLED, savedCap = process.env.GOOGLE_PLACES_MAX_CALLS_PER_RUN;
+    process.env.GOOGLE_PLACES_API_KEY = "test-key-not-real";
+    process.env.GOOGLE_PLACES_ENABLED = "true";
+    process.env.GOOGLE_PLACES_MAX_CALLS_PER_RUN = "32";
+    let fetchCalls = 0;
+    (globalThis as any).fetch = async () => { fetchCalls++; return { ok: true, json: async () => ({ places: [] }) } as any; };
+    const budget = newBudget(32);
+    await queryGooglePlaces("Test Diner", "UB1 1AA", null, budget, "UK");
+    assert(fetchCalls === 1, `a single successful candidate query makes exactly one live Text Search call (got ${fetchCalls})`);
+    assert(budget.callsMade === 1, `exactly one budget slot is consumed for a single successful call (got ${budget.callsMade})`);
+    globalThis.fetch = savedFetch;
+    if (savedKey !== undefined) process.env.GOOGLE_PLACES_API_KEY = savedKey; else delete process.env.GOOGLE_PLACES_API_KEY;
+    if (savedEnabled !== undefined) process.env.GOOGLE_PLACES_ENABLED = savedEnabled; else delete process.env.GOOGLE_PLACES_ENABLED;
+    if (savedCap !== undefined) process.env.GOOGLE_PLACES_MAX_CALLS_PER_RUN = savedCap; else delete process.env.GOOGLE_PLACES_MAX_CALLS_PER_RUN;
+  }
+
+  // --- Supplemental-run proof 5: all N selected candidates appear in the supplemental evidence
+  // register (i.e. the candidate-ids selection mechanism is exact — no more, no fewer) ---
+  {
+    const population = [
+      { candidateId: "a", name: "A" }, { candidateId: "b", name: "B" }, { candidateId: "c", name: "C" },
+      { candidateId: "d", name: "D" }, { candidateId: "e", name: "E" },
+    ];
+    const selected = selectPopulationByIds(population, ["b", "d"]);
+    assert(selected.length === 2, `selecting 2 IDs returns exactly 2 records (got ${selected.length})`);
+    assert(selected.map((r: any) => r.candidateId).join(",") === "b,d", "the selected records are exactly (and only) the requested IDs, in the requested order");
+    const notFound = selectPopulationByIds(population, ["b", "zzz"]);
+    assert(notFound.length === 1, "a requested ID that does not exist in the population is silently omitted from the result (never fabricated) — the caller is responsible for detecting and reporting the shortfall");
+  }
 
   // --- 1 & 2: exactly 83 accepted candidates enter; excluded Phase 1/FSA records do not ---
   {

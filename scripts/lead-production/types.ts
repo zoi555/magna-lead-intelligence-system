@@ -336,12 +336,35 @@ export interface GooglePlaceEvidence {
   distanceFromCandidateMetres: number | null; // supporting evidence only
 }
 
+// Minimal per-result audit summary retained for EVERY place Google returned, regardless of
+// whether it qualified as classification evidence (plausibleResults is a filtered subset —
+// see google-match.ts). Exists specifically so a zero-result response, a weak-match response,
+// and an API failure are all independently provable from the persisted record, and so a future
+// reprocessing pass (see reprocess-google-results.ts) never has to reconstruct discarded data.
+export interface GoogleRawResultSummary {
+  placeId: string;
+  officialName: string;
+  formattedAddress: string;
+  businessStatus: string;
+  nameSimilarity: number;
+  postcodeAgreement: boolean;
+}
+
 export interface GoogleMatchResult {
   candidateId: string;
   candidateTradingName: string;
   candidatePostcode: string | null;
   outcome: GoogleOutcome;
   plausibleResults: GooglePlaceEvidence[]; // every retained plausible result, never just "the first"
+  // resultCount/zeroResults/allReturnedResults: full raw-evidence retention, independent of
+  // plausibleResults' classification filtering. resultCount is null ONLY when the call itself
+  // never returned a response at all (API failure or not attempted) — see apiFailureReason;
+  // it is 0, not null, for a genuine successful zero-result Google response. zeroResults is
+  // true iff the call succeeded AND resultCount === 0 — the explicit "Google was asked and said
+  // nothing exists here" marker distinct from "Google was never successfully asked".
+  resultCount: number | null;
+  zeroResults: boolean;
+  allReturnedResults: GoogleRawResultSummary[];
   evidenceTags: string[];
   retrievalTimestamp: string;
   sourceResponseReference: string; // the exact query text sent to Google
