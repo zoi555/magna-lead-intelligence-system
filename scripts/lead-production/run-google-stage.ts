@@ -129,13 +129,14 @@ async function main() {
   await loadDotEnv();
 
   const fsaDir = arg("fsa-dir");
+  const phase1Dir = arg("phase1-dir"); // required only when self-deriving the population (no --population override and no pre-existing google-input-population.json in --out) — see derivePopulationFromFsaCheckpoint()
   const customersPath = arg("customers");
   const registryPath = arg("registry");
   const outArg = arg("out");
   const live = flag("live");
   const maxCallsOverride = arg("max-calls") ? Number.parseInt(arg("max-calls")!, 10) : null;
   const candidateIdsPath = arg("candidate-ids"); // optional: restrict to a supplemental subset of the population
-  const populationOverridePath = arg("population"); // optional: read the population JSON from elsewhere (supplemental runs use a fresh --out dir with no population file of its own yet)
+  const populationOverridePath = arg("population"); // optional: read the population JSON from elsewhere (e.g. reproducing a prior run bit-for-bit, or a supplemental run's fresh --out dir with no population file of its own yet)
   const noFsaNameInQuery = flag("no-fsa-name-in-query"); // supplemental runs: never append an FSA name, even a decisive one
   const localityHint = arg("locality-hint"); // e.g. "UK" — appended after the postcode
 
@@ -163,7 +164,11 @@ async function main() {
 
   // --- Load read-only inputs. Checksummed on read so the report can prove the FSA-stage
   // checkpoint files were not modified by this run. ---
-  const inputPopulationPath = populationOverridePath ?? await resolveGoogleInputPopulationPath(outDir, fsaDir!);
+  let inputPopulationPath = populationOverridePath ?? (await fileExists(path.join(outDir, "google-input-population.json")) ? path.join(outDir, "google-input-population.json") : null);
+  if (!inputPopulationPath) {
+    if (!phase1Dir) throw new Error("No --population override, no pre-existing google-input-population.json in --out, and no --phase1-dir supplied to self-derive the population from. This stage must always start from a real checkpoint, never an assumed/fabricated one.");
+    inputPopulationPath = await derivePopulationFromFsaCheckpoint(phase1Dir, fsaDir!, outDir);
+  }
   const fullPopulationRaw = JSON.parse(await fs.readFile(inputPopulationPath, "utf8")) as any[];
   const populationChecksum = await md5(inputPopulationPath);
   console.log(`Google-stage source population: ${fullPopulationRaw.length} candidates — ${path.basename(inputPopulationPath)} md5=${populationChecksum}`);
@@ -384,15 +389,40 @@ async function fileExists(p: string): Promise<boolean> {
   try { await fs.access(p); return true; } catch { return false; }
 }
 
-/** The 83-candidate Google-input population was written earlier this session directly into the
- *  Google-stage output directory (google-input-population.json) — sibling to this run's own
- *  --out, not under --fsa-dir. Resolve it robustly: prefer <out>/google-input-population.json;
- *  fall back to a candidate-population.json under --fsa-dir's parent if a different layout is
- *  ever used. */
-async function resolveGoogleInputPopulationPath(outDir: string, _fsaDir: string): Promise<string> {
-  const preferred = path.join(outDir, "google-input-population.json");
-  if (await fileExists(preferred)) return preferred;
-  throw new Error(`google-input-population.json not found in --out directory (${outDir}). Expected it to already exist there (written by the population-extraction step earlier this session) before running this stage.`);
+/** Self-derives the Google-stage population directly from the FSA checkpoint, mirroring
+ *  run-fsa-stage.ts's own POPULATION_STATUSES filter and run-companies-house-stage.ts's own
+ *  population-derivation pattern — never requires an externally pre-placed population file.
+ *  (UB1's original checkpoint was built before this function existed, via a one-off script —
+ *  that checkpoint is untouched; this only changes how a NEW territory's population is derived
+ *  going forward, which is exactly what territory-agnostic reuse requires.)
+ *
+ *  Population = the FSA stage's own input population (every candidate with Phase 1
+ *  preliminaryStatus in {clear_for_enrichment, probable_customer_match, possible_customer_match})
+ *  MINUS candidates the FSA stage itself confirmed as an active Magna customer — the ONLY
+ *  FSA-stage exclusion this stage needs to reapply (inactive-customer confirmations are NOT
+ *  excluded pre-Google, matching the original design). Writes the derived population to
+ *  <out>/google-input-population.json so it becomes this run's own durable checkpoint artifact,
+ *  exactly like the original manually-extracted file was. */
+async function derivePopulationFromFsaCheckpoint(phase1Dir: string, fsaDir: string, outDir: string): Promise<string> {
+  const POPULATION_STATUSES = new Set(["clear_for_enrichment", "probable_customer_match", "possible_customer_match"]);
+  const phase1Results = JSON.parse(await fs.readFile(path.join(phase1Dir, "customer-match-results.json"), "utf8")) as any[];
+  const fsaPopulation = phase1Results.filter((p) => POPULATION_STATUSES.has(p.preliminaryStatus));
+
+  const { rows: fsaCustResRows } = parseCsvObjects(await fs.readFile(path.join(fsaDir, "customer-match-resolution-after-fsa.csv"), "utf8"));
+  const fsaCustResByCandidate = new Map(fsaCustResRows.map((r) => [r.candidate_id, r]));
+
+  const derived = fsaPopulation
+    .filter((p) => fsaCustResByCandidate.get(p.candidateId)?.resolution_outcome !== "confirmed_active_customer_after_fsa")
+    .map((p) => {
+      const res = fsaCustResByCandidate.get(p.candidateId);
+      const phase2SourceBucket = !res ? "clear_for_enrichment" : res.resolution_outcome === "clear_for_enrichment_after_fsa" ? "released_from_customer_hold" : res.resolution_outcome === "confirmed_inactive_customer_after_fsa" ? "confirmed_inactive_customer_after_fsa" : "unresolved_customer_match";
+      return { ...p, phase2SourceBucket };
+    });
+
+  const outPath = path.join(outDir, "google-input-population.json");
+  await fs.writeFile(outPath, JSON.stringify(derived, null, 2));
+  console.log(`Derived Google-stage population from the FSA checkpoint: ${fsaPopulation.length} FSA-population candidates, ${fsaPopulation.length - derived.length} excluded (confirmed active Magna customer after FSA), ${derived.length} eligible — written to ${outPath}`);
+  return outPath;
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
