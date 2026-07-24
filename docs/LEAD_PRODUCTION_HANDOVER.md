@@ -476,3 +476,42 @@ the representative-facing files in both packages.
 
 Full test/build gate re-run clean after this work: `test-lead-production-territory-v2.ts` ALL
 PASSED, `npm run typecheck` clean, `npm run build` succeeded.
+
+## NW1-NW10 — Ayesha's full Sales Territory, ACCEPTED (2026-07-24)
+
+All 10 Postcode Districts run live end-to-end and individually accepted. Territory totals: 12198
+raw = 1222 geography-valid + 10976 rejected (exact, every district). 525 raw candidates -> **14
+genuine cross-district duplicates removed -> 511 unique candidates** = 23 customer-master
+exclusions + 40 excluded groups + 238 usable (140 premium, 98 releasable L1, 10 key accounts) +
+10 held + 200 hard-rejected. All exported Sales Pro Lead IDs (228 new leads + 10 key accounts +
+23 customer-master exclusions = 261 of 511 total candidates) verified present in the Master
+workbook's Evidence Register (261/261). Zero customer-master leakage into any rep-facing/Sales
+Pro/map output, verified explicitly.
+
+**One real deterministic defect (ISS-0030) found and fixed live**: the website enrichment stage
+crashed the entire orchestrator process on a real HTTP/2 GOAWAY connection error, reproduced
+twice identically against the same remote host during live NW3 processing. Root cause: undici
+sometimes emits a connection-level failure as an `'error'` event directly on the internal
+`ClientHttp2Stream` rather than as a promise rejection, bypassing `website-adapter.ts`'s own
+try/catch. Fixed by forcing HTTP/1.1 for all website-crawl requests via an explicit `undici`
+`Agent({ allowH2: false })` dispatcher (commit `0cec029`), with two new regression tests. No
+final lead data was affected — NW3 hadn't produced any exported output when the defect surfaced.
+
+**Two transient (non-defect) discovery failures** — NW2 and NW7 — each resolved via an
+evidence-completeness procedure (100% of the failed run's partial raw evidence confirmed as a
+strict subset of its bounded replacement run's evidence; audited via `app_audit_log`). NW7
+additionally surfaced a real operational-robustness gap (`discovery_runs.status` can stay stuck
+at `"queued"` when the write that would mark it `"failed"` itself fails) — logged as **ISS-0031**
+for a future source-level fix; not a final-lead-data defect, so it did not block acceptance.
+
+Standardised handover package produced:
+`/Users/homemac/Data/aspectlead-lead-production/handover/ayesha-nw1-nw10/` (8 files —
+Representative Master, Sales Pro new-leads CSV, New Leads Map, Key Accounts Management Review,
+Customer Master Exclusions Audit, Lead Production Report, Field Provenance CSV, README).
+Representative-facing files verified to contain ordinary approved leads only (228 of 238 usable,
+zero overlap with key accounts/held/rejected/excluded).
+
+Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/ayesha/combined-2026-07-24/NW1-NW10-TERRITORY-RECONCILIATION-REPORT.md`
+
+**Next territory (TW1-TW10, Kunz's territory; and TW11-TW20, Meer's) requires separate owner
+authorisation.** No new branch created, no merge to `main`, no deployment.

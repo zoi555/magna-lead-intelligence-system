@@ -825,3 +825,35 @@ misbehaving domain.
 None — root-caused and fixed at the source (`scripts/lead-production/website-adapter.ts`), not
 patched around. See `docs/10_BUGS_AND_FIXES.md` for the fix and `docs/09_DECISIONS.md` for the
 new `undici` dependency this required.
+
+## ISS-0031 — discovery_runs.status can stay stuck at 'queued' when finishExecution() fails (2026-07-24)
+
+Date: 2026-07-24
+Severity: Medium
+Owner: Zoeb
+Status: **Open — worked around per-instance, not yet fixed at the source**
+
+### Problem
+
+NW7's discovery run failed with a transient HTTP/2 stream timeout inside `insertRawObservation`/
+`finishExecution` (`src/lib/discovery-engine/repository/supabase.ts`). The `je_executions` row
+correctly recorded `status: "failed"`, but the `discovery_runs` row's own `status` column never
+transitioned away from `"queued"` — because the same failure that killed the execution also
+prevented whatever write is meant to update `discovery_runs.status` from completing. This left a
+permanently "queued"-looking run that the duplicate-run guard in `scripts/je-run.ts` correctly
+(from its own narrow perspective) treated as still in-progress, blocking a legitimate retry until
+manually corrected (`discovery_runs.status` set to `"failed"` directly via a one-off script, same
+session, same pattern as the NW2/NW7 evidence-completeness procedure recorded in
+`docs/09_DECISIONS.md`).
+
+### Next action
+
+Root-cause fix (not yet done — logged for a future session, not blocking live NW1-NW10
+production): make the `discovery_runs.status` transition to `"failed"` resilient to a partial
+write failure — e.g. write it in the SAME transaction/request as the `je_executions` failure
+update rather than a separate later call, or add a periodic reconciliation check that catches
+`discovery_runs` rows stuck at `"queued"`/`"running"` whose `je_executions` row shows `"failed"`
+and corrects them automatically. Must include a regression test reproducing a `finishExecution`
+failure and asserting `discovery_runs.status` still ends up correct. Per the permanent root-cause
+correction policy, the manual DB correction applied to unblock NW7 is a legitimate one-off
+recovery (documented, audited), not a substitute for this fix — flagged here so it is not lost.

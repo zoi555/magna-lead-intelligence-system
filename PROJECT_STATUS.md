@@ -627,6 +627,41 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   only in an output file from Ayesha's territory (NW1) onward.
 - Full test/build gate re-run clean: `test-lead-production-territory-v2.ts` ALL PASSED,
   `npm run typecheck` clean, `npm run build` succeeded.
-- **Next task**: owner authorisation required before starting NW1 (Ayesha's territory) — same
-  per-territory authorisation pattern as RM1-RM14/KT1-KT24. No new branch created, no merge to
-  `main`, no deployment; all work remains on `feature/mvp-vertical-slice-001`.
+- **Next task (superseded, see below)**: owner authorisation was required before starting NW1 —
+  this has since been granted and completed; see the new section below.
+
+### NW1-NW10 (Ayesha's full Sales Territory) — live, accepted — 2026-07-24
+
+- All 10 NW Postcode Districts run live end-to-end and accepted: 12198 raw = 1222 geography-valid
+  + 10976 rejected (exact, every district). 525 candidates → 14 genuine cross-district duplicates
+  removed → 511 unique. Permanent `customer_master_exclusion` rule enforced: 23 exclusions found,
+  zero leakage into any rep-facing/Sales Pro/map output. Final: 238 usable (140 premium, 98
+  releasable Level 1, 10 key accounts), 10 held for review, 200 hard-rejected, 40 excluded
+  groups. Ayesha's combined 107-field Master workbook and 108-column Sales Pro files generated;
+  all 261 exported Sales Pro Lead IDs (228 new leads + 10 key accounts + 23 customer-master
+  exclusions) verified present in the Master workbook's Evidence Register.
+- **One real deterministic defect found live and fixed (ISS-0030)**: the website enrichment
+  stage crashed the entire orchestrator process on a real HTTP/2 GOAWAY connection error,
+  reproduced twice identically against the same remote host during live NW3 processing. Root
+  cause: undici emitting a connection-level failure as an `'error'` event outside the promise
+  chain, bypassing the adapter's own try/catch. Fixed by forcing HTTP/1.1 for all website-crawl
+  requests (commit `0cec029`), with `undici` added as an explicit dependency and two new
+  regression tests. No final lead data was affected (NW3 hadn't produced output yet).
+- **Two transient discovery failures (NW2, NW7)** resolved via an evidence-completeness
+  procedure — 100% of each failed run's partial raw evidence confirmed as a strict subset of its
+  bounded replacement run's evidence, audited via `app_audit_log`. NW7 also surfaced a real
+  operational gap (`discovery_runs.status` can stay stuck at `"queued"` on a partial write
+  failure) logged as **ISS-0031** for future root-cause work — not a lead-data defect, did not
+  block acceptance.
+- Standardised handover package produced:
+  `/Users/homemac/Data/aspectlead-lead-production/handover/ayesha-nw1-nw10/` (8 files),
+  representative-facing files verified to contain ordinary approved leads only, zero leakage.
+- Representative Progress Register updated: Nauman, Manraj, and Ayesha now ACCEPTED.
+- Full test/build gate re-run clean: `test-lead-production-territory-v2.ts` ALL PASSED,
+  `test-lead-production-website.ts` ALL PASSED (2 new ISS-0030 regressions), `npm run typecheck`
+  clean, `npm run build` succeeded.
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/ayesha/combined-2026-07-24/NW1-NW10-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task**: owner authorisation required before starting TW1-TW10 (Kunz's territory) or
+  TW11-TW20 (Meer's) — same per-territory authorisation pattern. No new branch created, no merge
+  to `main`, no deployment; all work remains on `feature/mvp-vertical-slice-001`.

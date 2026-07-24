@@ -16,8 +16,8 @@ branches — do not confuse a commit SHA with a branch name anywhere in this doc
 ## Current state at time of audit
 
 - **Active branch:** `feature/mvp-vertical-slice-001`
-- **Local HEAD:** `fbd2d61bf34a59d566a47d8df118306737a529e4` (107 commits ahead of `main`)
-- **Remote HEAD (`origin/feature/mvp-vertical-slice-001`):** same SHA — fully pushed, zero commits ahead/behind origin
+- **Local HEAD:** `ed18855` (114 commits ahead of `main`)
+- **Remote HEAD (`origin/feature/mvp-vertical-slice-001`):** kept in sync — fully pushed after every commit this session
 - **Update 2026-07-24:** Nauman's full Sales Territory (RM1-RM14, 14 Postcode Districts)
   processed live end-to-end and accepted on this same branch — no new branch created, no merge
   to `main`. See `docs/LEAD_PRODUCTION_HANDOVER.md` for full detail.
@@ -25,6 +25,12 @@ branches — do not confuse a commit SHA with a branch name anywhere in this doc
   processed live end-to-end and accepted on this same branch, at this same commit — no code
   changes were needed for KT processing (the RM1-RM14-era fixes carried over clean), so HEAD is
   unchanged from the RM1-RM14 update. No new branch created, no merge to `main`. See
+  `docs/LEAD_PRODUCTION_HANDOVER.md` for full detail.
+- **Update 2026-07-24 (later still):** Ayesha's full Sales Territory (NW1-NW10, 10 Postcode
+  Districts) processed live end-to-end and accepted on this same branch. One real pipeline defect
+  (ISS-0030, website-crawl HTTP/2 GOAWAY process crash) found and fixed mid-territory, commit
+  `0cec029`. Standardised handover packaging/field-provenance/progress-register tooling also
+  applied to this territory. No new branch created, no merge to `main`. See
   `docs/LEAD_PRODUCTION_HANDOVER.md` for full detail.
 - **Untracked files present:** yes, 2 —
   `scripts/export-operational-leads.ts` (pre-existing before this project's lead-production
