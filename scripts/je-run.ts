@@ -6,6 +6,13 @@
 // Plans the territory (showing expansion), saves the run, runs the worker inline against
 // the LIVE lawful Just Eat endpoint (capped/paced), consolidates the results, and prints
 // canonical metrics + provenance. Requires JUST_EAT_ENABLED=true + service credentials.
+//
+// Duplicate-run guard (2026-07-24): refuses to start a new live run for the same tenant +
+// Postcode District + source within a 24h operating window if an accepted (queued/running/
+// completed, not superseded) run already exists — found live when two independent RM2 runs
+// were triggered 4 minutes apart; je_raw_observations' own outlet-identity dedup correctly
+// prevented duplicate candidates, but real API/scrape cost was still spent twice. Pass
+// --force-duplicate-run to override with an explicit, logged reason.
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -45,6 +52,30 @@ async function main() {
   const tenantRes = await db.from("tenants").select("id").eq("slug", tenantSlug).maybeSingle();
   if (tenantRes.error || !tenantRes.data) { console.error(`Tenant slug '${tenantSlug}' not found.`); process.exit(1); }
   const tenantId = (tenantRes.data as { id: string }).id;
+
+  // --- Duplicate-run guard: same tenant + Postcode District + source, accepted/in-progress,
+  // within a 24h operating window. A run explicitly marked duplicate_superseded_by_<id> (see
+  // docs/09_DECISIONS.md) never counts as a blocker — it's already been resolved.
+  const forceOverride = args.includes("--force-duplicate-run");
+  const windowStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const existing = await db.from("discovery_runs")
+    .select("id,status,created_at,reference")
+    .eq("tenant_id", tenantId)
+    .ilike("territory_input", input)
+    .eq("source_config->>source", "just_eat")
+    .in("status", ["queued", "running", "completed"])
+    .gte("created_at", windowStart);
+  const blockers = (existing.data ?? []).filter((r) => !(r.reference ?? "").startsWith("duplicate_superseded_by_"));
+  if (blockers.length && !forceOverride) {
+    console.error(`REFUSING TO START: an accepted or in-progress Just Eat run already exists for tenant "${tenantSlug}", Postcode District "${input}", within the last 24h:`);
+    for (const b of blockers) console.error(`  run ${b.id} — status=${b.status}, created=${b.created_at}`);
+    console.error(`Pass --force-duplicate-run to override with an explicit reason (this spends real API/scrape cost a second time — only do this if you have confirmed the existing run is genuinely inadequate, not just re-triggering out of habit).`);
+    process.exit(1);
+  }
+  if (blockers.length && forceOverride) {
+    console.log(`--force-duplicate-run: proceeding despite ${blockers.length} existing accepted run(s) for this tenant/district/source within 24h: ${blockers.map((b) => b.id).join(", ")}.`);
+  }
+
   const ref = await loadPostcodeReference();
 
   console.log(`\n=== Territory: "${input}" ===`);

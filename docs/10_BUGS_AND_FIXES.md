@@ -541,3 +541,29 @@ stage's own summary JSON (`candidatesExpected: 84` → `phase1TotalCandidates`).
 `test:lead-production-fsa` unaffected (no test referenced the removed field).
 
 **See also:** `scripts/lead-production/run-fsa-stage.ts` — this session's Milestone 7 work.
+
+## Fix — added a duplicate-run guard to `scripts/je-run.ts` (2026-07-24)
+
+**Found:** two independent live Just Eat discovery runs were triggered for RM2 within 4 minutes
+of each other (once via this session's CLI invocation, once separately by the owner). Real API/
+scrape cost was spent twice for the same real district. `je_raw_observations`'s own outlet-
+identity-based dedup (`duplicate_of`) correctly prevented the second run from creating any
+duplicate `consolidated_candidates` (verified: run B's 639 raw observations were ALL marked
+duplicate of run A's; 0 canonical, 0 consolidated candidates) — no data-integrity defect, but no
+guard existed to prevent the redundant live call in the first place.
+
+**Fix:** `je-run.ts` now checks, before planning or making any live call, whether an accepted
+run (queued/running/completed, not marked `duplicate_superseded_by_<id>`) already exists for the
+same tenant + Postcode District + source within a 24h window, and refuses to start (fail-fast,
+before any network call) unless `--force-duplicate-run` is explicitly passed. Verified live: a
+repeat `npm run je:run -- "RM2"` is correctly refused, citing the existing run.
+
+**Resolution of the specific incident:** the second RM2 run
+(`3d640e28-29d9-43fa-ba6b-4881f5267d08`) was compared against the first
+(`3a8d156e-334d-44b5-9594-d41ab6862414`) — raw/geography counts identical, run B contributed
+zero unique candidates (fully subsumed by run A). Run A (created first, already verified,
+already progressed through 5 pipeline stages) kept as authoritative; run B preserved (not
+deleted) and annotated `reference = "duplicate_superseded_by_3a8d156e..."` plus a full
+`app_audit_log` entry recording the comparison evidence and decision.
+
+**See also:** `scripts/je-run.ts`, `docs/09_DECISIONS.md`.

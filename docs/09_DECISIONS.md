@@ -830,3 +830,34 @@ dropdown value) requires a new versioned mapping (v1.1), not an edit to v1.
 **See also:** `scripts/lead-production/customer-match-materiality.ts`,
 `run-final-scoring-stage-v2.ts`, `qualification-v2.ts`, `generate-master-export.ts`,
 `generate-salespro-export.ts`, `scripts/test-lead-production-customer-master-exclusion.ts`.
+
+## RM2 duplicate discovery run resolved; discovery_runs run A kept authoritative (2026-07-24)
+
+### Decision
+
+Two independent live Just Eat discovery runs were triggered for the RM2 Postcode District 4
+minutes apart: `3a8d156e-334d-44b5-9594-d41ab6862414` (created 00:23:02Z) and
+`3d640e28-29d9-43fa-ba6b-4881f5267d08` (created 00:27:35Z), same tenant, same source. Compared
+in full before any decision: raw observation counts identical (639/639), geography validation
+totals identical (46 valid / 593 rejected of 639 on both), but run B's own `je_raw_observations`
+outlet-identity dedup (`duplicate_of`, not run-scoped) marked ALL 639 of its raw observations as
+duplicates of run A's pre-existing rows — run B produced zero canonical observations and zero
+consolidated candidates of its own. Not a divergent duplicate: run B is fully subsumed by run A
+with zero unique value.
+
+Per the owner's decision rule: run A kept as authoritative (created first, already verified,
+already progressed through 5 of 8 pipeline stages). Run B preserved for audit — not deleted —
+and annotated `reference = "duplicate_superseded_by_3a8d156e-334d-44b5-9594-d41ab6862414"`, with
+a full `app_audit_log` entry recording the comparison evidence. Run B is excluded from
+enrichment, territory combination, and exports.
+
+### Reason
+
+Two RM2 discovery triggers happened because no guard existed to prevent a second live run for
+the same district while one was already accepted/in-progress — fixed going forward (see
+`docs/10_BUGS_AND_FIXES.md`, `je-run.ts`'s new duplicate-run guard). Never merge two independent
+discovery populations automatically, even when comparison shows them fully equivalent — the
+comparison and decision are recorded so the choice is auditable, not silent.
+
+**See also:** `scripts/je-run.ts`, `docs/10_BUGS_AND_FIXES.md`, `app_audit_log` entry
+`ef1adab0-7b90-4d4b-89c6-d2673b4e82f5`.
