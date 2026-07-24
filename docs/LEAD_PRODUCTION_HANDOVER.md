@@ -131,10 +131,14 @@ re-verify at any point.
 | 99 | 07-23 | d3fe76e | Milestone 6 (1/2) — close ISS-0028, full 13-suite test/build gate green |
 | 100 | 07-23 | 3c93e09 | Milestone 6 (2/2) — pre-production certification doc, GO_FOR_RM1_LIVE |
 | 101 | 07-24 | ed56cbf | Milestone 7 — 2 deterministic defects found/fixed on first live RM1 run |
+| 102 | 07-24 | 8be932d | Docs — record RM1 live discovery + district acceptance |
+| 103 | 07-24 | (pending) | fix: enforce customer master exclusion rule |
 
-**Next dependency:** RM1 is live, complete, and district-accepted (see
-`/Users/homemac/Data/aspectlead-lead-production/output/rm1/2026-07-23T23-19-07Z-live/RM1-DISTRICT-VERIFICATION-REPORT.md`,
-outside the repo). RM2 requires explicit owner authorisation per-district, same as RM1.
+**Next dependency:** RM1 is live, complete, district-accepted, AND reprocessed under the
+customer_master_exclusion rule (see
+`/Users/homemac/Data/aspectlead-lead-production/output/rm1/2026-07-23T23-19-07Z-live/RM1-DISTRICT-VERIFICATION-REPORT.md`
+and `.../rm1-v2-customer-master-exclusion-reprocess/`, outside the repo). RM2 requires explicit
+owner authorisation per-district, same as RM1.
 
 ## Accepted UB1 checkpoints (outside repo)
 
@@ -299,6 +303,17 @@ npx tsx scripts/lead-production/generate-release-package-v2.ts \
   --territory=ub1 \
   --final-scoring-dir=/Users/homemac/Data/aspectlead-lead-production/output/ub1/2026-07-23T13-00-00Z-v2-calibration-with-json
 ```
+
+## Customer master exclusion rule (2026-07-24)
+
+Permanent, unconditional hard exclusion for any candidate confirmed matching any Magna
+customer-master record, of ANY lifecycle status (`customer_master_exclusion` — see
+`docs/09_DECISIONS.md`). Reactivation retired as an operational lead category. UB1 and RM1 both
+reprocessed from existing evidence (zero new external calls): UB1 20 exclusions (was 13 under
+the old active+reactivation split), RM1 4 (was 3) — both territories' genuinely-qualified
+populations unchanged (UB1 47, RM1 60). Full regression suite:
+`scripts/test-lead-production-customer-master-exclusion.ts` (`npm run
+test:lead-production-customer-master-exclusion`).
 
 ## RM1 — live, complete, district-accepted (2026-07-24)
 

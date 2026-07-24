@@ -29,7 +29,7 @@ import { assessPhysicalPremises } from "./physical-premises";
 import { calculateScore } from "./scoring";
 import { calculateChannelSuitability } from "./channel-suitability";
 import { assignFinalOutcome } from "./final-outcome";
-import { assessCustomerMatchMateriality } from "./customer-match-materiality";
+import { assessCustomerMatchMateriality, findConfirmedCustomerMasterMatch } from "./customer-match-materiality";
 import { classifyQualificationV2 } from "./qualification-v2";
 import { RULES_VERSIONS } from "./rules-versions";
 import { loadCustomerFile } from "./load-customers";
@@ -146,35 +146,43 @@ async function main() {
     const postcode = p1.normalisedPostcode?.candidateOriginal ?? null;
     const v1Row = v1ByCandidate.get(candidateId);
 
-    // Terminal exclusions (active/inactive customer, excluded group, closed) are derived
-    // INDEPENDENTLY from the same Phase1/FSA/Google checkpoint evidence v1's own
-    // run-final-scoring-stage.ts uses (mirrored exactly, not reimplemented differently) — v2
-    // never depends on a prior v1 run existing at all, so a brand-new territory with no v1
-    // history works identically to a reprocessed one. None of this session's fixes touch these
-    // decisions: an active-customer confirmation is already a DECISIVE match, not an unresolved
-    // one, so materiality reprocessing is a no-op here by construction.
+    // Terminal exclusions are derived INDEPENDENTLY from the same Phase1/FSA/Google/Companies
+    // House checkpoint evidence v1's own run-final-scoring-stage.ts uses (mirrored, not
+    // reimplemented differently) — v2 never depends on a prior v1 run existing at all.
+    //
+    // 2026-07-24 customer_master_exclusion rule: ANY stage decisively confirming a match to ANY
+    // customer-master record — regardless of that record's active/inactive/lifecycle status —
+    // is now ONE unconditional terminal bucket, checked across ALL FOUR stages (Phase 1, FSA,
+    // Google, Companies House). Previously only Phase1/FSA/Google were checked here — a
+    // Companies-House-stage-only confirmation (confirmed_active/inactive_customer_after_
+    // companies_house) fell through unnoticed and would have reached normal scoring. Fixed.
+    // "active_customer_excluded"/"inactive_customer_reactivation" are no longer produced —
+    // reactivation is retired as an operational lead category (docs/09_DECISIONS.md).
     const fsaCustRes0 = fsaCustResByCandidate.get(candidateId);
     const googleCustRes0 = googleCustResByCandidate.get(candidateId);
+    const chCustRes0 = chCustResByCandidate.get(candidateId);
     const google0 = googleByCandidate.get(candidateId);
     let terminalBucket: MasterOutcomeBucket | null = null;
     let terminalReason: string | null = null;
-    if (p1.preliminaryStatus === "active_customer") { terminalBucket = "active_customer_excluded"; terminalReason = "Confirmed active Magna customer at Phase 1."; }
-    else if (p1.preliminaryStatus === "inactive_customer") { terminalBucket = "inactive_customer_reactivation"; terminalReason = "Confirmed inactive Magna customer at Phase 1 (reactivation candidate)."; }
+    const confirmedAnyStage = findConfirmedCustomerMasterMatch({
+      phase1PreliminaryStatus: p1.preliminaryStatus ?? null,
+      fsaResolutionOutcome: fsaCustRes0?.resolution_outcome ?? null,
+      googleResolutionOutcome: googleCustRes0?.resolution_outcome ?? null,
+      companiesHouseResolutionOutcome: chCustRes0?.resolution_outcome ?? null,
+    });
+    if (confirmedAnyStage) { terminalBucket = "customer_master_exclusion"; terminalReason = `Confirmed match to a Magna customer-master record at the ${confirmedAnyStage} stage — permanent hard exclusion regardless of that record's lifecycle/active/inactive status (customer_master_exclusion rule, 2026-07-24).`; }
     else if (p1.preliminaryStatus === "excluded_large_group") { terminalBucket = "excluded_large_group"; terminalReason = "Excluded large national group/chain at Phase 1."; }
-    else if (fsaCustRes0?.resolution_outcome === "confirmed_active_customer_after_fsa") { terminalBucket = "active_customer_excluded"; terminalReason = "Confirmed active Magna customer after FSA evidence."; }
-    else if (fsaCustRes0?.resolution_outcome === "confirmed_inactive_customer_after_fsa") { terminalBucket = "inactive_customer_reactivation"; terminalReason = "Confirmed inactive Magna customer after FSA evidence."; }
-    else if (googleCustRes0?.resolution_outcome === "confirmed_active_customer_after_google") { terminalBucket = "active_customer_excluded"; terminalReason = "Confirmed active Magna customer after Google evidence."; }
-    else if (googleCustRes0?.resolution_outcome === "confirmed_inactive_customer_after_google") { terminalBucket = "inactive_customer_reactivation"; terminalReason = "Confirmed inactive Magna customer after Google evidence."; }
     else if (google0?.outcome === "permanently_closed") { terminalBucket = "permanently_closed"; terminalReason = "Google evidence confirms permanent closure."; }
     else if (google0?.outcome === "temporarily_closed") { terminalBucket = "temporarily_closed_held"; terminalReason = "Google evidence confirms temporary closure — held, not discarded."; }
     else if (!eligibleSet.has(candidateId)) { terminalBucket = "probable_customer_match_unresolved"; terminalReason = "Excluded from the Companies House-eligible population by an exclusion reason not explicitly enumerated above — held for manual review rather than silently dropped."; }
 
     if (terminalBucket) {
+      const isCustomerMasterExclusion = terminalBucket === "customer_master_exclusion";
       masterRows.push({
         candidateId, tradingName, postcode, phone: null, website: null,
         v1Bucket: v1Row?.bucket ?? terminalBucket, v1Level: null, v1Channel: v1Row?.channel ?? null, v1Score: null,
         v1FailedGates: [], v1ReasonTags: [], v1LevelReason: v1Row?.bucketReason ?? terminalReason, decisionCategory: "not_applicable_terminal_exclusion",
-        qualificationStatus: "hard_rejected",
+        qualificationStatus: isCustomerMasterExclusion ? "customer_master_exclusion" : "hard_rejected",
         channelEligibility: "neither", enrichmentCompletenessBand: "minimal", enrichmentCompletenessFraction: 0,
         commercialPriorityScore: null, maxPossibleScore: null, finalOutcome: null,
         googleReclassified: false, googleOutcomeBefore: null, googleOutcomeAfter: null,
@@ -282,7 +290,14 @@ async function main() {
     });
 
     // --- Customer-match materiality: replaces the naive "any unresolved state with a
-    // prior_matched_customer_id" check with genuine corroboration-strength evidence. ---
+    // prior_matched_customer_id" check with genuine corroboration-strength evidence.
+    // 2026-07-24: now three-way, not binary. A "confirmed" tier here is evidence-based
+    // corroboration strong enough for a permanent hard exclusion even though no single stage's
+    // own decisive-match algorithm independently confirmed it (that case is already caught by
+    // the terminal-bucket check above, earlier in this loop) — pushed below as a terminal
+    // customer_master_exclusion row, short-circuiting hard gates/scoring/channel exactly like
+    // every other terminal exclusion. A "probable" tier remains a held (not excluded, not
+    // released) review case. ---
     const priorMatchedCustomerId = chCustRes?.prior_matched_customer_id || null;
     const matchedCustomer = priorMatchedCustomerId ? customerById.get(priorMatchedCustomerId) : null;
     const hasUnresolvedCustomerConflictBefore = chCustRes?.resolution_outcome === "unresolved_customer_match_after_companies_house" && !!priorMatchedCustomerId;
@@ -291,7 +306,20 @@ async function main() {
       candidateCompanyNumber: chDecisive ? chResult?.plausibleCompanies?.[0]?.companyNumber ?? null : null,
       matchedCustomer: matchedCustomer ? { postcode: matchedCustomer.postcode, tradingName: matchedCustomer.tradingName, phone: matchedCustomer.phone, domain: null, companyNumber: matchedCustomer.companyNumber } : null,
     });
-    const hasUnresolvedCustomerConflictAfter = hasUnresolvedCustomerConflictBefore && materiality.material;
+    if (hasUnresolvedCustomerConflictBefore && materiality.outcomeTier === "confirmed") {
+      masterRows.push({
+        candidateId, tradingName, postcode, phone: null, website: null,
+        v1Bucket: "customer_master_exclusion", v1Level: null, v1Channel: v1Row?.channel ?? null, v1Score: null,
+        v1FailedGates: [], v1ReasonTags: [], v1LevelReason: materiality.reason, decisionCategory: "not_applicable_terminal_exclusion",
+        qualificationStatus: "customer_master_exclusion", channelEligibility: "neither", enrichmentCompletenessBand: "minimal", enrichmentCompletenessFraction: 0,
+        commercialPriorityScore: null, maxPossibleScore: null, finalOutcome: null,
+        googleReclassified, googleOutcomeBefore, googleOutcomeAfter,
+        customerConflictMaterialityChanged: true, hasUnresolvedCustomerConflictBefore: true, hasUnresolvedCustomerConflictAfter: true, customerConflictReason: materiality.reason,
+        outcomeChanged: true, changeReason: `Customer-match evidence corroboration reached the "confirmed" tier post-Companies-House: ${materiality.reason}`,
+      });
+      continue;
+    }
+    const hasUnresolvedCustomerConflictAfter = hasUnresolvedCustomerConflictBefore && materiality.outcomeTier === "probable";
     const customerConflictMaterialityChanged = hasUnresolvedCustomerConflictBefore !== hasUnresolvedCustomerConflictAfter;
 
     const finalOutcome = assignFinalOutcome(candidateId, gates, scoring, channel, hasUnresolvedCustomerConflictAfter);
@@ -366,9 +394,12 @@ async function writeOutputs(outDir: string, territory: string, rows: MasterRowV2
   const telesales = usable.filter((r) => r.channelEligibility === "telesales_only" || r.channelEligibility === "both");
   const fieldSales = usable.filter((r) => r.channelEligibility === "field_sales_only" || r.channelEligibility === "both");
   const bothChannels = usable.filter((r) => r.channelEligibility === "both");
-  const stillHeld = rows.filter((r) => r.qualificationStatus === "held_for_material_conflict");
+  const stillHeld = rows.filter((r) => r.qualificationStatus === "held_for_customer_match_review");
   const hardRejects = rows.filter((r) => r.qualificationStatus === "hard_rejected");
-  const reactivation = rows.filter((r) => r.v1Bucket === "inactive_customer_reactivation");
+  // customer_master_exclusion: permanent hard exclusion, ANY lifecycle (active/inactive/former/
+  // lost/renewal/closed/dormant/etc — this pipeline only distinguishes active vs. everything-
+  // else, and both are excluded identically). Audit-only — never rep-facing, never reactivation.
+  const customerMasterExclusions = rows.filter((r) => r.v1Bucket === "customer_master_exclusion");
   const keyAccounts = rows.filter((r) => r.v1Bucket === "level_0_sales_ready" && r.v1Channel === "both" && (r.commercialPriorityScore ?? 0) >= 80);
 
   await fs.writeFile(path.join(outDir, `${prefix}-v2-sales-usable.csv`), writeCsv([...MASTER_COLUMNS], usable.map(masterRow)));
@@ -379,7 +410,7 @@ async function writeOutputs(outDir: string, territory: string, rows: MasterRowV2
   await fs.writeFile(path.join(outDir, `${prefix}-v2-both-channels.csv`), writeCsv([...MASTER_COLUMNS], bothChannels.map(masterRow)));
   await fs.writeFile(path.join(outDir, `${prefix}-v2-still-held.csv`), writeCsv([...MASTER_COLUMNS], stillHeld.map(masterRow)));
   await fs.writeFile(path.join(outDir, `${prefix}-v2-hard-rejects.csv`), writeCsv([...MASTER_COLUMNS], hardRejects.map(masterRow)));
-  await fs.writeFile(path.join(outDir, `${prefix}-v2-reactivation.csv`), writeCsv([...MASTER_COLUMNS], reactivation.map(masterRow)));
+  await fs.writeFile(path.join(outDir, `${prefix}-v2-customer-master-exclusions.csv`), writeCsv([...MASTER_COLUMNS], customerMasterExclusions.map(masterRow)));
   await fs.writeFile(path.join(outDir, `${prefix}-v2-key-accounts.csv`), writeCsv([...MASTER_COLUMNS], keyAccounts.map(masterRow)));
 
   const CHANGE_COLUMNS = ["candidate_id", "trading_name", "v1_bucket", "v1_level", "v1_channel", "v2_qualification_status", "v2_channel_eligibility", "google_outcome_before", "google_outcome_after", "customer_conflict_before", "customer_conflict_after", "change_reason"] as const;
@@ -443,6 +474,14 @@ async function writeOutputs(outDir: string, territory: string, rows: MasterRowV2
         defect: "Optional-enrichment scoring components (filed accounts, decision-maker profile, product-fit keyword matches) that are legitimately unavailable for small independents pulled otherwise fully-qualified candidates (passed every hard gate, usable channel, no conflict) below the 65-point cliff, holding them at Level 1/3 for score reasons alone. Several UB1 Level 1 candidates scored 61-64, immediately below the cliff.",
         newRule: "qualification_status is determined ONLY by hard gates + customer-conflict materiality + channel eligibility. commercial_priority_score (the same 100-point score, unchanged formula) is used only to rank already-qualified candidates, never to gate them.",
         evidenceJustifyingChange: "See ub1-v2-before-after-outcomes.csv and the qualification_status column of ub1-v2-complete-evidence-register.csv for every candidate this reclassifies.",
+        reusableAcrossTerritories: true,
+      },
+      {
+        id: "customer-master-exclusion-rule", module: "scripts/lead-production/customer-match-materiality.ts, run-final-scoring-stage-v2.ts, qualification-v2.ts",
+        oldRule: "Only a Companies-House-stage \"confirmed active\" outcome hard-rejected a candidate (hard-gates.ts's not_an_active_magna_customer). An inactive/former/lost customer routed to a separate \"reactivation\" operational bucket. A stage-level confirmation at FSA/Google that a later stage's own resolution didn't independently re-confirm could be silently lost by the time Companies House ran (only the LAST stage's outcome was checked for the hard gate); Companies-House-stage-only confirmations were never checked as a terminal bucket at all.",
+        defect: "Any customer-master match should be a hard exclusion regardless of lifecycle status, but the old model only excluded ACTIVE customers, treated inactive/former customers as a distinct reactivation lead type, and had a real gap where a Companies-House-stage confirmation (active or inactive) was never checked anywhere in the terminal-bucket derivation.",
+        newRule: "Any candidate confirmed as matching any customer-master record, at ANY of the 4 stages (Phase 1/FSA/Google/Companies House), of ANY lifecycle status, is now permanently hard-excluded under one unconditional bucket: customer_master_exclusion. Reactivation is retired as an operational lead category. Possible/probable material matches (customer-match-materiality.ts's new \"probable\" tier — genuine but not strong enough to confirm) are held_for_customer_match_review, never rep-facing until conclusively released or confirmed. Weak/generic matches remain rejected as evidence, unchanged.",
+        evidenceJustifyingChange: "Owner-specified business rule, 2026-07-24. See customer-master-exclusions.csv for every excluded candidate ID and which stage/evidence confirmed it.",
         reusableAcrossTerritories: true,
       },
     ],
@@ -545,8 +584,9 @@ score is used only to rank/prioritise, never to gate release.
 |---|---|---|
 | Sales-ready/usable | 14 (Level 0 only) | ${usableCount} (qualified + qualified_with_channel_limit) |
 | Premium (score >= 65) | 14 | ${premiumCount} |
-| Held (customer-conflict-driven) | 35 | ${qualCounts.held_for_material_conflict ?? 0} |
-| Hard-rejected (incl. terminal exclusions) | 32 (15 Level 4 + active/excluded/closed) | ${qualCounts.hard_rejected ?? 0} |
+| Held for customer-match review (probable, not confirmed) | 35 | ${qualCounts.held_for_customer_match_review ?? 0} |
+| Customer master exclusions (confirmed, any lifecycle) | n/a (v1 had no unified rule) | ${qualCounts.customer_master_exclusion ?? 0} |
+| Hard-rejected (excl. customer-master exclusions) | 32 (15 Level 4 + active/excluded/closed) | ${qualCounts.hard_rejected ?? 0} |
 
 Candidates whose Google classification or customer-conflict materiality actually changed:
 ${changedForSummary.length} of 94. Every one is listed with its exact before/after evidence in

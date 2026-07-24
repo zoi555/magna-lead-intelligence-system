@@ -719,3 +719,38 @@ The regex in `scripts/test-lead-production-google.ts` line 325 should be narrowe
 `types.ts`'s own type-definition lines (or scoped to only the other 7 files in that loop) in a
 future, separately-approved test-suite maintenance pass — not applied this session per
 instruction to document rather than silently patch a test outside the current work's scope.
+
+## ISS-0029 — `magna_customer_match_status` (descriptive field) can lag behind the authoritative `customer_master_exclusion` bucket
+
+Date: 2026-07-24
+Severity: Low — cosmetic/descriptive only, does not affect exclusion routing
+Owner: Zoeb
+Status: Open — worked around, not fixed
+
+### Problem
+
+`candidate-dossier.ts`'s `magna_customer_match_result` field is derived as
+`chCustRes?.resolution_outcome ?? p1?.preliminaryStatus` — only the Companies-House-stage
+resolution (or, failing that, Phase 1's raw status). If a candidate was confirmed at an EARLIER
+stage (FSA or Google) but the Companies House stage's own resolution still reads "unresolved",
+this descriptive field does not reflect the earlier confirmation, even though
+`run-final-scoring-stage-v2.ts`'s `findConfirmedCustomerMasterMatch()` (checked across all 4
+stages) correctly still routes the candidate to `customer_master_exclusion`.
+
+### Impact and workaround
+
+Exclusion routing itself is unaffected — verified correct against real RM1 data (3 of RM1's 4
+`customer_master_exclusion` candidates were confirmed at Google Places or Phase 1, not Companies
+House, and are all correctly excluded). `master-field-resolver.ts`'s `existing_customer_warning`
+field was patched to check `dossier.v1Bucket === "customer_master_exclusion"` directly (the
+authoritative signal) rather than relying solely on the descriptive field, so the one
+REQUIRED/rep-facing field this could have affected is already correct. Only the free-text
+`magna_customer_match_status` field itself (e.g. showing "Unresolved" instead of "Confirmed
+Active Customer" for a candidate excluded via an earlier stage) can be cosmetically stale.
+
+### Next action
+
+Update `candidate-dossier.ts`'s `magna_customer_match_result` derivation to check all 4 stages
+(mirroring `findConfirmedCustomerMasterMatch()`) in a future pass — out of scope this session
+since `candidate-dossier.ts` is shared with the accepted, byte-identical-verified UB1 release
+package generator and any change there requires re-verifying that byte-identical guarantee.

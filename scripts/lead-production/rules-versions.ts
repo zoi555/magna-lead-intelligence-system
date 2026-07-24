@@ -34,7 +34,11 @@ export const RULES_VERSIONS = {
 
   // scripts/lead-production/customer-match-materiality.ts — NEW in v2. Replaces "any unresolved
   // customer-match state blocks release" with genuine corroboration-strength evidence.
-  customerMatchMaterialityVersion: "customer-match-materiality-v1-2026-07-23",
+  // Bumped 2026-07-24: the customer_master_exclusion permanent hard-exclusion rule — any
+  // confirmed customer-master match (any lifecycle, any of the 4 stages) is now excluded
+  // unconditionally; a genuine but non-confirmed ("probable") match is held for review, never
+  // rep-facing; reactivation retired as an operational lead category.
+  customerMatchMaterialityVersion: "customer-master-exclusion-v2-2026-07-24",
 
   // The approved group/franchise registry used by screen-large-groups.ts and
   // group-rescreen-after-google.ts — versioned by the registry FILE itself

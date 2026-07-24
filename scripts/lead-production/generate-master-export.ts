@@ -57,24 +57,26 @@ function addSheet(wb: XLSX.WorkBook, name: string, rows: Record<string, unknown>
 }
 
 interface Buckets {
-  activeCustomers: RowBundle[]; excludedGroups: RowBundle[]; reactivation: RowBundle[];
+  // 2026-07-24: customerMasterExclusions REPLACES the old activeCustomers + reactivation split —
+  // any confirmed customer-master match, of ANY lifecycle status, is one unconditional audit-
+  // only bucket. Reactivation is retired as an operational lead category.
+  customerMasterExclusions: RowBundle[]; excludedGroups: RowBundle[];
   usable: RowBundle[]; premium: RowBundle[]; releasableL1: RowBundle[]; keyAccounts: RowBundle[];
   held: RowBundle[]; hardRejects: RowBundle[];
 }
 
 function classify(rows: RowBundle[]): Buckets {
-  const activeCustomers = rows.filter((r) => r.dossier.v1Bucket === "active_customer_excluded");
+  const customerMasterExclusions = rows.filter((r) => r.dossier.v1Bucket === "customer_master_exclusion");
   const excludedGroups = rows.filter((r) => r.dossier.v1Bucket === "excluded_large_group");
-  const reactivation = rows.filter((r) => r.dossier.v1Bucket === "inactive_customer_reactivation");
-  const removed = new Set([...activeCustomers, ...excludedGroups, ...reactivation]);
+  const removed = new Set([...customerMasterExclusions, ...excludedGroups]);
   const remaining = rows.filter((r) => !removed.has(r));
   const usable = remaining.filter((r) => r.dossier.qualificationStatus === "qualified" || r.dossier.qualificationStatus === "qualified_with_channel_limit");
   const premium = usable.filter((r) => r.dossier.qualificationStatus === "qualified" && ((r.dossier.fields.commercial_score as number) ?? 0) >= 65);
   const releasableL1 = usable.filter((r) => !premium.includes(r));
   const keyAccounts = usable.filter((r) => r.resolved.fields.key_account_indicator === "Yes");
-  const held = remaining.filter((r) => r.dossier.qualificationStatus === "held_for_material_conflict");
+  const held = remaining.filter((r) => r.dossier.qualificationStatus === "held_for_customer_match_review");
   const hardRejects = remaining.filter((r) => r.dossier.qualificationStatus === "hard_rejected");
-  return { activeCustomers, excludedGroups, reactivation, usable, premium, releasableL1, keyAccounts, held, hardRejects };
+  return { customerMasterExclusions, excludedGroups, usable, premium, releasableL1, keyAccounts, held, hardRejects };
 }
 
 async function main() {
@@ -126,11 +128,17 @@ async function main() {
 
   // --- Reconciliation: every candidate must land in exactly one bucket. ---
   const buckets = classify(rows);
-  const partitioned = [...buckets.activeCustomers, ...buckets.excludedGroups, ...buckets.reactivation, ...buckets.usable, ...buckets.held, ...buckets.hardRejects];
+  const partitioned = [...buckets.customerMasterExclusions, ...buckets.excludedGroups, ...buckets.usable, ...buckets.held, ...buckets.hardRejects];
   if (partitioned.length !== rows.length) throw new Error(`Reconciliation FAILED: ${rows.length} total candidates but only ${partitioned.length} landed in a Master export bucket. Refusing to write an incomplete export.`);
   const uniqueIds = new Set(partitioned.map((r) => r.dossier.candidateId));
   if (uniqueIds.size !== rows.length) throw new Error(`Reconciliation FAILED: candidate appears in more than one Master export bucket (${rows.length} rows, ${uniqueIds.size} unique candidate IDs).`);
-  console.log(`Reconciliation: ${rows.length} total = ${buckets.activeCustomers.length} active customers + ${buckets.excludedGroups.length} excluded groups + ${buckets.reactivation.length} reactivation + ${buckets.usable.length} usable + ${buckets.held.length} held + ${buckets.hardRejects.length} hard-rejected. Zero overlap. ✓`);
+  console.log(`Reconciliation: ${rows.length} total = ${buckets.customerMasterExclusions.length} customer-master exclusions + ${buckets.excludedGroups.length} excluded groups + ${buckets.usable.length} usable + ${buckets.held.length} held + ${buckets.hardRejects.length} hard-rejected. Zero overlap. ✓`);
+  // Safety check: no customer-master-excluded or excluded-group candidate may ever appear in a
+  // rep-facing bucket (usable/premium/releasableL1/held/keyAccounts) — enforced by construction
+  // above (removed before usable/held are even computed), reverified here defensively.
+  const repFacingIds = new Set([...buckets.usable, ...buckets.held, ...buckets.keyAccounts].map((r) => r.dossier.candidateId));
+  const leakedExclusions = [...buckets.customerMasterExclusions, ...buckets.excludedGroups].filter((r) => repFacingIds.has(r.dossier.candidateId));
+  if (leakedExclusions.length) throw new Error(`SAFETY FAILURE: ${leakedExclusions.length} customer-master-excluded/excluded-group candidate(s) also appear in a rep-facing bucket: ${leakedExclusions.map((r) => r.dossier.candidateId).join(", ")}.`);
 
   // --- Data-quality gap report (never silent) ---
   const gapRows = rows.filter((r) => r.resolved.dataQualityGaps.length > 0);
@@ -144,19 +152,19 @@ async function main() {
 
   const rowsFor = (bucket: RowBundle[]) => bucket.map((r) => toLabelRow(schema, r.resolved));
 
-  // --- Combined campaign workbook (14 tabs) ---
+  // --- Combined campaign workbook (13 tabs — 2026-07-24: "Active Customers" + "Reactivation"
+  // consolidated into one "Customer Master Exclusions" tab, see customer_master_exclusion rule) ---
   const combinedWb = XLSX.utils.book_new();
   addSheet(combinedWb, "Operationally Usable Leads", rowsFor(buckets.usable));
   addSheet(combinedWb, "Premium Level 0", rowsFor(buckets.premium));
   addSheet(combinedWb, "Releasable Level 1", rowsFor(buckets.releasableL1));
   addSheet(combinedWb, "Held-Review", rowsFor(buckets.held));
   addSheet(combinedWb, "Hard Rejects", rowsFor(buckets.hardRejects));
-  addSheet(combinedWb, "Active Customers", rowsFor(buckets.activeCustomers));
-  addSheet(combinedWb, "Reactivation", rowsFor(buckets.reactivation));
+  addSheet(combinedWb, "Customer Master Exclusions", rowsFor(buckets.customerMasterExclusions));
   addSheet(combinedWb, "Excluded Groups", rowsFor(buckets.excludedGroups));
   addSheet(combinedWb, "Key Accounts", rowsFor(buckets.keyAccounts));
 
-  const repSummaryRows = [{ Representative: representative, Role: role === "field_sales" ? "Field Sales" : "Telesales", "Sales Territory": salesTerritory, "Districts Included": districts.map((d) => d.district).join(", "), "Total Candidates": rows.length, Usable: buckets.usable.length, "Premium Level 0": buckets.premium.length, "Releasable Level 1": buckets.releasableL1.length, "Key Accounts": buckets.keyAccounts.length, "Held/Review": buckets.held.length, "Hard Rejects": buckets.hardRejects.length, "Active Customers": buckets.activeCustomers.length, "Excluded Groups": buckets.excludedGroups.length, Reactivation: buckets.reactivation.length }];
+  const repSummaryRows = [{ Representative: representative, Role: role === "field_sales" ? "Field Sales" : "Telesales", "Sales Territory": salesTerritory, "Districts Included": districts.map((d) => d.district).join(", "), "Total Candidates": rows.length, Usable: buckets.usable.length, "Premium Level 0": buckets.premium.length, "Releasable Level 1": buckets.releasableL1.length, "Key Accounts": buckets.keyAccounts.length, "Held/Review": buckets.held.length, "Hard Rejects": buckets.hardRejects.length, "Customer Master Exclusions": buckets.customerMasterExclusions.length, "Excluded Groups": buckets.excludedGroups.length }];
   addSheet(combinedWb, "Representative Summary", repSummaryRows);
   addSheet(combinedWb, "Territory Summary", [{ "Sales Territory": salesTerritory, Representative: representative, "District Count": districts.length, "Total Candidates": rows.length }]);
 
@@ -182,13 +190,14 @@ async function main() {
   const combinedPath = path.join(outArg, `${representative.toLowerCase()}-master-combined.xlsx`);
   XLSX.writeFile(combinedWb, combinedPath);
 
-  // --- Per-representative workbook (9 contents) ---
+  // --- Per-representative workbook (8 contents — Reactivation retired: representatives must
+  // never see or receive customer-master-excluded businesses, so there is no rep-facing
+  // equivalent of the old Reactivation sheet any more). ---
   const repWb = XLSX.utils.book_new();
   addSheet(repWb, "Usable", rowsFor(buckets.usable));
   addSheet(repWb, "Premium", rowsFor(buckets.premium));
   addSheet(repWb, "Releasable Level 1", rowsFor(buckets.releasableL1));
   addSheet(repWb, "Held-Review", rowsFor(buckets.held));
-  addSheet(repWb, "Reactivation", rowsFor(buckets.reactivation));
   addSheet(repWb, "Key Accounts", rowsFor(buckets.keyAccounts));
   addSheet(repWb, "District Summaries", districtSummaryRows);
   addSheet(repWb, "Evidence References", evidenceRegisterRows, evidenceRegisterColumns);
@@ -199,7 +208,7 @@ async function main() {
 
   console.log(`\nCombined workbook: ${combinedPath}`);
   console.log(`Representative workbook: ${repPath}`);
-  console.log(`Usable: ${buckets.usable.length} (${buckets.premium.length} premium, ${buckets.releasableL1.length} releasable-L1, ${buckets.keyAccounts.length} key accounts). Held: ${buckets.held.length}. Hard-rejected: ${buckets.hardRejects.length}. Active customers: ${buckets.activeCustomers.length}. Excluded groups: ${buckets.excludedGroups.length}. Reactivation: ${buckets.reactivation.length}.`);
+  console.log(`Usable: ${buckets.usable.length} (${buckets.premium.length} premium, ${buckets.releasableL1.length} releasable-L1, ${buckets.keyAccounts.length} key accounts). Held: ${buckets.held.length}. Hard-rejected: ${buckets.hardRejects.length}. Customer master exclusions: ${buckets.customerMasterExclusions.length}. Excluded groups: ${buckets.excludedGroups.length}.`);
   process.exit(0);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

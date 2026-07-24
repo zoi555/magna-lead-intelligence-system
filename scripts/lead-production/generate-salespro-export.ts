@@ -7,8 +7,12 @@
 // Enforces: exact CTO labels/order (from the schema file, never hardcoded here), the 20
 // existing + 88 new fields, dropdown/type validation (refuses to WRITE a value outside a
 // column's allowedValues — never ships a bad value into the CTO's real import system), and
-// strict separation of ordinary new leads / reactivation / key-account review into three
-// distinct files that are never mixed.
+// strict separation of ordinary new leads / key-account review / customer-master exclusions
+// (audit-only, never rep-facing) into three distinct files that are never mixed.
+//
+// 2026-07-24: reactivation retired as an operational lead category — any candidate confirmed as
+// matching a Magna customer-master record, of ANY lifecycle status, is a permanent hard
+// exclusion (customer_master_exclusion), never a reactivation lead.
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -52,13 +56,19 @@ function parseNumericRange(allowedValues: string[]): { min: number; max: number 
   return { min: Number(m[1]), max: Number(m[2]) };
 }
 
-function buildRowAndValidate(columns: SalesProColumn[], bundle: RowBundle, role: "telesales" | "field_sales", violations: ValidationViolation[]): Record<string, unknown> {
+// skipDropdownValidation: true ONLY for the audit-only customer-master-exclusions bucket. That
+// file is never a CTO import — it exists purely for internal reconciliation. Its
+// qualification_status value ("Customer Master Exclusion") is not in the CTO-approved v1
+// dropdown list (that locked schema is never altered — see docs/09_DECISIONS.md), so it would
+// otherwise trip the very check designed to protect the CTO's real import files. Every genuine
+// import file (new-leads, key-accounts) is still validated in full.
+function buildRowAndValidate(columns: SalesProColumn[], bundle: RowBundle, role: "telesales" | "field_sales", violations: ValidationViolation[], skipDropdownValidation = false): Record<string, unknown> {
   const row: Record<string, unknown> = {};
   for (const col of columns) {
     let raw = bundle.fields[col.canonicalName];
     raw = representativeColumnValue(col, raw, role);
     const cell = toCellValue(raw);
-    if (col.allowedValues.length > 0 && cell !== "") {
+    if (!skipDropdownValidation && col.allowedValues.length > 0 && cell !== "") {
       const range = parseNumericRange(col.allowedValues);
       if (range) {
         const n = Number(cell);
@@ -131,28 +141,30 @@ async function main() {
     }
   }
 
-  // --- Strict exclusion from ordinary new-lead exports: held, hard-rejected, active customers,
-  // excluded groups, closed businesses (folded into hard_rejected upstream), duplicates
-  // (already resolved by cross-district dedup before this ever runs), unresolved material
-  // conflict (== held_for_material_conflict). Reactivation and key accounts get their own files. ---
-  const activeCustomers = bundles.filter((b) => b.dossier.v1Bucket === "active_customer_excluded");
+  // --- Strict exclusion from ordinary new-lead exports: held, hard-rejected, customer-master
+  // exclusions (any lifecycle — confirmed active/inactive/former/lost/renewal/closed/dormant, no
+  // longer distinguished), excluded groups, closed businesses (folded into hard_rejected
+  // upstream), duplicates (already resolved by cross-district dedup before this ever runs),
+  // unresolved material conflict (== held_for_customer_match_review). Reactivation is retired as
+  // an operational lead category — customer_master_exclusion candidates go only to the
+  // audit-only customer-master-exclusions.csv, never to a rep-facing or import file. ---
+  const customerMasterExclusions = bundles.filter((b) => b.dossier.v1Bucket === "customer_master_exclusion");
   const excludedGroups = bundles.filter((b) => b.dossier.v1Bucket === "excluded_large_group");
-  const reactivation = bundles.filter((b) => b.dossier.v1Bucket === "inactive_customer_reactivation");
-  const excludedSet = new Set([...activeCustomers, ...excludedGroups, ...reactivation]);
+  const excludedSet = new Set([...customerMasterExclusions, ...excludedGroups]);
   const remaining = bundles.filter((b) => !excludedSet.has(b));
   const usable = remaining.filter((b) => b.dossier.qualificationStatus === "qualified" || b.dossier.qualificationStatus === "qualified_with_channel_limit");
   const keyAccounts = usable.filter((b) => b.fields.key_account_indicator === "Yes");
   const ordinaryNewLeads = usable.filter((b) => !keyAccounts.includes(b));
 
-  console.log(`Ordinary new leads: ${ordinaryNewLeads.length}. Reactivation: ${reactivation.length}. Key accounts: ${keyAccounts.length}.`);
-  console.log(`Excluded from ordinary export: ${activeCustomers.length} active customers, ${excludedGroups.length} excluded groups, ${remaining.length - usable.length} held/hard-rejected.`);
+  console.log(`Ordinary new leads: ${ordinaryNewLeads.length}. Key accounts: ${keyAccounts.length}.`);
+  console.log(`Excluded from ordinary export: ${customerMasterExclusions.length} customer-master exclusions (audit-only), ${excludedGroups.length} excluded groups, ${remaining.length - usable.length} held/hard-rejected.`);
 
   const columnLabels = columns.map((c) => c.salesProFieldLabel);
   const violations: ValidationViolation[] = [];
   const buildRows = (list: RowBundle[]) => list.map((b) => buildRowAndValidate(columns, b, role!, violations));
 
   const newLeadRows = buildRows(ordinaryNewLeads);
-  const reactivationRows = buildRows(reactivation);
+  const customerMasterExclusionRows = customerMasterExclusions.map((b) => buildRowAndValidate(columns, b, role!, violations, true));
   const keyAccountRows = buildRows(keyAccounts);
 
   if (violations.length) {
@@ -160,8 +172,16 @@ async function main() {
     throw new Error(`Refusing to write Sales Pro export: ${violations.length} dropdown/type violation(s) found (see ${territoryPrefix}-salespro-dropdown-violations.csv). No value outside a column's allowed set is ever written to a CTO import file.`);
   }
 
+  // Safety check: zero overlap between the ordinary new-lead file and the audit-only exclusions
+  // file — a customer-master match must never reach a rep-facing/import file.
+  const newLeadIds = new Set(ordinaryNewLeads.map((b) => b.dossier.candidateId));
+  const leaked = customerMasterExclusions.filter((b) => newLeadIds.has(b.dossier.candidateId));
+  if (leaked.length) throw new Error(`SAFETY FAILURE: ${leaked.length} customer-master-excluded candidate(s) also appear in the ordinary new-leads file: ${leaked.map((b) => b.dossier.candidateId).join(", ")}.`);
+
   await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-new-leads.csv`), writeCsv(columnLabels, newLeadRows));
-  await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-reactivation.csv`), writeCsv(columnLabels, reactivationRows));
+  // Audit-only — not one of the rep-facing/import categories. Representatives must not see or
+  // receive these businesses; this file exists for reconciliation/audit purposes only.
+  await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-customer-master-exclusions.csv`), writeCsv(columnLabels, customerMasterExclusionRows));
   await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-key-accounts.csv`), writeCsv(columnLabels, keyAccountRows));
 
   const testSampleSize = Number(arg("test-sample") ?? "0");
@@ -179,10 +199,11 @@ async function main() {
 
   const reconciliation = {
     generatedAt: new Date().toISOString(), representative, role, salesTerritory, districts: districts.map((d) => d.district),
-    totalCandidates: bundles.length, ordinaryNewLeads: ordinaryNewLeads.length, reactivation: reactivation.length, keyAccounts: keyAccounts.length,
-    excludedActiveCustomers: activeCustomers.length, excludedGroups: excludedGroups.length, excludedHeldOrHardRejected: remaining.length - usable.length,
+    totalCandidates: bundles.length, ordinaryNewLeads: ordinaryNewLeads.length, keyAccounts: keyAccounts.length,
+    customerMasterExclusions: customerMasterExclusions.length, excludedGroups: excludedGroups.length, excludedHeldOrHardRejected: remaining.length - usable.length,
     columnCount: columns.length, existingCtoFieldCount: existingCount, newFieldCount: newCount, dropdownViolations: 0,
     everyLeadIdAlsoInMaster: true, // by construction — same resolveMasterFields() call, same leadId formula
+    reactivationRetired: true, // 2026-07-24 — reactivation is no longer an operational lead category
   };
   await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-export-reconciliation.json`), JSON.stringify(reconciliation, null, 2));
 

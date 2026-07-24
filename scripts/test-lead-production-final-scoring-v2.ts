@@ -58,7 +58,7 @@ async function main() {
     assert(r1.material === false, "a matched customer in a materially different postal district is NOT material, regardless of name similarity");
 
     const r2 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 2NN", candidateName: "Ali Baba's", candidatePhone: null, candidateDomain: null, candidateCompanyNumber: null, matchedCustomer: { postcode: "UB1 2NN", tradingName: "Ali Baba's Ltd T/A Ali Baba's", phone: "02085787786", domain: null, companyNumber: null } });
-    assert(r2.material === true && r2.evidenceTier === "exact_postcode_and_identity", "exact postcode + genuine name correspondence IS material");
+    assert(r2.material === true && (r2.evidenceTier === "exact_postcode_and_strong_identity" || r2.evidenceTier === "exact_postcode_and_moderate_identity"), `exact postcode + genuine name correspondence IS material (got tier="${r2.evidenceTier}", outcomeTier="${r2.outcomeTier}")`);
 
     const r3 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1RR", candidateName: "CakeCo (South Road)", candidatePhone: null, candidateDomain: null, candidateCompanyNumber: null, matchedCustomer: { postcode: "UB1 1SU", tradingName: "ROOSTERS PIRI PIRI (SOUTH ROAD)", phone: null, domain: null, companyNumber: null } });
     assert(r3.material === false, "same postal district but a different specific postcode, matched only on a generic locality word, is NOT material");
@@ -82,7 +82,7 @@ async function main() {
     assert(q1.qualificationStatus === "hard_rejected", "a hard-gate failure is always hard_rejected regardless of channel/conflict");
 
     const q2 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: true, channelSuitability: mkChannel("both"), stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
-    assert(q2.qualificationStatus === "held_for_material_conflict", "a material customer conflict overrides an otherwise-passing candidate");
+    assert(q2.qualificationStatus === "held_for_customer_match_review", "a material (probable-tier) customer conflict overrides an otherwise-passing candidate");
 
     const q3 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: false, channelSuitability: mkChannel("neither"), stagesWithDecisiveEvidence: 1, totalStagesConsidered: 4 });
     assert(q3.qualificationStatus === "hard_rejected" && q3.channelEligibility === "neither", "passing every hard gate but having no usable channel is not releasable");

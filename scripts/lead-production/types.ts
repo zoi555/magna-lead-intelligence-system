@@ -941,8 +941,15 @@ export interface FinalOutcomeResult {
 // The bucket every one of the ORIGINAL 94 candidates lands in exactly once — the top-level
 // reconciliation key for the final master evidence register (spec Phase G QA proof #1/#4).
 export type MasterOutcomeBucket =
+  // 2026-07-24: "active_customer_excluded" and "inactive_customer_reactivation" are retained in
+  // this type ONLY so historical v1 baseline data (frozen, never regenerated) still parses —
+  // v2's own terminal-bucket derivation never produces either any more. Any confirmed customer-
+  // master match, of ANY lifecycle status, is now a single unconditional bucket:
+  // "customer_master_exclusion" (see customer-match-materiality.ts, run-final-scoring-stage-v2.ts).
+  // Reactivation is retired as an operational lead category — see docs/09_DECISIONS.md.
   | "active_customer_excluded"
   | "inactive_customer_reactivation"
+  | "customer_master_exclusion"
   | "excluded_large_group"
   | "permanently_closed"
   | "temporarily_closed_held" // held, not discarded — explicit QA requirement; never merged into permanently_closed or scored

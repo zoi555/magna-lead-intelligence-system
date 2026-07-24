@@ -43,9 +43,15 @@ function matchEnum(raw: string | null | undefined, table: Array<[string, string]
   return null;
 }
 
+// "Customer Master Exclusion" is deliberately NOT in the CTO-approved v1 Sales Pro dropdown list
+// (never altered — see docs/09_DECISIONS.md); it only ever appears in the Master workbook and
+// the audit-only customer-master-exclusions file (which explicitly skips dropdown validation —
+// see generate-salespro-export.ts's buildRowAndValidate skipDropdownValidation flag), never in a
+// genuine CTO import file.
 const QUALIFICATION_STATUS_MAP: Record<string, string> = {
   qualified: "Qualified", qualified_with_channel_limit: "Qualified with Channel Limit",
-  held_for_material_conflict: "Held for Material Conflict", hard_rejected: "Hard Rejected",
+  held_for_customer_match_review: "Held for Customer Match Review", hard_rejected: "Hard Rejected",
+  customer_master_exclusion: "Customer Master Exclusion",
 };
 const LEVEL_MAP: Record<string, string> = { level_0: "Level 0", level_1: "Level 1", level_2: "Level 2", level_3: "Level 3", level_4: "Level 4" };
 
@@ -97,8 +103,12 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext): 
     (f.hard_gate_results as Array<{ gate: string; passed: boolean }>)?.find((g) => g.gate === "currently_trading_not_permanently_closed")?.passed ? "Trading" : "Unclear";
 
   const isKeyAccount = dossier.qualificationStatus === "qualified" && dossier.channelEligibility === "both" && ((f.commercial_score as number) ?? 0) >= 80;
-  const isReactivation = dossier.v1Bucket === "inactive_customer_reactivation";
-  const leadType = isReactivation ? "Reactivation" : isKeyAccount ? "Key Account" : "New Lead";
+  // "Reactivation" is retired as an operational lead category (customer_master_exclusion rule,
+  // 2026-07-24) — a customer_master_exclusion candidate never reaches a rep-facing export at
+  // all, so this field is never populated with "Reactivation" any more. "Reactivation" remains a
+  // technically-allowed dropdown value in the approved v1 schema (never silently altered — see
+  // docs/09_DECISIONS.md), simply no longer produced by this pipeline.
+  const leadType = isKeyAccount ? "Key Account" : "New Lead";
 
   const score = f.commercial_score as number | null;
   const leadUrgency = dossier.finalLevel === "level_0" && (score ?? 0) >= 65 ? "Hot Lead" : dossier.finalLevel === "level_0" || dossier.finalLevel === "level_1" ? "Warm Lead" : "Standard Lead";
@@ -122,7 +132,11 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext): 
   const cuisineTags = ((f.cuisine_service_model as any)?.cuisineTags as string[]) ?? [];
 
   const notIndependent = groupClass !== "Independent Single Site" && groupClass !== "Independent Multi Site" && groupClass !== "Unresolved";
-  const isExistingCustomer = customerStatus === "Confirmed Active Customer" || customerStatus === "Confirmed Inactive Customer" || customerStatus === "Probable Match" || customerStatus === "Possible Match";
+  // dossier.v1Bucket === "customer_master_exclusion" is the AUTHORITATIVE signal (confirmed at
+  // any of the 4 stages, per run-final-scoring-stage-v2.ts) — always forces the warning, even if
+  // the descriptive magna_customer_match_result field (derived only from the LAST stage that ran)
+  // doesn't itself reflect an earlier stage's confirmation.
+  const isExistingCustomer = dossier.v1Bucket === "customer_master_exclusion" || customerStatus === "Confirmed Active Customer" || customerStatus === "Confirmed Inactive Customer" || customerStatus === "Probable Match" || customerStatus === "Possible Match";
 
   const fields: Record<string, unknown> = {
     lead_id: leadId,

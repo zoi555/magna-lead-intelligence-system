@@ -14,11 +14,19 @@
 
 import type { HardGateResult, ChannelSuitabilityResult, ChannelSuitability } from "./types";
 
-export type QualificationStatusV2 = "qualified" | "qualified_with_channel_limit" | "held_for_material_conflict" | "hard_rejected";
+// 2026-07-24: "held_for_material_conflict" renamed to "held_for_customer_match_review" — this
+// status has always been exclusively about customer-master match conflicts (never a general
+// "material conflict" concept), so this is a faithful rename, not a new parallel status.
+// "customer_master_exclusion" is included here for type completeness, though in practice a
+// CONFIRMED customer-master match is classified as a terminal bucket earlier, in
+// run-final-scoring-stage-v2.ts, before a candidate ever reaches this function — it never
+// depends on hard gates, score, or channel, exactly like the other terminal buckets
+// (active/excluded-group/closed).
+export type QualificationStatusV2 = "qualified" | "qualified_with_channel_limit" | "held_for_customer_match_review" | "customer_master_exclusion" | "hard_rejected";
 
 export interface QualificationV2Input {
   hardGates: HardGateResult;
-  materialCustomerConflict: boolean; // from customer-match-materiality.ts — NOT the same as "any unresolved match exists"
+  materialCustomerConflict: boolean; // from customer-match-materiality.ts's "probable" tier — a CONFIRMED match never reaches this function at all
   channelSuitability: ChannelSuitabilityResult;
   stagesWithDecisiveEvidence: number; // 0-4, same input already computed for scoring.ts's dataCompletenessConfidence
   totalStagesConsidered: number;
@@ -47,9 +55,9 @@ export function classifyQualificationV2(input: QualificationV2Input): Qualificat
 
   if (input.materialCustomerConflict) {
     return {
-      qualificationStatus: "held_for_material_conflict", channelEligibility: input.channelSuitability.suitability,
+      qualificationStatus: "held_for_customer_match_review", channelEligibility: input.channelSuitability.suitability,
       enrichmentCompletenessBand, enrichmentCompletenessFraction: completenessFraction,
-      reason: "A materially-corroborated (not merely suggested) active-customer match remains unresolved.",
+      reason: "A probable (not yet confirmed, not rejected as coincidence) customer-master match remains unresolved — held until conclusively released or confirmed, never rep-facing in the meantime.",
     };
   }
 

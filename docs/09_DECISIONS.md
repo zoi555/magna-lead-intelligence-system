@@ -783,3 +783,50 @@ any future CTO change must land as a new versioned mapping (e.g. `v1.1`), never 
 this file. Full field-level validation (uniqueness, count, cross-sheet consistency) was run
 against the source spreadsheets before conversion; see `docs/77_LEAD_SCHEMA_V1_SUMMARY.md` for
 the summary and `docs/LEAD_PRODUCTION_HANDOVER.md` for full continuation detail.
+
+## Permanent customer_master_exclusion rule; reactivation retired (2026-07-24)
+
+### Decision
+
+Any candidate confirmed as matching any record in the Magna customer master — active, inactive,
+former, lost, renewal, closed, dormant, or any other lifecycle status — is permanently
+ineligible for sales contact. The single primary exclusion outcome is `customer_master_exclusion`
+(`v1Bucket`/`qualificationStatus`). It is checked across all 4 pipeline stages (Phase 1, FSA,
+Google Places, Companies House) — a genuine gap where a Companies-House-stage-only confirmation
+was never checked as a terminal bucket is fixed as part of this change. Possible/probable
+material matches (genuine but not strong enough to confirm) are `held_for_customer_match_review`
+(renamed from `held_for_material_conflict`, which was already exclusively about customer
+matches) — never rep-facing until conclusively released or confirmed. Weak/generic matches are
+unchanged (rejected as evidence, never held or excluded).
+
+Reactivation is retired as an operational lead category. The old "Active Customers" +
+"Reactivation" Master workbook tabs are consolidated into one "Customer Master Exclusions" tab;
+the Sales Pro `-reactivation.csv` file is replaced by an audit-only `-customer-master-
+exclusions.csv` (never a CTO import file — explicitly skips dropdown validation against the
+CTO-approved schema, since "Customer Master Exclusion" is not one of that schema's locked
+allowed values for `qualification_status`). Representative workbooks drop the Reactivation sheet
+entirely (8 sheets, not 9) — representatives must never see or receive these businesses.
+
+### Reason
+
+Owner-specified business rule, 2026-07-24: any customer-master match must be hard-excluded
+regardless of lifecycle, not merely active customers (the old model) or routed to a separate
+reactivation lead type (inactive customers). Reprocessing UB1 and RM1 from existing evidence
+(zero new external calls) found the rule change correctly reclassifies only exclusion-side
+buckets — both territories' genuinely-qualified populations are byte-for-byte unchanged (UB1: 47
+usable; RM1: 60 usable) — while catching additional genuine matches the old narrower checks
+missed (UB1: 20 exclusions vs. 13 previously; RM1: 4 vs. 3 previously), each with a documented,
+per-candidate evidence trail.
+
+### Not altered
+
+`config/lead-production/master-schema-v1.json` and `salespro-schema-v1.json` (the CTO-approved
+v1 schema files) are unchanged — "Reactivation" remains a technically-allowed
+`lead_type` dropdown value and "Held for Material Conflict"/"Active"/etc. remain in those
+locked files' documented allowed-value lists; this pipeline simply no longer produces those
+values. Any formal schema update (e.g. adding "Customer Master Exclusion" as an approved
+dropdown value) requires a new versioned mapping (v1.1), not an edit to v1.
+
+**See also:** `scripts/lead-production/customer-match-materiality.ts`,
+`run-final-scoring-stage-v2.ts`, `qualification-v2.ts`, `generate-master-export.ts`,
+`generate-salespro-export.ts`, `scripts/test-lead-production-customer-master-exclusion.ts`.

@@ -26,14 +26,15 @@ async function main() {
   const labels = schema.columns.map((c: any) => c.salesProFieldLabel);
   assert(new Set(labels).size === 108, "all 108 salesProFieldLabel column headers are unique strings");
 
-  console.log("\nEnd-to-end real UB1 checkpoint proof:");
+  console.log("\nEnd-to-end real UB1 checkpoint proof (customer_master_exclusion rule applied):");
   const D = "/Users/homemac/Data/aspectlead-lead-production/output/ub1";
+  const V2_DIR = `${D}/2026-07-24T00-00-00Z-v2-customer-master-exclusion-reprocess`;
   const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "salespro-export-e2e-"));
   const res = spawnSync("npx", ["tsx", "scripts/lead-production/generate-salespro-export.ts",
     `--phase1-dir=${D}/2026-07-23T01-44-16Z-ub1-comparison`, `--fsa-dir=${D}/2026-07-23T01-54-31Z-fsa-stage`,
     `--google-checkpoint=${D}/2026-07-23T03-34-51Z-google-stage-final`, `--companies-house-dir=${D}/2026-07-23T04-14-30Z-companies-house-stage`,
     `--website-dir=${D}/2026-07-23T04-28-39Z-website-stage`, `--public-profile-dir=${D}/2026-07-23T04-35-35Z-public-profile-stage`,
-    `--group-rescreen-dir=${D}/2026-07-23T04-39-22Z-final-group-rescreen-stage`, `--v2-dir=${D}/2026-07-23T13-00-00Z-v2-calibration-with-json`,
+    `--group-rescreen-dir=${D}/2026-07-23T04-39-22Z-final-group-rescreen-stage`, `--v2-dir=${V2_DIR}`,
     "--territory=UB1", "--representative=Naseh", "--role=telesales", "--sales-territory=UB1-UB5", "--test-sample=5", `--out=${outDir}`,
   ], { encoding: "utf8", cwd: process.cwd() });
   assert(res.status === 0, `generate-salespro-export.ts exits 0 against real UB1 checkpoints (got ${res.status}); stderr tail: ${(res.stderr ?? "").slice(-1000)}`);
@@ -41,26 +42,28 @@ async function main() {
   const readCsv = async (name: string) => { const text = await fs.readFile(path.join(outDir, name), "utf8"); return parseCsvObjects(text); };
   const newLeads = await readCsv("ub1-salespro-new-leads.csv");
   assert(newLeads.header.length === 108, `new-leads file has exactly 108 columns (got ${newLeads.header.length})`);
-  assert(newLeads.rows.length === 42, `new-leads file has exactly 42 rows (got ${newLeads.rows.length}) — matches the known UB1 usable-minus-key-account count`);
+  assert(newLeads.rows.length === 42, `new-leads file has exactly 42 rows (got ${newLeads.rows.length}) — unchanged from before the rule change (customer_master_exclusion only reclassifies exclusion-side buckets)`);
   assert(newLeads.header[0] === "Shop Name" && newLeads.header[6] === "Field Sales Rep" && newLeads.header[7] === "Sales Rep", "column order matches the CTO's exact existing labels/order (Shop Name, ..., Field Sales Rep, Sales Rep)");
   assert(newLeads.header.includes("Permanent Lead ID"), "Permanent Lead ID column is present");
 
-  const reactivation = await readCsv("ub1-salespro-reactivation.csv");
+  const exclusions = await readCsv("ub1-salespro-customer-master-exclusions.csv");
   const keyAccounts = await readCsv("ub1-salespro-key-accounts.csv");
-  assert(reactivation.rows.length === 3, `reactivation file has exactly 3 rows (got ${reactivation.rows.length})`);
+  assert(exclusions.rows.length === 20, `customer-master-exclusions file has exactly 20 rows (got ${exclusions.rows.length})`);
   assert(keyAccounts.rows.length === 5, `key-accounts file has exactly 5 rows (got ${keyAccounts.rows.length})`);
+  const reactivationFileExists = await fs.access(path.join(outDir, "ub1-salespro-reactivation.csv")).then(() => true).catch(() => false);
+  assert(!reactivationFileExists, "no ub1-salespro-reactivation.csv file is produced any more — reactivation is retired as an operational lead category");
 
   const newLeadIds = new Set(newLeads.rows.map((r) => r["Permanent Lead ID"]));
-  const reactivationIds = new Set(reactivation.rows.map((r) => r["Permanent Lead ID"]));
+  const exclusionIds = new Set(exclusions.rows.map((r) => r["Permanent Lead ID"]));
   const keyAccountIds = new Set(keyAccounts.rows.map((r) => r["Permanent Lead ID"]));
-  assert([...newLeadIds].every((id) => !reactivationIds.has(id) && !keyAccountIds.has(id)), "new-leads, reactivation, and key-accounts are mutually exclusive (never mixed)");
+  assert([...newLeadIds].every((id) => !exclusionIds.has(id) && !keyAccountIds.has(id)), "new-leads, customer-master-exclusions, and key-accounts are mutually exclusive (never mixed)");
   assert(newLeadIds.size === newLeads.rows.length, "every new-lead row has a unique Lead ID");
 
-  console.log("\nOrdinary new-lead file excludes held/rejected/active-customer/excluded-group rows:");
+  console.log("\nOrdinary new-lead file excludes held/rejected/customer-master-excluded/excluded-group rows:");
   const anyBlankLeadId = newLeads.rows.some((r) => !r["Permanent Lead ID"]);
   assert(!anyBlankLeadId, "no row in the new-leads file has a blank Lead ID");
-  const anyHardRejectedStatus = newLeads.rows.some((r) => r["Qualification Status"] === "Hard Rejected" || r["Qualification Status"] === "Held for Material Conflict");
-  assert(!anyHardRejectedStatus, "no row in the new-leads file has Qualification Status Hard Rejected or Held for Material Conflict");
+  const anyHardRejectedStatus = newLeads.rows.some((r) => r["Qualification Status"] === "Hard Rejected" || r["Qualification Status"] === "Held for Customer Match Review" || r["Qualification Status"] === "Customer Master Exclusion");
+  assert(!anyHardRejectedStatus, "no row in the new-leads file has Qualification Status Hard Rejected, Held for Customer Match Review, or Customer Master Exclusion");
 
   console.log("\nDual-column representative field (documented exception):");
   const telesalesRowsHaveFieldSalesRepBlank = newLeads.rows.every((r) => r["Field Sales Rep"] === "");

@@ -86,14 +86,15 @@ async function main() {
   assert(noScore.dataQualityGaps.includes("commercial_priority_score"), "the missing score is recorded as a data-quality gap, not silently dropped");
   assert(noScore.fields.final_lead_level === "Level 4", "final_lead_level is still populated (hard-gate failure always assigns level_4 even with no score) — only the score itself is genuinely absent");
 
-  console.log("\nEnd-to-end real UB1 checkpoint proof (Milestone 5 preview): 107 fields, 14 tabs, reconciliation:");
+  console.log("\nEnd-to-end real UB1 checkpoint proof (109-column/13-tab, customer_master_exclusion rule applied): 107 fields, 13 tabs, reconciliation:");
   const D = "/Users/homemac/Data/aspectlead-lead-production/output/ub1";
+  const V2_DIR = `${D}/2026-07-24T00-00-00Z-v2-customer-master-exclusion-reprocess`;
   const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "master-export-e2e-"));
   const res = spawnSync("npx", ["tsx", "scripts/lead-production/generate-master-export.ts",
     `--phase1-dir=${D}/2026-07-23T01-44-16Z-ub1-comparison`, `--fsa-dir=${D}/2026-07-23T01-54-31Z-fsa-stage`,
     `--google-checkpoint=${D}/2026-07-23T03-34-51Z-google-stage-final`, `--companies-house-dir=${D}/2026-07-23T04-14-30Z-companies-house-stage`,
     `--website-dir=${D}/2026-07-23T04-28-39Z-website-stage`, `--public-profile-dir=${D}/2026-07-23T04-35-35Z-public-profile-stage`,
-    `--group-rescreen-dir=${D}/2026-07-23T04-39-22Z-final-group-rescreen-stage`, `--v2-dir=${D}/2026-07-23T13-00-00Z-v2-calibration-with-json`,
+    `--group-rescreen-dir=${D}/2026-07-23T04-39-22Z-final-group-rescreen-stage`, `--v2-dir=${V2_DIR}`,
     "--territory=UB1", "--representative=Naseh", "--role=telesales", "--sales-territory=UB1-UB5", `--out=${outDir}`,
   ], { encoding: "utf8", cwd: process.cwd() });
   assert(res.status === 0, `generate-master-export.ts exits 0 against real UB1 checkpoints (got ${res.status}); stderr tail: ${(res.stderr ?? "").slice(-800)}`);
@@ -102,34 +103,38 @@ async function main() {
   assert(combinedExists, "combined campaign workbook was written");
   if (combinedExists) {
     const wb = XLSX.readFile(combinedPath);
-    const EXPECTED_TABS = ["Operationally Usable Leads", "Premium Level 0", "Releasable Level 1", "Held-Review", "Hard Rejects", "Active Customers", "Reactivation", "Excluded Groups", "Key Accounts", "Representative Summary", "Territory Summary", "District Summary", "Evidence Register", "Run Manifest"];
-    assert(wb.SheetNames.length === 14, `combined workbook has exactly 14 tabs (got ${wb.SheetNames.length}: ${wb.SheetNames.join(", ")})`);
+    const EXPECTED_TABS = ["Operationally Usable Leads", "Premium Level 0", "Releasable Level 1", "Held-Review", "Hard Rejects", "Customer Master Exclusions", "Excluded Groups", "Key Accounts", "Representative Summary", "Territory Summary", "District Summary", "Evidence Register", "Run Manifest"];
+    assert(wb.SheetNames.length === 13, `combined workbook has exactly 13 tabs (got ${wb.SheetNames.length}: ${wb.SheetNames.join(", ")})`);
     for (const tab of EXPECTED_TABS) assert(wb.SheetNames.includes(tab), `tab "${tab}" is present`);
+    assert(!wb.SheetNames.includes("Active Customers") && !wb.SheetNames.includes("Reactivation"), "the old \"Active Customers\"/\"Reactivation\" tabs no longer exist — consolidated into \"Customer Master Exclusions\"");
     const usableRows = XLSX.utils.sheet_to_json(wb.Sheets["Operationally Usable Leads"]) as any[];
-    assert(usableRows.length === 47, `Operationally Usable Leads has exactly 47 rows (got ${usableRows.length})`);
+    assert(usableRows.length === 47, `Operationally Usable Leads has exactly 47 rows (got ${usableRows.length}) — unchanged by the rule change`);
     assert(usableRows.length > 0 && Object.keys(usableRows[0]).length === 107, `every usable row has exactly 107 fields (got ${Object.keys(usableRows[0] ?? {}).length})`);
     const premiumRows = XLSX.utils.sheet_to_json(wb.Sheets["Premium Level 0"]) as any[];
     assert(premiumRows.length === 30, `Premium Level 0 has exactly 30 rows (got ${premiumRows.length})`);
     const releasableRows = XLSX.utils.sheet_to_json(wb.Sheets["Releasable Level 1"]) as any[];
     assert(releasableRows.length === 17, `Releasable Level 1 has exactly 17 rows (got ${releasableRows.length})`);
     const heldRows = XLSX.utils.sheet_to_json(wb.Sheets["Held-Review"]) as any[];
-    assert(heldRows.length === 11, `Held-Review has exactly 11 rows (got ${heldRows.length})`);
-    const activeCustRows = XLSX.utils.sheet_to_json(wb.Sheets["Active Customers"]) as any[];
+    assert(heldRows.length === 6, `Held-Review has exactly 6 rows (got ${heldRows.length}) — down from 11 (5 were reclassified to confirmed customer_master_exclusion)`);
+    const exclusionRows = XLSX.utils.sheet_to_json(wb.Sheets["Customer Master Exclusions"]) as any[];
+    assert(exclusionRows.length === 20, `Customer Master Exclusions has exactly 20 rows (got ${exclusionRows.length})`);
     const excludedRows = XLSX.utils.sheet_to_json(wb.Sheets["Excluded Groups"]) as any[];
-    const reactivationRows = XLSX.utils.sheet_to_json(wb.Sheets["Reactivation"]) as any[];
     const hardRejectRows = XLSX.utils.sheet_to_json(wb.Sheets["Hard Rejects"]) as any[];
-    const total = usableRows.length + heldRows.length + hardRejectRows.length + activeCustRows.length + excludedRows.length + reactivationRows.length;
-    assert(total === 94, `all 14 tabs' mutually-exclusive buckets sum to exactly 94 total UB1 candidates (got ${total})`);
+    const total = usableRows.length + heldRows.length + hardRejectRows.length + exclusionRows.length + excludedRows.length;
+    assert(total === 94, `all 13 tabs' mutually-exclusive buckets sum to exactly 94 total UB1 candidates (got ${total})`);
     const leadIdsInUsable = usableRows.map((r) => r["Permanent Lead ID"]);
     assert(leadIdsInUsable.every((id: string) => /^UB1-[0-9A-F]{8}$/.test(id)), "every usable row's Permanent Lead ID matches the required format");
     assert(new Set(leadIdsInUsable).size === leadIdsInUsable.length, "every usable row has a unique Permanent Lead ID");
+    const leadIdsInExclusions = new Set(exclusionRows.map((r) => r["Permanent Lead ID"]));
+    assert([...leadIdsInUsable].every((id) => !leadIdsInExclusions.has(id)), "zero overlap between usable leads and customer master exclusions");
   }
   const repPath = path.join(outDir, "naseh-master-representative.xlsx");
   const repExists = await fs.access(repPath).then(() => true).catch(() => false);
   assert(repExists, "representative workbook was written");
   if (repExists) {
     const wb = XLSX.readFile(repPath);
-    assert(wb.SheetNames.length === 9, `representative workbook has exactly 9 sheets (got ${wb.SheetNames.length}: ${wb.SheetNames.join(", ")})`);
+    assert(wb.SheetNames.length === 8, `representative workbook has exactly 8 sheets (got ${wb.SheetNames.length}: ${wb.SheetNames.join(", ")}) — Reactivation retired, reps never see customer-master-excluded businesses`);
+    assert(!wb.SheetNames.includes("Reactivation"), "the representative workbook has no Reactivation sheet");
   }
   await fs.rm(outDir, { recursive: true, force: true });
 
