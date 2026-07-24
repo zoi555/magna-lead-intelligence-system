@@ -567,3 +567,37 @@ deleted) and annotated `reference = "duplicate_superseded_by_3a8d156e..."` plus 
 `app_audit_log` entry recording the comparison evidence and decision.
 
 **See also:** `scripts/je-run.ts`, `docs/09_DECISIONS.md`.
+
+## Fix — cross-district dedup false-merged different chain/franchise premises (2026-07-24)
+
+**Bug:** found while combining Nauman's RM1-RM14 (748 candidates across 14 districts).
+`dedupeAcrossDistricts()`'s company-number/phone/domain tiers required NO other corroborating
+signal — a shared corporate website domain or central phone line across genuinely different
+physical premises of the same chain/franchise was enough to wrongly merge them. Real cases: Ember
+Inns' two different pubs (RM7/RM12, shared `emberinns.co.uk`), Pizza Hut Delivery's two branches
+(RM7/RM13), Shell's two petrol stations (RM1/RM10), Favorite Chicken & Ribs' two locations
+(RM5/RM13), Sizzling Pubs' two sites (RM6/RM8) — 81 of 748 candidates (10.8%) were being wrongly
+collapsed into 667, each merge silently dropping a genuinely distinct sales opportunity.
+Additionally, the weakest tier (`exact_postcode_and_identity`, floor 0.3) matched "Costa -
+Romford" to "Wenzel's - Romford" — two unrelated chains — purely on the shared locality suffix.
+
+**Fix:** company-number/phone/domain tiers now REQUIRE the same full postcode as a necessary
+corroborating signal (the same real premises discovered near a district boundary genuinely
+geocodes to the same postcode in both districts; two different branches of a chain do not). The
+postcode+identity-only tier's name-similarity floor raised from 0.3 to 0.6 (dedup silently DROPS
+a candidate on a match — a strictly worse failure mode than customer-matching's "hold for
+review," so it needs a materially higher confidence bar). Re-run against the real 748-candidate
+set: 25 genuine duplicates found (same postcode + same phone/company-number — consistent with
+the known "dark kitchen"/virtual-brand pattern of one kitchen listing multiple JE storefronts),
+zero false positives on manual inspection. Also wired `dedupeAcrossDistricts()` into
+`generate-master-export.ts`/`generate-salespro-export.ts` (previously computed but never
+actually applied to the exported rows) and fixed a field-name bug in the Sales Pro exporter's
+dedup input (`resolved.fields.telephone`/`.website` don't exist — the resolved Master-schema
+field names are `main_phone`/`website_url`; fixed to read the raw dossier fields, matching the
+Master exporter's own correct usage).
+
+Regression-tested with the exact real false-positive cases (Ember Inns, Costa/Wenzel's) as
+fixtures in `test-lead-production-territory-v2.ts`.
+
+**See also:** `scripts/lead-production/district-reconciliation.ts`,
+`generate-master-export.ts`, `generate-salespro-export.ts`.

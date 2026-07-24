@@ -122,14 +122,19 @@ async function main() {
   assert(grepOld.status === 1, "run-sales-territory.ts and territory-assignment-v2.ts never IMPORT the old load-assignments.ts (CSV/Excel) loader (a doc-comment mention explaining supersession is fine)");
 
   console.log("\nCross-district deduplication (tiered identity, synthetic fixtures):");
+  // 2026-07-24 fix: a shared company number/phone/domain ALONE is not a safe cross-district
+  // merge signal (found live: chains/franchises share a corporate domain or central phone
+  // across many genuinely distinct premises — real RM1-RM14 cases: Pizza Hut, Ember Inns,
+  // Shell, Favorite Chicken all merged wrongly under the old logic). The same full postcode is
+  // now a REQUIRED corroborating signal alongside any identifier tier.
   const base: DistrictCandidateForDedup = { candidateId: "c-a", district: "RM1", tradingName: "Spice Villa", postcode: "RM1 1AA", phone: "020 7946 0001", website: "https://spicevilla.co.uk", companyNumber: "01234567", finalOutcome: "level_0" };
-  const sameCompanyNumber: DistrictCandidateForDedup = { ...base, candidateId: "c-b", district: "RM2", tradingName: "Spice Villa Ltd", postcode: "RM2 2BB", phone: "020 7946 0099", website: "https://different.co.uk" };
-  const d1 = dedupeAcrossDistricts([base, sameCompanyNumber]);
-  assert(d1.kept.length === 1 && d1.duplicateClusters.length === 1 && d1.duplicateClusters[0].tier === "exact_company_number", "identical Companies House number across two districts collapses to one candidate (exact_company_number tier)");
+  const sameCompanyNumberSamePostcode: DistrictCandidateForDedup = { ...base, candidateId: "c-b", district: "RM2", tradingName: "Spice Villa Ltd", phone: "020 7946 0099", website: "https://different.co.uk" };
+  const d1 = dedupeAcrossDistricts([base, sameCompanyNumberSamePostcode]);
+  assert(d1.kept.length === 1 && d1.duplicateClusters.length === 1 && d1.duplicateClusters[0].tier === "exact_company_number", "identical company number AT THE SAME FULL POSTCODE collapses to one candidate (exact_company_number tier)");
 
-  const samePhone: DistrictCandidateForDedup = { candidateId: "c-c", district: "RM3", tradingName: "Curry House", postcode: "RM3 3CC", phone: "020 7946 0001", website: null, companyNumber: null, finalOutcome: "level_0" };
-  const d2 = dedupeAcrossDistricts([{ ...base, companyNumber: null }, samePhone]);
-  assert(d2.kept.length === 1 && d2.duplicateClusters[0].tier === "exact_phone", "identical phone number (no company number available) collapses via exact_phone tier");
+  const samePhoneSamePostcode: DistrictCandidateForDedup = { candidateId: "c-c", district: "RM3", tradingName: "Curry House", postcode: "RM1 1AA", phone: "020 7946 0001", website: null, companyNumber: null, finalOutcome: "level_0" };
+  const d2 = dedupeAcrossDistricts([{ ...base, companyNumber: null }, samePhoneSamePostcode]);
+  assert(d2.kept.length === 1 && d2.duplicateClusters[0].tier === "exact_phone", "identical phone number AT THE SAME FULL POSTCODE collapses via exact_phone tier");
 
   const unrelated: DistrictCandidateForDedup = { candidateId: "c-d", district: "RM4", tradingName: "Green Leaf Cafe", postcode: "RM4 4DD", phone: "020 7946 0002", website: "https://greenleaf.co.uk", companyNumber: null, finalOutcome: "level_0" };
   const d3 = dedupeAcrossDistricts([{ ...base, companyNumber: null, phone: null, website: null }, unrelated]);
@@ -139,7 +144,27 @@ async function main() {
   const d4 = dedupeAcrossDistricts([{ ...base, companyNumber: null, phone: null, website: null }, samePostcodeSimilarName]);
   assert(d4.kept.length === 1 && d4.duplicateClusters[0].tier === "exact_postcode_and_identity", "same full postcode + similar trading name collapses via the weakest (postcode+identity) tier");
 
-  const shuffledOrder = dedupeAcrossDistricts([sameCompanyNumber, base]);
+  // Regression guard: the exact real-world false-positive that motivated raising this tier's
+  // floor from 0.3 to 0.6 — two completely unrelated chains sharing only a locality suffix.
+  const costaA: DistrictCandidateForDedup = { candidateId: "c-j", district: "RM1", tradingName: "Costa - Romford", postcode: "RM1 1NL", phone: null, website: null, companyNumber: null, finalOutcome: "level_0" };
+  const wenzelsB: DistrictCandidateForDedup = { candidateId: "c-k", district: "RM1", tradingName: "Wenzel's - Romford", postcode: "RM1 1NL", phone: "01708 987311", website: "wenzels.co.uk", companyNumber: null, finalOutcome: "level_0" };
+  const d4b = dedupeAcrossDistricts([costaA, wenzelsB]);
+  assert(d4b.kept.length === 2, "\"Costa - Romford\" and \"Wenzel's - Romford\" (unrelated chains, same postcode, name similarity 0.33 from the shared locality suffix alone) are never merged (real RM1 case that motivated raising the postcode+identity floor to 0.6)");
+
+  // Regression guard: the exact real-world false-positive class this fix closes — a chain/
+  // franchise sharing ONE corporate domain (and even a central phone) across genuinely
+  // different premises must NEVER be merged just because the identifiers match.
+  const emberInnsA: DistrictCandidateForDedup = { candidateId: "c-f", district: "RM7", tradingName: "Ember Inns - The Mawney Arms", postcode: "RM7 7HT", phone: "01708 761162", website: "emberinns.co.uk", companyNumber: null, finalOutcome: "level_0" };
+  const emberInnsB: DistrictCandidateForDedup = { candidateId: "c-g", district: "RM12", tradingName: "Ember Inns - The Railway Hotel", postcode: "RM12 6SB", phone: "01708 440028", website: "emberinns.co.uk", companyNumber: null, finalOutcome: "level_0" };
+  const d5 = dedupeAcrossDistricts([emberInnsA, emberInnsB]);
+  assert(d5.kept.length === 2, "two different chain branches sharing one corporate website domain, at different postcodes, are NEVER merged (real RM7/RM12 case that motivated this fix)");
+
+  const orchidA: DistrictCandidateForDedup = { candidateId: "c-h", district: "RM12", tradingName: "Thai Orchid", postcode: "RM12 5AD", phone: "01708 607677", website: "http://www.thaibangla.co.uk/", companyNumber: null, finalOutcome: "level_0" };
+  const orchidB: DistrictCandidateForDedup = { candidateId: "c-i", district: "RM12", tradingName: "Orchid Indian Cuisine", postcode: "RM12 5AB", phone: "01708 607677", website: "http://www.thaibangla.co.uk/", companyNumber: null, finalOutcome: "level_0" };
+  const d6 = dedupeAcrossDistricts([orchidA, orchidB]);
+  assert(d6.kept.length === 2, "two candidates sharing BOTH phone and domain but at different postcodes are never merged (real RM12 case — plausibly a shared operator, but a genuinely different premises/opportunity)");
+
+  const shuffledOrder = dedupeAcrossDistricts([sameCompanyNumberSamePostcode, base]);
   assert(JSON.stringify(shuffledOrder.kept.map((k) => k.candidateId).sort()) === JSON.stringify(d1.kept.map((k) => k.candidateId).sort()), "dedup outcome is deterministic regardless of input/processing order");
 
   console.log("\nPer-district population invariant:");

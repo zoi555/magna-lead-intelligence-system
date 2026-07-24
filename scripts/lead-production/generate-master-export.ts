@@ -17,6 +17,7 @@ import path from "node:path";
 import * as XLSX from "xlsx";
 import { loadCandidateDossiers, type Dossier } from "./candidate-dossier";
 import { resolveMasterFields, type ResolvedMasterRow, type MasterFieldContext } from "./master-field-resolver";
+import { dedupeAcrossDistricts, type DistrictCandidateForDedup, type DuplicateCluster } from "./district-reconciliation";
 import { writeCsv } from "./csv";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
@@ -31,14 +32,25 @@ async function loadMasterSchema(): Promise<{ canonicalName: string; masterFieldL
 
 interface RowBundle { dossier: Dossier; resolved: ResolvedMasterRow; district: string }
 
-async function loadAllRows(districts: DistrictInput[], ctxFor: (district: string) => MasterFieldContext): Promise<RowBundle[]> {
+async function loadAllRows(districts: DistrictInput[], ctxFor: (district: string) => MasterFieldContext): Promise<{ rows: RowBundle[]; duplicatesRemoved: DuplicateCluster[] }> {
   const out: RowBundle[] = [];
   for (const d of districts) {
     const { dossiers } = await loadCandidateDossiers(d.dirs);
     const ctx = ctxFor(d.district);
     for (const dossier of dossiers) out.push({ dossier, resolved: resolveMasterFields(dossier, ctx), district: d.district });
   }
-  return out;
+  // Cross-district dedup only makes sense with more than one district — a single-district
+  // export (UB1 validation, ad-hoc mode) has nothing to dedup against.
+  if (districts.length <= 1) return { rows: out, duplicatesRemoved: [] };
+  const dedupInput: DistrictCandidateForDedup[] = out.map((r) => ({
+    candidateId: r.dossier.candidateId, district: r.district, tradingName: r.dossier.tradingName,
+    postcode: r.dossier.postcode, phone: r.dossier.fields.telephone as string | null,
+    website: r.dossier.fields.website as string | null, companyNumber: r.dossier.fields.companies_house_number as string | null,
+    finalOutcome: r.dossier.qualificationStatus,
+  }));
+  const dedupResult = dedupeAcrossDistricts(dedupInput);
+  const keptIds = new Set(dedupResult.kept.map((c) => c.candidateId));
+  return { rows: out.filter((r) => keptIds.has(r.dossier.candidateId)), duplicatesRemoved: dedupResult.duplicateClusters };
 }
 
 function toLabelRow(schema: { canonicalName: string; masterFieldLabel: string }[], resolved: ResolvedMasterRow): Record<string, unknown> {
@@ -124,7 +136,14 @@ async function main() {
   console.log(`=== Master exporter (107 fields) — ${representative} (${role}), ${salesTerritory}, ${districts.length} district(s) ===`);
 
   const schema = await loadMasterSchema();
-  const rows = await loadAllRows(districts, (district) => ({ territory: district, representative: representative!, role: role!, salesTerritory: salesTerritory! }));
+  const { rows, duplicatesRemoved } = await loadAllRows(districts, (district) => ({ territory: district, representative: representative!, role: role!, salesTerritory: salesTerritory! }));
+  if (duplicatesRemoved.length) {
+    console.log(`Cross-district dedup: ${duplicatesRemoved.length} duplicate(s) removed (same real premises independently discovered in two districts near a boundary).`);
+    await fs.writeFile(path.join(outArg, "territory-reconciliation.csv"), writeCsv(
+      ["tier", "kept_candidate_id", "kept_district", "dropped_candidate_id", "dropped_district"],
+      duplicatesRemoved.map((c) => ({ tier: c.tier, kept_candidate_id: c.keptCandidateId, kept_district: c.keptDistrict, dropped_candidate_id: c.droppedCandidateId, dropped_district: c.droppedDistrict })),
+    ));
+  }
 
   // --- Reconciliation: every candidate must land in exactly one bucket. ---
   const buckets = classify(rows);

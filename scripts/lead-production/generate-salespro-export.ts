@@ -18,6 +18,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { loadCandidateDossiers, type Dossier } from "./candidate-dossier";
 import { resolveMasterFields, type MasterFieldContext } from "./master-field-resolver";
+import { dedupeAcrossDistricts, type DistrictCandidateForDedup } from "./district-reconciliation";
 import { writeCsv } from "./csv";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
@@ -131,7 +132,7 @@ async function main() {
   const newCount = columns.filter((c) => c.origin !== "Existing CTO Field").length;
   if (existingCount !== 20 || newCount !== 88) throw new Error(`Schema drift: expected 20 existing + 88 new, got ${existingCount} existing + ${newCount} new.`);
 
-  const bundles: RowBundle[] = [];
+  let bundles: RowBundle[] = [];
   for (const d of districts) {
     const { dossiers } = await loadCandidateDossiers(d.dirs);
     const ctx: MasterFieldContext = { territory: d.district, representative: representative!, role: role!, salesTerritory: salesTerritory! };
@@ -139,6 +140,20 @@ async function main() {
       const resolved = resolveMasterFields(dossier, ctx);
       bundles.push({ dossier, district: d.district, fields: resolved.fields, leadId: resolved.leadId, gaps: resolved.dataQualityGaps });
     }
+  }
+  // Cross-district dedup — same tiered logic as the Master exporter (district-reconciliation.ts),
+  // never reimplemented. Only meaningful with more than one district.
+  if (districts.length > 1) {
+    const dedupInput: DistrictCandidateForDedup[] = bundles.map((b) => ({
+      candidateId: b.dossier.candidateId, district: b.district, tradingName: b.dossier.tradingName,
+      postcode: b.dossier.postcode, phone: b.dossier.fields.telephone as string | null, website: b.dossier.fields.website as string | null,
+      companyNumber: b.dossier.fields.companies_house_number as string | null, finalOutcome: b.dossier.qualificationStatus,
+    }));
+    const dedupResult = dedupeAcrossDistricts(dedupInput);
+    const keptIds = new Set(dedupResult.kept.map((c) => c.candidateId));
+    const removed = bundles.length - dedupResult.kept.length;
+    bundles = bundles.filter((b) => keptIds.has(b.dossier.candidateId));
+    if (removed) console.log(`Cross-district dedup: ${removed} duplicate(s) removed (same real premises independently discovered in two districts near a boundary).`);
   }
 
   // --- Strict exclusion from ordinary new-lead exports: held, hard-rejected, customer-master

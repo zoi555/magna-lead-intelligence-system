@@ -38,13 +38,22 @@ export interface DedupeResult {
 // meaningfully similar trading name. Different postal district alone is never sufficient to
 // merge two records — cross-district dedup exists BECAUSE district boundaries can overlap in
 // discovery, not because we assume all similarly-named businesses are the same.
+// 2026-07-24 fix: company number / phone / domain ALONE are NOT safe cross-district merge
+// signals — found live against real RM1-RM14 data. Chains and franchises (Pizza Hut, Ember
+// Inns, Shell, Favorite Chicken, Sizzling Pubs, Pepe's Piri Piri, ...) share ONE corporate
+// website domain and sometimes ONE central phone line across MANY genuinely distinct physical
+// premises — the original tiering merged 81 of 748 real candidates this way, most of them
+// clearly different branches at different postcodes (e.g. "Ember Inns — The Mawney Arms" RM7
+// vs "Ember Inns — The Railway Hotel" RM12: same emberinns.co.uk domain, different pub,
+// different postcode, different phone). A shared UK company number can likewise cover multiple
+// trading premises of the same legal entity. Cross-district dedup now REQUIRES the same full
+// postcode as a necessary corroborating signal alongside any of the three identifier tiers —
+// the same real premises discovered independently near a district boundary genuinely geocodes
+// to the same postcode in both districts; two different branches of the same chain do not.
 export function dedupeAcrossDistricts(candidates: DistrictCandidateForDedup[]): DedupeResult {
   const kept: DistrictCandidateForDedup[] = [];
   const duplicateClusters: DuplicateCluster[] = [];
 
-  const byCompanyNumber = new Map<string, DistrictCandidateForDedup>();
-  const byPhone = new Map<string, DistrictCandidateForDedup>();
-  const byDomain = new Map<string, DistrictCandidateForDedup>();
   const byPostcode = new Map<string, DistrictCandidateForDedup[]>();
 
   // Deterministic order: sort by candidateId so dedupe outcome does not depend on district
@@ -60,13 +69,28 @@ export function dedupeAcrossDistricts(candidates: DistrictCandidateForDedup[]): 
     let matchOf: DistrictCandidateForDedup | null = null;
     let tier: DuplicateEvidenceTier | null = null;
 
-    if (companyNumber && byCompanyNumber.has(companyNumber)) { matchOf = byCompanyNumber.get(companyNumber)!; tier = "exact_company_number"; }
-    else if (phone && byPhone.has(phone)) { matchOf = byPhone.get(phone)!; tier = "exact_phone"; }
-    else if (domain && byDomain.has(domain)) { matchOf = byDomain.get(domain)!; tier = "exact_domain"; }
-    else if (postcode) {
+    if (postcode) {
       const samePostcode = byPostcode.get(postcode) ?? [];
-      const identityMatch = samePostcode.find((other) => nameSimilarity(normaliseName(other.tradingName), normaliseName(c.tradingName)) >= 0.3);
-      if (identityMatch) { matchOf = identityMatch; tier = "exact_postcode_and_identity"; }
+      for (const other of samePostcode) {
+        const otherCompanyNumber = other.companyNumber?.trim().toUpperCase() || null;
+        const otherPhone = other.phone ? normalisePhone(other.phone).comparison : null;
+        const otherDomain = other.website ? normaliseDomain(other.website) : null;
+        if (companyNumber && otherCompanyNumber === companyNumber) { matchOf = other; tier = "exact_company_number"; break; }
+        if (phone && otherPhone === phone) { matchOf = other; tier = "exact_phone"; break; }
+        if (domain && otherDomain === domain) { matchOf = other; tier = "exact_domain"; break; }
+      }
+      if (!matchOf) {
+        // 0.6, not the weaker 0.3 "material but not confirmed" floor used elsewhere in this
+        // pipeline (customer-match-materiality.ts) — found live: "Costa - Romford" vs
+        // "Wenzel's - Romford" (two unrelated chains, same postcode) scored 0.33 purely from
+        // the shared locality suffix "Romford", clearing 0.3. Dedup SILENTLY DROPS a candidate
+        // on a match, unlike customer-matching (which routes an uncertain match to human
+        // review) — a wrongly dropped candidate is a lost real sales opportunity, a strictly
+        // worse outcome than a duplicate lead reaching a rep, so dedup deliberately uses the
+        // higher confirm-only bar.
+        const identityMatch = samePostcode.find((other) => nameSimilarity(normaliseName(other.tradingName), normaliseName(c.tradingName)) >= 0.6);
+        if (identityMatch) { matchOf = identityMatch; tier = "exact_postcode_and_identity"; }
+      }
     }
 
     if (matchOf && tier) {
@@ -75,9 +99,6 @@ export function dedupeAcrossDistricts(candidates: DistrictCandidateForDedup[]): 
     }
 
     kept.push(c);
-    if (companyNumber) byCompanyNumber.set(companyNumber, c);
-    if (phone) byPhone.set(phone, c);
-    if (domain) byDomain.set(domain, c);
     if (postcode) byPostcode.set(postcode, [...(byPostcode.get(postcode) ?? []), c]);
   }
 
