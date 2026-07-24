@@ -56,9 +56,9 @@ const REPRESENTATIVES = [
     customerExclusions: 76, groupExclusions: 42, held: 19, hardRejected: 132,
     masterFilePath: `${KUNZ_DIR}/Kunz_TW1-TW10_Representative_Master.xlsx`,
     salesProFilePath: `${KUNZ_DIR}/Kunz_TW1-TW10_SalesPro_New_Leads.csv`,
-    mapPath: `${KUNZ_DIR}/Kunz_TW1-TW10_New_Leads_Map.xlsx`,
+    mapPath: "n/a (telesales — mapRequired=false, resolved from sales-territories-v2.json; no map file produced or referenced)",
     reportPath: `${KUNZ_DIR}/Kunz_TW1-TW10_Lead_Production_Report.xlsx`,
-    latestCommit: "ac0060f", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
+    latestCommit: "a8f94b4 (map_required resolver fix — corrected this record retroactively from existing evidence)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
     lastUpdated: "2026-07-24", nextAction: "None — territory complete, handed over, awaiting no further action.",
   },
   { representative: "Meer", role: "telesales", salesTerritory: "TW11-TW20", totalDistricts: 10, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 10, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
@@ -97,6 +97,24 @@ const COLUMN_LABELS: Record<string, string> = {
 };
 
 async function main() {
+  // map_required cross-check (2026-07-24): for every ACCEPTED representative, the register's
+  // own mapPath entry must agree with the authoritative resolver — a field_sales rep's mapPath
+  // must be a real file path, a telesales rep's must not reference a map file at all. Refuses
+  // (rather than silently writing a stale/incorrect register) if this drifts, exactly the class
+  // of bug this fix addresses — Kunz's package originally contained an unnecessary map file
+  // because nothing cross-checked the register/handover package against the canonical config.
+  const { resolveMapRequired } = await import("./resolve-map-required");
+  for (const r of REPRESENTATIVES.filter((r) => r.territoryStatus === "ACCEPTED")) {
+    const resolved = await resolveMapRequired(r.representative);
+    const mapPathReferencesMapFile = /New_Leads_Map\.xlsx/.test(r.mapPath);
+    if (resolved.mapRequired && !mapPathReferencesMapFile) {
+      throw new Error(`REGISTER INCONSISTENCY: ${r.representative} is ${resolved.role} (mapRequired=true) but the register's mapPath ("${r.mapPath}") does not reference a map file.`);
+    }
+    if (!resolved.mapRequired && mapPathReferencesMapFile) {
+      throw new Error(`REGISTER INCONSISTENCY: ${r.representative} is ${resolved.role} (mapRequired=false) but the register's mapPath ("${r.mapPath}") references a map file — telesales packages must never expose one.`);
+    }
+  }
+
   const columns = Object.keys(COLUMN_LABELS);
   const rows = REPRESENTATIVES.map((r) => {
     const o: Record<string, unknown> = {};
