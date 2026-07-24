@@ -110,6 +110,27 @@ const AYESHA_DEFECTS = [
 ];
 const AYESHA_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-lead-production-website.ts — ALL PASSED (including 2 new regressions for ISS-0030: a connection-level fetch rejection is caught gracefully, and a structural check that the HTTP/1.1-only dispatcher stays wired). npm run typecheck — clean. npm run build — succeeded.";
 
+const KUNZ_DISTRICTS = [
+  ["TW1", 622, 88, 534, 70, 38, 23, 15, 3, 0, 21, 4, 7],
+  ["TW2", 815, 45, 770, 38, 21, 10, 11, 0, 1, 8, 2, 6],
+  ["TW3", 805, 184, 621, 167, 66, 46, 20, 6, 11, 42, 40, 8],
+  ["TW4", 750, 53, 697, 47, 16, 11, 5, 0, 3, 18, 9, 1],
+  ["TW5", 945, 52, 893, 47, 15, 11, 4, 1, 1, 11, 16, 4],
+  ["TW6", 75, 1, 74, 1, 0, 0, 0, 0, 0, 1, 0, 0],
+  ["TW7", 1021, 51, 970, 26, 7, 5, 2, 2, 0, 14, 1, 4],
+  ["TW8", 998, 41, 957, 34, 9, 6, 3, 1, 2, 14, 2, 7],
+  ["TW9", 235, 27, 208, 23, 9, 5, 4, 1, 0, 7, 2, 5],
+  ["TW10", 87, 5, 82, 5, 1, 1, 0, 0, 1, 2, 1, 0],
+];
+const KUNZ_SOURCE_CALLS = [
+  ["TW1", 61, 56], ["TW2", 30, 27], ["TW3", 144, 122], ["TW4", 42, 37], ["TW5", 38, 27],
+  ["TW6", 1, 1], ["TW7", 20, 16], ["TW8", 26, 23], ["TW9", 18, 15], ["TW10", 4, 4],
+];
+const KUNZ_DEFECTS: string[][] = [
+  ["1", "run-district.ts's assignment CSV hardcoded map_required=true for every representative, including telesales (should be false)", "Session scratchpad helper script (not part of the committed pipeline) — the real run-full-territory.ts/load-assignments.ts correctly reads map_required from the assignment CSV", "Fixed the scratchpad script to derive map_required from role (field_sales=true, telesales=false) before running any TW district", "n/a (scratchpad-only fix, not a repo commit)"],
+];
+const KUNZ_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED, fixed and verified before TW1 started. npm run typecheck — clean. npm run build — succeeded. No lead-data defect found during TW1-TW10 processing.";
+
 const TERRITORIES: Record<string, any> = {
   ayesha: {
     representative: "Ayesha", role: "Field Sales", salesTerritory: "NW1-NW10", filePrefix: "Ayesha_NW1-NW10",
@@ -120,6 +141,16 @@ const TERRITORIES: Record<string, any> = {
     commitSha: "0cec029 (ISS-0030 website-crawl HTTP/1.1 fix, applied mid-territory)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
     handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/ayesha-nw1-nw10",
     territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/ayesha/combined-2026-07-24/NW1-NW10-TERRITORY-RECONCILIATION-REPORT.md",
+  },
+  kunz: {
+    representative: "Kunz", role: "Telesales", salesTerritory: "TW1-TW10", filePrefix: "Kunz_TW1-TW10",
+    districts: KUNZ_DISTRICTS, sourceCalls: KUNZ_SOURCE_CALLS, defects: KUNZ_DEFECTS, tests: KUNZ_TESTS,
+    totalRaw: 6353, totalValid: 547, totalRejected: 5806, totalCandidates: 458, duplicatesRemoved: 8, uniqueCandidates: 450,
+    usable: 181, premium: 118, releasableL1: 63, keyAccounts: 14, held: 19, hardRejected: 132, customerExclusions: 76, excludedGroups: 42,
+    salesProNewLeads: 167, salesProKeyAccounts: 14, salesProCustExclusions: 76,
+    commitSha: "ac0060f (ISS-0031 discovery-run-recovery fix, applied before TW1 started)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
+    handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/kunz-tw1-tw10",
+    territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/kunz/combined-2026-07-24/TW1-TW10-TERRITORY-RECONCILIATION-REPORT.md",
   },
   nauman: {
     representative: "Nauman", role: "Field Sales", salesTerritory: "RM1-RM14", filePrefix: "Nauman_RM1-RM14",
