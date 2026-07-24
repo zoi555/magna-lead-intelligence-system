@@ -13,6 +13,12 @@ import type { GeographyRunContext, GeographyVerdict } from "../geography/provide
 
 export interface ClaimResult { execution: ExecutionRecord | null }
 
+/** Outcome of `failRun()`: `downgraded` is false when the run was already in a terminal
+ *  accepted state (`completed`/`completed_with_warnings`) and was therefore left untouched —
+ *  no successful/accepted run may ever be overwritten by a later failure signal (ISS-0031,
+ *  ISS-0031 requirement 8). */
+export interface FailRunResult { downgraded: boolean; }
+
 /** Heartbeat outcome: `owned` is false if this worker no longer holds the execution
  *  (its lease expired and another worker re-claimed it) — the caller must then abort. */
 export interface HeartbeatResult { owned: boolean; cancelRequested: boolean }
@@ -36,6 +42,15 @@ export interface DiscoveryRepository {
    *  'draft' — callers must enforce that precondition; the repository itself does not
    *  restrict which rows can be updated. */
   updateRunDraft(id: string, patch: Partial<RunInput>): Promise<RunRecord>;
+  /** Mark a run 'failed' with a preserved reason (ISS-0031). Distinct from `setRunStatus`
+   *  because it (a) is safe to call from a failure-handling path that may itself be racing a
+   *  flaky connection — implementations retry this specific write with bounded backoff, since
+   *  a lost failure-status write is exactly the bug this method exists to prevent — and (b)
+   *  never downgrades a run already in a terminal accepted state (`completed`/
+   *  `completed_with_warnings`); see `FailRunResult`. The reason is appended (not overwritten)
+   *  to the run's existing `reference` annotation, so an explicit replacement-run linkage
+   *  written by `--replaces=` is never clobbered by a later failure on the same run. */
+  failRun(id: string, reason: string): Promise<FailRunResult>;
 
   // executions
   createExecution(runId: string, tenantId: string, plannedQueries: number): Promise<ExecutionRecord>;
@@ -51,6 +66,14 @@ export interface DiscoveryRepository {
   findObservationByHash(tenantId: string, contentHash: string): Promise<{ id: string } | null>;
   insertRawObservation(obs: RawObservationInput & { duplicate_of?: string | null }): Promise<RawObservationRecord>;
   countObservations(executionId: string): Promise<number>;
+  /** All canonical (duplicate_of IS NULL) raw observations for a run, oldest first — used by
+   *  resume-geography.ts (ISS-0031 requirement 7) to reconstruct a run's outlet set from
+   *  RETAINED evidence without a new discovery call. Never returns duplicate rows. */
+  listCanonicalRawObservationsForRun(runId: string): Promise<RawObservationRecord[]>;
+  /** Count of provider_geography_validations rows already recorded for a run — used to detect
+   *  "raw retained, geography incomplete" (resumable) vs. "already processed" (refuse to
+   *  duplicate validation records) in resume-geography.ts. */
+  countGeographyValidationsForRun(runId: string): Promise<number>;
 
   // normalised outlets + history + provenance
   upsertOutlet(u: OutletUpsert): Promise<OutletRecord>;

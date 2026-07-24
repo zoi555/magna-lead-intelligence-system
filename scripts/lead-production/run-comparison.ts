@@ -145,9 +145,25 @@ async function main() {
   const { MATCHING_RULE_VERSION } = await import("./version");
 
   const db = createServiceClient();
-  const runRes = await db.from("discovery_runs").select("tenant_id").eq("id", runId).maybeSingle();
-  const tenantId = (runRes.data as { tenant_id: string } | null)?.tenant_id;
+  const runRes = await db.from("discovery_runs").select("tenant_id,status").eq("id", runId).maybeSingle();
+  const runRow = runRes.data as { tenant_id: string; status: string } | null;
+  const tenantId = runRow?.tenant_id;
   if (!tenantId) { console.error(`Run ${runId} not found.`); process.exit(1); }
+
+  // ISS-0031 requirement 4: never treat a run whose geography processing never completed as
+  // a genuine zero-result district. A run stuck at 'queued'/'running' (or terminally 'failed'/
+  // 'cancelled') may have zero valid_geography candidates simply because it never got that
+  // far — reading loadOperationalCandidates() on such a run and proceeding silently would
+  // fabricate a "0 candidates" result indistinguishable from a real empty district. Refuse
+  // closed, exactly like the Google/Companies House stages already refuse on an unbounded/
+  // unclear request rather than guess. --synthetic-test fixtures are exempt (they exercise
+  // this script against a controlled, non-discovery-engine run on purpose).
+  if (!syntheticTest && runRow!.status !== "completed" && runRow!.status !== "completed_with_warnings") {
+    console.error(`REFUSING TO PROCEED: run ${runId} has status "${runRow!.status}", not "completed"/"completed_with_warnings".`);
+    console.error(`Geography validation and consolidation may never have run against this district's raw observations — treating whatever candidate count exists as a genuine result would risk silently mistaking incomplete processing for a real zero-result district.`);
+    console.error(`If this run failed and you have confirmed (via evidence-completeness verification — see docs/09_DECISIONS.md) that a bounded replacement run is warranted, run that replacement and pass its --run=<id> instead.`);
+    process.exit(1);
+  }
 
   console.log(`=== Lead-production bridge: customer comparison + large-group screening ===`);
   if (syntheticTest) console.log(`*** SYNTHETIC TEST RUN — output is test evidence only, NOT a commercial qualification ***`);

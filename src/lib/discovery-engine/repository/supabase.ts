@@ -5,7 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "../supabase-client";
 import { NORMALISATION_VERSION } from "../version";
-import type { DiscoveryRepository, HeartbeatResult, FinishExecutionPatch } from "./repository";
+import type { DiscoveryRepository, HeartbeatResult, FinishExecutionPatch, FailRunResult } from "./repository";
 import type {
   RunInput, RunRecord, RunStatus, ExecutionRecord, ExecutionStatus,
   RawObservationInput, RawObservationRecord, OutletUpsert, OutletRecord,
@@ -16,6 +16,23 @@ function must<T>(res: { data: T | null; error: unknown }, what: string): T {
   if (res.error) throw new Error(`${what}: ${JSON.stringify(res.error)}`);
   if (res.data == null) throw new Error(`${what}: no data returned`);
   return res.data;
+}
+
+/** Bounded retry (ISS-0031) for writes that must not be silently lost to a transient
+ *  connection blip — specifically the run-level terminal-status write, which the
+ *  duplicate-run guard and every downstream lead-production stage depend on. 3 attempts,
+ *  short exponential-ish backoff (300ms/900ms/2700ms). Never used for the high-volume
+ *  per-outlet writes (insertRawObservation etc.) — only for the low-frequency, high-stakes
+ *  status transition itself. */
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 300): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try { return await fn(); } catch (e) {
+      lastErr = e;
+      if (i < attempts - 1) await new Promise((r) => setTimeout(r, baseDelayMs * 3 ** i));
+    }
+  }
+  throw lastErr;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -54,12 +71,34 @@ export class SupabaseRepository implements DiscoveryRepository {
     return must(r, "listRuns") as RunRecord[];
   }
   async setRunStatus(id: string, status: RunStatus) {
-    const r = await this.db.from("discovery_runs").update({ status }).eq("id", id);
-    if (r.error) throw new Error(`setRunStatus: ${JSON.stringify(r.error)}`);
+    await withRetry(async () => {
+      const r = await this.db.from("discovery_runs").update({ status }).eq("id", id);
+      if (r.error) throw new Error(`setRunStatus: ${JSON.stringify(r.error)}`);
+    });
   }
   async updateRunDraft(id: string, patch: Partial<RunInput>): Promise<RunRecord> {
     const r = await this.db.from("discovery_runs").update(patch).eq("id", id).select().single();
     return must(r, "updateRunDraft") as RunRecord;
+  }
+  async failRun(id: string, reason: string): Promise<FailRunResult> {
+    return withRetry(async () => {
+      const existing = await this.db.from("discovery_runs").select("reference").eq("id", id).maybeSingle();
+      if (existing.error) throw new Error(`failRun.readReference: ${JSON.stringify(existing.error)}`);
+      const priorReference = (existing.data as { reference: string | null } | null)?.reference ?? null;
+      const stamp = new Date().toISOString();
+      const failureNote = `failed_transient: ${reason.slice(0, 400)} (at ${stamp})`;
+      const reference = priorReference ? `${priorReference} | ${failureNote}` : failureNote;
+      // Guarded UPDATE: only transitions rows NOT already in a terminal accepted state — a
+      // 0-row result here means the run had already completed/completed_with_warnings and was
+      // correctly left untouched (requirement 8 — no successful run may be overwritten).
+      const r = await this.db.from("discovery_runs")
+        .update({ status: "failed", reference })
+        .eq("id", id)
+        .not("status", "in", "(completed,completed_with_warnings)")
+        .select("id");
+      if (r.error) throw new Error(`failRun: ${JSON.stringify(r.error)}`);
+      return { downgraded: (r.data ?? []).length > 0 };
+    });
   }
 
   async createExecution(runId: string, tenantId: string, plannedQueries: number): Promise<ExecutionRecord> {
@@ -124,6 +163,15 @@ export class SupabaseRepository implements DiscoveryRepository {
   async countObservations(executionId: string) {
     const r = await this.db.from("je_raw_observations").select("id", { count: "exact", head: true }).eq("execution_id", executionId);
     if (r.error) throw new Error(`countObservations: ${JSON.stringify(r.error)}`);
+    return r.count ?? 0;
+  }
+  async listCanonicalRawObservationsForRun(runId: string): Promise<RawObservationRecord[]> {
+    const r = await this.db.from("je_raw_observations").select("*").eq("run_id", runId).is("duplicate_of", null).order("created_at", { ascending: true });
+    return must(r, "listCanonicalRawObservationsForRun") as RawObservationRecord[];
+  }
+  async countGeographyValidationsForRun(runId: string): Promise<number> {
+    const r = await this.db.from("provider_geography_validations").select("id", { count: "exact", head: true }).eq("run_id", runId);
+    if (r.error) throw new Error(`countGeographyValidationsForRun: ${JSON.stringify(r.error)}`);
     return r.count ?? 0;
   }
 

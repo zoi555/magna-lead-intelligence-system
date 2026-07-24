@@ -4,7 +4,7 @@
 // reads mirror RLS. NOT for production — Supabase is the canonical store.
 
 import { randomUUID } from "node:crypto";
-import type { DiscoveryRepository, HeartbeatResult, FinishExecutionPatch } from "./repository";
+import type { DiscoveryRepository, HeartbeatResult, FinishExecutionPatch, FailRunResult } from "./repository";
 import type {
   RunInput, RunRecord, RunStatus, ExecutionRecord, ExecutionStatus,
   RawObservationInput, RawObservationRecord, OutletUpsert, OutletRecord,
@@ -37,6 +37,26 @@ export class MemoryRepository implements DiscoveryRepository {
     const next = { ...r, ...patch, updated_at: now() };
     this.runs.set(id, next);
     return next;
+  }
+  /** Test-only hook: when set, the NEXT call to failRun() throws this error instead of
+   *  succeeding, then clears itself — lets tests simulate the exact ISS-0031 scenario (the
+   *  run-level status write itself failing) without touching real network code. */
+  failRunShouldThrowOnce: Error | null = null;
+  async failRun(id: string, reason: string): Promise<FailRunResult> {
+    if (this.failRunShouldThrowOnce) {
+      const err = this.failRunShouldThrowOnce;
+      this.failRunShouldThrowOnce = null;
+      throw err;
+    }
+    const r = this.runs.get(id);
+    if (!r) return { downgraded: false };
+    if (r.status === "completed" || r.status === "completed_with_warnings") return { downgraded: false };
+    const stamp = now();
+    const failureNote = `failed_transient: ${reason.slice(0, 400)} (at ${stamp})`;
+    r.reference = r.reference ? `${r.reference} | ${failureNote}` : failureNote;
+    r.status = "failed";
+    r.updated_at = stamp;
+    return { downgraded: true };
   }
 
   async createExecution(runId: string, tenantId: string, plannedQueries: number): Promise<ExecutionRecord> {
@@ -85,7 +105,16 @@ export class MemoryRepository implements DiscoveryRepository {
     const e = this.executions.get(executionId);
     if (e) { e.cancel_requested = true; if (e.status === "running" || e.status === "queued") e.status = "cancelling"; }
   }
+  /** Test-only hook: when set, the NEXT call to finishExecution() throws this error instead
+   *  of succeeding, then clears itself — mirrors failRunShouldThrowOnce for the execution-level
+   *  write, so tests can simulate either write (or both) failing independently. */
+  finishExecutionShouldThrowOnce: Error | null = null;
   async finishExecution(id: string, status: ExecutionStatus, patch: FinishExecutionPatch) {
+    if (this.finishExecutionShouldThrowOnce) {
+      const err = this.finishExecutionShouldThrowOnce;
+      this.finishExecutionShouldThrowOnce = null;
+      throw err;
+    }
     const e = this.executions.get(id);
     if (!e) return;
     if (patch.claimedBy && e.claimed_by !== patch.claimedBy) return;   // ownership guard
@@ -107,6 +136,14 @@ export class MemoryRepository implements DiscoveryRepository {
     return rec;
   }
   async countObservations(executionId: string) { return [...this.observations.values()].filter((o) => o.execution_id === executionId).length; }
+  async listCanonicalRawObservationsForRun(runId: string): Promise<RawObservationRecord[]> {
+    return [...this.observations.values()]
+      .filter((o) => o.run_id === runId && o.duplicate_of == null)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+  }
+  async countGeographyValidationsForRun(runId: string): Promise<number> {
+    return this.geographyValidations.filter((v) => v.runId === runId).length;
+  }
 
   async upsertOutlet(u: OutletUpsert): Promise<OutletRecord> {
     const key = `${u.tenant_id}:${u.parsed.je_outlet_id}`;
@@ -140,7 +177,16 @@ export class MemoryRepository implements DiscoveryRepository {
   }
 
   geographyValidations: { tenantId: string; runId: string | null; verdict: unknown }[] = [];
+  /** Test-only hook: simulates the geography-validation write itself failing after raw
+   *  observations have already been persisted — the exact "raw retained, geography
+   *  incomplete" scenario (NW2/NW7's real failure shape). */
+  persistGeographyValidationsShouldThrowOnce: Error | null = null;
   async persistGeographyValidations(args: { tenantId: string; runId: string | null; verdicts: { verdict: unknown }[] }) {
+    if (this.persistGeographyValidationsShouldThrowOnce) {
+      const err = this.persistGeographyValidationsShouldThrowOnce;
+      this.persistGeographyValidationsShouldThrowOnce = null;
+      throw err;
+    }
     for (const v of args.verdicts) this.geographyValidations.push({ tenantId: args.tenantId, runId: args.runId, verdict: v.verdict });
     return { inserted: args.verdicts.length };
   }

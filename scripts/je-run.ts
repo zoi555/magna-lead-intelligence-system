@@ -13,6 +13,18 @@
 // were triggered 4 minutes apart; je_raw_observations' own outlet-identity dedup correctly
 // prevented duplicate candidates, but real API/scrape cost was still spent twice. Pass
 // --force-duplicate-run to override with an explicit, logged reason.
+//
+// ISS-0031 additions (2026-07-24):
+//   --replaces=<failed-run-id>   Explicitly links this run as the bounded replacement for a
+//                                 prior failed run (requirement 6) — annotates BOTH runs'
+//                                 `reference` field bidirectionally, formalising what was
+//                                 previously a manual one-off correction (NW2/NW7).
+//   --resume-from=<failed-run-id>  Skips live discovery entirely and resumes geography
+//                                 validation + consolidation directly from that run's own
+//                                 RETAINED raw observations (requirement 7) — use only when a
+//                                 prior run's query fully completed but a later step (geography
+//                                 validation/consolidation) failed transiently; refuses if the
+//                                 retained evidence is absent or already processed.
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -30,7 +42,12 @@ async function main() {
   const args = process.argv.slice(2);
   const tenantArgIdx = args.findIndex((a) => a.startsWith("--tenant-slug="));
   const tenantSlug = tenantArgIdx >= 0 ? args[tenantArgIdx].split("=")[1] : process.env.WORKER_TENANT_SLUG;
-  const input = args.filter((_, i) => i !== tenantArgIdx).join(" ").trim() || "UB1";
+  // Every recognised flag must be excluded from the territory-input text, not just
+  // --tenant-slug= — a bug that predates this change (--force-duplicate-run was never
+  // stripped either) and would otherwise now also swallow --replaces=/--resume-from= into the
+  // literal territory string passed to the geography planner.
+  const isRecognisedFlag = (a: string) => a.startsWith("--tenant-slug=") || a.startsWith("--replaces=") || a.startsWith("--resume-from=") || a === "--force-duplicate-run";
+  const input = args.filter((a) => !isRecognisedFlag(a)).join(" ").trim() || "UB1";
   if (!tenantSlug) {
     console.error("No tenant specified — pass --tenant-slug=<slug> or set WORKER_TENANT_SLUG in .env.local.");
     console.error("This CLI has no session to resolve a tenant from, and no longer silently defaults to 'magna'.");
@@ -52,6 +69,37 @@ async function main() {
   const tenantRes = await db.from("tenants").select("id").eq("slug", tenantSlug).maybeSingle();
   if (tenantRes.error || !tenantRes.data) { console.error(`Tenant slug '${tenantSlug}' not found.`); process.exit(1); }
   const tenantId = (tenantRes.data as { id: string }).id;
+
+  // --- ISS-0031 requirement 7: resume geography validation/consolidation from a prior run's
+  // RETAINED raw evidence, with no new Just Eat call at all. Exits immediately either way. ---
+  const resumeFromArgIdx = args.findIndex((a) => a.startsWith("--resume-from="));
+  if (resumeFromArgIdx >= 0) {
+    const resumeFromRunId = args[resumeFromArgIdx].split("=")[1];
+    const { resumeGeographyProcessing } = await import("../src/lib/discovery-engine/worker/resume-geography");
+    console.log(`Resuming geography validation/consolidation for run ${resumeFromRunId} from retained raw evidence (no new discovery call)...`);
+    const result = await resumeGeographyProcessing(repo, tenantId, resumeFromRunId);
+    if (!result.ok) {
+      console.error(`REFUSING TO RESUME: ${result.reason}`);
+      process.exit(1);
+    }
+    console.log(`Resumed: ${result.rawObservationsUsed} raw observations -> ${result.uniqueOutlets} unique outlets -> ${result.geographyValidationsInserted} geography validations -> ${result.consolidation?.candidates ?? 0} consolidated candidates. Run ${resumeFromRunId} marked completed.`);
+    process.exit(0);
+  }
+
+  // --- ISS-0031 requirement 6: explicit bidirectional replacement-run linkage. Validated
+  // (must reference an existing 'failed' run) before any live call is made, so a typo'd run
+  // id fails fast rather than after spending real API/scrape cost. ---
+  const replacesArgIdx = args.findIndex((a) => a.startsWith("--replaces="));
+  let replacesRunId: string | null = null;
+  if (replacesArgIdx >= 0) {
+    replacesRunId = args[replacesArgIdx].split("=")[1];
+    const replacedRes = await db.from("discovery_runs").select("id,status").eq("id", replacesRunId).maybeSingle();
+    if (!replacedRes.data) { console.error(`--replaces=${replacesRunId}: run not found.`); process.exit(1); }
+    if ((replacedRes.data as { status: string }).status !== "failed") {
+      console.error(`--replaces=${replacesRunId}: run has status "${(replacedRes.data as { status: string }).status}", not "failed" — only an explicitly failed run may be linked as replaced. If it is stuck at queued/running due to a partial write failure, investigate and correct its status first (see docs/11_ISSUES_LOG.md, ISS-0031) before linking a replacement.`);
+      process.exit(1);
+    }
+  }
 
   // --- Duplicate-run guard: same tenant + Postcode District + source, accepted/in-progress,
   // within a 24h operating window. A run explicitly marked duplicate_superseded_by_<id> (see
@@ -89,6 +137,21 @@ async function main() {
   const { run } = await saveRunFromPlan(repo, { tenant_id: tenantId, name: runName, territory_mode: "manual_outcodes", territory_input: input }, plan);
   const exec = await queueJustEatExecution(repo, run.id);
   console.log(`Run ${run.id} queued (execution ${exec.id}).`);
+
+  // --- ISS-0031 requirement 6: write the bidirectional linkage now that both run ids exist.
+  // Read-modify-write (append), never overwrite — a run's reference may already carry other
+  // annotations (e.g. a failure note written by failRun()). ---
+  if (replacesRunId) {
+    const oldRes = await db.from("discovery_runs").select("reference").eq("id", replacesRunId).maybeSingle();
+    const oldRef = (oldRes.data as { reference: string | null } | null)?.reference ?? null;
+    const oldNote = `explicit_replacement_run_${run.id}`;
+    await db.from("discovery_runs").update({ reference: oldRef ? `${oldRef} | ${oldNote}` : oldNote }).eq("id", replacesRunId);
+    const newRes = await db.from("discovery_runs").select("reference").eq("id", run.id).maybeSingle();
+    const newRef = (newRes.data as { reference: string | null } | null)?.reference ?? null;
+    const newNote = `explicit_replacement_for_${replacesRunId}`;
+    await db.from("discovery_runs").update({ reference: newRef ? `${newRef} | ${newNote}` : newNote }).eq("id", run.id);
+    console.log(`Linked: run ${run.id} is the explicit bounded replacement for failed run ${replacesRunId} (bidirectional reference annotation written to both rows).`);
+  }
 
   const t0 = Date.now();
   await runWorkerOnce(repo, { workerId: `runner-${input.replace(/\W+/g, "")}`, onLog: (m) => console.log("  " + m) });
