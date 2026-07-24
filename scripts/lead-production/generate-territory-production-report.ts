@@ -127,9 +127,9 @@ const KUNZ_SOURCE_CALLS = [
   ["TW6", 1, 1], ["TW7", 20, 16], ["TW8", 26, 23], ["TW9", 18, 15], ["TW10", 4, 4],
 ];
 const KUNZ_DEFECTS: string[][] = [
-  ["1", "run-district.ts's assignment CSV hardcoded map_required=true for every representative, including telesales (should be false)", "Session scratchpad helper script (not part of the committed pipeline) — the real run-full-territory.ts/load-assignments.ts correctly reads map_required from the assignment CSV", "Fixed the scratchpad script to derive map_required from role (field_sales=true, telesales=false) before running any TW district", "n/a (scratchpad-only fix, not a repo commit)"],
+  ["1", "run-full-territory.ts read map_required directly from a hand-typed assignment CSV column, never cross-checked against the authoritative config/lead-production/sales-territories-v2.json — the CSV was found hardcoded to true for every representative including telesales, and nothing in the reusable pipeline would have caught a wrong value", "run-full-territory.ts's assignment-resolution step (Stage 1); no downstream consumer previously used the resolved value for anything but a log line", "Added scripts/lead-production/resolve-map-required.ts (single authoritative resolver reading sales-territories-v2.json's own mapsRequired field, fails closed on an unrecognised representative); run-full-territory.ts now ignores the CSV's map_required column entirely and refuses on a role mismatch between the CSV and the canonical config; wired assignment into phase1's config-hash dependencies so a changed sales-territories-v2.json invalidates affected checkpoints; added scripts/lead-production/generate-representative-handover.ts (new reusable handover-package builder that gates the map deliverable on the resolved value) and used it to correct Kunz's already-built package (removed the map file it had incorrectly included). 27-assertion regression suite: scripts/test-map-required.ts", "<commit-pending>"],
 ];
-const KUNZ_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED, fixed and verified before TW1 started. npm run typecheck — clean. npm run build — succeeded. No lead-data defect found during TW1-TW10 processing.";
+const KUNZ_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions), fixed and verified before TW11 started. npm run typecheck — clean. npm run build — succeeded. No lead-data defect found during TW1-TW10 processing.";
 
 const TERRITORIES: Record<string, any> = {
   ayesha: {
@@ -225,6 +225,8 @@ async function main() {
   const key = arg("territory");
   if (!key || !TERRITORIES[key]) { console.error("Usage: --territory=nauman|manraj"); process.exit(1); }
   const t = TERRITORIES[key];
+  const { resolveMapRequired } = await import("./resolve-map-required");
+  const mapResolution = await resolveMapRequired(t.representative);
 
   const districtHeader = ["District", "Raw", "Geo-Valid", "Rejected", "Candidates", "Usable", "Premium L0", "Releasable L1", "Key Accounts", "Held", "Hard Rejected", "Customer Exclusions", "Excluded Groups"];
   const districtRows = t.districts.map((d: any[]) => Object.fromEntries(districtHeader.map((h, i) => [h, d[i]])));
@@ -235,6 +237,7 @@ async function main() {
   const overview = [{
     "Representative": t.representative, "Role": t.role, "Sales Territory": t.salesTerritory,
     "Districts": t.districts.map((d: any[]) => d[0]).join(", "), "District Count": t.districts.length,
+    "Map Required": mapResolution.mapRequired,
     "Pipeline Commit SHA": t.commitSha, "Schema Version": t.schemaVersion, "Rules Version": t.rulesVersion,
     "Territory Status": "ACCEPTED", "Handover Readiness": "Ready — package verified, zero leakage, all Sales Pro Lead IDs traced to Master",
     "Generated": "2026-07-24",
@@ -266,7 +269,10 @@ async function main() {
   const outputPaths = [
     { File: "Representative Master (rep-facing, ordinary leads only)", Path: `${t.handoverDir}/${t.filePrefix}_Representative_Master.xlsx` },
     { File: "Sales Pro New Leads CSV (rep-facing)", Path: `${t.handoverDir}/${t.filePrefix}_SalesPro_New_Leads.csv` },
-    { File: "New Leads Map (rep-facing)", Path: `${t.handoverDir}/${t.filePrefix}_New_Leads_Map.xlsx` },
+    // map_required fix (2026-07-24): only listed when the representative's role genuinely
+    // requires a map deliverable (resolved from sales-territories-v2.json) — a telesales
+    // package must never contain or reference a map file.
+    ...(mapResolution.mapRequired ? [{ File: "New Leads Map (rep-facing)", Path: `${t.handoverDir}/${t.filePrefix}_New_Leads_Map.xlsx` }] : []),
     { File: "Key Accounts Management Review (management-only)", Path: `${t.handoverDir}/${t.filePrefix}_Key_Accounts_Management_Review.xlsx` },
     { File: "Customer Master Exclusions Audit (management-only)", Path: `${t.handoverDir}/${t.filePrefix}_Customer_Master_Exclusions_Audit.xlsx` },
     { File: "Lead Production Report (this file, management-only)", Path: `${t.handoverDir}/${t.filePrefix}_Lead_Production_Report.xlsx` },
@@ -274,6 +280,7 @@ async function main() {
     { File: "README", Path: `${t.handoverDir}/README.md` },
     { File: "Full territory reconciliation report (internal, not part of the handover package)", Path: t.territoryReportPath },
   ];
+  if (!mapResolution.mapRequired) console.log(`${t.representative} is telesales (mapRequired=false) — no map file listed in Output Paths, matching the handover package.`);
 
   const provenanceCsvPath = `${t.handoverDir}/${t.filePrefix}_Field_Provenance.csv`;
   const contribution = await fieldContributionSummary(provenanceCsvPath);

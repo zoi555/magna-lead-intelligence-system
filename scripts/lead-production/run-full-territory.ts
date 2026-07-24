@@ -95,8 +95,8 @@ interface OrchestratorManifest {
 // requirement (Section 6/8). A changed hash here invalidates this stage AND every later stage
 // in the linear pipeline (never just this one — a stale customer comparison would poison every
 // downstream customer-resolution decision too).
-const STAGE_CONFIG_DEPENDENCIES: Record<StageKey, Array<"customers" | "registry" | "scoring_version">> = {
-  phase1: ["customers"], fsa: ["customers"], google: ["customers"], companies_house: ["customers", "registry"],
+export const STAGE_CONFIG_DEPENDENCIES: Record<StageKey, Array<"customers" | "registry" | "scoring_version" | "assignment">> = {
+  phase1: ["customers", "assignment"], fsa: ["customers"], google: ["customers"], companies_house: ["customers", "registry"],
   website: ["registry"], public_profile: [], group_rescreen: ["registry"], final_scoring: ["customers", "scoring_version"],
 };
 
@@ -111,7 +111,7 @@ function runScript(scriptPath: string, args: string[]): { ok: boolean; stdout: s
   return { ok: res.status === 0, stdout, code: res.status };
 }
 
-interface Context {
+export interface Context {
   territoryOutRoot: string;
   territory: string;
   customers: string;
@@ -126,14 +126,16 @@ interface Context {
   useV1Scoring: boolean; // default false — qualification/scoring rules v2 is the default ruleset for every new run; v1 remains available (unchanged) only for explicit historical replay/audit
   scoringRulesVersion: string; // explicit version label, independent of which script executes — a provenance/config-hash input, not a code-path switch
   v1FinalScoringDirOverride: string | null; // optional: when scoring with v2, also produce the before/after comparison against this prior v1 (or v2) run
+  assignment: { salesperson: string; role: string; mapRequired: boolean } | null; // resolved assignment (ISS-map-required fix) — feeds phase1's config hash so a changed sales-territories-v2.json invalidates affected checkpoints (requirement 5)
 }
 
-async function computeConfigHashes(def: StageDefinition, ctx: Context): Promise<Record<string, string>> {
+export async function computeConfigHashes(def: StageDefinition, ctx: Context): Promise<Record<string, string>> {
   const deps = STAGE_CONFIG_DEPENDENCIES[def.key];
   const hashes: Record<string, string> = {};
   if (deps.includes("customers")) hashes.customers = (await md5(ctx.customers)) ?? "missing";
   if (deps.includes("registry")) hashes.registry = (await md5(ctx.registry)) ?? "missing";
   if (deps.includes("scoring_version")) hashes.scoring_version = ctx.scoringRulesVersion;
+  if (deps.includes("assignment")) hashes.assignment = ctx.assignment ? `${ctx.assignment.salesperson}|${ctx.assignment.role}|${ctx.assignment.mapRequired}` : "none";
   return hashes;
 }
 
@@ -269,11 +271,23 @@ async function main() {
     const loaded = await loadAssignmentFile(assignmentsPath); // throws DuplicateTerritoryOwnershipError on conflict — never caught here, fails closed
     const matches = loaded.assignments.filter((a) => a.territory.toLowerCase() === territory.toLowerCase() && (!role || a.role === role) && (!salesperson || a.salesperson.toLowerCase() === salesperson.toLowerCase()));
     if (matches.length === 0) { console.error(`No assignment row found for territory "${territory}"${role ? ` role "${role}"` : ""}${salesperson ? ` salesperson "${salesperson}"` : ""} in ${assignmentsPath}.`); process.exit(1); }
-    // map_required is not part of the shared AssignmentRecord field set — read it directly.
-    const { parseCsvObjects } = await import("./csv");
-    const raw = (await parseCsvObjects(await fs.readFile(assignmentsPath, "utf8"))).rows.find((r) => (r.territory ?? "").toLowerCase() === territory.toLowerCase());
-    assignment = { salesperson: matches[0].salesperson, role: matches[0].role, mapRequired: (raw?.map_required ?? "").toLowerCase() === "true" };
-    console.log(`Assignment: ${assignment.salesperson} (${assignment.role})${assignment.mapRequired ? " — map required" : ""}.`);
+
+    // map_required (fix, 2026-07-24): this MUST come from the canonical
+    // config/lead-production/sales-territories-v2.json's own mapsRequired field, keyed by
+    // representative — never inferred from a freeform assignment CSV column (which had been
+    // hand-typed and was found hardcoded to "true" for every representative regardless of
+    // role, including telesales — a real defect, not just a session scratchpad slip, since
+    // this orchestrator itself never cross-checked the CSV against the authoritative config).
+    // The assignment CSV's own map_required column (if present) is IGNORED here — a mismatch
+    // is reported, never silently trusted, so config drift is visible rather than papered over.
+    const { resolveMapRequired } = await import("./resolve-map-required");
+    const resolved = await resolveMapRequired(matches[0].salesperson);
+    assignment = { salesperson: matches[0].salesperson, role: matches[0].role, mapRequired: resolved.mapRequired };
+    if (resolved.role.toLowerCase() !== matches[0].role.toLowerCase()) {
+      console.error(`REFUSING: ${matches[0].salesperson}'s role in the assignment file ("${matches[0].role}") does not match their role in the authoritative sales-territories-v2.json ("${resolved.role}"). Fix the mismatch before proceeding.`);
+      process.exit(1);
+    }
+    console.log(`Assignment: ${assignment.salesperson} (${assignment.role})${assignment.mapRequired ? " — map required" : " — no map required"} [resolved from ${resolved.sourceConfigPath}, not the assignment CSV].`);
   }
 
   await fs.mkdir(outArg, { recursive: true });
@@ -284,7 +298,7 @@ async function main() {
     assignments: assignmentsPath, groups: arg("groups"), // reuses the SAME --assignments CSV already loaded above for the display/manifest lookup — run-comparison.ts's own required --assignments/--groups args, previously never passed through at all
     live, requestPlanOnly, checkpointOverrides,
     maxCalls: { google: arg("max-google-calls"), companiesHouse: arg("max-ch-calls"), companiesHouseDocuments: arg("max-ch-document-calls") },
-    discoveryRunId, useV1Scoring, v1FinalScoringDirOverride, scoringRulesVersion,
+    discoveryRunId, useV1Scoring, v1FinalScoringDirOverride, scoringRulesVersion, assignment,
   };
 
   if (resume && (await exists(manifestPath))) {
@@ -387,4 +401,4 @@ async function main() {
   console.log(`Manifest: ${manifestPath}`);
   process.exit(0);
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });

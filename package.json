@@ -27,6 +27,7 @@
     "test:je-stage1": "tsx scripts/test-je-stage1.ts",
     "test:je-supabase": "tsx scripts/test-je-supabase.ts",
     "test:discovery-run-recovery": "tsx scripts/test-discovery-run-recovery.ts",
+    "test:map-required": "tsx scripts/test-map-required.ts",
     "je:worker": "tsx scripts/je-worker.ts",
     "seed:postcode-reference": "tsx scripts/seed-postcode-reference.ts",
     "test:geography-standard": "tsx scripts/test-geography-standard.ts",
