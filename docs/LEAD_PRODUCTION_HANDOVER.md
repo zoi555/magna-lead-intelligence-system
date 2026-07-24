@@ -596,3 +596,31 @@ exported Sales Pro Lead IDs verified present in the Master's Evidence Register. 
 between held/hard-rejected/excluded-groups and the rep-facing new-leads+key-accounts set.
 
 Full detail and correction notice: `/Users/homemac/Data/aspectlead-lead-production/handover/kunz-tw1-tw10/README.md`.
+
+## TW11-TW20 — Meer's full Sales Territory, ACCEPTED (2026-07-25)
+
+All 10 Postcode Districts run live end-to-end and individually accepted, using the fully-fixed
+pipeline (ISS-0030, ISS-0031, and the map_required resolver fix all already in place before TW11
+started — no new code changes were needed). Territory totals: 5178 raw = 466 geography-valid +
+4712 rejected (exact, every district). 409 raw candidates -> **11 genuine cross-district
+duplicates removed -> 398 unique candidates** = 40 customer-master exclusions + 56 excluded
+groups + 178 usable (97 premium, 81 releasable L1, 10 key accounts) + 8 held + 116 hard-rejected.
+All exported Sales Pro Lead IDs (168 new leads + 10 key accounts + 40 customer-master exclusions
+= 218 of 398 total candidates) verified present in the Master workbook's Evidence Register
+(218/218). Zero customer-master leakage into any rep-facing/Sales Pro output.
+
+No new defect found. The handover package was built correctly from the start via the corrected
+`generate-representative-handover.ts` — `mapRequired=false` resolved from
+`sales-territories-v2.json`, no map file produced, no retroactive correction needed (unlike
+Kunz's TW1-TW10 package, built before that fix existed). No district hit the ISS-0030
+HTTP/2 GOAWAY class or required the ISS-0031 evidence-completeness recovery procedure.
+
+Standardised handover package produced:
+`/Users/homemac/Data/aspectlead-lead-production/handover/meer-tw11-tw20/` (7 files, no map
+deliverable — telesales). Representative-facing files verified to contain ordinary approved
+leads only (168 of 178 usable, zero overlap with key accounts/held/rejected/excluded).
+
+Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/meer/combined-2026-07-24/TW11-TW20-TERRITORY-RECONCILIATION-REPORT.md`
+
+**Next territory (UB2-UB5, part of Naseh's UB1-UB5 territory) requires separate owner
+authorisation.** No new branch created, no merge to `main`, no deployment.

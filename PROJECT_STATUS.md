@@ -735,6 +735,34 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
 - Full test/build gate re-verified clean: `test-map-required.ts`, `test-lead-production-territory-v2.ts`,
   `test-discovery-run-recovery.ts` ALL PASSED, `npm run typecheck` clean, `npm run build`
   succeeded.
-- **Next task**: owner authorisation required before starting TW11-TW20 (Meer's territory) —
-  same per-territory authorisation pattern. No new branch created, no merge to `main`, no
-  deployment; all work remains on `feature/mvp-vertical-slice-001`.
+- **Next task (superseded, see below)**: owner authorisation was required before starting
+  TW11-TW20 — see the Meer section below.
+
+### TW11-TW20 (Meer's full Sales Territory) — live, accepted — 2026-07-25
+
+- All 10 TW Postcode Districts run live end-to-end and accepted, using the fully-fixed pipeline
+  (ISS-0030, ISS-0031, map_required resolver fix all already in place before TW11 started — no
+  new code changes needed): 5178 raw = 466 geography-valid + 4712 rejected (exact, every
+  district). 409 candidates → 11 genuine cross-district duplicates removed → 398 unique.
+  Permanent `customer_master_exclusion` rule enforced: 40 exclusions found, zero leakage. Final:
+  178 usable (97 premium, 81 releasable Level 1, 10 key accounts), 8 held for review, 116
+  hard-rejected, 56 excluded groups. Meer's combined 107-field Master workbook and 108-column
+  Sales Pro files generated; all 218 exported Sales Pro Lead IDs verified present in the Master
+  workbook's Evidence Register.
+- No new defect found. The handover package was built correctly from the start
+  (`mapRequired=false` resolved from `sales-territories-v2.json`, no map file produced) — no
+  retroactive correction needed, unlike Kunz's package.
+- Standardised handover package produced:
+  `/Users/homemac/Data/aspectlead-lead-production/handover/meer-tw11-tw20/` (7 files, no map
+  deliverable), representative-facing files verified to contain ordinary approved leads only,
+  zero leakage.
+- Representative Progress Register updated: Nauman, Manraj, Ayesha, Kunz, and Meer now ACCEPTED.
+- Full test/build gate re-run clean: `test-lead-production-territory-v2.ts`,
+  `test-discovery-run-recovery.ts`, `test-map-required.ts` ALL PASSED, `npm run typecheck`
+  clean, `npm run build` succeeded.
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/meer/combined-2026-07-24/TW11-TW20-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task**: owner authorisation required before starting UB2-UB5 (continuing Naseh's
+  UB1-UB5 territory, UB1 already complete) — same per-territory authorisation pattern. No new
+  branch created, no merge to `main`, no deployment; all work remains on
+  `feature/mvp-vertical-slice-001`.

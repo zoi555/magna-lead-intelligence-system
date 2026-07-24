@@ -16,8 +16,13 @@ branches — do not confuse a commit SHA with a branch name anywhere in this doc
 ## Current state at time of audit
 
 - **Active branch:** `feature/mvp-vertical-slice-001`
-- **Local HEAD:** `4f7978b` (118 commits ahead of `main`)
+- **Local HEAD:** `e6f1b68` (123 commits ahead of `main`)
 - **Remote HEAD (`origin/feature/mvp-vertical-slice-001`):** kept in sync — fully pushed after every commit this session
+- **Update 2026-07-25:** map_required resolver fix (commit `a8f94b4`) applied and Kunz's
+  TW1-TW10 package corrected retroactively from existing evidence; Meer's full Sales Territory
+  (TW11-TW20, 10 Postcode Districts) processed live end-to-end and accepted on this same branch,
+  with the fix already in place — no retroactive correction needed. No new branch created, no
+  merge to `main`. See `docs/LEAD_PRODUCTION_HANDOVER.md` for full detail.
 - **Update 2026-07-24 (later still):** ISS-0031 fixed in the reusable discovery-engine pipeline
   (commits `bc5f965`/`ac0060f`) before Kunz's full Sales Territory (TW1-TW10, 10 Postcode
   Districts) was processed live end-to-end and accepted on this same branch. No new branch
