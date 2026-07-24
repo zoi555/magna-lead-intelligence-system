@@ -515,3 +515,43 @@ Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/
 
 **Next territory (TW1-TW10, Kunz's territory; and TW11-TW20, Meer's) requires separate owner
 authorisation.** No new branch created, no merge to `main`, no deployment.
+
+## TW1-TW10 — Kunz's full Sales Territory, ACCEPTED (2026-07-24)
+
+All 10 Postcode Districts run live end-to-end and individually accepted (first telesales
+territory processed this session — `mapsRequired: false` per the assignment config, though map
+data was still produced for consistency). Territory totals: 6353 raw = 547 geography-valid +
+5806 rejected (exact, every district). 458 raw candidates -> **8 genuine cross-district
+duplicates removed -> 450 unique candidates** = 76 customer-master exclusions + 42 excluded
+groups + 181 usable (118 premium, 63 releasable L1, 14 key accounts) + 19 held + 132
+hard-rejected. All exported Sales Pro Lead IDs (167 new leads + 14 key accounts + 76
+customer-master exclusions = 257 of 450 total candidates) verified present in the Master
+workbook's Evidence Register (257/257). Zero customer-master leakage into any rep-facing/Sales
+Pro output, verified explicitly. TW6 was a genuine small-result district (1 candidate, 0 usable,
+`completed` status, fully reconciled) — confirmed as a real result, not incomplete processing,
+per the exact distinction ISS-0031's fix (below) makes reliably checkable.
+
+**ISS-0031 fixed in the reusable pipeline before this territory began** — a failed discovery
+execution's run-level status could previously stay stuck at `"queued"` after a partial write
+failure (found live during NW1-NW10's NW7 district), blocking retries and risking incomplete
+processing being mistaken for a genuine zero-result district. Fixed with independent, retried,
+non-overwriting run/execution-level failure writes; a new `resumeGeographyProcessing()` capable
+of resuming from a run's own retained raw evidence with no new discovery call; `--replaces=`/
+`--resume-from=` added to `scripts/je-run.ts`; and a guard in `run-comparison.ts` refusing to
+treat an incomplete run as a genuine zero-result. 9-scenario/33-assertion regression suite
+(`scripts/test-discovery-run-recovery.ts`), full existing test suites, typecheck, and build all
+re-verified before TW1 started. Commits `bc5f965` (code) / `ac0060f` (docs).
+
+One session-local scratchpad-tooling issue was found and fixed before TW1 (not a repository
+defect): the per-district runner helper hardcoded `map_required=true` regardless of role,
+incorrect for telesales — fixed to derive it from role.
+
+Standardised handover package produced:
+`/Users/homemac/Data/aspectlead-lead-production/handover/kunz-tw1-tw10/` (8 files).
+Representative-facing files verified to contain ordinary approved leads only (167 of 181 usable,
+zero overlap with key accounts/held/rejected/excluded).
+
+Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/kunz/combined-2026-07-24/TW1-TW10-TERRITORY-RECONCILIATION-REPORT.md`
+
+**Next territory (TW11-TW20, Meer's territory) requires separate owner authorisation.** No new
+branch created, no merge to `main`, no deployment.

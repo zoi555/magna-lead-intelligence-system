@@ -662,6 +662,55 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   clean, `npm run build` succeeded.
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/ayesha/combined-2026-07-24/NW1-NW10-TERRITORY-RECONCILIATION-REPORT.md`.
-- **Next task**: owner authorisation required before starting TW1-TW10 (Kunz's territory) or
-  TW11-TW20 (Meer's) — same per-territory authorisation pattern. No new branch created, no merge
-  to `main`, no deployment; all work remains on `feature/mvp-vertical-slice-001`.
+- **Next task (superseded, see below)**: owner authorisation was required before starting
+  TW1-TW10 — this has since been granted and completed; see the new sections below.
+
+### ISS-0031 fix — reliable terminal status on discovery run failure — 2026-07-24
+
+- Root-caused and fixed before starting TW1: `worker/loop.ts`'s failure-handling paths made two
+  unguarded sequential writes (`finishExecution()` then `setRunStatus()`); if the first threw
+  (as happened live for both NW2 and NW7, on the same flaky connection that triggered the
+  failure), `discovery_runs.status` could stay stuck at `"queued"` forever.
+- Fix: run-level and execution-level failure writes now attempt independently (each in its own
+  try/catch, run-level first); new `repo.failRun()` retries with bounded backoff, preserves the
+  original exception/timestamp, and never downgrades an already-accepted run; new
+  `resumeGeographyProcessing()` resumes from a run's own retained raw evidence with no new
+  discovery call when the query fully completed but a later step didn't; `scripts/je-run.ts`
+  gained `--replaces=`/`--resume-from=`; `run-comparison.ts` now refuses to treat an incomplete
+  run as a genuine zero-result.
+- Regression suite: `scripts/test-discovery-run-recovery.ts`, 9 scenarios / 33 assertions
+  against `MemoryRepository` (no network). Full existing discovery-engine and lead-production
+  test suites, the real-database `test:je-supabase` integration test, typecheck, and build all
+  re-verified passing.
+- Commits: `bc5f965` (code), `ac0060f` (docs), both pushed to `feature/mvp-vertical-slice-001`
+  before any TW1 live call was made.
+
+### TW1-TW10 (Kunz's full Sales Territory) — live, accepted — 2026-07-24
+
+- All 10 TW Postcode Districts run live end-to-end and accepted (first telesales territory this
+  session): 6353 raw = 547 geography-valid + 5806 rejected (exact, every district). 458
+  candidates → 8 genuine cross-district duplicates removed → 450 unique. Permanent
+  `customer_master_exclusion` rule enforced: 76 exclusions found, zero leakage into any
+  rep-facing/Sales Pro output. Final: 181 usable (118 premium, 63 releasable Level 1, 14 key
+  accounts), 19 held for review, 132 hard-rejected, 42 excluded groups. Kunz's combined
+  107-field Master workbook and 108-column Sales Pro files generated; all 257 exported Sales Pro
+  Lead IDs (167 new leads + 14 key accounts + 76 customer-master exclusions) verified present in
+  the Master workbook's Evidence Register.
+- TW6 was a genuine small-result district (1 candidate, 0 usable) — confirmed `completed`
+  status, fully reconciled (75 raw = 1 valid + 74 rejected), correctly distinguished from
+  incomplete processing per ISS-0031's fix.
+- No lead-data defect found. One session-local scratchpad-tooling fix (not a repository defect):
+  the per-district runner helper hardcoded `map_required=true` regardless of role, incorrect for
+  telesales — fixed before TW1 to derive it from role.
+- Standardised handover package produced:
+  `/Users/homemac/Data/aspectlead-lead-production/handover/kunz-tw1-tw10/` (8 files),
+  representative-facing files verified to contain ordinary approved leads only, zero leakage.
+- Representative Progress Register updated: Nauman, Manraj, Ayesha, and Kunz now ACCEPTED.
+- Full test/build gate re-run clean: `test-lead-production-territory-v2.ts` ALL PASSED,
+  `test-discovery-run-recovery.ts` ALL PASSED, `npm run typecheck` clean, `npm run build`
+  succeeded.
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/kunz/combined-2026-07-24/TW1-TW10-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task**: owner authorisation required before starting TW11-TW20 (Meer's territory) —
+  same per-territory authorisation pattern. No new branch created, no merge to `main`, no
+  deployment; all work remains on `feature/mvp-vertical-slice-001`.
