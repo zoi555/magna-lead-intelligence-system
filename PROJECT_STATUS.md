@@ -601,6 +601,32 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   defect, the underlying numbers were always correct.
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/manraj/combined-2026-07-24/KT1-KT24-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task (superseded, see below)**: owner authorisation required before starting NW1.
+
+### Standardised handover packages, field provenance, progress register — 2026-07-24
+
+- Three new reusable scripts (`scripts/lead-production/generate-field-provenance.ts`,
+  `generate-territory-production-report.ts`, `generate-progress-register.ts`) built entirely
+  from already-accepted checkpoints/exports — no new discovery or enrichment calls.
+- Standardised 8-file handover packages produced for both accepted territories:
+  `/Users/homemac/Data/aspectlead-lead-production/handover/nauman-rm1-rm14/` and
+  `.../handover/manraj-kt1-kt24/`. Representative-facing files (Master, Sales Pro CSV, Map)
+  verified to contain ordinary approved leads only — zero overlap with key accounts, customer
+  exclusions, held, or hard-rejected candidates in either package.
+- Field-level provenance generated for all 388 (Nauman) + 364 (Manraj) usable leads, mirroring
+  `candidate-dossier.ts`'s real field-resolution logic line-for-line rather than guessed — see
+  `docs/LEAD_PRODUCTION_HANDOVER.md` for the full methodology note and both territories' source-
+  contribution summaries (e.g. Nauman: 105/388 phones from website vs 282/388 from Google;
+  Manraj: 114/364 vs 245/364).
+- `/Users/homemac/Data/aspectlead-lead-production/status/REPRESENTATIVE_PROGRESS_REGISTER.xlsx`
+  (+ `.csv`) created, covering all 13 representatives: Nauman and Manraj ACCEPTED; Naseh
+  in_progress (UB1 done, UB2-UB5 remaining); 10 representatives not_started.
+- Permanent root-cause correction policy adopted and documented in `docs/11_ISSUES_LOG.md`,
+  `docs/09_DECISIONS.md`, `docs/LEAD_PRODUCTION_HANDOVER.md`, and
+  `docs/LEAD_PRODUCTION_PREPRODUCTION_CERTIFICATION.md`: no final-lead defect may be corrected
+  only in an output file from Ayesha's territory (NW1) onward.
+- Full test/build gate re-run clean: `test-lead-production-territory-v2.ts` ALL PASSED,
+  `npm run typecheck` clean, `npm run build` succeeded.
 - **Next task**: owner authorisation required before starting NW1 (Ayesha's territory) — same
   per-territory authorisation pattern as RM1-RM14/KT1-KT24. No new branch created, no merge to
   `main`, no deployment; all work remains on `feature/mvp-vertical-slice-001`.

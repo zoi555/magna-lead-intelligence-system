@@ -754,3 +754,48 @@ Update `candidate-dossier.ts`'s `magna_customer_match_result` derivation to chec
 (mirroring `findConfirmedCustomerMasterMatch()`) in a future pass — out of scope this session
 since `candidate-dossier.ts` is shared with the accepted, byte-identical-verified UB1 release
 package generator and any change there requires re-verifying that byte-identical guarantee.
+
+## POLICY — Permanent root-cause correction policy (2026-07-24)
+
+Status: **Active, permanent, applies to every representative territory from RM1-RM14/KT1-KT24
+onward.** Not an issue; a standing process rule. Also recorded in `docs/09_DECISIONS.md`,
+`docs/LEAD_PRODUCTION_HANDOVER.md`, and `docs/LEAD_PRODUCTION_PREPRODUCTION_CERTIFICATION.md`.
+
+### Rule
+
+**No final-lead defect may be corrected only in an output file.** Patching a Master workbook,
+Sales Pro CSV, or handover package by hand (or with a one-off script that edits exported rows
+directly) to make a wrong value look right is prohibited — it leaves the reusable pipeline able
+to produce the same wrong value again for the next candidate, the next district, or the next
+territory. Every defect that affects a final lead's data must be fixed at its source.
+
+### Required steps, every time
+
+1. Create an issue ID (`docs/11_ISSUES_LOG.md`, `ISS-NNNN`).
+2. Identify the source stage or shared rule responsible (Phase 1, FSA, Google, Companies House,
+   website, public-profile, group-rescreen, final-scoring/qualification, dedup, exporter field
+   resolution — name the exact script/function).
+3. Fix the reusable pipeline code at that stage/rule — never the exported file.
+4. Add a regression test that reproduces the real failing case as a fixture (not a synthetic
+   case chosen to be easy to pass).
+5. Bump the affected rules/schema/component version where the fix changes behaviour a future
+   territory would otherwise rely on unchanged (e.g. `rulesetVersion`, Master/Sales Pro schema
+   version, assignment version) — see `docs/09_DECISIONS.md`'s versioned-config decisions.
+6. Reprocess all affected districts from the earliest valid checkpoint the defect could have
+   touched (not just re-run the final export step) — using existing checkpoints/live data as
+   appropriate, never fabricated data.
+7. Regenerate every downstream Master workbook, Sales Pro export, map file, and report affected.
+8. Document affected candidates and before/after outcomes (candidate IDs, what changed, why) in
+   the relevant territory reconciliation report and in the fix's `docs/10_BUGS_AND_FIXES.md`
+   entry.
+9. Confirm in writing (in the same bugfix entry) why the defect cannot recur in a future
+   territory — what the regression test now guards, and whether any other pipeline stage shares
+   the same defect pattern and needs the same check.
+
+### Precedent this policy formalises
+
+Every real defect found during RM1-RM14/KT1-KT24 processing was already fixed this way in
+practice (assignments/groups passthrough, FSA hardcoded-84 removal, duplicate-run guard,
+cross-district dedup false-merge fix — see `docs/10_BUGS_AND_FIXES.md` and
+`docs/09_DECISIONS.md`) — this entry makes that practice an explicit, permanent, checkable rule
+rather than an informal habit, for every representative from Ayesha (NW1) onward.

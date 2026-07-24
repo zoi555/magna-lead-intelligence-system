@@ -286,3 +286,16 @@ own design (per-district live execution, verify-before-continue, hold-on-failure
 RM1-RM14) is the actual mechanism to close incrementally and safely, exactly as specified.
 
 # GO_FOR_RM1_LIVE
+
+## Addendum (2026-07-24): Permanent root-cause correction policy
+
+Adopted after RM1-RM14/KT1-KT24 acceptance, applying to every representative territory from
+Ayesha's (NW1) onward: **no final-lead defect may be corrected only in an output file.** Every
+defect affecting a final lead's data must be fixed at its source pipeline stage/rule, with a
+regression test using the real failing case as a fixture, before any affected Master workbook,
+Sales Pro export, map file, or report is regenerated. Full 9-step procedure recorded in
+`docs/11_ISSUES_LOG.md` ("POLICY — Permanent root-cause correction policy") and
+`docs/09_DECISIONS.md`. This formalises the practice already followed for the four real defects
+found and fixed during RM1-RM14 processing (see `docs/10_BUGS_AND_FIXES.md`), and is now a gate
+condition for any future territory's acceptance: an unresolved output-file-only patch is treated
+as equivalent to an unresolved pipeline defect for acceptance purposes.

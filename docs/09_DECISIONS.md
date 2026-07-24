@@ -887,3 +887,30 @@ lease with no renewal).
 
 **See also:** `scripts/je-run.ts` (duplicate-run guard), `docs/10_BUGS_AND_FIXES.md`,
 `docs/15_AI_WORK_LOG.md` (Session: 2026-07-24 — Live RM1-RM14 and KT1-KT24 territory production).
+
+## Permanent root-cause correction policy — no output-file-only fixes (2026-07-24)
+
+### Decision
+
+Adopted as a standing, permanent rule for every representative territory from Ayesha (NW1)
+onward: **no final-lead defect may be corrected only in an output file.** Every defect affecting
+a final lead's data must be fixed at its source stage/rule in the reusable pipeline, with a
+regression test, before any affected output is regenerated. Full 9-step procedure (issue ID →
+identify source stage → fix pipeline → regression test → version bump where relevant → reprocess
+affected districts from the earliest valid checkpoint → regenerate downstream outputs → document
+before/after outcomes → confirm non-recurrence) recorded in full in `docs/11_ISSUES_LOG.md`'s
+"POLICY — Permanent root-cause correction policy" entry.
+
+### Reason
+
+Every real defect found during RM1-RM14/KT1-KT24 processing (assignments/groups passthrough
+failure, hardcoded UB1-specific FSA warning, duplicate discovery run, cross-district dedup
+false-merging genuine chain/franchise branches) was fixed this way already — at the pipeline
+source, not by hand-patching an export. Formalising this as an explicit, checkable rule closes
+off the tempting shortcut of quietly correcting a wrong value in a Master/Sales Pro file (which
+would leave the underlying defect live for the next district or territory) and ensures every
+future defect leaves behind a permanent regression test, not just a corrected spreadsheet.
+
+**See also:** `docs/11_ISSUES_LOG.md` (full policy text), `docs/10_BUGS_AND_FIXES.md` (the
+precedent fixes this formalises), `docs/LEAD_PRODUCTION_HANDOVER.md`,
+`docs/LEAD_PRODUCTION_PREPRODUCTION_CERTIFICATION.md`.

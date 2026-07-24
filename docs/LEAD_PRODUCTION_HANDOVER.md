@@ -421,3 +421,58 @@ RM2–RM14: each district requires the same explicit, scoped owner authorisation
 (live discovery is a real-cost, real-data action) — the orchestrator does not proceed to a new
 district without it. See the RM1 verification report's "Proposed next command" for the exact
 RM2 discovery command.
+
+## Permanent root-cause correction policy (2026-07-24)
+
+**No final-lead defect may be corrected only in an output file.** From Ayesha's territory (NW1)
+onward, every defect affecting a final lead's data must be fixed at its source pipeline stage/
+rule, with a regression test using the real failing case as a fixture, before any affected Master
+workbook, Sales Pro export, map file, or report is regenerated. Full 9-step procedure (issue ID,
+source-stage identification, pipeline fix, regression test, version bump where relevant,
+reprocessing affected districts from the earliest valid checkpoint, regenerating every downstream
+output, documenting before/after outcomes, confirming non-recurrence) recorded in full in
+`docs/11_ISSUES_LOG.md` and `docs/09_DECISIONS.md`. This formalises the practice already followed
+for every real defect found during RM1-RM14 and KT1-KT24 processing.
+
+## Standardised representative handover packages, field provenance, and progress register (2026-07-24)
+
+Built entirely from already-accepted checkpoints and exports — no new discovery or enrichment
+calls. Three new reusable scripts under `scripts/lead-production/`:
+
+- **`generate-field-provenance.ts`** — for every usable candidate in a territory, records which
+  stage/provider supplied each important final field value (trading name, address, postcode,
+  lat/long, phone, email, website, opening hours, FSA identity/rating, Google rating/reviews,
+  legal name, company number/status, directors, PSCs, decision-maker, group classification,
+  product fit, qualification/scoring), plus the alternate value that was NOT selected when the
+  pipeline has more than one candidate source, and whether the final value replaced or was
+  retained over that alternate. The resolution logic is mirrored line-for-line from
+  `candidate-dossier.ts`'s `buildDossier()` (each field's expression is cited by source line in
+  the script's comments) rather than guessed — telephone is the only field with a genuine stored
+  correction note in the pipeline itself; every other multi-source field's provenance is
+  reconstructed by re-evaluating the same priority-chain logic against the same raw per-stage
+  checkpoints. Output: one `*_Field_Provenance.csv` per territory.
+- **`generate-territory-production-report.ts`** — builds the management-facing
+  `*_Lead_Production_Report.xlsx` per territory: overview, district reconciliation, territory
+  reconciliation, Sales Pro reconciliation, source calls, field contribution summary (real
+  numbers computed from the provenance CSV, e.g. "105/388 Nauman phones from website vs
+  282/388 from Google"), defects/fixes, tests/build, output paths, and a full embedded Field
+  Provenance tab.
+- **`generate-progress-register.ts`** — builds
+  `/Users/homemac/Data/aspectlead-lead-production/status/REPRESENTATIVE_PROGRESS_REGISTER.xlsx`
+  (and a `.csv` twin) covering all 13 representatives: Nauman and Manraj ACCEPTED; Naseh
+  in_progress (UB1 complete, UB2-UB5 remaining); the other 10 representatives not_started. Every
+  future terminal report is expected to begin with COMPLETED REPRESENTATIVES / IN PROGRESS /
+  REMAINING REPRESENTATIVES, matching this register's own "Summary" sheet.
+
+Two standardised handover folders were produced:
+`/Users/homemac/Data/aspectlead-lead-production/handover/nauman-rm1-rm14/` and
+`/Users/homemac/Data/aspectlead-lead-production/handover/manraj-kt1-kt24/`, each containing 8
+files (Representative Master, Sales Pro new-leads CSV, New Leads Map, Key Accounts Management
+Review, Customer Master Exclusions Audit, Lead Production Report, Field Provenance CSV, README).
+Representative-facing files (Representative Master, Sales Pro CSV, Map) contain ordinary approved
+leads only — key accounts, customer exclusions, held, and hard-rejected candidates are excluded
+by construction and verified to have zero overlap (full ID-set intersection checks, all = 0) with
+the representative-facing files in both packages.
+
+Full test/build gate re-run clean after this work: `test-lead-production-territory-v2.ts` ALL
+PASSED, `npm run typecheck` clean, `npm run build` succeeded.
