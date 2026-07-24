@@ -799,3 +799,29 @@ practice (assignments/groups passthrough, FSA hardcoded-84 removal, duplicate-ru
 cross-district dedup false-merge fix — see `docs/10_BUGS_AND_FIXES.md` and
 `docs/09_DECISIONS.md`) — this entry makes that practice an explicit, permanent, checkable rule
 rather than an informal habit, for every representative from Ayesha (NW1) onward.
+
+## ISS-0030 — Website-crawl stage crashed the whole process on an HTTP/2 GOAWAY (2026-07-24)
+
+Date: 2026-07-24
+Severity: High
+Owner: Zoeb
+Status: **Fixed 2026-07-24** — see `docs/10_BUGS_AND_FIXES.md`.
+
+### Problem
+
+During live NW3 processing, the website enrichment stage crashed the entire orchestrator process
+twice in a row — reproduced identically against the same remote host (148.72.87.238), at nearly
+the same byte offset — with `SocketError: other side closed` / `HTTP/2: "GOAWAY" frame received`.
+Node's default `fetch()` auto-negotiates HTTP/2; when a remote server closed a shared/reused H2
+connection mid-response, undici emitted the failure as an `'error'` event directly on the
+internal `ClientHttp2Stream` rather than as a `fetch()`/`res.text()` promise rejection — bypassing
+`website-adapter.ts`'s own try/catch entirely (`fetchWithTimeout()` already wrapped every fetch
+call in try/catch; the crash came from an EventEmitter path outside that promise chain). This
+took down the whole district's website-enrichment stage for all candidates, not just the one
+misbehaving domain.
+
+### Next action
+
+None — root-caused and fixed at the source (`scripts/lead-production/website-adapter.ts`), not
+patched around. See `docs/10_BUGS_AND_FIXES.md` for the fix and `docs/09_DECISIONS.md` for the
+new `undici` dependency this required.

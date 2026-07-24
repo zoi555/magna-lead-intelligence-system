@@ -601,3 +601,36 @@ fixtures in `test-lead-production-territory-v2.ts`.
 
 **See also:** `scripts/lead-production/district-reconciliation.ts`,
 `generate-master-export.ts`, `generate-salespro-export.ts`.
+
+## Fix — website-crawl stage crashed the whole process on an HTTP/2 GOAWAY (ISS-0030, 2026-07-24)
+
+**BUG:** `scripts/lead-production/website-adapter.ts`'s `fetchWithTimeout()` wrapped every
+`fetch()` call in try/catch, but a specific class of connection-level failure (the remote server
+closing a shared/reused HTTP/2 connection mid-response — `HTTP/2: "GOAWAY" frame received`) was
+emitted by undici as an `'error'` event directly on the internal `ClientHttp2Stream`, not as a
+promise rejection — this bypassed the try/catch entirely and crashed the whole Node process with
+an unhandled exception. Reproduced twice, identically, against the same remote host during real
+live NW3 website enrichment, taking down the entire district's website stage (not just the one
+misbehaving domain) both times, including once after a `--resume` that skipped straight back into
+the same crawl.
+
+**FIX:** Forced HTTP/1.1 for all website-crawl requests via an explicit `undici` `Agent({
+allowH2: false })`, passed as every request's `dispatcher`. HTTP/1.1 does not have HTTP/2's
+connection-sharing/GOAWAY semantics that caused the crash — a per-request connection failure
+under HTTP/1.1 surfaces as an ordinary `fetch()` promise rejection, caught exactly as designed.
+Added `undici` as an explicit project dependency (previously only present transitively as Node's
+internal fetch implementation) — see `docs/09_DECISIONS.md` for the dependency decision. Made the
+fetch implementation an exported, reassignable binding (`fetchImpl`/`setFetchImplForTesting()`)
+so the existing test suite's mocking pattern (previously reassigning `globalThis.fetch`, which
+silently stopped working once the adapter switched to importing `undici`'s `fetch` directly)
+continues to work without a module-mocking framework.
+
+Regression-tested in `scripts/test-lead-production-website.ts`: (1) a connection-level fetch
+rejection (mirroring the real GOAWAY error message) is now asserted to be caught and returned as
+a graceful `{ ok: false }` result rather than left to crash the process; (2) a structural
+assertion that `allowH2: false` remains wired in `website-adapter.ts`, so this fix cannot be
+silently reverted by a future edit without the test suite catching it.
+
+**See also:** `scripts/lead-production/website-adapter.ts`,
+`scripts/test-lead-production-website.ts`, `docs/09_DECISIONS.md`, `docs/11_ISSUES_LOG.md`
+(ISS-0030).

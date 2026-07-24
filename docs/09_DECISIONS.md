@@ -914,3 +914,65 @@ future defect leaves behind a permanent regression test, not just a corrected sp
 **See also:** `docs/11_ISSUES_LOG.md` (full policy text), `docs/10_BUGS_AND_FIXES.md` (the
 precedent fixes this formalises), `docs/LEAD_PRODUCTION_HANDOVER.md`,
 `docs/LEAD_PRODUCTION_PREPRODUCTION_CERTIFICATION.md`.
+
+## NW2 transient-network discovery failure: bounded replacement, not a duplicate-run or defect (2026-07-24)
+
+### Decision
+
+NW2's first live discovery run (`03fabe79-...`) failed mid-flight with `TypeError: fetch failed`
+(`HTTP/2 GOAWAY` frame) during the provenance-write step; `je_executions` recorded
+`planned_queries: 1, completed_queries: 0` — the Just Eat query itself never completed. Before
+retrying, the retained evidence was checked for completeness: the failed run's 286 raw
+observations (286 unique `source_record_id`) were compared against the bounded replacement run's
+(`4f0040bb-...`) 1064 raw observations — **all 286 failed-run outlets are a strict subset of the
+replacement run's 1064**, zero lost or divergent. Geography validation and consolidation never
+ran against the failed run (0 rows in `provider_geography_validations`/`consolidated_candidates`
+for that run), so there was no valid checkpoint to resume from at that stage — the evidence was
+genuinely incomplete, not merely uncommitted-but-complete. Decision: mark the failed run
+`reference = "failed_transient_network_replaced_by_4f0040bb-..."`, preserve it (never deleted),
+and use the replacement run as NW2's sole authoritative evidence. Full evidence recorded in
+`app_audit_log` (action `discovery_run_transient_failure_replaced`, target `03fabe79-...`).
+
+### Reason
+
+This is a third, distinct duplicate/failure pattern alongside the two already documented: RM2's
+case (two independent SEQUENTIAL, both-completed runs — required comparison-and-choose) and KT1's
+case (a genuinely CONCURRENT, actively-running execution — required waiting, not comparing). NW2
+is neither: one run failed outright due to a transient network error before completing its query,
+and the fix is a bounded, single retry — not a duplicate-run ambiguity requiring the RM2 decision
+rule, and not a live-execution conflict requiring KT1's wait-and-don't-override response. The
+`discovery_runs.status = 'failed'` value is correctly excluded from the duplicate-run guard's
+blocking check (only `queued`/`running`/`completed` block), so no guard override was needed for
+the retry itself — the additional step this case requires is evidence-completeness verification
+*before* treating the retry as safe, which is now the standing procedure for any future
+transient-failure-during-discovery case: never assume a failed run's partial evidence was
+"probably fine" — check the outlet-ID overlap against the replacement run before discarding the
+question.
+
+**See also:** `scripts/je-run.ts` (duplicate-run guard, unaffected — `failed` status never
+blocked), `app_audit_log` entry `c25a0ea5-e5bd-4c55-8964-e938c6de30b2`,
+`docs/LEAD_PRODUCTION_HANDOVER.md`.
+
+## New dependency: `undici` added as an explicit project dependency (2026-07-24)
+
+### Decision
+
+Added `undici@8.9.0` as an explicit dependency (previously present only transitively as Node's
+internal `fetch()` implementation, not importable directly). Used in
+`scripts/lead-production/website-adapter.ts` to construct an explicit `Agent({ allowH2: false })`
+dispatcher, forcing HTTP/1.1 for all website-crawl requests — the fix for ISS-0030 (a real HTTP/2
+GOAWAY connection error crashing the whole website-enrichment stage; see
+`docs/10_BUGS_AND_FIXES.md`).
+
+### Reason
+
+Node's global `fetch()` does not expose a documented way to force HTTP/1.1 or otherwise configure
+its underlying dispatcher without importing `undici` directly — the functionality genuinely
+requires the package, not just a code-level workaround. `undici` is already Node's own bundled
+HTTP client (zero new transitive attack surface — it is already running inside every Node process
+this codebase uses); making it an explicit dependency only exposes its already-present `Agent`/
+`fetch` API for direct use. Logged per the project rule "do not introduce packages without
+logging the decision" even though the package was already present transitively.
+
+**See also:** `scripts/lead-production/website-adapter.ts`, `docs/10_BUGS_AND_FIXES.md`,
+`docs/11_ISSUES_LOG.md` (ISS-0030), `package.json`.
