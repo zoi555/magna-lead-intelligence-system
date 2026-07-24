@@ -132,7 +132,9 @@ re-verify at any point.
 | 100 | 07-23 | 3c93e09 | Milestone 6 (2/2) — pre-production certification doc, GO_FOR_RM1_LIVE |
 | 101 | 07-24 | ed56cbf | Milestone 7 — 2 deterministic defects found/fixed on first live RM1 run |
 | 102 | 07-24 | 8be932d | Docs — record RM1 live discovery + district acceptance |
-| 103 | 07-24 | (pending) | fix: enforce customer master exclusion rule |
+| 103 | 07-24 | 86ae836 | fix: enforce customer master exclusion rule |
+| 104 | 07-24 | 02af5a3 | fix: duplicate-run guard; resolve RM2 duplicate discovery |
+| 105 | 07-24 | (pending) | Docs — record RM2 district acceptance |
 
 **Next dependency:** RM1 is live, complete, district-accepted, AND reprocessed under the
 customer_master_exclusion rule (see
@@ -314,6 +316,16 @@ the old active+reactivation split), RM1 4 (was 3) — both territories' genuinel
 populations unchanged (UB1 47, RM1 60). Full regression suite:
 `scripts/test-lead-production-customer-master-exclusion.ts` (`npm run
 test:lead-production-customer-master-exclusion`).
+
+## RM2 — live, complete, district-accepted (2026-07-24)
+
+Discovery run `3a8d156e-334d-44b5-9594-d41ab6862414` (kept authoritative after a duplicate-run
+comparison — see `docs/09_DECISIONS.md`): 639 raw → 46 valid + 593 rejected (639 total) → 39
+candidates. Full 8-stage pipeline live: FSA 35, Google 35/800, Companies House 82/600 + 6/250
+docs, website 17 domains. Reconciliation: 39 = 0 customer-master exclusions + 4 excluded groups +
+21 usable (11 premium, 10 releasable L1, 1 key account) + 0 held + 14 hard-rejected. Zero
+confirmed customer-master matches this district (genuinely 0, verified not assumed). Full
+report: `.../output/rm2/2026-07-24T00-26-03Z-live/RM2-DISTRICT-VERIFICATION-REPORT.md`.
 
 ## RM1 — live, complete, district-accepted (2026-07-24)
 
