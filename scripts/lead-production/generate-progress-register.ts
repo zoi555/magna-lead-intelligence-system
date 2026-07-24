@@ -11,6 +11,7 @@ const NAUMAN_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/naum
 const MANRAJ_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/manraj-kt1-kt24";
 const AYESHA_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/ayesha-nw1-nw10";
 const KUNZ_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/kunz-tw1-tw10";
+const MEER_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/meer-tw11-tw20";
 
 const REPRESENTATIVES = [
   {
@@ -61,7 +62,18 @@ const REPRESENTATIVES = [
     latestCommit: "a8f94b4 (map_required resolver fix — corrected this record retroactively from existing evidence)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
     lastUpdated: "2026-07-24", nextAction: "None — territory complete, handed over, awaiting no further action.",
   },
-  { representative: "Meer", role: "telesales", salesTerritory: "TW11-TW20", totalDistricts: 10, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 10, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
+  {
+    representative: "Meer", role: "telesales", salesTerritory: "TW11-TW20",
+    totalDistricts: 10, districtsCompleted: 10, districtsHeld: 0, districtsRemaining: 0,
+    territoryStatus: "ACCEPTED", usable: 178, ordinaryNewLeads: 168, keyAccounts: 10,
+    customerExclusions: 40, groupExclusions: 56, held: 8, hardRejected: 116,
+    masterFilePath: `${MEER_DIR}/Meer_TW11-TW20_Representative_Master.xlsx`,
+    salesProFilePath: `${MEER_DIR}/Meer_TW11-TW20_SalesPro_New_Leads.csv`,
+    mapPath: "n/a (telesales — mapRequired=false, resolved from sales-territories-v2.json; no map file produced or referenced)",
+    reportPath: `${MEER_DIR}/Meer_TW11-TW20_Lead_Production_Report.xlsx`,
+    latestCommit: "a8f94b4", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
+    lastUpdated: "2026-07-25", nextAction: "None — territory complete, handed over, awaiting no further action.",
+  },
   {
     representative: "Naseh", role: "telesales", salesTerritory: "UB1-UB5",
     totalDistricts: 5, districtsCompleted: 1, districtsHeld: 0, districtsRemaining: 4,

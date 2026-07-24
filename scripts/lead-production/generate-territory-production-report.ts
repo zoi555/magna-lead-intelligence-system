@@ -131,6 +131,25 @@ const KUNZ_DEFECTS: string[][] = [
 ];
 const KUNZ_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions), fixed and verified before TW11 started. npm run typecheck — clean. npm run build — succeeded. No lead-data defect found during TW1-TW10 processing.";
 
+const MEER_DISTRICTS = [
+  ["TW11", 611, 31, 580, 29, 11, 7, 4, 0, 0, 11, 2, 5],
+  ["TW12", 566, 36, 530, 32, 16, 9, 7, 0, 0, 10, 1, 5],
+  ["TW13", 700, 93, 607, 79, 33, 19, 14, 3, 1, 19, 14, 12],
+  ["TW14", 675, 48, 627, 47, 23, 15, 8, 2, 2, 13, 4, 5],
+  ["TW15", 609, 62, 547, 57, 32, 15, 17, 1, 1, 11, 6, 7],
+  ["TW16", 638, 42, 596, 30, 11, 5, 6, 0, 2, 12, 3, 2],
+  ["TW17", 480, 26, 454, 26, 11, 5, 6, 2, 0, 11, 1, 3],
+  ["TW18", 464, 81, 383, 69, 24, 13, 11, 2, 0, 23, 8, 14],
+  ["TW19", 71, 4, 67, 4, 2, 1, 1, 0, 1, 1, 0, 0],
+  ["TW20", 364, 43, 321, 36, 18, 10, 8, 0, 1, 11, 2, 4],
+];
+const MEER_SOURCE_CALLS = [
+  ["TW11", 22, 20], ["TW12", 26, 25], ["TW13", 61, 56], ["TW14", 38, 35], ["TW15", 48, 46],
+  ["TW16", 25, 24], ["TW17", 22, 21], ["TW18", 51, 45], ["TW19", 4, 4], ["TW20", 31, 29],
+];
+const MEER_DEFECTS: string[][] = [];
+const MEER_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions), fixed and verified before TW11 started. npm run typecheck — clean. npm run build — succeeded. No lead-data defect found during TW11-TW20 processing. Handover package correctly produced with no map deliverable from the start (mapRequired=false resolved from sales-territories-v2.json).";
+
 const TERRITORIES: Record<string, any> = {
   ayesha: {
     representative: "Ayesha", role: "Field Sales", salesTerritory: "NW1-NW10", filePrefix: "Ayesha_NW1-NW10",
@@ -141,6 +160,16 @@ const TERRITORIES: Record<string, any> = {
     commitSha: "0cec029 (ISS-0030 website-crawl HTTP/1.1 fix, applied mid-territory)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
     handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/ayesha-nw1-nw10",
     territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/ayesha/combined-2026-07-24/NW1-NW10-TERRITORY-RECONCILIATION-REPORT.md",
+  },
+  meer: {
+    representative: "Meer", role: "Telesales", salesTerritory: "TW11-TW20", filePrefix: "Meer_TW11-TW20",
+    districts: MEER_DISTRICTS, sourceCalls: MEER_SOURCE_CALLS, defects: MEER_DEFECTS, tests: MEER_TESTS,
+    totalRaw: 5178, totalValid: 466, totalRejected: 4712, totalCandidates: 409, duplicatesRemoved: 11, uniqueCandidates: 398,
+    usable: 178, premium: 97, releasableL1: 81, keyAccounts: 10, held: 8, hardRejected: 116, customerExclusions: 40, excludedGroups: 56,
+    salesProNewLeads: 168, salesProKeyAccounts: 10, salesProCustExclusions: 40,
+    commitSha: "a8f94b4 (map_required fix, already in place before TW11 started)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
+    handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/meer-tw11-tw20",
+    territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/meer/combined-2026-07-24/TW11-TW20-TERRITORY-RECONCILIATION-REPORT.md",
   },
   kunz: {
     representative: "Kunz", role: "Telesales", salesTerritory: "TW1-TW10", filePrefix: "Kunz_TW1-TW10",
