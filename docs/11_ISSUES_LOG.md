@@ -831,7 +831,8 @@ new `undici` dependency this required.
 Date: 2026-07-24
 Severity: Medium
 Owner: Zoeb
-Status: **Open — worked around per-instance, not yet fixed at the source**
+Status: **Fixed 2026-07-24** — see `docs/10_BUGS_AND_FIXES.md`. Regression suite:
+`scripts/test-discovery-run-recovery.ts` (`npm run test:discovery-run-recovery`).
 
 ### Problem
 
@@ -857,3 +858,15 @@ and corrects them automatically. Must include a regression test reproducing a `f
 failure and asserting `discovery_runs.status` still ends up correct. Per the permanent root-cause
 correction policy, the manual DB correction applied to unblock NW7 is a legitimate one-off
 recovery (documented, audited), not a substitute for this fix — flagged here so it is not lost.
+
+### Fix (2026-07-24)
+
+Root-caused and fixed before starting TW1. Full detail in `docs/10_BUGS_AND_FIXES.md`; summary:
+the run-level and execution-level terminal-failure writes are now attempted independently (each
+in its own try/catch, run-level first) instead of two unguarded sequential awaits; the run-level
+write (`repo.failRun()`) retries with bounded backoff and never overwrites an already-accepted
+run; a companion `resumeGeographyProcessing()` lets a genuinely interrupted-but-fully-discovered
+run resume from its own retained raw evidence with no new Just Eat call; `--replaces=`/
+`--resume-from=` were added to `scripts/je-run.ts`; and `run-comparison.ts` now refuses to treat
+an incomplete run's candidate count as a genuine zero-result. 9-scenario regression suite in
+`scripts/test-discovery-run-recovery.ts`.

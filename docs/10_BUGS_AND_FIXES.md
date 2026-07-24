@@ -634,3 +634,71 @@ silently reverted by a future edit without the test suite catching it.
 **See also:** `scripts/lead-production/website-adapter.ts`,
 `scripts/test-lead-production-website.ts`, `docs/09_DECISIONS.md`, `docs/11_ISSUES_LOG.md`
 (ISS-0030).
+
+## Fix — discovery_runs.status could stay stuck at 'queued' after a partial write failure (ISS-0031, 2026-07-24)
+
+**BUG:** `src/lib/discovery-engine/worker/loop.ts`'s failure-handling paths (the catch-all
+handler and the disabled-source guard) made two unguarded, sequential `await` calls —
+`repo.finishExecution(...)` then `repo.setRunStatus(run.id, "failed")` — with no independent
+error handling. If `finishExecution()` itself threw (as it did live for both NW2 and NW7, on the
+SAME flaky connection that triggered the failure path in the first place), the exception
+propagated out of the catch block before `setRunStatus()` ever ran, leaving `discovery_runs.status`
+permanently stuck at `"queued"`/`"running"`. This incorrectly kept the duplicate-run guard in
+`scripts/je-run.ts` treating the district as still in-progress, blocking any retry until manually
+corrected. Separately, nothing in the lead-production pipeline distinguished "this run's
+geography processing genuinely never completed" from "this district genuinely has zero
+candidates" — a downstream stage reading 0 candidates from an incomplete run would silently
+treat it as a real empty-district result.
+
+**FIX — five parts, all satisfying the explicit ISS-0031 requirements:**
+1. **Independent, ordered writes.** `worker/loop.ts`'s new `failRunAndExecution()` helper
+   attempts the run-level write FIRST, in its own try/catch, then the execution-level write in
+   its own try/catch — a failure in either can never prevent the other from being attempted, and
+   either failure is logged loudly (a `CRITICAL` line naming ISS-0031), never silently swallowed.
+2. **`repo.failRun(id, reason)`** (new `DiscoveryRepository` method, implemented in both
+   `SupabaseRepository` and `MemoryRepository`): retries the run-level write with bounded
+   backoff (3 attempts, 300ms/900ms/2700ms — `SupabaseRepository`'s new `withRetry()` helper,
+   also now wrapping `setRunStatus()`); preserves the original exception + timestamp by
+   appending (never overwriting) a `failed_transient: <reason> (at <timestamp>)` note to the
+   run's `reference` column; and — via a guarded `UPDATE ... WHERE status NOT IN
+   ('completed','completed_with_warnings')` — never downgrades a run already in a terminal
+   accepted state (requirement 8).
+3. **`resumeGeographyProcessing()` / `checkResumableFromRetainedEvidence()`** (new
+   `src/lib/discovery-engine/worker/resume-geography.ts`): re-derives a run's outlet set by
+   re-parsing each retained `je_raw_observations.raw_payload` with the same Just Eat parser the
+   original execution used, then runs the same geography-gate + persist + consolidate steps —
+   with NO new discovery call — when a run's query fully completed but a later step didn't.
+   Refuses (rather than duplicating validation rows) if geography validation already has data
+   for that run. Goes entirely through the `DiscoveryRepository` interface (two new methods,
+   `listCanonicalRawObservationsForRun`/`countGeographyValidationsForRun`, implemented in both
+   repositories) so it is fully testable against `MemoryRepository`, no network required.
+4. **`scripts/je-run.ts`**: `--replaces=<failed-run-id>` validates the referenced run is
+   genuinely `"failed"` then writes a bidirectional `reference` annotation linking the two runs
+   (append-only, never clobbering an existing failure note); `--resume-from=<failed-run-id>`
+   invokes `resumeGeographyProcessing()` directly, skipping live discovery entirely. Also fixed
+   a latent, related bug while touching this file: the territory-input parser only ever
+   stripped `--tenant-slug=` out of `process.argv` before treating the remainder as the literal
+   territory string — `--force-duplicate-run` (and now `--replaces=`/`--resume-from=`) were
+   never excluded, so passing them would have silently corrupted the territory-input text.
+5. **`scripts/lead-production/run-comparison.ts`**: refuses to proceed (clear error, not a
+   silent 0-candidate result) when `--run=<id>` references a run whose status is not
+   `"completed"`/`"completed_with_warnings"` — closing the exact gap that let the pipeline treat
+   NW2's original incomplete run as if it had genuinely found nothing.
+
+**Regression suite:** `scripts/test-discovery-run-recovery.ts` (`npm run
+test:discovery-run-recovery`), 9 scenarios / 33 assertions, entirely against `MemoryRepository`
+(no network): finishExecution network failure; failed status-update call; raw observations
+retained but geography incomplete; queued-status recovery; explicit replacement-run linkage;
+duplicate-run guard behaviour (including a regression guard proving the guard's correctness
+genuinely depends on `failRun()` running, not luck); interrupted execution and resume from
+retained evidence (including refusing a second resume against already-processed data); zero
+candidate result vs. incomplete processing (proving the two cases can never share a status); and
+a full end-to-end run through the real `runWorkerOnce()` production code path (not a simulated
+mirror). Also re-ran the full existing discovery-engine and lead-production test suites plus the
+real-database `test:je-supabase` integration test — all pass unchanged.
+
+**See also:** `src/lib/discovery-engine/worker/loop.ts`,
+`src/lib/discovery-engine/repository/{repository,supabase,memory}.ts`,
+`src/lib/discovery-engine/worker/resume-geography.ts`, `scripts/je-run.ts`,
+`scripts/lead-production/run-comparison.ts`, `scripts/test-discovery-run-recovery.ts`,
+`docs/11_ISSUES_LOG.md` (ISS-0031).
