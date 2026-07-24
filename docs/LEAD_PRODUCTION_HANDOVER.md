@@ -555,3 +555,44 @@ Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/
 
 **Next territory (TW11-TW20, Meer's territory) requires separate owner authorisation.** No new
 branch created, no merge to `main`, no deployment.
+
+## Correction — Kunz's TW1-TW10 package incorrectly included a map deliverable (2026-07-24)
+
+**Real pipeline defect found and fixed** before TW11 started: `run-full-territory.ts` resolved
+`map_required` from a hand-typed assignment CSV column, never cross-checked against the
+authoritative `config/lead-production/sales-territories-v2.json`. The CSV had been hardcoded to
+`"true"` for every representative including telesales. Kunz's (telesales) already-built
+TW1-TW10 handover package was found to incorrectly contain `Kunz_TW1-TW10_New_Leads_Map.xlsx`.
+
+Fixed with a new single-authority resolver (`resolve-map-required.ts`), a new reusable/tested
+handover-package builder (`generate-representative-handover.ts`) that gates the map file on the
+resolved value, assignment wired into phase1's config-hash invalidation so a changed
+`sales-territories-v2.json` invalidates affected checkpoints, and a standing cross-check in the
+progress-register generator that refuses to write an inconsistent register. 27-assertion
+regression suite: `scripts/test-map-required.ts`. Commit `a8f94b4`. Full detail:
+`docs/10_BUGS_AND_FIXES.md`.
+
+**Kunz's package corrected retroactively, from existing evidence only — no new discovery or
+enrichment calls.** The map file was removed; `Lead_Production_Report.xlsx` and the progress
+register were regenerated. Clean, independently re-derived reconciliation (read directly from
+the final Master workbook and Sales Pro exports):
+
+| Item | Value |
+|---|---|
+| Unique candidates after cross-district dedup | **450** |
+| Premium Level 0 | 118 |
+| Releasable Level 1 | 63 |
+| Total usable | **181** |
+| Ordinary new leads | **167** |
+| Key accounts | **14** |
+| Held | 19 |
+| Hard rejected | 132 |
+| Customer master exclusions | 76 |
+| Excluded groups | 42 |
+
+Sum proof: 181 + 19 + 132 + 76 + 42 = **450**, exact. Sales Pro row counts: new-leads 167,
+key-accounts 14, customer-master-exclusions 76 — all unique, no duplicates. Every one of the 257
+exported Sales Pro Lead IDs verified present in the Master's Evidence Register. Zero overlap
+between held/hard-rejected/excluded-groups and the rep-facing new-leads+key-accounts set.
+
+Full detail and correction notice: `/Users/homemac/Data/aspectlead-lead-production/handover/kunz-tw1-tw10/README.md`.

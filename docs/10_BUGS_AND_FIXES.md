@@ -702,3 +702,82 @@ real-database `test:je-supabase` integration test — all pass unchanged.
 `src/lib/discovery-engine/worker/resume-geography.ts`, `scripts/je-run.ts`,
 `scripts/lead-production/run-comparison.ts`, `scripts/test-discovery-run-recovery.ts`,
 `docs/11_ISSUES_LOG.md` (ISS-0031).
+
+## Fix — map_required resolved from a hand-typed CSV, never cross-checked against sales-territories-v2.json (2026-07-24)
+
+**BUG:** `run-full-territory.ts`'s Stage 1 assignment resolution read `map_required` directly
+from a raw column in the per-district assignment CSV (`(raw?.map_required ?? "").toLowerCase()
+=== "true"`), never cross-checked against the authoritative
+`config/lead-production/sales-territories-v2.json`'s own `mapsRequired` field. The CSV column
+was hand-typed by the session's own per-district runner helper and was found hardcoded to
+`"true"` for every representative regardless of role, including telesales. Nothing downstream
+had ever consumed the resolved value for anything except a single log line, so a wrong value
+had zero chance of being caught by any existing check. The consequence surfaced concretely:
+Kunz's (telesales) already-built TW1-TW10 handover package incorrectly included a
+`Kunz_TW1-TW10_New_Leads_Map.xlsx` deliverable.
+
+**FIX:**
+1. **`scripts/lead-production/resolve-map-required.ts`** (new) — the single authoritative
+   resolver. Reads `sales-territories-v2.json` via the existing `loadSalesTerritoriesV2()` /
+   `findRepresentative()` (`territory-assignment-v2.ts`, unchanged), returns the representative's
+   real `mapsRequired` value. Fails closed (throws `UnknownRepresentativeError`) for an
+   unrecognised representative rather than defaulting to `true` or `false`.
+2. **`run-full-territory.ts`** — the assignment CSV's `map_required` column is now ignored
+   entirely; `mapRequired` comes only from `resolveMapRequired()`. Also refuses (exits 1) if the
+   CSV's `role` column disagrees with the canonical config's role for that representative,
+   surfacing config drift instead of silently trusting either source. `assignment` (the resolved
+   `{salesperson, role, mapRequired}`) is now wired into `STAGE_CONFIG_DEPENDENCIES`/
+   `computeConfigHashes()` as a new dependency type for the `phase1` stage — a changed
+   `sales-territories-v2.json` (different representative, different role, or different
+   `mapsRequired`) now produces a different phase1 config hash, so `--resume` correctly
+   invalidates phase1 and every downstream stage rather than silently reusing a checkpoint built
+   under a stale assignment. Both `STAGE_CONFIG_DEPENDENCIES` and `computeConfigHashes()` are now
+   exported for direct testability; `main()` is now guarded with `if (require.main === module)`
+   so the file can be imported by tests without auto-executing the CLI.
+3. **`scripts/lead-production/generate-representative-handover.ts`** (new) — a single reusable,
+   tested handover-package builder replacing the four repeated ad-hoc packaging scripts written
+   this session (Nauman/Manraj/Ayesha/Kunz). Produces the Representative Master, Sales Pro CSV,
+   Key Accounts Management Review, and Customer Master Exclusions Audit files unconditionally,
+   and the New Leads Map file **only** when `resolveMapRequired()` says the representative's role
+   requires one. Coordinates remain in the Representative Master's own sheet regardless of role
+   (they are Master-workbook evidence, never a channel-gated deliverable) — only the standalone
+   map file is gated.
+4. **`generate-territory-production-report.ts`** — the Overview sheet now records the resolved
+   `Map Required` value and the Output Paths sheet only lists a map-file row when the
+   representative's role requires one.
+5. **`generate-progress-register.ts`** — added a runtime cross-check in `main()`: for every
+   `ACCEPTED` representative, the register refuses to write if its own `mapPath` entry disagrees
+   with `resolveMapRequired()` (a field_sales rep must have a real map-file path; a telesales rep
+   must not reference one at all). This is a standing guard, not a one-off assertion — it will
+   catch this exact class of drift automatically for every future representative.
+6. **Kunz's package corrected retroactively, from existing evidence only** — no new discovery or
+   enrichment calls. `Kunz_TW1-TW10_New_Leads_Map.xlsx` removed; the package regenerated via the
+   new `generate-representative-handover.ts` (confirmed `mapRequired=false, map file
+   produced=false`); `Kunz_TW1-TW10_Lead_Production_Report.xlsx` regenerated; the progress
+   register's Kunz row corrected (`mapPath` now states the telesales/no-map rationale instead of
+   a file path); `README.md` updated with a correction notice and a clean, independently
+   re-derived reconciliation table (unique candidates 450; premium 118; releasable L1 63; usable
+   181; ordinary new leads 167; key accounts 14; held 19; hard-rejected 132; customer exclusions
+   76; excluded groups 42; sum proof 181+19+132+76+42=450 exact; Sales Pro row counts 167/14/76;
+   zero leakage confirmed against held/hard-rejected/excluded-groups).
+
+**Regression suite:** `scripts/test-map-required.ts` (`npm run test:map-required`), 27
+assertions: field-sales representatives (Nauman, Manraj, Ayesha) retain `mapRequired=true`;
+every telesales representative (all 10) resolves `mapRequired=false`; an unrecognised
+representative throws rather than guessing; a telesales package produces no map file (and its
+file list never references one) while a field-sales package does, using real synthetic Master
+workbooks built for the test; the telesales package's Representative Master still carries real
+Latitude/Longitude for every lead, proving coordinate presence never gates map production; a
+changed representative or a changed `mapRequired` value (simulating an edited
+`sales-territories-v2.json`) produces a different phase1 config hash while the unrelated
+customers-file hash component stays identical; and 13 representatives resolved concurrently in
+one process never cross-contaminate, including a targeted check of config-array-adjacent
+representatives (Nauman/Manraj/Ayesha/Kunz) for an off-by-one class of bug. Full
+lead-production/discovery-engine test suites, typecheck, and build all re-verified passing.
+
+**See also:** `scripts/lead-production/resolve-map-required.ts`,
+`scripts/lead-production/generate-representative-handover.ts`,
+`scripts/lead-production/run-full-territory.ts`,
+`scripts/lead-production/generate-territory-production-report.ts`,
+`scripts/lead-production/generate-progress-register.ts`, `scripts/test-map-required.ts`,
+`config/lead-production/sales-territories-v2.json`.

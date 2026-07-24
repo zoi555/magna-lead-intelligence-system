@@ -711,6 +711,30 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   succeeded.
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/kunz/combined-2026-07-24/TW1-TW10-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task (superseded, see below)**: owner authorisation was required before starting
+  TW11-TW20 — see the correction and Meer sections below.
+
+### map_required fix + Kunz correction — 2026-07-24
+
+- Real pipeline defect found and fixed before TW11: `run-full-territory.ts` resolved
+  `map_required` from a hand-typed assignment CSV column, never cross-checked against
+  `config/lead-production/sales-territories-v2.json`. Kunz's (telesales) already-built TW1-TW10
+  package was found to incorrectly contain a map deliverable.
+- Fix: new `resolve-map-required.ts` (single authoritative resolver), new
+  `generate-representative-handover.ts` (reusable, tested package builder gating the map file on
+  the resolved value), assignment wired into phase1's config-hash invalidation, and a standing
+  cross-check in the progress-register generator. 27-assertion regression suite
+  (`scripts/test-map-required.ts`). Commit `a8f94b4`.
+- Kunz's package corrected retroactively from existing evidence only (no new discovery/
+  enrichment calls): map file removed, Lead Production Report and progress register regenerated.
+  Clean reconciliation re-derived directly from the final Master/Sales Pro files: 450 unique
+  candidates = 181 usable (118 premium, 63 releasable L1) + 19 held + 132 hard-rejected + 76
+  customer exclusions + 42 excluded groups; Sales Pro rows 167/14/76; zero leakage confirmed.
+  Full detail: `docs/LEAD_PRODUCTION_HANDOVER.md`,
+  `/Users/homemac/Data/aspectlead-lead-production/handover/kunz-tw1-tw10/README.md`.
+- Full test/build gate re-verified clean: `test-map-required.ts`, `test-lead-production-territory-v2.ts`,
+  `test-discovery-run-recovery.ts` ALL PASSED, `npm run typecheck` clean, `npm run build`
+  succeeded.
 - **Next task**: owner authorisation required before starting TW11-TW20 (Meer's territory) —
   same per-territory authorisation pattern. No new branch created, no merge to `main`, no
   deployment; all work remains on `feature/mvp-vertical-slice-001`.
