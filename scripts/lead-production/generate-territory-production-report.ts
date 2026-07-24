@@ -87,7 +87,40 @@ const MANRAJ_SOURCE_CALLS = [
 const MANRAJ_DEFECTS: string[][] = [];
 const MANRAJ_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. npm run typecheck — clean. npm run build — succeeded. No new pipeline defect found during KT processing — the already-fixed cross-district dedup tiering and both exporters' independent 25-duplicate agreement carried over cleanly from RM1-RM14.";
 
+const AYESHA_DISTRICTS = [
+  ["NW1", 1751, 232, 1519, 64, 32, 23, 9, 0, 0, 31, 0, 1],
+  ["NW2", 1064, 103, 961, 88, 39, 20, 19, 1, 2, 29, 6, 12],
+  ["NW3", 1295, 72, 1223, 17, 12, 8, 4, 0, 0, 5, 0, 0],
+  ["NW4", 1111, 80, 1031, 17, 7, 1, 6, 0, 0, 7, 2, 1],
+  ["NW5", 1301, 81, 1220, 17, 8, 3, 5, 0, 0, 9, 0, 0],
+  ["NW6", 1124, 167, 957, 50, 24, 16, 8, 3, 1, 24, 1, 0],
+  ["NW7", 853, 38, 815, 23, 9, 8, 1, 0, 0, 10, 0, 4],
+  ["NW8", 1506, 27, 1479, 13, 5, 2, 3, 0, 0, 7, 1, 0],
+  ["NW9", 993, 179, 814, 150, 69, 40, 29, 5, 6, 50, 9, 16],
+  ["NW10", 1200, 243, 957, 86, 39, 22, 17, 2, 2, 34, 5, 6],
+];
+const AYESHA_SOURCE_CALLS = [
+  ["NW1", 61, 53], ["NW2", 73, 65], ["NW3", 17, 16], ["NW4", 14, 14], ["NW5", 17, 15],
+  ["NW6", 50, 41], ["NW7", 19, 17], ["NW8", 12, 10], ["NW9", 129, 123], ["NW10", 77, 69],
+];
+const AYESHA_DEFECTS = [
+  ["1", "Website enrichment stage crashed the whole orchestrator process on a real HTTP/2 GOAWAY connection error (reproduced twice, identically, against the same remote host during live NW3 processing)", "website-adapter.ts (fetchWithTimeout's try/catch was bypassed by an EventEmitter 'error' event outside the promise chain)", "Forced HTTP/1.1 for all website-crawl requests via an explicit undici Agent({ allowH2: false }) dispatcher; added undici as an explicit dependency; made the fetch call an exported, reassignable binding so the existing test mocking pattern kept working; regression tests added (connection-level rejection caught gracefully, structural check that allowH2:false stays wired)", "0cec029"],
+  ["2", "NW2 discovery run failed transiently (HTTP/2 GOAWAY during provenance write) with the query only 27% complete (286 of the eventual 1064 outlets)", "je-run.ts / discovery worker (transient network failure, not a logic defect)", "Evidence-completeness verified (100% of the failed run's outlets were a strict subset of the bounded replacement run's — zero lost); failed run marked failed_transient_network and preserved; app_audit_log entry written; replacement run used as sole authoritative evidence", "n/a (no code change — transient failure, procedure documented in docs/09_DECISIONS.md)"],
+  ["3", "NW7 discovery run failed transiently (HTTP/2 stream timeout during insertRawObservation/finishExecution); additionally left discovery_runs.status stuck at 'queued' (never transitioned to 'failed'), blocking the duplicate-run guard on retry", "je-run.ts discovery worker + src/lib/discovery-engine/repository/supabase.ts's finishExecution (the stuck-status bookkeeping gap is a real robustness issue, logged as ISS-0031 for a future source-level fix)", "Evidence-completeness verified (zero lost outlets); discovery_runs.status corrected directly (documented, audited) to unblock the guard; bounded replacement run performed and used as sole authoritative evidence", "n/a this session (ISS-0031 logged for future root-cause fix; not a final-lead-data defect)"],
+];
+const AYESHA_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-lead-production-website.ts — ALL PASSED (including 2 new regressions for ISS-0030: a connection-level fetch rejection is caught gracefully, and a structural check that the HTTP/1.1-only dispatcher stays wired). npm run typecheck — clean. npm run build — succeeded.";
+
 const TERRITORIES: Record<string, any> = {
+  ayesha: {
+    representative: "Ayesha", role: "Field Sales", salesTerritory: "NW1-NW10", filePrefix: "Ayesha_NW1-NW10",
+    districts: AYESHA_DISTRICTS, sourceCalls: AYESHA_SOURCE_CALLS, defects: AYESHA_DEFECTS, tests: AYESHA_TESTS,
+    totalRaw: 12198, totalValid: 1222, totalRejected: 10976, totalCandidates: 525, duplicatesRemoved: 14, uniqueCandidates: 511,
+    usable: 238, premium: 140, releasableL1: 98, keyAccounts: 10, held: 10, hardRejected: 200, customerExclusions: 23, excludedGroups: 40,
+    salesProNewLeads: 228, salesProKeyAccounts: 10, salesProCustExclusions: 23,
+    commitSha: "0cec029 (ISS-0030 website-crawl HTTP/1.1 fix, applied mid-territory)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
+    handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/ayesha-nw1-nw10",
+    territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/ayesha/combined-2026-07-24/NW1-NW10-TERRITORY-RECONCILIATION-REPORT.md",
+  },
   nauman: {
     representative: "Nauman", role: "Field Sales", salesTerritory: "RM1-RM14", filePrefix: "Nauman_RM1-RM14",
     districts: NAUMAN_DISTRICTS, sourceCalls: NAUMAN_SOURCE_CALLS, defects: NAUMAN_DEFECTS, tests: NAUMAN_TESTS,

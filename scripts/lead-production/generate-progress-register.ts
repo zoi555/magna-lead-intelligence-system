@@ -9,6 +9,7 @@ import { writeCsv } from "./csv";
 
 const NAUMAN_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/nauman-rm1-rm14";
 const MANRAJ_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/manraj-kt1-kt24";
+const AYESHA_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/ayesha-nw1-nw10";
 
 const REPRESENTATIVES = [
   {
@@ -37,12 +38,15 @@ const REPRESENTATIVES = [
   },
   {
     representative: "Ayesha", role: "field_sales", salesTerritory: "NW1-NW10",
-    totalDistricts: 10, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 10,
-    territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0,
-    customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0,
-    masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "",
-    latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a",
-    lastUpdated: "2026-07-24", nextAction: "Awaiting explicit owner authorisation to begin NW1 (first district).",
+    totalDistricts: 10, districtsCompleted: 10, districtsHeld: 0, districtsRemaining: 0,
+    territoryStatus: "ACCEPTED", usable: 238, ordinaryNewLeads: 228, keyAccounts: 10,
+    customerExclusions: 23, groupExclusions: 40, held: 10, hardRejected: 200,
+    masterFilePath: `${AYESHA_DIR}/Ayesha_NW1-NW10_Representative_Master.xlsx`,
+    salesProFilePath: `${AYESHA_DIR}/Ayesha_NW1-NW10_SalesPro_New_Leads.csv`,
+    mapPath: `${AYESHA_DIR}/Ayesha_NW1-NW10_New_Leads_Map.xlsx`,
+    reportPath: `${AYESHA_DIR}/Ayesha_NW1-NW10_Lead_Production_Report.xlsx`,
+    latestCommit: "0cec029", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
+    lastUpdated: "2026-07-24", nextAction: "None — territory complete, handed over, awaiting no further action.",
   },
   { representative: "Kunz", role: "telesales", salesTerritory: "TW1-TW10", totalDistricts: 10, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 10, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
   { representative: "Meer", role: "telesales", salesTerritory: "TW11-TW20", totalDistricts: 10, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 10, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
