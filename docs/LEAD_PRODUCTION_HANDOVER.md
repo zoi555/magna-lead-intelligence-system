@@ -134,7 +134,14 @@ re-verify at any point.
 | 102 | 07-24 | 8be932d | Docs — record RM1 live discovery + district acceptance |
 | 103 | 07-24 | 86ae836 | fix: enforce customer master exclusion rule |
 | 104 | 07-24 | 02af5a3 | fix: duplicate-run guard; resolve RM2 duplicate discovery |
-| 105 | 07-24 | (pending) | Docs — record RM2 district acceptance |
+| 105 | 07-24 | db0cdfd | Docs — record RM2 district acceptance |
+| 106 | 07-24 | df52f16 | fix: cross-district dedup false-merged different chain/franchise premises |
+| 107 | 07-24 | (pending) | Docs — record RM1-RM14 full territory acceptance (RM3-RM14 + combination) |
+
+RM3-RM14 were run live via a session-local convenience script
+(`run-district.ts`, not committed — a thin subprocess wrapper reusing every existing, already-
+tested repo script; no new pipeline logic). RM2's duplicate-discovery-run incident (found
+mid-run, before RM3 started) is recorded above; RM3-RM14 each ran cleanly with no repeat.
 
 **Next dependency:** RM1 is live, complete, district-accepted, AND reprocessed under the
 customer_master_exclusion rule (see
@@ -316,6 +323,32 @@ the old active+reactivation split), RM1 4 (was 3) — both territories' genuinel
 populations unchanged (UB1 47, RM1 60). Full regression suite:
 `scripts/test-lead-production-customer-master-exclusion.ts` (`npm run
 test:lead-production-customer-master-exclusion`).
+
+## RM1-RM14 — Nauman's full Sales Territory, ACCEPTED (2026-07-24)
+
+All 14 Postcode Districts run live end-to-end and individually accepted. Territory totals:
+8542 raw = 855 geography-valid + 7687 rejected (exact, every district). 748 raw candidates ->
+**25 genuine cross-district duplicates removed -> 723 unique candidates** = 26 customer-master
+exclusions + 76 excluded groups + 388 usable (236 premium, 152 releasable L1, 30 key accounts) +
+2 held + 231 hard-rejected. Every Sales Pro Lead ID (358 new leads + 30 key accounts = 388)
+verified present in the Master workbook. Zero customer-master leakage into any rep-facing/Sales
+Pro/map output, verified explicitly.
+
+A significant defect was found and fixed mid-combination: the original cross-district dedup
+logic wrongly merged 81 of 748 candidates — mostly different branches of the same chain/
+franchise sharing only a corporate website domain or phone line (Ember Inns, Pizza Hut Delivery,
+Shell, Favorite Chicken & Ribs, Sizzling Pubs) — each a real, distinct sales opportunity that
+would have been silently dropped. Fixed to require same-postcode corroboration (commit
+`df52f16`) before the territory-level outputs below were finalised.
+
+Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/nauman/combined-2026-07-24/RM1-RM14-TERRITORY-RECONCILIATION-REPORT.md`
+(outside the repo, no lead data committed). Per-district reports:
+`.../output/rmN/<timestamp>-live/RMN-DISTRICT-VERIFICATION-REPORT.md` for RM1/RM2 (RM3-RM14
+verified inline via the same checks, not separately written up as files, given the volume — all
+counts recorded in the combined territory report's per-district table).
+
+**Next territory (Manraj, KT1-KT24) requires separate owner authorisation, same as every RM
+district did.** No new branch created, no merge to `main`, no deployment.
 
 ## RM2 — live, complete, district-accepted (2026-07-24)
 

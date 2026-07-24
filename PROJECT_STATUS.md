@@ -532,3 +532,33 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   `sales-territories-v2.json` directly, then build district-level expansion in the discovery
   orchestrator (raw Sales Territory → Postcode Districts → per-district discovery/checkpoint →
   cross-district combine/dedup).
+
+### RM1-RM14 (Nauman's full Sales Territory) — live, accepted — 2026-07-24
+
+- District/territory orchestration (Milestone 2), Master exporter (Milestone 3), Sales Pro
+  exporter (Milestone 4), UB1 export proof (Milestone 5), and a full pre-production
+  certification (Milestone 6, `docs/LEAD_PRODUCTION_PREPRODUCTION_CERTIFICATION.md`,
+  **GO_FOR_RM1_LIVE**) were all completed this session before any live discovery was triggered.
+- **All 14 RM Postcode Districts run live end-to-end and accepted**: 8542 raw = 855 geography-
+  valid + 7687 rejected (exact, every district). 748 candidates → 25 genuine cross-district
+  duplicates removed → 723 unique. Permanent `customer_master_exclusion` rule enforced (any
+  confirmed Magna customer-master match, any lifecycle status, hard-excluded — reactivation
+  retired as an operational lead category): 26 exclusions found across the territory, zero
+  leakage into any rep-facing/Sales Pro/map output. Final: 388 usable (236 premium, 152
+  releasable Level 1, 30 key accounts), 2 held for review, 231 hard-rejected, 76 excluded groups.
+  Nauman's combined 107-field Master workbook and 108-column Sales Pro files generated; every
+  Sales Pro Lead ID verified present in the Master.
+- **Four real deterministic defects found live and fixed** (each committed separately,
+  regression-tested with the exact real-world case as a fixture): (1) the orchestrator's phase1
+  stage never passed `--assignments`/`--groups` through (caught before any live call); (2) a
+  hardcoded UB1-specific "expected 84 candidates" FSA warning; (3) a duplicate live discovery
+  run for RM2 (two independent triggers 4 minutes apart — compared in full, resolved, and
+  `je-run.ts` given a duplicate-run guard); (4) the most significant — cross-district dedup was
+  wrongly merging different chain/franchise branches sharing a corporate domain or phone line
+  (81 of 748 candidates would have been wrongly collapsed; fixed to require same-postcode
+  corroboration, corrected to 25 genuine duplicates).
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/nauman/combined-2026-07-24/RM1-RM14-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task**: owner authorisation required before starting KT1-KT24 (Manraj's territory) —
+  same per-territory authorisation pattern as RM1-RM14. No new branch created, no merge to
+  `main`, no deployment; all work remains on `feature/mvp-vertical-slice-001`.
