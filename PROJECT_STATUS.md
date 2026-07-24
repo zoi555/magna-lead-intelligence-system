@@ -574,9 +574,11 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   exclusions found across the territory, zero leakage into any rep-facing/Sales Pro/map output.
   Final: 364 usable (221 premium, 143 releasable Level 1, 21 key accounts), 6 held for review,
   290 hard-rejected, 99 excluded groups. Manraj's combined 107-field Master workbook and
-  108-column Sales Pro files generated; every Sales Pro Lead ID verified present in the Master
-  workbook's Evidence Register (788/788); single representative owner ("Manraj") confirmed
-  across all 788 rows in every Master sheet.
+  108-column Sales Pro files generated; all **exported** Sales Pro Lead IDs (343 new leads + 21
+  key accounts + 29 customer-master exclusions = 393 of 788 total candidates — held/hard-
+  rejected/excluded-group candidates exist only in the Master workbook by design) verified
+  present in the Master workbook's Evidence Register (393/393); single representative owner
+  ("Manraj") confirmed across all 788 rows in every Master sheet.
 - **No new defect found or fixed during KT processing** — the RM1-RM14-era fixes (assignments/
   groups passthrough, FSA hardcoded-84 removal, duplicate-run guard, cross-district dedup
   false-merge fix) all carried over clean; both exporters independently agreed on the same
@@ -586,6 +588,17 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   KT1's checkpoint. Expected guard behaviour, not a defect.
 - Full test/build gate run clean: `test-lead-production-territory-v2.ts` all passed,
   `npm run typecheck` clean, `npm run build` succeeded.
+- **Documentation-only reconciliation (2026-07-24, post-acceptance, no live calls)**: 12 items
+  re-derived directly from the final exported files at the owner's request. All confirmed exact:
+  788 unique post-dedup population; 343 new leads; 21 key accounts; 364 usable; 6 held; 290
+  hard-rejected; 29 customer-master exclusions; 99 excluded groups; sum of usable+held+hard-
+  rejected+customer-exclusions+excluded-groups = 788 exactly; Sales Pro CSV row counts (343/21/29)
+  match their Master sheets exactly; all 393 exported Sales Pro Lead IDs found in both the
+  Evidence Register and their respective Master sheet; zero overlap between held/hard-rejected/
+  customer-excluded/group-excluded records and the representative-facing new-leads/key-accounts
+  files. Corrected an earlier documentation wording error along the way — "every Sales Pro Lead
+  ID (788/788)" should have read "every **exported** Sales Pro Lead ID (393/393)"; no exporter
+  defect, the underlying numbers were always correct.
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/manraj/combined-2026-07-24/KT1-KT24-TERRITORY-RECONCILIATION-REPORT.md`.
 - **Next task**: owner authorisation required before starting NW1 (Ayesha's territory) — same

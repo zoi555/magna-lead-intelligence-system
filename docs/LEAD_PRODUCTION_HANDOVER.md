@@ -331,11 +331,13 @@ already accepted at the end of RM1-RM14 processing (commit `fbd2d61` — no new 
 needed or made). Territory totals: 9586 raw = 969 geography-valid + 8617 rejected (exact, every
 district). 813 raw candidates -> **25 genuine cross-district duplicates removed -> 788 unique
 candidates** = 29 customer-master exclusions + 99 excluded groups + 364 usable (221 premium, 143
-releasable L1, 21 key accounts) + 6 held + 290 hard-rejected. Every Sales Pro Lead ID (343 new
-leads + 21 key accounts = 364) verified present in the Master workbook's Evidence Register (all
-788 rows). Zero customer-master leakage into any rep-facing/Sales Pro/map output, verified
-explicitly. Single representative owner ("Manraj") confirmed across all 788 rows in every Master
-sheet.
+releasable L1, 21 key accounts) + 6 held + 290 hard-rejected. All **exported** Sales Pro Lead IDs
+(343 new leads + 21 key accounts + 29 customer-master exclusions = 393 of the 788 total
+candidates — held/hard-rejected/excluded-group candidates exist only in the Master workbook, by
+design, and correctly have no Sales Pro row) verified present in the Master workbook's Evidence
+Register (393/393). Zero customer-master leakage into any rep-facing/Sales Pro/map output,
+verified explicitly. Single representative owner ("Manraj") confirmed across all 788 rows in
+every Master sheet.
 
 No new pipeline defect was found during KT processing — the already-fixed cross-district dedup
 tiering and both exporters' independent 25-duplicate agreement carried over cleanly from
@@ -344,7 +346,18 @@ RM2-era duplicate-run guard correctly blocked a fresh trigger against an already
 execution; the run was allowed to complete naturally and its output used as KT1's checkpoint —
 expected guard behaviour, not a defect.
 
-Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/manraj/combined-2026-07-24/KT1-KT24-TERRITORY-RECONCILIATION-REPORT.md`
+**Documentation-only reconciliation (2026-07-24, post-acceptance, no live calls)**: re-derived
+all 12 requested checks directly from the final exported files. Confirmed exact: 788 unique
+post-dedup population; 343 new leads; 21 key accounts; 364 total usable; 6 held; 290
+hard-rejected; 29 customer-master exclusions; 99 excluded groups; 364+6+290+29+99 = 788 sums
+exactly; Sales Pro row counts (343/21/29) match their respective Master sheets exactly; all 393
+exported Sales Pro Lead IDs present in both the Evidence Register and their respective Master
+sheet; zero overlap between held/hard-rejected/customer-excluded/group-excluded records and the
+representative-facing new-leads/key-accounts files. This pass also corrected an earlier
+documentation wording error — "every Sales Pro Lead ID (788/788)" should have read "every
+**exported** Sales Pro Lead ID (393/393)" — no exporter defect was found, the underlying numbers
+were always correct. Full detail (including the per-item table):
+`/Users/homemac/Data/aspectlead-lead-production/output/territories/manraj/combined-2026-07-24/KT1-KT24-TERRITORY-RECONCILIATION-REPORT.md`
 (outside the repo, no lead data committed).
 
 **Next territory (Ayesha, NW1...) requires separate owner authorisation.** No new branch
