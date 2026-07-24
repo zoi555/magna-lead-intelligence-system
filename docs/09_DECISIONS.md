@@ -861,3 +861,29 @@ comparison and decision are recorded so the choice is auditable, not silent.
 
 **See also:** `scripts/je-run.ts`, `docs/10_BUGS_AND_FIXES.md`, `app_audit_log` entry
 `ef1adab0-7b90-4d4b-89c6-d2673b4e82f5`.
+
+## Concurrent (not duplicate) discovery run at KT1: wait rather than compare-and-choose (2026-07-24)
+
+### Decision
+
+When `scripts/je-run.ts`'s duplicate-run guard blocked a fresh KT1 discovery trigger, the
+blocking run (`fe9a468c-...`) was found to be genuinely **in-flight** (`je_executions.status =
+"running"`, live/fresh `heartbeat_at`, active `lease_expires_at`) rather than a second completed
+run like RM2's case. There was nothing yet to compare. Decision: wait for the in-flight execution
+to finish naturally (polled every 60-90s) rather than override the guard with
+`--force-duplicate-run`, which would have risked racing or duplicating a live scrape mid-flight.
+The run completed cleanly (529 raw, 0 failures) and its output was used as KT1's authoritative
+checkpoint.
+
+### Reason
+
+The RM2 decision rule (`docs/09_DECISIONS.md`, "RM2 duplicate discovery run resolved") is scoped
+to comparing two runs that have both already produced data. A concurrent in-flight run is a
+different situation: forcing a second live run against the same district while one is actively
+scraping is exactly the failure mode the duplicate-run guard exists to prevent, and there is no
+completed-run data yet to compare. Waiting is the safe default; only fall back to
+`--force-duplicate-run` if the blocking run is confirmed stalled/dead (stale heartbeat, expired
+lease with no renewal).
+
+**See also:** `scripts/je-run.ts` (duplicate-run guard), `docs/10_BUGS_AND_FIXES.md`,
+`docs/15_AI_WORK_LOG.md` (Session: 2026-07-24 — Live RM1-RM14 and KT1-KT24 territory production).

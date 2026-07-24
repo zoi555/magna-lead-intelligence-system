@@ -324,6 +324,32 @@ populations unchanged (UB1 47, RM1 60). Full regression suite:
 `scripts/test-lead-production-customer-master-exclusion.ts` (`npm run
 test:lead-production-customer-master-exclusion`).
 
+## KT1-KT24 — Manraj's full Sales Territory, ACCEPTED (2026-07-24)
+
+All 24 Postcode Districts run live end-to-end and individually accepted, using the pipeline
+already accepted at the end of RM1-RM14 processing (commit `fbd2d61` — no new code changes were
+needed or made). Territory totals: 9586 raw = 969 geography-valid + 8617 rejected (exact, every
+district). 813 raw candidates -> **25 genuine cross-district duplicates removed -> 788 unique
+candidates** = 29 customer-master exclusions + 99 excluded groups + 364 usable (221 premium, 143
+releasable L1, 21 key accounts) + 6 held + 290 hard-rejected. Every Sales Pro Lead ID (343 new
+leads + 21 key accounts = 364) verified present in the Master workbook's Evidence Register (all
+788 rows). Zero customer-master leakage into any rep-facing/Sales Pro/map output, verified
+explicitly. Single representative owner ("Manraj") confirmed across all 788 rows in every Master
+sheet.
+
+No new pipeline defect was found during KT processing — the already-fixed cross-district dedup
+tiering and both exporters' independent 25-duplicate agreement carried over cleanly from
+RM1-RM14. One concurrent (not duplicate) live discovery execution was encountered at KT1: the
+RM2-era duplicate-run guard correctly blocked a fresh trigger against an already-running
+execution; the run was allowed to complete naturally and its output used as KT1's checkpoint —
+expected guard behaviour, not a defect.
+
+Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/manraj/combined-2026-07-24/KT1-KT24-TERRITORY-RECONCILIATION-REPORT.md`
+(outside the repo, no lead data committed).
+
+**Next territory (Ayesha, NW1...) requires separate owner authorisation.** No new branch
+created, no merge to `main`, no deployment.
+
 ## RM1-RM14 — Nauman's full Sales Territory, ACCEPTED (2026-07-24)
 
 All 14 Postcode Districts run live end-to-end and individually accepted. Territory totals:

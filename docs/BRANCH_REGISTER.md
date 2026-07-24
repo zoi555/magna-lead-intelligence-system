@@ -16,11 +16,16 @@ branches — do not confuse a commit SHA with a branch name anywhere in this doc
 ## Current state at time of audit
 
 - **Active branch:** `feature/mvp-vertical-slice-001`
-- **Local HEAD:** `df52f162c0f87e2f254f7a51c1ebe9abc7e58da4` — "fix: cross-district dedup false-merged different chain/franchise premises" (106 commits ahead of `main`)
+- **Local HEAD:** `fbd2d61bf34a59d566a47d8df118306737a529e4` (107 commits ahead of `main`)
 - **Remote HEAD (`origin/feature/mvp-vertical-slice-001`):** same SHA — fully pushed, zero commits ahead/behind origin
 - **Update 2026-07-24:** Nauman's full Sales Territory (RM1-RM14, 14 Postcode Districts)
   processed live end-to-end and accepted on this same branch — no new branch created, no merge
   to `main`. See `docs/LEAD_PRODUCTION_HANDOVER.md` for full detail.
+- **Update 2026-07-24 (later):** Manraj's full Sales Territory (KT1-KT24, 24 Postcode Districts)
+  processed live end-to-end and accepted on this same branch, at this same commit — no code
+  changes were needed for KT processing (the RM1-RM14-era fixes carried over clean), so HEAD is
+  unchanged from the RM1-RM14 update. No new branch created, no merge to `main`. See
+  `docs/LEAD_PRODUCTION_HANDOVER.md` for full detail.
 - **Untracked files present:** yes, 2 —
   `scripts/export-operational-leads.ts` (pre-existing before this project's lead-production
   sessions began; never authored or touched by this work; intentionally left untracked) and

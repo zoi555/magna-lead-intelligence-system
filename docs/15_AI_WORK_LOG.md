@@ -830,3 +830,51 @@ deterministic defect was proven (none was).
 - **Not done**: no live RM1/KT1/TW discovery; FSA/Companies House reclassification with the
   fixed `normaliseName()` (still only Google is reclassified, documented in
   `scoring-rules-v2.json`'s `notApplied` list).
+
+## Session: 2026-07-24 — Live RM1-RM14 (Nauman) and KT1-KT24 (Manraj) territory production
+
+Human request: pre-production certification, then explicit bounded owner authorisation for live
+Just Eat discovery per district, first for Nauman's full RM1-RM14 Sales Territory and then (after
+RM1-RM14 was accepted) Manraj's full KT1-KT24 Sales Territory. Standing rules throughout: the
+permanent `customer_master_exclusion` hard rule, no mock data live, no merge to `main`, no
+deployment, no branch/checkpoint/evidence deletion, stop early on any of a fixed list of
+integrity/ambiguity conditions.
+
+- **Pre-production certification**: all 15 required categories passed; gate resolved
+  `GO_FOR_RM1_LIVE`.
+- **RM1-RM14 (Nauman) — all 14 districts run live and accepted**: 8542 raw → 855 valid + 7687
+  rejected → 748 candidates → 25 cross-district duplicates removed → 723 unique (388 usable, 26
+  customer-master exclusions, 76 excluded groups, 2 held, 231 hard-rejected). Four real defects
+  found and fixed live, each committed separately with a regression-test fixture built from the
+  real case: missing `--assignments`/`--groups` passthrough (`ed56cbf`), hardcoded UB1-specific
+  FSA warning (`ed56cbf`), a duplicate live RM2 discovery run — compared per an explicit
+  owner-supplied decision rule, run A kept authoritative, `je-run.ts` given a duplicate-run guard
+  (`02af5a3`), and — the most significant — cross-district dedup wrongly merging 81 of 748
+  candidates that were genuinely distinct chain/franchise branches sharing only a corporate
+  domain/phone (Ember Inns, Pizza Hut Delivery, Shell, Favorite Chicken & Ribs, Sizzling Pubs),
+  fixed to require same-postcode corroboration, corrected to 25 genuine duplicates (`df52f16`).
+  Full report:
+  `.../output/territories/nauman/combined-2026-07-24/RM1-RM14-TERRITORY-RECONCILIATION-REPORT.md`.
+- **KT1-KT24 (Manraj) — all 24 districts run live and accepted**, using the pipeline already
+  accepted at the end of RM1-RM14 (`fbd2d61`) with **no new code changes needed**: 9586 raw → 969
+  valid + 8617 rejected → 813 candidates → 25 cross-district duplicates removed → 788 unique (364
+  usable, 29 customer-master exclusions, 99 excluded groups, 6 held, 290 hard-rejected). No new
+  pipeline defect found. One genuinely concurrent (not duplicate) live discovery execution was
+  correctly blocked by the duplicate-run guard at KT1 and allowed to complete naturally rather
+  than overridden — judged as the difference between a sequential-duplicate case (RM2, requires
+  comparison) and a concurrent-in-flight case (KT1, nothing to compare yet, just wait). Districts
+  KT18-KT24 required `run_in_background` + polling due to longer website-crawl times exceeding
+  the 600s foreground execution limit. Full test/build gate clean
+  (`test-lead-production-territory-v2.ts`, `typecheck`, `build`). Full report:
+  `.../output/territories/manraj/combined-2026-07-24/KT1-KT24-TERRITORY-RECONCILIATION-REPORT.md`.
+- Both territories: every Sales Pro Lead ID verified present in the Master workbook; zero
+  cross-bucket leakage (customer-master exclusions / key accounts / new leads all pairwise
+  disjoint); single representative owner confirmed across every row in every Master sheet.
+- Commits this session: `ed56cbf`, `02af5a3`, `df52f16`, `db0cdfd` (RM2 docs), `fbd2d61` (RM1-RM14
+  docs), all pushed to `feature/mvp-vertical-slice-001`. No new commit was needed for KT1-KT24
+  itself (pipeline unchanged); this session's doc updates (`BRANCH_REGISTER.md`,
+  `LEAD_PRODUCTION_HANDOVER.md`, `PROJECT_STATUS.md`, this file) are being committed together.
+- **Not done**: NW1 (Ayesha's territory) — stops here per explicit owner instruction, requires
+  separate authorisation. KT1-KT24 territory data files (Master/Sales Pro workbooks, CSVs, this
+  session's territory reports) are intentionally not committed to the repo — generated lead data
+  lives outside git per project convention, at the paths cited above.

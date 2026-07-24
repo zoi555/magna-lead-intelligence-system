@@ -559,6 +559,35 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   corroboration, corrected to 25 genuine duplicates).
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/nauman/combined-2026-07-24/RM1-RM14-TERRITORY-RECONCILIATION-REPORT.md`.
-- **Next task**: owner authorisation required before starting KT1-KT24 (Manraj's territory) —
-  same per-territory authorisation pattern as RM1-RM14. No new branch created, no merge to
+- **Next task (superseded, see below)**: owner authorisation was required before starting
+  KT1-KT24 (Manraj's territory) — this has since been granted and completed; see the new section
+  below.
+
+### KT1-KT24 (Manraj's full Sales Territory) — live, accepted — 2026-07-24
+
+- All 24 KT Postcode Districts run live end-to-end and accepted, using the pipeline already
+  accepted at the end of RM1-RM14 processing (commit `fbd2d61`) — **no new code changes were
+  needed or made**.
+- **All 24 KT Postcode Districts run live end-to-end and accepted**: 9586 raw = 969 geography-
+  valid + 8617 rejected (exact, every district). 813 candidates → 25 genuine cross-district
+  duplicates removed → 788 unique. Permanent `customer_master_exclusion` rule enforced: 29
+  exclusions found across the territory, zero leakage into any rep-facing/Sales Pro/map output.
+  Final: 364 usable (221 premium, 143 releasable Level 1, 21 key accounts), 6 held for review,
+  290 hard-rejected, 99 excluded groups. Manraj's combined 107-field Master workbook and
+  108-column Sales Pro files generated; every Sales Pro Lead ID verified present in the Master
+  workbook's Evidence Register (788/788); single representative owner ("Manraj") confirmed
+  across all 788 rows in every Master sheet.
+- **No new defect found or fixed during KT processing** — the RM1-RM14-era fixes (assignments/
+  groups passthrough, FSA hardcoded-84 removal, duplicate-run guard, cross-district dedup
+  false-merge fix) all carried over clean; both exporters independently agreed on the same
+  25-duplicate count. One genuinely concurrent (not duplicate) live discovery execution was
+  encountered at KT1 — the duplicate-run guard correctly blocked a fresh trigger against an
+  already-running execution; the run was allowed to complete naturally and its output used as
+  KT1's checkpoint. Expected guard behaviour, not a defect.
+- Full test/build gate run clean: `test-lead-production-territory-v2.ts` all passed,
+  `npm run typecheck` clean, `npm run build` succeeded.
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/manraj/combined-2026-07-24/KT1-KT24-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task**: owner authorisation required before starting NW1 (Ayesha's territory) — same
+  per-territory authorisation pattern as RM1-RM14/KT1-KT24. No new branch created, no merge to
   `main`, no deployment; all work remains on `feature/mvp-vertical-slice-001`.
