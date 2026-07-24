@@ -7,7 +7,7 @@ import path from "node:path";
 import { selectWebsite, isDirectorySite } from "./lead-production/website-selection";
 import * as extract from "./lead-production/website-extraction";
 import { calculateProductFit } from "./lead-production/product-fit";
-import { fetchRobotsRules, isPathDisallowed, fetchPage } from "./lead-production/website-adapter";
+import { fetchRobotsRules, isPathDisallowed, fetchPage, setFetchImplForTesting } from "./lead-production/website-adapter";
 import type { WebsiteExtractedData } from "./lead-production/types";
 
 let fails = 0;
@@ -100,30 +100,37 @@ async function main() {
 
   // --- Robots.txt is genuinely fetched and honoured, never evaded ---
   {
-    const savedFetch = globalThis.fetch;
-    (globalThis as any).fetch = async (url: string) => {
-      if (url.includes("robots.txt")) {
+    setFetchImplForTesting(async (url: any) => {
+      if (String(url).includes("robots.txt")) {
         return { ok: true, status: 200, text: async () => "User-agent: *\nDisallow: /admin\nDisallow: /private\n" } as any;
       }
       return { ok: true, status: 200, text: async () => "<html></html>" } as any;
-    };
+    });
     const rules = await fetchRobotsRules("test.co.uk");
     assert(rules.fetchedOk === true, "robots.txt is genuinely fetched (not skipped)");
     assert(rules.disallowedPaths.includes("/admin") && rules.disallowedPaths.includes("/private"), "Disallow rules under the '*' user-agent block are parsed and retained");
     assert(isPathDisallowed("/admin/users", rules.disallowedPaths), "a path under a disallowed prefix is correctly detected as disallowed");
     assert(!isPathDisallowed("/menu", rules.disallowedPaths), "a path NOT covered by any Disallow rule is correctly allowed");
-    globalThis.fetch = savedFetch;
+    setFetchImplForTesting(null);
   }
 
   // --- fetchPage: real bounded retry (one resend), never more, never fabricated content on failure ---
   {
-    const savedFetch = globalThis.fetch;
     let calls = 0;
-    (globalThis as any).fetch = async () => { calls++; return { ok: false, status: 503, text: async () => "" } as any; };
+    setFetchImplForTesting(async () => { calls++; return { ok: false, status: 503, text: async () => "" } as any; });
     const res = await fetchPage("https://test.co.uk/");
     assert(calls === 2, `fetchPage makes exactly one retry (2 total attempts) on failure, never more (got ${calls})`);
     assert(res.ok === false && res.html === null, "a failed page fetch never returns fabricated HTML content");
-    globalThis.fetch = savedFetch;
+    setFetchImplForTesting(null);
+
+    // --- Regression (ISS-0030): a connection-level error emitted asynchronously (mirroring the
+    // real HTTP/2 GOAWAY crash from NW3) must be caught as an ordinary rejection, not escape as
+    // an unhandled exception. If fetchWithTimeout's try/catch is ever bypassed, this throws and
+    // fails the whole test process instead of silently passing. ---
+    setFetchImplForTesting(async () => { throw new Error("SocketError: other side closed (simulated GOAWAY)"); });
+    const crashRes = await fetchPage("https://flaky-host.example/");
+    assert(crashRes.ok === false && !!crashRes.errorMessage?.includes("SocketError"), "a connection-level fetch rejection is caught and returned as a graceful failure, never left to crash the process");
+    setFetchImplForTesting(null);
   }
 
   // --- Structural: no sales-ready label, no numeric Level 0-4 score, no login/CAPTCHA bypass code ---
@@ -135,6 +142,13 @@ async function main() {
       assert(!/level[_-]?[0-4]\b/i.test(text), `${f} never assigns a numeric Level 0-4 score`);
       assert(!/document\.cookie|setCookie|login|password|captcha/i.test(stripComments(text)), `${f} contains no login/CAPTCHA/cookie-session handling code (outside explanatory comments)`);
     }
+  }
+
+  // --- Regression (ISS-0030): the HTTP/1.1-only dispatcher must stay wired, or the real
+  // GOAWAY-crash class this fix addresses can silently return ---
+  {
+    const text = await fs.readFile(path.resolve(process.cwd(), "scripts/lead-production/website-adapter.ts"), "utf8");
+    assert(/allowH2:\s*false/.test(text), "website-adapter.ts still forces an HTTP/1.1-only dispatcher (allowH2: false) to prevent the HTTP/2 GOAWAY crash class");
   }
 
   console.log(fails === 0 ? "\nAll website-stage assertions passed ✓" : `\n${fails} FAILED`);

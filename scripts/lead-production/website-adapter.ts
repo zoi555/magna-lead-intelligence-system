@@ -8,15 +8,38 @@
 // real timeout (AbortController, 20s) and at most one retry; no cookies/session are carried
 // (no login is possible from this client at all — no credential input exists); no CAPTCHA
 // handling exists (a CAPTCHA-protected page simply fails cleanly, never bypassed).
+//
+// HTTP/1.1-only dispatcher (ISS-0030, 2026-07-24): Node's default global fetch() auto-negotiates
+// HTTP/2 via ALPN. When a remote server closes a shared/reused H2 connection mid-response
+// (GOAWAY), undici sometimes emits the failure as an 'error' event directly on the internal
+// ClientHttp2Stream rather than as a fetch()/res.text() promise rejection — that event bypasses
+// this file's own try/catch entirely and crashes the whole Node process (reproduced twice,
+// identically, against the same remote host, during real NW3 live crawls). Forcing HTTP/1.1 via
+// an explicit undici Agent removes the H2 connection-sharing behaviour that causes this class of
+// crash; a per-request connection failure under HTTP/1.1 is a normal fetch() rejection, caught
+// below like any other network error. See docs/09_DECISIONS.md for the dependency decision
+// (added `undici` as an explicit dependency) and docs/10_BUGS_AND_FIXES.md for the fix record.
+//
+// `fetchImpl` is an exported, reassignable binding (not a hardcoded call) specifically so tests
+// can substitute a mock without needing a module-mocking framework — the same pattern the
+// existing test suite already used for `globalThis.fetch` before this fix, preserved here at the
+// module level instead since real production traffic must go through the HTTP/1.1 dispatcher.
+import { Agent, fetch as undiciFetch } from "undici";
 
 const REQUEST_TIMEOUT_MS = 20_000;
 const USER_AGENT = "AspectLeadBot/1.0 (+internal lead-production research; contact: zoeb@magnafoodservice.co.uk)";
+const HTTP1_ONLY_DISPATCHER = new Agent({ allowH2: false });
+
+export let fetchImpl: typeof undiciFetch = (url, init) => undiciFetch(url, { ...init, dispatcher: HTTP1_ONLY_DISPATCHER });
+export function setFetchImplForTesting(fn: typeof undiciFetch | null): void {
+  fetchImpl = fn ?? ((url, init) => undiciFetch(url, { ...init, dispatcher: HTTP1_ONLY_DISPATCHER }));
+}
 
 async function fetchWithTimeout(url: string, timeoutMs: number): Promise<{ ok: boolean; status: number; text: string | null; error: string | null }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { headers: { "User-Agent": USER_AGENT, Accept: "text/html,application/xhtml+xml" }, signal: controller.signal, redirect: "follow" });
+    const res = await fetchImpl(url, { headers: { "User-Agent": USER_AGENT, Accept: "text/html,application/xhtml+xml" }, signal: controller.signal, redirect: "follow" });
     const text = res.ok ? await res.text() : null;
     return { ok: res.ok, status: res.status, text, error: null };
   } catch (e) {
