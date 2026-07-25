@@ -1033,6 +1033,55 @@ the owner supplied — all confirmed correct, no corrective commit made.
   ALL PASSED, `npm run typecheck` clean, `npm run build` succeeded.
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/wajahat/combined-2026-07-25/WD17-WD25-TERRITORY-RECONCILIATION-REPORT.md`.
-- **Next task**: owner authorisation required before starting Hassan's EN1-EN5 territory — same
+- **Next task (superseded, see below)**: owner authorisation was required before starting
+  Hassan's EN1-EN5 territory — see the Hassan section below.
+
+### EN1-EN5 (Hassan's full Sales Territory) — live, accepted — 2026-07-25
+
+Preceded by a read-only verification of Wajahat's stored territory documentation (manifest,
+reconciliation report, Lead Production Report xlsx, progress register) against the exact figures
+the owner supplied, plus WD20/WD21/WD22 containment checks — all confirmed correct, no corrective
+commit made.
+
+- Before any live call, all five configured Postcode Districts (EN1-EN5) were confirmed as real
+  entries in the authoritative postcode reference.
+- All 5 districts run live end-to-end, sequentially, each independently DB-reconciled and
+  zero-leakage-verified before proceeding to the next, using the fully-fixed pipeline
+  (map_required resolver, ISS-0030, ISS-0031, ISS-0032 all already in place).
+- **EN4 recovery (ISS-0031 procedure applied live)**: EN4's discovery run failed transiently
+  (HTTP/2 stream timeout during a downstream provenance write) after the Just Eat query itself had
+  already fully completed (460 raw observations retained, 0 failed queries). Its retained evidence
+  (raw observations present, 0 geography validations, 0 candidates) confirmed the query had
+  completed but geography validation/consolidation simply hadn't run yet. Recovered via the
+  certified `--resume-from` procedure — zero new Just Eat call — exactly the recovery path
+  ISS-0031 was built for. No data was fabricated, lost, or duplicated; this is the recovery
+  procedure working as designed, not a new defect.
+- Territory totals: 2428 raw = 382 geography-valid + 2046 rejected (exact, every district). 340
+  candidates → 7 genuine cross-district duplicates removed → 333 unique. Permanent
+  `customer_master_exclusion` rule enforced: 4 exclusions found, zero leakage. Final: 172 usable
+  (107 premium, 65 releasable Level 1, 12 key accounts), 3 held for review, 116 hard-rejected, 38
+  excluded groups. Hassan's combined 107-field Master workbook and 108-column Sales Pro files
+  generated; all 176 exported Sales Pro Lead IDs verified present in the Master workbook's
+  Evidence Register.
+- Source calls (stated separately): Google combined total 300 (55+56+97+31+61). Companies House
+  combined total 716 (123+130+247+70+146), documents total 39 (4+7+16+2+10). No request exceeded
+  its certified per-district cap (Google 800, Companies House 600 combined / 250 documents) on any
+  of the 5 districts.
+- Standardised handover package produced (**7 files**):
+  `/Users/homemac/Data/aspectlead-lead-production/handover/hassan-en1-en5/`
+  (`Hassan_EN1-EN5_Representative_Master.xlsx`, `Hassan_EN1-EN5_SalesPro_New_Leads.csv`,
+  `Hassan_EN1-EN5_Key_Accounts_Management_Review.xlsx`,
+  `Hassan_EN1-EN5_Customer_Master_Exclusions_Audit.xlsx`,
+  `Hassan_EN1-EN5_Lead_Production_Report.xlsx`, `Hassan_EN1-EN5_Field_Provenance.csv`,
+  `README.md`), representative-facing files verified to contain ordinary approved leads only,
+  zero leakage.
+- Representative Progress Register updated: Nauman, Manraj, Ayesha, Kunz, Meer, Naseh, Saad,
+  Saif, Shahzaib, Tahira, Wajahat, and Hassan now ACCEPTED (12/13 representatives complete).
+- Full test/build gate re-run clean: `test-lead-production-territory-v2.ts` (111-district
+  postcode-reference guard re-confirmed), `test-discovery-run-recovery.ts`, `test-map-required.ts`
+  ALL PASSED, `npm run typecheck` clean, `npm run build` succeeded.
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/hassan/combined-2026-07-25/EN1-EN5-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task**: owner authorisation required before starting Haleema's EN6-EN11 territory — same
   per-territory authorisation pattern. No new branch created, no merge to `main`, no deployment;
   all work remains on `feature/mvp-vertical-slice-001`.

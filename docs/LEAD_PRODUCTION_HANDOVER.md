@@ -864,5 +864,50 @@ path `/Users/homemac/Data/aspectlead-lead-production/handover/wajahat-wd17-wd25/
 
 Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/wajahat/combined-2026-07-25/WD17-WD25-TERRITORY-RECONCILIATION-REPORT.md`
 
-**Next territory (Hassan's EN1-EN5) requires separate owner authorisation.** No new branch
+## EN1-EN5 — Hassan's full Sales Territory, ACCEPTED (2026-07-25)
+
+Before any live call was made, all five configured Postcode Districts (EN1-EN5) were confirmed as
+real entries in the pipeline's own authoritative postcode reference data. All 5 districts then
+run live end-to-end, sequentially, and individually accepted, using the fully-fixed pipeline
+(ISS-0030, ISS-0031, ISS-0032, and the map_required resolver fix all already in place), with
+independent per-district DB reconciliation and zero-leakage verification before proceeding to the
+next district.
+
+**EN4 recovery (ISS-0031 procedure applied live):** EN4's discovery run failed transiently
+(HTTP/2 stream timeout during a downstream provenance write) after the Just Eat query itself had
+already fully completed (460 raw observations retained, 0 failed queries). Recovered via the
+certified `--resume-from` procedure — geography validation and consolidation resumed directly
+from retained raw evidence with **zero new Just Eat call** — exactly the recovery path ISS-0031
+was built for. No data was fabricated, lost, or duplicated.
+
+Territory totals: 2428 raw = 382 geography-valid + 2046 rejected (exact, every district). 340 raw
+candidates -> **7 genuine cross-district duplicates removed -> 333 unique candidates** = 4
+customer-master exclusions + 38 excluded groups + 172 usable (107 premium, 65 releasable L1, 12
+key accounts) + 3 held + 116 hard-rejected. All exported Sales Pro Lead IDs (160 new leads + 12
+key accounts + 4 customer-master exclusions = 176 of 333 total candidates) verified present in
+the Master workbook's Evidence Register (176/176). Zero customer-master leakage into any
+rep-facing/Sales Pro output.
+
+No new pipeline-code or lead-data defect found. The handover package was built correctly from the
+start via the corrected `generate-representative-handover.ts` — `mapRequired=false` resolved from
+`sales-territories-v2.json`, no map file produced.
+
+Source calls (stated separately, EN4's figures are from its completed discovery + enrichment
+stages — no new Just Eat call was made at recovery): Google combined total 300
+(55+56+97+31+61). Companies House combined total 716 (123+130+247+70+146), documents total 39
+(4+7+16+2+10). No request exceeded its certified per-district cap (Google 800, Companies House
+600 combined / 250 documents) on any of the 5 districts.
+
+Standardised handover package produced (**7 files**, no map deliverable — telesales), at exact
+path `/Users/homemac/Data/aspectlead-lead-production/handover/hassan-en1-en5/`:
+`Hassan_EN1-EN5_Representative_Master.xlsx`, `Hassan_EN1-EN5_SalesPro_New_Leads.csv`,
+`Hassan_EN1-EN5_Key_Accounts_Management_Review.xlsx`,
+`Hassan_EN1-EN5_Customer_Master_Exclusions_Audit.xlsx`,
+`Hassan_EN1-EN5_Lead_Production_Report.xlsx`, `Hassan_EN1-EN5_Field_Provenance.csv`, `README.md`.
+Representative-facing files verified to contain ordinary approved leads only (160 of 172 usable,
+zero overlap with key accounts/held/rejected/excluded).
+
+Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/hassan/combined-2026-07-25/EN1-EN5-TERRITORY-RECONCILIATION-REPORT.md`
+
+**Next territory (Haleema's EN6-EN11) requires separate owner authorisation.** No new branch
 created, no merge to `main`, no deployment.
