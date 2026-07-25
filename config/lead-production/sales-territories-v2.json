@@ -3,7 +3,10 @@
   "generatedAt": "2026-07-23T22:00:00Z",
   "supersedes": "territory-assignments-tonight.csv (the previous 22-representative table) - marked historical/inactive, not deleted",
   "totalRepresentatives": 13,
-  "totalDistricts": 112,
+  "totalDistricts": 111,
+  "corrections": [
+    "2026-07-25: Shahzaib's assignment corrected from HA6-HA10 (5 districts) to HA6-HA9 (4 districts). HA10 was not a real UK postcode district - the HA postcode area (Harrow) only spans HA0-HA9, confirmed against the pipeline's own authoritative postcode reference data (districtsInArea('HA') returns exactly HA0..HA9). The error was caught live: a discovery run for 'HA10' completed with genuinely 0 raw observations (Just Eat found nothing to query), which then correctly halted downstream enrichment (0 candidates). Verified this was the only invalid postcode district across all 13 representatives before correcting. See docs/10_BUGS_AND_FIXES.md and docs/11_ISSUES_LOG.md (ISS-0032)."
+  ],
   "terminology": {
     "postcodeArea": "The letter prefix of a postcode district, e.g. RM, KT, TW.",
     "postcodeDistrict": "One area + district number, e.g. RM1, KT4, TW14 - the unit this pipeline runs discovery/enrichment against.",
@@ -172,15 +175,14 @@
     {
       "representative": "Shahzaib",
       "role": "telesales",
-      "salesTerritory": "HA6\u2013HA10",
+      "salesTerritory": "HA6\u2013HA9",
       "postcodeDistricts": [
         "HA6",
         "HA7",
         "HA8",
-        "HA9",
-        "HA10"
+        "HA9"
       ],
-      "districtCount": 5,
+      "districtCount": 4,
       "mapsRequired": false
     },
     {

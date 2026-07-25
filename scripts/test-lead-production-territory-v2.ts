@@ -1,9 +1,15 @@
 // Fixture + real-config-driven proofs for Milestone 2 (district/Sales-Territory orchestration):
 // native sales-territories-v2.json loading, inclusive/non-contiguous range expansion,
-// representative-ownership validation across all 13 reps / 112 districts, cross-district
+// representative-ownership validation across all 13 reps / 111 districts, cross-district
 // dedup, per-district population invariant, territory status derivation, and one real
 // end-to-end request-plan-only smoke test of run-sales-territory.ts.
 // npm run test:lead-production-territory-v2
+//
+// ISS-0032 (2026-07-25): Shahzaib's config previously included "HA10", which is not a real UK
+// postcode district (Harrow's HA postcode area only spans HA0-HA9) - discovered live when a
+// discovery run for "HA10" genuinely returned 0 raw observations. Corrected to HA6-HA9 (4
+// districts). The "every postcode district resolves against the authoritative reference" test
+// below (added by this fix) guards against this class of error recurring for any representative.
 
 import { promises as fs } from "node:fs";
 import os from "node:os";
@@ -15,6 +21,16 @@ import {
   type SalesTerritoriesV2Config,
 } from "./lead-production/territory-assignment-v2";
 import { dedupeAcrossDistricts, checkDistrictInvariant, deriveTerritoryStatus, type DistrictCandidateForDedup } from "./lead-production/district-reconciliation";
+import { loadPostcodeReference } from "../src/lib/discovery-engine/geography/reference";
+
+async function loadDotEnv() {
+  for (const f of [".env.local", ".env"]) {
+    try {
+      const txt = await fs.readFile(path.resolve(process.cwd(), f), "utf8");
+      for (const line of txt.split(/\r?\n/)) { const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/); if (m && process.env[m[1]] === undefined) process.env[m[1]] = m[2].replace(/^["']|["']$/g, ""); }
+    } catch { /* absent */ }
+  }
+}
 
 let fails = 0;
 const assert = (c: boolean, m: string) => { if (!c) { console.error("  ✗", m); fails++; } else console.log("  ✓", m); };
@@ -23,18 +39,19 @@ const CONFIG_PATH = "config/lead-production/sales-territories-v2.json";
 
 const EXPECTED_COUNTS: Record<string, number> = {
   Nauman: 14, Manraj: 24, Ayesha: 10, Kunz: 10, Meer: 10, Naseh: 5, Saad: 6, Saif: 6,
-  Shahzaib: 5, Tahira: 5, Wajahat: 6, Hassan: 5, Haleema: 6,
+  Shahzaib: 4, Tahira: 5, Wajahat: 6, Hassan: 5, Haleema: 6,
 };
 const FIELD_SALES_REPS = new Set(["Nauman", "Manraj", "Ayesha"]);
 
 async function main() {
+  await loadDotEnv();
   console.log("Sales Territory v2 / district orchestration — fixture-driven proofs:\n");
 
   console.log("Native config loading and structural validation:");
   const config = await loadSalesTerritoriesV2(CONFIG_PATH);
   assert(config.assignmentVersion === "v2", "assignmentVersion is v2");
   assert(config.totalRepresentatives === 13, `totalRepresentatives === 13 (got ${config.totalRepresentatives})`);
-  assert(config.totalDistricts === 112, `totalDistricts === 112 (got ${config.totalDistricts})`);
+  assert(config.totalDistricts === 111, `totalDistricts === 111 (got ${config.totalDistricts})`);
   assert(config.representatives.length === 13, "exactly 13 representative entries present");
 
   console.log("\nPer-representative district counts, role, and map requirement (all 13):");
@@ -50,7 +67,7 @@ async function main() {
     assert(rep.mapsRequired === expectedMapsRequired, `${name}: mapsRequired === ${expectedMapsRequired}`);
   }
 
-  console.log("\nAll 112 Postcode Districts individually resolve to exactly the expected owner:");
+  console.log("\nAll 111 Postcode Districts individually resolve to exactly the expected owner:");
   let districtChecks = 0;
   for (const rep of config.representatives) {
     for (const district of rep.postcodeDistricts) {
@@ -59,9 +76,24 @@ async function main() {
       districtChecks++;
     }
   }
-  assert(districtChecks === 112, `checked all 112 districts individually (checked ${districtChecks})`);
+  assert(districtChecks === 111, `checked all 111 districts individually (checked ${districtChecks})`);
   const allDistrictsFlat = config.representatives.flatMap((r) => r.postcodeDistricts);
-  assert(new Set(allDistrictsFlat).size === 112, "112 unique Postcode Districts, no duplicates across the whole config");
+  assert(new Set(allDistrictsFlat).size === 111, "111 unique Postcode Districts, no duplicates across the whole config");
+
+  console.log("\nEvery configured Postcode District is a real, recognised entry in the authoritative");
+  console.log("postcode reference (ISS-0032 regression guard — catches a non-existent district like");
+  console.log("the previous \"HA10\" before it ever reaches a live discovery run):");
+  const postcodeRef = await loadPostcodeReference() as any;
+  let refChecks = 0;
+  for (const rep of config.representatives) {
+    for (const district of rep.postcodeDistricts) {
+      const entry = postcodeRef.entry?.(district);
+      assert(!!entry, `${rep.representative}'s district "${district}" is a real entry in the postcode reference`);
+      refChecks++;
+    }
+  }
+  assert(refChecks === 111, `checked all 111 districts against the postcode reference (checked ${refChecks})`);
+  assert(!postcodeRef.entry?.("HA10"), "HA10 itself is confirmed absent from the reference (the exact case this guard exists for)");
 
   console.log("\nSpecific assignment-spec cases:");
   const nauman = findRepresentative(config, "Nauman")!;
