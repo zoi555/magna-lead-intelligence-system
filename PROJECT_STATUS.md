@@ -788,9 +788,18 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   Evidence Register.
 - No new defect found. The handover package was built correctly from the start
   (`mapRequired=false` resolved from `sales-territories-v2.json`, no map file produced).
-- Standardised handover package produced:
-  `/Users/homemac/Data/aspectlead-lead-production/handover/naseh-ub1-ub5/` (6 files, no map
-  deliverable), representative-facing files verified to contain ordinary approved leads only,
+- Source calls (corrected, stated separately per district-cap type): Google — 190 live this
+  session (UB2-UB5: 50+68+65+7) + 83 reused/historical (UB1) = 273 combined total. Companies
+  House — 504 combined requests live this session (UB2-UB5: 146+178+170+10) + 185
+  reused/historical (UB1) = 689 combined total. No request exceeded its certified per-district
+  cap (Google 800, Companies House 600 combined / 250 documents) on any of the 5 districts.
+- Standardised handover package produced (**7 files**, not 6 — corrected from an earlier
+  miscount): `/Users/homemac/Data/aspectlead-lead-production/handover/naseh-ub1-ub5/`
+  (`Naseh_UB1-UB5_Representative_Master.xlsx`, `Naseh_UB1-UB5_SalesPro_New_Leads.csv`,
+  `Naseh_UB1-UB5_Key_Accounts_Management_Review.xlsx`,
+  `Naseh_UB1-UB5_Customer_Master_Exclusions_Audit.xlsx`,
+  `Naseh_UB1-UB5_Lead_Production_Report.xlsx`, `Naseh_UB1-UB5_Field_Provenance.csv`,
+  `README.md`), representative-facing files verified to contain ordinary approved leads only,
   zero leakage.
 - Representative Progress Register updated: Nauman, Manraj, Ayesha, Kunz, Meer, and Naseh now
   ACCEPTED (6/13 representatives complete).
@@ -799,6 +808,17 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   clean, `npm run build` succeeded.
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/naseh/combined-2026-07-25/UB1-UB5-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Documentation-only correction (2026-07-25, later):** the initial handover documentation
+  mislabelled the package as "6 files" (it is 7 — 6 substantive files + `README.md`, matching the
+  convention used for every other representative's package) and presented the source-call totals
+  in a malformed, ambiguous table cell (Companies House combined-request and document counts
+  concatenated as e.g. "185 (12 documents)" instead of stated separately). Underlying lead-data
+  totals were re-verified against the DB/exports and found already correct (no exporter or
+  reconciliation defect) — only the file-count label and the source-call table presentation were
+  wrong. Corrected in `UB1-UB5-TERRITORY-RECONCILIATION-REPORT.md`, the handover `README.md`, the
+  `Naseh_UB1-UB5_Lead_Production_Report.xlsx` (new "Source Calls Summary" sheet), and this
+  document; `REPRESENTATIVE_PROGRESS_REGISTER.xlsx`/`.csv` were checked and found already correct
+  (no change required). No code change — data-output and documentation only.
 - **Next task**: owner authorisation required before starting Saad's UB6-UB11 territory — same
   per-territory authorisation pattern. No new branch created, no merge to `main`, no deployment;
   all work remains on `feature/mvp-vertical-slice-001`.

@@ -646,10 +646,20 @@ No new defect found. The handover package was built correctly from the start via
 `sales-territories-v2.json`, no map file produced. No district hit the ISS-0030 HTTP/2 GOAWAY
 class or required the ISS-0031 evidence-completeness recovery procedure.
 
-Standardised handover package produced:
-`/Users/homemac/Data/aspectlead-lead-production/handover/naseh-ub1-ub5/` (6 files, no map
-deliverable — telesales). Representative-facing files verified to contain ordinary approved
-leads only (113 of 126 usable, zero overlap with key accounts/held/rejected/excluded).
+Source calls (corrected, stated separately per district-cap type): Google — 190 live this session
+(UB2-UB5) + 83 reused/historical (UB1) = 273 combined total. Companies House — 504 combined
+requests live this session (UB2-UB5) + 185 reused/historical (UB1) = 689 combined total. No
+request exceeded its certified per-district cap (Google 800, Companies House 600 combined / 250
+documents) on any of the 5 districts.
+
+Standardised handover package produced (**7 files**, no map deliverable — telesales), at exact
+path `/Users/homemac/Data/aspectlead-lead-production/handover/naseh-ub1-ub5/`:
+`Naseh_UB1-UB5_Representative_Master.xlsx`, `Naseh_UB1-UB5_SalesPro_New_Leads.csv`,
+`Naseh_UB1-UB5_Key_Accounts_Management_Review.xlsx`,
+`Naseh_UB1-UB5_Customer_Master_Exclusions_Audit.xlsx`,
+`Naseh_UB1-UB5_Lead_Production_Report.xlsx`, `Naseh_UB1-UB5_Field_Provenance.csv`, `README.md`.
+Representative-facing files verified to contain ordinary approved leads only (113 of 126 usable,
+zero overlap with key accounts/held/rejected/excluded).
 
 Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/naseh/combined-2026-07-25/UB1-UB5-TERRITORY-RECONCILIATION-REPORT.md`
 
