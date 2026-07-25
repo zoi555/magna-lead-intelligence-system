@@ -897,6 +897,56 @@ the owner supplied — all confirmed correct, no corrective commit made.
   clean, `npm run build` succeeded.
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/saif/combined-2026-07-25/HA0-HA5-TERRITORY-RECONCILIATION-REPORT.md`.
-- **Next task**: owner authorisation required before starting Shahzaib's HA6-HA10 territory —
-  same per-territory authorisation pattern. No new branch created, no merge to `main`, no
-  deployment; all work remains on `feature/mvp-vertical-slice-001`.
+- **Next task (superseded, see below)**: owner authorisation was required before starting
+  Shahzaib's HA6-HA10 territory — see the Shahzaib section below (territory corrected to HA6-HA9
+  during processing; see ISS-0032).
+
+### HA6-HA9 (Shahzaib's full Sales Territory, corrected from HA6-HA10) — live, accepted — 2026-07-25
+
+Preceded by a read-only verification of Saif's stored HA0-HA5 documentation (manifest,
+reconciliation report, Lead Production Report xlsx, progress register) against the exact figures
+the owner supplied — all confirmed correct, no corrective commit made.
+
+- **ISS-0032 found and fixed mid-territory**: "HA10", part of Shahzaib's originally-configured
+  "HA6-HA10" territory, is not a real UK postcode district (Harrow's HA postcode area only spans
+  HA0-HA9, confirmed against the pipeline's own authoritative postcode reference). A live
+  discovery run for "HA10" completed with genuinely 0 raw observations, cascading to 0 candidates
+  and a deliberate pipeline refusal — no data was corrupted. Root-caused and fixed at the config
+  level: `config/lead-production/sales-territories-v2.json` corrected to HA6-HA9 (4 districts,
+  was 5); `totalDistricts` corrected 112 → 111; commit `47dc384`. A permanent regression guard
+  was added to `scripts/test-lead-production-territory-v2.ts` validating every representative's
+  every configured Postcode District against the reference — confirmed all 111 remaining
+  districts (all 13 representatives) are valid, with HA10 confirmed absent. HA6, HA7, HA8, HA9 —
+  already live-processed and verified before this was found — required no rework.
+- All 4 real Postcode Districts (HA6-HA9) run live end-to-end, sequentially, each independently
+  DB-reconciled and zero-leakage-verified before proceeding to the next, using the fully-fixed
+  pipeline (map_required resolver, ISS-0030, ISS-0031 all already in place).
+- Territory totals: 3447 raw = 408 geography-valid + 3039 rejected (exact, every district). 341
+  candidates → 8 genuine cross-district duplicates removed → 333 unique. Permanent
+  `customer_master_exclusion` rule enforced: 28 exclusions found, zero leakage. Final: 161 usable
+  (101 premium, 60 releasable Level 1, 7 key accounts), 5 held for review, 105 hard-rejected, 34
+  excluded groups. Shahzaib's combined 107-field Master workbook and 108-column Sales Pro files
+  generated; all 189 exported Sales Pro Lead IDs verified present in the Master workbook's
+  Evidence Register.
+- Source calls (stated separately, all live this session): Google combined total 286
+  (38+23+108+117). Companies House combined total 692 (90+54+274+274), documents total 46
+  (2+4+20+20). No request exceeded its certified per-district cap (Google 800, Companies House
+  600 combined / 250 documents) on any of the 4 districts.
+- Standardised handover package produced (**7 files**):
+  `/Users/homemac/Data/aspectlead-lead-production/handover/shahzaib-ha6-ha9/`
+  (`Shahzaib_HA6-HA9_Representative_Master.xlsx`, `Shahzaib_HA6-HA9_SalesPro_New_Leads.csv`,
+  `Shahzaib_HA6-HA9_Key_Accounts_Management_Review.xlsx`,
+  `Shahzaib_HA6-HA9_Customer_Master_Exclusions_Audit.xlsx`,
+  `Shahzaib_HA6-HA9_Lead_Production_Report.xlsx`, `Shahzaib_HA6-HA9_Field_Provenance.csv`,
+  `README.md`), representative-facing files verified to contain ordinary approved leads only,
+  zero leakage.
+- Representative Progress Register updated: Nauman, Manraj, Ayesha, Kunz, Meer, Naseh, Saad,
+  Saif, and Shahzaib now ACCEPTED (9/13 representatives complete).
+- Full test/build gate re-run clean: `test-lead-production-territory-v2.ts` (including the new
+  ISS-0032 postcode-reference-validity guard), `test-discovery-run-recovery.ts`,
+  `test-map-required.ts` ALL PASSED, `npm run typecheck` clean, `npm run build` succeeded.
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/shahzaib/combined-2026-07-25/HA6-HA9-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task**: owner authorisation required before starting Tahira's WD3-WD7 territory — same
+  per-territory authorisation pattern. No new branch created, no merge to `main`, no deployment;
+  all work remains on `feature/mvp-vertical-slice-001`.

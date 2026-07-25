@@ -739,5 +739,53 @@ zero overlap with key accounts/held/rejected/excluded).
 
 Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/saif/combined-2026-07-25/HA0-HA5-TERRITORY-RECONCILIATION-REPORT.md`
 
-**Next territory (Shahzaib's HA6-HA10) requires separate owner authorisation.** No new branch
+## HA6-HA9 — Shahzaib's full Sales Territory, ACCEPTED (2026-07-25)
+
+**Correction notice (ISS-0032):** Shahzaib's Sales Territory was originally configured as
+"HA6-HA10" (5 Postcode Districts), but HA10 is not a real UK postcode district — the HA postcode
+area (Harrow) only spans HA0-HA9. Caught live: a discovery run for "HA10" completed with
+genuinely 0 raw observations, cascading to 0 candidates and a deliberate pipeline refusal — no
+data was corrupted. `config/lead-production/sales-territories-v2.json` was corrected to HA6-HA9
+(4 districts); `totalDistricts` corrected 112 → 111. A permanent regression guard was added to
+`scripts/test-lead-production-territory-v2.ts` that validates every representative's every
+configured Postcode District against the pipeline's authoritative postcode reference — confirmed
+all 111 remaining districts (all 13 representatives) are valid. HA6, HA7, HA8, and HA9 — already
+live-processed and verified before this was discovered — required no rework. Full detail:
+`docs/11_ISSUES_LOG.md` (ISS-0032), `docs/10_BUGS_AND_FIXES.md`.
+
+All 4 real Postcode Districts (HA6, HA7, HA8, HA9) run live end-to-end, sequentially, and
+individually accepted, using the fully-fixed pipeline (ISS-0030, ISS-0031, and the map_required
+resolver fix all already in place), with independent per-district DB reconciliation and
+zero-leakage verification before proceeding to the next district.
+
+Territory totals: 3447 raw = 408 geography-valid + 3039 rejected (exact, every district). 341 raw
+candidates -> **8 genuine cross-district duplicates removed -> 333 unique candidates** = 28
+customer-master exclusions + 34 excluded groups + 161 usable (101 premium, 60 releasable L1, 7 key
+accounts) + 5 held + 105 hard-rejected. All exported Sales Pro Lead IDs (154 new leads + 7 key
+accounts + 28 customer-master exclusions = 189 of 333 total candidates) verified present in the
+Master workbook's Evidence Register (189/189). Zero customer-master leakage into any
+rep-facing/Sales Pro output.
+
+No new lead-data or pipeline-code defect found. The handover package was built correctly from the
+start via the corrected `generate-representative-handover.ts` — `mapRequired=false` resolved from
+`sales-territories-v2.json`, no map file produced. No district hit the ISS-0030 HTTP/2 GOAWAY
+class or required the ISS-0031 evidence-completeness recovery procedure.
+
+Source calls (stated separately, all live this session): Google combined total 286
+(38+23+108+117). Companies House combined total 692 (90+54+274+274), documents total 46
+(2+4+20+20). No request exceeded its certified per-district cap (Google 800, Companies House 600
+combined / 250 documents) on any of the 4 districts.
+
+Standardised handover package produced (**7 files**, no map deliverable — telesales), at exact
+path `/Users/homemac/Data/aspectlead-lead-production/handover/shahzaib-ha6-ha9/`:
+`Shahzaib_HA6-HA9_Representative_Master.xlsx`, `Shahzaib_HA6-HA9_SalesPro_New_Leads.csv`,
+`Shahzaib_HA6-HA9_Key_Accounts_Management_Review.xlsx`,
+`Shahzaib_HA6-HA9_Customer_Master_Exclusions_Audit.xlsx`,
+`Shahzaib_HA6-HA9_Lead_Production_Report.xlsx`, `Shahzaib_HA6-HA9_Field_Provenance.csv`,
+`README.md`. Representative-facing files verified to contain ordinary approved leads only (154 of
+161 usable, zero overlap with key accounts/held/rejected/excluded).
+
+Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/shahzaib/combined-2026-07-25/HA6-HA9-TERRITORY-RECONCILIATION-REPORT.md`
+
+**Next territory (Tahira's WD3-WD7) requires separate owner authorisation.** No new branch
 created, no merge to `main`, no deployment.
