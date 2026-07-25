@@ -49,9 +49,13 @@ async function buildFixtureMasterWorkbook(dir: string, leadIds: string[]): Promi
   const masterPath = path.join(dir, "fixture-master-combined.xlsx");
   XLSX.writeFile(wb, masterPath);
 
-  const csvHeader = "Permanent Lead ID\n";
+  // Includes the approved 20 CTO columns (fixture only — real SalesPro CSVs always have all 108,
+  // of which these 20 are a prefix) so buildRepresentativeHandover's simplified-workbook builder,
+  // which requires them, can run against this fixture unchanged.
+  const CTO_COLUMNS = ["Shop Name", "Contact Person", "Email", "Phone", "Whatsapp", "Customer NetSuite Account Code", "Field Sales Rep", "Sales Rep", "Region/Route", "Postcode", "Inward Code", "Lead Contact Position/Designation", "Terms", "Business Types", "Ordering Days", "Pipeline Status/Stage", "Lead Type", "Lead Urgency", "Opening Hours", "Closing Hours"];
+  const csvHeader = ["Permanent Lead ID", ...CTO_COLUMNS].join(",") + "\n";
   const newLeadsCsv = path.join(dir, "fixture-salespro-new-leads.csv");
-  await fs.writeFile(newLeadsCsv, csvHeader + leadIds.map((id) => id).join("\n") + "\n");
+  await fs.writeFile(newLeadsCsv, csvHeader + leadIds.map((id) => [id, ...CTO_COLUMNS.map(() => "")].join(",")).join("\n") + "\n");
   const keyAccountsCsv = path.join(dir, "fixture-salespro-key-accounts.csv");
   await fs.writeFile(keyAccountsCsv, csvHeader);
 

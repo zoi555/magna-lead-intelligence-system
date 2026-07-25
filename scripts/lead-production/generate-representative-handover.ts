@@ -15,6 +15,39 @@
 import { promises as fs } from "node:fs";
 import * as XLSX from "xlsx";
 import { resolveMapRequired } from "./resolve-map-required";
+import { parseCsvObjects } from "./csv";
+
+// The approved CTO 20-field order (config/lead-production/cto-existing-field-mapping-v1.json),
+// with column 1 relabelled "Business Name" for the rep-facing simplified workbook — the CTO's
+// own approved label for that column remains "Shop Name" everywhere else (the CTO_Existing_Lead
+// _Form file, the Sales Pro export); this relabel exists only in this one rep-facing workbook.
+const SIMPLIFIED_WORKBOOK_SOURCE_COLUMNS = [
+  "Shop Name", "Contact Person", "Email", "Phone", "Whatsapp", "Customer NetSuite Account Code",
+  "Field Sales Rep", "Sales Rep", "Region/Route", "Postcode", "Inward Code",
+  "Lead Contact Position/Designation", "Terms", "Business Types", "Ordering Days",
+  "Pipeline Status/Stage", "Lead Type", "Lead Urgency", "Opening Hours", "Closing Hours",
+];
+const SIMPLIFIED_WORKBOOK_DISPLAY_LABELS: Record<string, string> = { "Shop Name": "Business Name" };
+
+/** Builds the simplified representative-facing workbook: the same approved 20 CTO fields, same
+ *  values, same row order as the CTO_Existing_Lead_Form CSV, but as a single-sheet .xlsx with
+ *  "Business Name" (not "Shop Name") as the first column — easier for a rep to browse than the
+ *  full 108-column Sales Pro CSV or the full 107-field Master workbook. */
+async function buildSimplifiedRepresentativeWorkbook(salesProNewLeadsPath: string, outPath: string): Promise<number> {
+  const { header, rows } = parseCsvObjects(await fs.readFile(salesProNewLeadsPath, "utf-8"));
+  const missing = SIMPLIFIED_WORKBOOK_SOURCE_COLUMNS.filter((c) => !header.includes(c));
+  if (missing.length) throw new Error(`buildSimplifiedRepresentativeWorkbook: source file ${salesProNewLeadsPath} is missing required column(s): ${missing.join(", ")}.`);
+  const outRows = rows.map((r) => {
+    const row: Record<string, string> = {};
+    for (const col of SIMPLIFIED_WORKBOOK_SOURCE_COLUMNS) row[SIMPLIFIED_WORKBOOK_DISPLAY_LABELS[col] ?? col] = r[col] ?? "";
+    return row;
+  });
+  const wb = XLSX.utils.book_new();
+  const columns = SIMPLIFIED_WORKBOOK_SOURCE_COLUMNS.map((c) => SIMPLIFIED_WORKBOOK_DISPLAY_LABELS[c] ?? c);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(outRows, { header: columns }), "Ordinary New Leads");
+  XLSX.writeFile(wb, outPath);
+  return outRows.length;
+}
 
 function arg(name: string): string | undefined {
   const p = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -50,6 +83,8 @@ export interface HandoverBuildResult {
   ordinaryLeadCount: number;
   keyAccountCount: number;
   customerExclusionCount: number;
+  simplifiedWorkbookRowCount: number;
+  commercialReviewExclusionCount: number;
   filesWritten: string[];
 }
 
@@ -61,6 +96,7 @@ export async function buildRepresentativeHandover(opts: {
   out: string;
   filePrefix: string;
   salesTerritoriesConfigPath?: string;
+  commercialReviewAuditPath?: string; // optional — only written when this territory had any commercial-review exclusion
 }): Promise<HandoverBuildResult> {
   const resolved = await resolveMapRequired(opts.representative, opts.salesTerritoriesConfigPath);
   await fs.mkdir(opts.out, { recursive: true });
@@ -109,6 +145,11 @@ export async function buildRepresentativeHandover(opts: {
   await fs.copyFile(opts.salesProNewLeadsPath, salesProOutPath);
   filesWritten.push(salesProOutPath);
 
+  // === Simplified representative-facing workbook (Business Name first column) ===
+  const simplifiedPath = `${opts.out}/${opts.filePrefix}_Simplified_Representative_Workbook.xlsx`;
+  const simplifiedWorkbookRowCount = await buildSimplifiedRepresentativeWorkbook(opts.salesProNewLeadsPath, simplifiedPath);
+  filesWritten.push(simplifiedPath);
+
   // === New Leads Map — ONLY when mapRequired is true. A telesales package never gets this
   // file, regardless of whether the underlying candidates have coordinates (they always do —
   // coordinates are Master-workbook evidence, not a channel-gated deliverable). ===
@@ -142,10 +183,26 @@ export async function buildRepresentativeHandover(opts: {
   XLSX.writeFile(ceWb, cePath);
   filesWritten.push(cePath);
 
+  // === Commercial Review Exclusions Audit (brand + pharmacy/chemist) — management-only,
+  // written only when this territory had at least one such exclusion. ===
+  let commercialReviewExclusionCount = 0;
+  if (opts.commercialReviewAuditPath) {
+    const exists = await fs.access(opts.commercialReviewAuditPath).then(() => true).catch(() => false);
+    if (exists) {
+      const { rows: auditRows } = parseCsvObjects(await fs.readFile(opts.commercialReviewAuditPath, "utf-8"));
+      commercialReviewExclusionCount = auditRows.length;
+      const crWb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(crWb, XLSX.utils.json_to_sheet(auditRows), "Commercial Review Exclusions");
+      const crPath = `${opts.out}/${opts.filePrefix}_Commercial_Review_Exclusions_Audit.xlsx`;
+      XLSX.writeFile(crWb, crPath);
+      filesWritten.push(crPath);
+    }
+  }
+
   return {
     representative: resolved.representative, role: resolved.role, mapRequired: resolved.mapRequired, mapFileProduced,
     ordinaryLeadCount: ordinaryLeads.length, keyAccountCount: keyAccountsSheet.length, customerExclusionCount: custExclSheet.length,
-    filesWritten,
+    simplifiedWorkbookRowCount, commercialReviewExclusionCount, filesWritten,
   };
 }
 
@@ -156,6 +213,7 @@ async function main() {
   const salesProKeyAccountsPath = arg("salespro-key-accounts");
   const out = arg("out");
   const filePrefix = arg("file-prefix");
+  const commercialReviewAuditPath = arg("commercial-review-audit");
   const missing = [
     !representative && "--representative=<name>", !masterWorkbookPath && "--master-workbook=<path>",
     !salesProNewLeadsPath && "--salespro-new-leads=<path>", !salesProKeyAccountsPath && "--salespro-key-accounts=<path>",
@@ -165,10 +223,10 @@ async function main() {
 
   const result = await buildRepresentativeHandover({
     representative: representative!, masterWorkbookPath: masterWorkbookPath!, salesProNewLeadsPath: salesProNewLeadsPath!,
-    salesProKeyAccountsPath: salesProKeyAccountsPath!, out: out!, filePrefix: filePrefix!,
+    salesProKeyAccountsPath: salesProKeyAccountsPath!, out: out!, filePrefix: filePrefix!, commercialReviewAuditPath,
   });
   console.log(`${result.representative} (${result.role}) — mapRequired=${result.mapRequired}, map file produced=${result.mapFileProduced}`);
-  console.log(`Ordinary leads: ${result.ordinaryLeadCount}, key accounts: ${result.keyAccountCount}, customer exclusions: ${result.customerExclusionCount}`);
+  console.log(`Ordinary leads: ${result.ordinaryLeadCount}, key accounts: ${result.keyAccountCount}, customer exclusions: ${result.customerExclusionCount}, commercial-review exclusions: ${result.commercialReviewExclusionCount}, simplified workbook rows: ${result.simplifiedWorkbookRowCount}`);
   console.log(`Files written:\n  ${result.filesWritten.join("\n  ")}`);
 }
 if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });

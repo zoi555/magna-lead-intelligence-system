@@ -62,6 +62,13 @@ export const RULES_VERSIONS = {
   // first-class output columns, adds the *-v2-authoritative-master.json full-detail dump, and
   // introduces the clean passed_*/failed_* hard-gate-reason label convention.
   outputSchemaVersion: "output-schema-v2-2026-07-23",
+
+  // config/lead-production/commercial-review-v1/ (load-commercial-review.ts, applied by
+  // commercial-review-filter.ts) — the approved brand keep/exclude registry (141 brands
+  // reviewed: 28 kept, 113 excluded as whole brands) plus the permanent pharmacy/chemist type
+  // exclusion. Added 2026-07-26, applied at export time against already-enriched evidence only
+  // — no discovery/enrichment re-run required to apply a new commercial-review version.
+  commercialReviewVersion: "commercial-review-v1",
 } as const;
 
 export type RulesVersions = typeof RULES_VERSIONS;
