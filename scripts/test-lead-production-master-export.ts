@@ -86,7 +86,7 @@ async function main() {
   assert(noScore.dataQualityGaps.includes("commercial_priority_score"), "the missing score is recorded as a data-quality gap, not silently dropped");
   assert(noScore.fields.final_lead_level === "Level 4", "final_lead_level is still populated (hard-gate failure always assigns level_4 even with no score) — only the score itself is genuinely absent");
 
-  console.log("\nEnd-to-end real UB1 checkpoint proof (109-column/13-tab, customer_master_exclusion rule applied): 107 fields, 13 tabs, reconciliation:");
+  console.log("\nEnd-to-end real UB1 checkpoint proof (107 fields, 14 tabs, customer_master_exclusion + commercial-review-v1 rules applied), reconciliation:");
   const D = "/Users/homemac/Data/aspectlead-lead-production/output/ub1";
   const V2_DIR = `${D}/2026-07-24T00-00-00Z-v2-customer-master-exclusion-reprocess`;
   const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "master-export-e2e-"));
@@ -103,25 +103,33 @@ async function main() {
   assert(combinedExists, "combined campaign workbook was written");
   if (combinedExists) {
     const wb = XLSX.readFile(combinedPath);
-    const EXPECTED_TABS = ["Operationally Usable Leads", "Premium Level 0", "Releasable Level 1", "Held-Review", "Hard Rejects", "Customer Master Exclusions", "Excluded Groups", "Key Accounts", "Representative Summary", "Territory Summary", "District Summary", "Evidence Register", "Run Manifest"];
-    assert(wb.SheetNames.length === 13, `combined workbook has exactly 13 tabs (got ${wb.SheetNames.length}: ${wb.SheetNames.join(", ")})`);
+    const EXPECTED_TABS = ["Operationally Usable Leads", "Premium Level 0", "Releasable Level 1", "Held-Review", "Hard Rejects", "Customer Master Exclusions", "Excluded Groups", "Commercial Review Exclusions", "Key Accounts", "Representative Summary", "Territory Summary", "District Summary", "Evidence Register", "Run Manifest"];
+    assert(wb.SheetNames.length === 14, `combined workbook has exactly 14 tabs (got ${wb.SheetNames.length}: ${wb.SheetNames.join(", ")})`);
     for (const tab of EXPECTED_TABS) assert(wb.SheetNames.includes(tab), `tab "${tab}" is present`);
     assert(!wb.SheetNames.includes("Active Customers") && !wb.SheetNames.includes("Reactivation"), "the old \"Active Customers\"/\"Reactivation\" tabs no longer exist — consolidated into \"Customer Master Exclusions\"");
+    // 2026-07-26: commercial-review-v1 brand exclusion removed 9 UB1 candidates from the usable
+    // population (Cake Shop, The Plough, Sambal Express, German Doner Kebab, Pizza Hut Delivery,
+    // Karak Chaii, Naan Staap, Amigos Burgers and Shakes, Tops Pizza — every one an exact or
+    // branch-name-variant match against an approved EXCLUDE brand, see
+    // commercial-review-exclusion-audit.csv). 6 of the 9 were previously usable (47 -> 41); the
+    // other 3 were already held/hard-rejected before this rule and are simply reclassified.
     const usableRows = XLSX.utils.sheet_to_json(wb.Sheets["Operationally Usable Leads"]) as any[];
-    assert(usableRows.length === 47, `Operationally Usable Leads has exactly 47 rows (got ${usableRows.length}) — unchanged by the rule change`);
+    assert(usableRows.length === 41, `Operationally Usable Leads has exactly 41 rows (got ${usableRows.length}) — down from 47 (6 commercial-review brand exclusions were previously usable)`);
     assert(usableRows.length > 0 && Object.keys(usableRows[0]).length === 107, `every usable row has exactly 107 fields (got ${Object.keys(usableRows[0] ?? {}).length})`);
     const premiumRows = XLSX.utils.sheet_to_json(wb.Sheets["Premium Level 0"]) as any[];
-    assert(premiumRows.length === 30, `Premium Level 0 has exactly 30 rows (got ${premiumRows.length})`);
+    assert(premiumRows.length === 26, `Premium Level 0 has exactly 26 rows (got ${premiumRows.length})`);
     const releasableRows = XLSX.utils.sheet_to_json(wb.Sheets["Releasable Level 1"]) as any[];
-    assert(releasableRows.length === 17, `Releasable Level 1 has exactly 17 rows (got ${releasableRows.length})`);
+    assert(releasableRows.length === 15, `Releasable Level 1 has exactly 15 rows (got ${releasableRows.length})`);
     const heldRows = XLSX.utils.sheet_to_json(wb.Sheets["Held-Review"]) as any[];
-    assert(heldRows.length === 6, `Held-Review has exactly 6 rows (got ${heldRows.length}) — down from 11 (5 were reclassified to confirmed customer_master_exclusion)`);
+    assert(heldRows.length === 5, `Held-Review has exactly 5 rows (got ${heldRows.length}) — down from 6 (1 commercial-review brand exclusion, Amigos Burgers and Shakes, was previously held)`);
     const exclusionRows = XLSX.utils.sheet_to_json(wb.Sheets["Customer Master Exclusions"]) as any[];
     assert(exclusionRows.length === 20, `Customer Master Exclusions has exactly 20 rows (got ${exclusionRows.length})`);
     const excludedRows = XLSX.utils.sheet_to_json(wb.Sheets["Excluded Groups"]) as any[];
+    const commercialReviewRows = XLSX.utils.sheet_to_json(wb.Sheets["Commercial Review Exclusions"]) as any[];
+    assert(commercialReviewRows.length === 9, `Commercial Review Exclusions has exactly 9 rows (got ${commercialReviewRows.length})`);
     const hardRejectRows = XLSX.utils.sheet_to_json(wb.Sheets["Hard Rejects"]) as any[];
-    const total = usableRows.length + heldRows.length + hardRejectRows.length + exclusionRows.length + excludedRows.length;
-    assert(total === 94, `all 13 tabs' mutually-exclusive buckets sum to exactly 94 total UB1 candidates (got ${total})`);
+    const total = usableRows.length + heldRows.length + hardRejectRows.length + exclusionRows.length + excludedRows.length + commercialReviewRows.length;
+    assert(total === 94, `all 14 tabs' mutually-exclusive buckets sum to exactly 94 total UB1 candidates (got ${total})`);
     const leadIdsInUsable = usableRows.map((r) => r["Permanent Lead ID"]);
     assert(leadIdsInUsable.every((id: string) => /^UB1-[0-9A-F]{8}$/.test(id)), "every usable row's Permanent Lead ID matches the required format");
     assert(new Set(leadIdsInUsable).size === leadIdsInUsable.length, "every usable row has a unique Permanent Lead ID");

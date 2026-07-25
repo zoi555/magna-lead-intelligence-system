@@ -20,6 +20,8 @@ import { loadCandidateDossiers, type Dossier } from "./candidate-dossier";
 import { resolveMasterFields, type MasterFieldContext } from "./master-field-resolver";
 import { dedupeAcrossDistricts, type DistrictCandidateForDedup } from "./district-reconciliation";
 import { writeCsv } from "./csv";
+import { loadCommercialReviewRegistry } from "./load-commercial-review";
+import { evaluateCommercialReviewExclusion } from "./commercial-review-filter";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
 async function readJson(p: string): Promise<any> { return JSON.parse(await fs.readFile(p, "utf8")); }
@@ -125,6 +127,10 @@ async function main() {
 
   console.log(`=== Magna Sales Pro exporter (108 columns) — ${representative} (${role}), ${salesTerritory}, ${districts.length} district(s) ===`);
 
+  const commercialReviewDir = arg("commercial-review-dir") ?? "config/lead-production/commercial-review-v1";
+  const commercialReviewRegistry = await loadCommercialReviewRegistry(commercialReviewDir);
+  console.log(`Commercial review registry: ${commercialReviewRegistry.version} (${commercialReviewRegistry.keepBrands.length} keep, ${commercialReviewRegistry.excludeBrands.length} exclude).`);
+
   const schema = await readJson("config/lead-production/salespro-schema-v1.json");
   const columns: SalesProColumn[] = schema.columns;
   if (columns.length !== 108) throw new Error(`Schema drift: expected 108 Sales Pro columns, got ${columns.length}. Refusing to export against a mismatched schema.`);
@@ -166,13 +172,42 @@ async function main() {
   const customerMasterExclusions = bundles.filter((b) => b.dossier.v1Bucket === "customer_master_exclusion");
   const excludedGroups = bundles.filter((b) => b.dossier.v1Bucket === "excluded_large_group");
   const excludedSet = new Set([...customerMasterExclusions, ...excludedGroups]);
-  const remaining = bundles.filter((b) => !excludedSet.has(b));
+  const afterExistingRules = bundles.filter((b) => !excludedSet.has(b));
+
+  // commercial-review-v1: approved whole-brand exclusions + permanent pharmacy/chemist
+  // exclusion, applied at export time against already-enriched evidence (no new discovery/
+  // enrichment call). Applied BEFORE the key-account split, so a key account matching an
+  // approved exclusion rule is also removed — "preserve key accounts as management-only unless
+  // separately excluded by an approved rule" (explicit requirement).
+  const commercialReviewAudit: { lead_id: string; representative: string; business_name: string; matched_rule: string; match_basis: string; previous_status: string; final_exclusion_status: string }[] = [];
+  const brandExcluded: typeof afterExistingRules = [];
+  const pharmacyChemistExcluded: typeof afterExistingRules = [];
+  for (const b of afterExistingRules) {
+    const result = evaluateCommercialReviewExclusion(b.dossier, commercialReviewRegistry);
+    if (!result.excluded) continue;
+    if (result.matchedRule === "brand_exclusion") brandExcluded.push(b); else pharmacyChemistExcluded.push(b);
+    commercialReviewAudit.push({
+      lead_id: b.leadId, representative: representative!, business_name: b.dossier.tradingName,
+      matched_rule: result.matchedRule!, match_basis: result.matchBasis ?? "",
+      previous_status: b.dossier.qualificationStatus, final_exclusion_status: result.matchedRule === "brand_exclusion" ? "excluded_brand_commercial_review" : "excluded_pharmacy_chemist",
+    });
+  }
+  const commercialReviewExcludedSet = new Set([...brandExcluded, ...pharmacyChemistExcluded]);
+  const remaining = afterExistingRules.filter((b) => !commercialReviewExcludedSet.has(b));
+
   const usable = remaining.filter((b) => b.dossier.qualificationStatus === "qualified" || b.dossier.qualificationStatus === "qualified_with_channel_limit");
   const keyAccounts = usable.filter((b) => b.fields.key_account_indicator === "Yes");
   const ordinaryNewLeads = usable.filter((b) => !keyAccounts.includes(b));
 
   console.log(`Ordinary new leads: ${ordinaryNewLeads.length}. Key accounts: ${keyAccounts.length}.`);
-  console.log(`Excluded from ordinary export: ${customerMasterExclusions.length} customer-master exclusions (audit-only), ${excludedGroups.length} excluded groups, ${remaining.length - usable.length} held/hard-rejected.`);
+  console.log(`Excluded from ordinary export: ${customerMasterExclusions.length} customer-master exclusions (audit-only), ${excludedGroups.length} excluded groups, ${brandExcluded.length} commercial-review brand exclusions, ${pharmacyChemistExcluded.length} pharmacy/chemist exclusions, ${remaining.length - usable.length} held/hard-rejected.`);
+
+  if (commercialReviewAudit.length) {
+    await fs.writeFile(path.join(outArg, `${territoryPrefix}-commercial-review-exclusion-audit.csv`), writeCsv(
+      ["lead_id", "representative", "business_name", "matched_rule", "match_basis", "previous_status", "final_exclusion_status"],
+      commercialReviewAudit,
+    ));
+  }
 
   const columnLabels = columns.map((c) => c.salesProFieldLabel);
   const violations: ValidationViolation[] = [];
@@ -190,8 +225,9 @@ async function main() {
   // Safety check: zero overlap between the ordinary new-lead file and the audit-only exclusions
   // file — a customer-master match must never reach a rep-facing/import file.
   const newLeadIds = new Set(ordinaryNewLeads.map((b) => b.dossier.candidateId));
-  const leaked = customerMasterExclusions.filter((b) => newLeadIds.has(b.dossier.candidateId));
-  if (leaked.length) throw new Error(`SAFETY FAILURE: ${leaked.length} customer-master-excluded candidate(s) also appear in the ordinary new-leads file: ${leaked.map((b) => b.dossier.candidateId).join(", ")}.`);
+  const keyAccountIds = new Set(keyAccounts.map((b) => b.dossier.candidateId));
+  const leaked = [...customerMasterExclusions, ...brandExcluded, ...pharmacyChemistExcluded].filter((b) => newLeadIds.has(b.dossier.candidateId) || keyAccountIds.has(b.dossier.candidateId));
+  if (leaked.length) throw new Error(`SAFETY FAILURE: ${leaked.length} excluded candidate(s) also appear in the ordinary new-leads or key-accounts file: ${leaked.map((b) => b.dossier.candidateId).join(", ")}.`);
 
   await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-new-leads.csv`), writeCsv(columnLabels, newLeadRows));
   // Audit-only — not one of the rep-facing/import categories. Representatives must not see or
@@ -216,6 +252,7 @@ async function main() {
     generatedAt: new Date().toISOString(), representative, role, salesTerritory, districts: districts.map((d) => d.district),
     totalCandidates: bundles.length, ordinaryNewLeads: ordinaryNewLeads.length, keyAccounts: keyAccounts.length,
     customerMasterExclusions: customerMasterExclusions.length, excludedGroups: excludedGroups.length, excludedHeldOrHardRejected: remaining.length - usable.length,
+    commercialReviewBrandExclusions: brandExcluded.length, pharmacyChemistExclusions: pharmacyChemistExcluded.length, commercialReviewVersion: commercialReviewRegistry.version,
     columnCount: columns.length, existingCtoFieldCount: existingCount, newFieldCount: newCount, dropdownViolations: 0,
     everyLeadIdAlsoInMaster: true, // by construction — same resolveMasterFields() call, same leadId formula
     reactivationRetired: true, // 2026-07-24 — reactivation is no longer an operational lead category

@@ -19,6 +19,8 @@ import { loadCandidateDossiers, type Dossier } from "./candidate-dossier";
 import { resolveMasterFields, type ResolvedMasterRow, type MasterFieldContext } from "./master-field-resolver";
 import { dedupeAcrossDistricts, type DistrictCandidateForDedup, type DuplicateCluster } from "./district-reconciliation";
 import { writeCsv } from "./csv";
+import { loadCommercialReviewRegistry, type CommercialReviewRegistry } from "./load-commercial-review";
+import { evaluateCommercialReviewExclusion } from "./commercial-review-filter";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
 async function readJson(p: string): Promise<any> { return JSON.parse(await fs.readFile(p, "utf8")); }
@@ -68,27 +70,58 @@ function addSheet(wb: XLSX.WorkBook, name: string, rows: Record<string, unknown>
   XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
 }
 
+interface CommercialReviewAuditRow extends Record<string, unknown> {
+  lead_id: string; representative: string; business_name: string; matched_rule: string;
+  match_basis: string; previous_status: string; final_exclusion_status: string;
+}
+
 interface Buckets {
   // 2026-07-24: customerMasterExclusions REPLACES the old activeCustomers + reactivation split —
   // any confirmed customer-master match, of ANY lifecycle status, is one unconditional audit-
   // only bucket. Reactivation is retired as an operational lead category.
   customerMasterExclusions: RowBundle[]; excludedGroups: RowBundle[];
+  // 2026-07-26: commercial-review-v1 — approved whole-brand exclusions (141 brands reviewed, 113
+  // excluded, 28 explicitly kept) and a permanent pharmacy/chemist type exclusion. Applied at
+  // export time against already-enriched evidence only (see commercial-review-filter.ts) — no
+  // new discovery/enrichment call is made for this rule.
+  brandExcluded: RowBundle[]; pharmacyChemistExcluded: RowBundle[];
   usable: RowBundle[]; premium: RowBundle[]; releasableL1: RowBundle[]; keyAccounts: RowBundle[];
   held: RowBundle[]; hardRejects: RowBundle[];
+  commercialReviewAudit: CommercialReviewAuditRow[];
 }
 
-function classify(rows: RowBundle[]): Buckets {
+function classify(rows: RowBundle[], registry: CommercialReviewRegistry, representative: string): Buckets {
   const customerMasterExclusions = rows.filter((r) => r.dossier.v1Bucket === "customer_master_exclusion");
   const excludedGroups = rows.filter((r) => r.dossier.v1Bucket === "excluded_large_group");
-  const removed = new Set([...customerMasterExclusions, ...excludedGroups]);
-  const remaining = rows.filter((r) => !removed.has(r));
+  const removedByExistingRules = new Set([...customerMasterExclusions, ...excludedGroups]);
+  const afterExistingRules = rows.filter((r) => !removedByExistingRules.has(r));
+
+  // Commercial-review brand/pharmacy exclusion is evaluated against every candidate not already
+  // removed by an existing rule (a candidate already excluded for another reason is left alone —
+  // it is never double-counted against this new rule).
+  const commercialReviewAudit: CommercialReviewAuditRow[] = [];
+  const brandExcluded: RowBundle[] = [];
+  const pharmacyChemistExcluded: RowBundle[] = [];
+  for (const r of afterExistingRules) {
+    const result = evaluateCommercialReviewExclusion(r.dossier, registry);
+    if (!result.excluded) continue;
+    if (result.matchedRule === "brand_exclusion") brandExcluded.push(r); else pharmacyChemistExcluded.push(r);
+    commercialReviewAudit.push({
+      lead_id: r.resolved.leadId, representative, business_name: r.dossier.tradingName,
+      matched_rule: result.matchedRule!, match_basis: result.matchBasis ?? "",
+      previous_status: r.dossier.qualificationStatus, final_exclusion_status: result.matchedRule === "brand_exclusion" ? "excluded_brand_commercial_review" : "excluded_pharmacy_chemist",
+    });
+  }
+  const removedByCommercialReview = new Set([...brandExcluded, ...pharmacyChemistExcluded]);
+  const remaining = afterExistingRules.filter((r) => !removedByCommercialReview.has(r));
+
   const usable = remaining.filter((r) => r.dossier.qualificationStatus === "qualified" || r.dossier.qualificationStatus === "qualified_with_channel_limit");
   const premium = usable.filter((r) => r.dossier.qualificationStatus === "qualified" && ((r.dossier.fields.commercial_score as number) ?? 0) >= 65);
   const releasableL1 = usable.filter((r) => !premium.includes(r));
   const keyAccounts = usable.filter((r) => r.resolved.fields.key_account_indicator === "Yes");
   const held = remaining.filter((r) => r.dossier.qualificationStatus === "held_for_customer_match_review");
   const hardRejects = remaining.filter((r) => r.dossier.qualificationStatus === "hard_rejected");
-  return { customerMasterExclusions, excludedGroups, usable, premium, releasableL1, keyAccounts, held, hardRejects };
+  return { customerMasterExclusions, excludedGroups, brandExcluded, pharmacyChemistExcluded, usable, premium, releasableL1, keyAccounts, held, hardRejects, commercialReviewAudit };
 }
 
 async function main() {
@@ -135,6 +168,10 @@ async function main() {
   if (!representative || !role || !salesTerritory) { console.error("Could not resolve representative/role/sales-territory."); process.exit(1); }
   console.log(`=== Master exporter (107 fields) — ${representative} (${role}), ${salesTerritory}, ${districts.length} district(s) ===`);
 
+  const commercialReviewDir = arg("commercial-review-dir") ?? "config/lead-production/commercial-review-v1";
+  const commercialReviewRegistry = await loadCommercialReviewRegistry(commercialReviewDir);
+  console.log(`Commercial review registry: ${commercialReviewRegistry.version} (${commercialReviewRegistry.keepBrands.length} keep, ${commercialReviewRegistry.excludeBrands.length} exclude).`);
+
   const schema = await loadMasterSchema();
   const { rows, duplicatesRemoved } = await loadAllRows(districts, (district) => ({ territory: district, representative: representative!, role: role!, salesTerritory: salesTerritory! }));
   if (duplicatesRemoved.length) {
@@ -146,18 +183,26 @@ async function main() {
   }
 
   // --- Reconciliation: every candidate must land in exactly one bucket. ---
-  const buckets = classify(rows);
-  const partitioned = [...buckets.customerMasterExclusions, ...buckets.excludedGroups, ...buckets.usable, ...buckets.held, ...buckets.hardRejects];
+  const buckets = classify(rows, commercialReviewRegistry, representative);
+  const partitioned = [...buckets.customerMasterExclusions, ...buckets.excludedGroups, ...buckets.brandExcluded, ...buckets.pharmacyChemistExcluded, ...buckets.usable, ...buckets.held, ...buckets.hardRejects];
   if (partitioned.length !== rows.length) throw new Error(`Reconciliation FAILED: ${rows.length} total candidates but only ${partitioned.length} landed in a Master export bucket. Refusing to write an incomplete export.`);
   const uniqueIds = new Set(partitioned.map((r) => r.dossier.candidateId));
   if (uniqueIds.size !== rows.length) throw new Error(`Reconciliation FAILED: candidate appears in more than one Master export bucket (${rows.length} rows, ${uniqueIds.size} unique candidate IDs).`);
-  console.log(`Reconciliation: ${rows.length} total = ${buckets.customerMasterExclusions.length} customer-master exclusions + ${buckets.excludedGroups.length} excluded groups + ${buckets.usable.length} usable + ${buckets.held.length} held + ${buckets.hardRejects.length} hard-rejected. Zero overlap. ✓`);
-  // Safety check: no customer-master-excluded or excluded-group candidate may ever appear in a
-  // rep-facing bucket (usable/premium/releasableL1/held/keyAccounts) — enforced by construction
-  // above (removed before usable/held are even computed), reverified here defensively.
+  console.log(`Reconciliation: ${rows.length} total = ${buckets.customerMasterExclusions.length} customer-master exclusions + ${buckets.excludedGroups.length} excluded groups + ${buckets.brandExcluded.length} commercial-review brand exclusions + ${buckets.pharmacyChemistExcluded.length} pharmacy/chemist exclusions + ${buckets.usable.length} usable + ${buckets.held.length} held + ${buckets.hardRejects.length} hard-rejected. Zero overlap. ✓`);
+  // Safety check: no customer-master-excluded, excluded-group, or commercial-review-excluded
+  // candidate may ever appear in a rep-facing bucket (usable/premium/releasableL1/held/
+  // keyAccounts) — enforced by construction above (removed before usable/held are even
+  // computed), reverified here defensively.
   const repFacingIds = new Set([...buckets.usable, ...buckets.held, ...buckets.keyAccounts].map((r) => r.dossier.candidateId));
-  const leakedExclusions = [...buckets.customerMasterExclusions, ...buckets.excludedGroups].filter((r) => repFacingIds.has(r.dossier.candidateId));
-  if (leakedExclusions.length) throw new Error(`SAFETY FAILURE: ${leakedExclusions.length} customer-master-excluded/excluded-group candidate(s) also appear in a rep-facing bucket: ${leakedExclusions.map((r) => r.dossier.candidateId).join(", ")}.`);
+  const leakedExclusions = [...buckets.customerMasterExclusions, ...buckets.excludedGroups, ...buckets.brandExcluded, ...buckets.pharmacyChemistExcluded].filter((r) => repFacingIds.has(r.dossier.candidateId));
+  if (leakedExclusions.length) throw new Error(`SAFETY FAILURE: ${leakedExclusions.length} excluded candidate(s) also appear in a rep-facing bucket: ${leakedExclusions.map((r) => r.dossier.candidateId).join(", ")}.`);
+
+  if (buckets.commercialReviewAudit.length) {
+    await fs.writeFile(path.join(outArg, "commercial-review-exclusion-audit.csv"), writeCsv(
+      ["lead_id", "representative", "business_name", "matched_rule", "match_basis", "previous_status", "final_exclusion_status"],
+      buckets.commercialReviewAudit,
+    ));
+  }
 
   // --- Data-quality gap report (never silent) ---
   const gapRows = rows.filter((r) => r.resolved.dataQualityGaps.length > 0);
@@ -181,9 +226,10 @@ async function main() {
   addSheet(combinedWb, "Hard Rejects", rowsFor(buckets.hardRejects));
   addSheet(combinedWb, "Customer Master Exclusions", rowsFor(buckets.customerMasterExclusions));
   addSheet(combinedWb, "Excluded Groups", rowsFor(buckets.excludedGroups));
+  addSheet(combinedWb, "Commercial Review Exclusions", rowsFor([...buckets.brandExcluded, ...buckets.pharmacyChemistExcluded]));
   addSheet(combinedWb, "Key Accounts", rowsFor(buckets.keyAccounts));
 
-  const repSummaryRows = [{ Representative: representative, Role: role === "field_sales" ? "Field Sales" : "Telesales", "Sales Territory": salesTerritory, "Districts Included": districts.map((d) => d.district).join(", "), "Total Candidates": rows.length, Usable: buckets.usable.length, "Premium Level 0": buckets.premium.length, "Releasable Level 1": buckets.releasableL1.length, "Key Accounts": buckets.keyAccounts.length, "Held/Review": buckets.held.length, "Hard Rejects": buckets.hardRejects.length, "Customer Master Exclusions": buckets.customerMasterExclusions.length, "Excluded Groups": buckets.excludedGroups.length }];
+  const repSummaryRows = [{ Representative: representative, Role: role === "field_sales" ? "Field Sales" : "Telesales", "Sales Territory": salesTerritory, "Districts Included": districts.map((d) => d.district).join(", "), "Total Candidates": rows.length, Usable: buckets.usable.length, "Premium Level 0": buckets.premium.length, "Releasable Level 1": buckets.releasableL1.length, "Key Accounts": buckets.keyAccounts.length, "Held/Review": buckets.held.length, "Hard Rejects": buckets.hardRejects.length, "Customer Master Exclusions": buckets.customerMasterExclusions.length, "Excluded Groups": buckets.excludedGroups.length, "Commercial Review Brand Exclusions": buckets.brandExcluded.length, "Pharmacy/Chemist Exclusions": buckets.pharmacyChemistExcluded.length }];
   addSheet(combinedWb, "Representative Summary", repSummaryRows);
   addSheet(combinedWb, "Territory Summary", [{ "Sales Territory": salesTerritory, Representative: representative, "District Count": districts.length, "Total Candidates": rows.length }]);
 
@@ -227,7 +273,7 @@ async function main() {
 
   console.log(`\nCombined workbook: ${combinedPath}`);
   console.log(`Representative workbook: ${repPath}`);
-  console.log(`Usable: ${buckets.usable.length} (${buckets.premium.length} premium, ${buckets.releasableL1.length} releasable-L1, ${buckets.keyAccounts.length} key accounts). Held: ${buckets.held.length}. Hard-rejected: ${buckets.hardRejects.length}. Customer master exclusions: ${buckets.customerMasterExclusions.length}. Excluded groups: ${buckets.excludedGroups.length}.`);
+  console.log(`Usable: ${buckets.usable.length} (${buckets.premium.length} premium, ${buckets.releasableL1.length} releasable-L1, ${buckets.keyAccounts.length} key accounts). Held: ${buckets.held.length}. Hard-rejected: ${buckets.hardRejects.length}. Customer master exclusions: ${buckets.customerMasterExclusions.length}. Excluded groups: ${buckets.excludedGroups.length}. Commercial-review brand exclusions: ${buckets.brandExcluded.length}. Pharmacy/chemist exclusions: ${buckets.pharmacyChemistExcluded.length}.`);
   process.exit(0);
 }
 main().catch((e) => { console.error(e); process.exit(1); });
