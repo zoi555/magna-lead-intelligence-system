@@ -15,6 +15,7 @@ const MEER_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/meer-t
 const NASEH_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/naseh-ub1-ub5";
 const SAAD_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/saad-ub6-ub11";
 const SAIF_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/saif-ha0-ha5";
+const SHAHZAIB_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/shahzaib-ha6-ha9";
 
 const REPRESENTATIVES = [
   {
@@ -116,7 +117,19 @@ const REPRESENTATIVES = [
     schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
     lastUpdated: "2026-07-25", nextAction: "None — territory complete, handed over, awaiting no further action.",
   },
-  { representative: "Shahzaib", role: "telesales", salesTerritory: "HA6-HA10", totalDistricts: 5, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 5, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
+  {
+    representative: "Shahzaib", role: "telesales", salesTerritory: "HA6-HA9",
+    totalDistricts: 4, districtsCompleted: 4, districtsHeld: 0, districtsRemaining: 0,
+    territoryStatus: "ACCEPTED", usable: 161, ordinaryNewLeads: 154, keyAccounts: 7,
+    customerExclusions: 28, groupExclusions: 34, held: 5, hardRejected: 105,
+    masterFilePath: `${SHAHZAIB_DIR}/Shahzaib_HA6-HA9_Representative_Master.xlsx`,
+    salesProFilePath: `${SHAHZAIB_DIR}/Shahzaib_HA6-HA9_SalesPro_New_Leads.csv`,
+    mapPath: "n/a (telesales — mapRequired=false, resolved from sales-territories-v2.json; no map file produced or referenced)",
+    reportPath: `${SHAHZAIB_DIR}/Shahzaib_HA6-HA9_Lead_Production_Report.xlsx`,
+    latestCommit: "47dc384 (ISS-0032 config fix — HA10 removed, territory corrected to HA6-HA9, 4 districts, applied before this territory was combined)",
+    schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
+    lastUpdated: "2026-07-25", nextAction: "None — territory complete, handed over, awaiting no further action.",
+  },
   { representative: "Tahira", role: "telesales", salesTerritory: "WD3-WD7", totalDistricts: 5, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 5, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
   { representative: "Wajahat", role: "telesales", salesTerritory: "WD17, WD18, WD19, WD23, WD24, WD25", totalDistricts: 6, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 6, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
   { representative: "Hassan", role: "telesales", salesTerritory: "EN1-EN5", totalDistricts: 5, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 5, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation. (--request-plan-only smoke test only, no live discovery.)" },

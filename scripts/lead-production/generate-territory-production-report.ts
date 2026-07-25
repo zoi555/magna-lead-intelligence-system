@@ -191,7 +191,31 @@ const SAIF_SOURCE_CALLS = [
 const SAIF_DEFECTS: string[][] = [];
 const SAIF_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during HA0-HA5 processing — all 6 districts processed fully live, sequentially, using the fully-fixed pipeline (map_required resolver, ISS-0030, ISS-0031 all already in place). Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
 
+const SHAHZAIB_DISTRICTS = [
+  ["HA6", 646, 53, 593, 46, 20, 14, 6, 0, 1, 19, 2, 4],
+  ["HA7", 875, 29, 846, 27, 16, 10, 6, 1, 0, 5, 2, 4],
+  ["HA8", 942, 150, 792, 126, 62, 39, 23, 3, 2, 40, 11, 11],
+  ["HA9", 984, 176, 808, 142, 65, 39, 26, 3, 2, 46, 14, 15],
+];
+const SHAHZAIB_SOURCE_CALLS = [
+  ["HA6", 38, 90], ["HA7", 23, 54], ["HA8", 108, 274], ["HA9", 117, 274],
+];
+const SHAHZAIB_DEFECTS: string[][] = [
+  ["1", "config/lead-production/sales-territories-v2.json assigned Shahzaib the Sales Territory \"HA6-HA10\" (5 Postcode Districts), but HA10 is not a real UK postcode district — the HA postcode area (Harrow) only spans HA0-HA9, confirmed against the pipeline's own authoritative postcode reference (loadPostcodeReference()). Nothing validated a configured Postcode District against the reference before treating it as a live query unit.", "config/lead-production/sales-territories-v2.json (assignment data, not pipeline logic)", "Caught live: a discovery run for \"HA10\" completed with genuinely 0 raw observations, cascading to 0 candidates and a deliberate pipeline refusal at the Google stage — no data was corrupted. Corrected Shahzaib's territory to HA6-HA9 (4 districts, was 5); totalDistricts corrected 112->111. Added a regression guard to test-lead-production-territory-v2.ts that resolves every representative's every configured Postcode District against the reference and asserts it exists — confirmed all 111 remaining districts (all 13 representatives) are valid. HA6-HA9's already-completed live data required no rework.", "47dc384"],
+];
+const SHAHZAIB_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED, including the new ISS-0032 postcode-reference-validity regression guard (111/111 districts confirmed valid, HA10 confirmed absent). test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
+
 const TERRITORIES: Record<string, any> = {
+  shahzaib: {
+    representative: "Shahzaib", role: "Telesales", salesTerritory: "HA6-HA9", filePrefix: "Shahzaib_HA6-HA9",
+    districts: SHAHZAIB_DISTRICTS, sourceCalls: SHAHZAIB_SOURCE_CALLS, defects: SHAHZAIB_DEFECTS, tests: SHAHZAIB_TESTS,
+    totalRaw: 3447, totalValid: 408, totalRejected: 3039, totalCandidates: 341, duplicatesRemoved: 8, uniqueCandidates: 333,
+    usable: 161, premium: 101, releasableL1: 60, keyAccounts: 7, held: 5, hardRejected: 105, customerExclusions: 28, excludedGroups: 34,
+    salesProNewLeads: 154, salesProKeyAccounts: 7, salesProCustExclusions: 28,
+    commitSha: "47dc384 (ISS-0032 config fix — HA10 removed, territory corrected to HA6-HA9, applied before this territory was combined)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
+    handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/shahzaib-ha6-ha9",
+    territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/shahzaib/combined-2026-07-25/HA6-HA9-TERRITORY-RECONCILIATION-REPORT.md",
+  },
   saif: {
     representative: "Saif", role: "Telesales", salesTerritory: "HA0-HA5", filePrefix: "Saif_HA0-HA5",
     districts: SAIF_DISTRICTS, sourceCalls: SAIF_SOURCE_CALLS, defects: SAIF_DEFECTS, tests: SAIF_TESTS,
