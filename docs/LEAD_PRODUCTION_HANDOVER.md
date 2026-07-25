@@ -622,5 +622,36 @@ leads only (168 of 178 usable, zero overlap with key accounts/held/rejected/excl
 
 Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/meer/combined-2026-07-24/TW11-TW20-TERRITORY-RECONCILIATION-REPORT.md`
 
-**Next territory (UB2-UB5, part of Naseh's UB1-UB5 territory) requires separate owner
-authorisation.** No new branch created, no merge to `main`, no deployment.
+## UB1-UB5 — Naseh's full Sales Territory, ACCEPTED (2026-07-25)
+
+UB1 was reused from the accepted 2026-07-24 customer-master-exclusion-reprocess checkpoint after
+independently verifying compatibility (byte-exact customer-master SHA256, byte-exact group-registry
+MD5, rules version `v2`, and a direct DB re-verification of UB1's geography reconciliation) — zero
+new live discovery or enrichment calls made for UB1 this session. UB2, UB3, UB4, UB5 were each
+processed fully live, sequentially, using the fully-fixed pipeline (ISS-0030, ISS-0031, and the
+map_required resolver fix all already in place — no new code changes were needed), with independent
+per-district DB reconciliation and zero-leakage verification before proceeding to the next district.
+
+Territory totals: 4246 raw = 402 geography-valid + 3844 rejected (exact, every district — UB1
+verified against retained DB evidence, UB2-UB5 verified live). 322 raw candidates -> **9 genuine
+cross-district duplicates removed -> 313 unique candidates** = 71 customer-master exclusions + 25
+excluded groups + 126 usable (89 premium, 37 releasable L1, 13 key accounts) + 17 held + 74
+hard-rejected. All exported Sales Pro Lead IDs (113 new leads + 13 key accounts + 71
+customer-master exclusions = 197 of 313 total candidates) verified present in the Master
+workbook's Evidence Register (197/197). Zero customer-master leakage into any rep-facing/Sales
+Pro output.
+
+No new defect found. The handover package was built correctly from the start via the corrected
+`generate-representative-handover.ts` — `mapRequired=false` resolved from
+`sales-territories-v2.json`, no map file produced. No district hit the ISS-0030 HTTP/2 GOAWAY
+class or required the ISS-0031 evidence-completeness recovery procedure.
+
+Standardised handover package produced:
+`/Users/homemac/Data/aspectlead-lead-production/handover/naseh-ub1-ub5/` (6 files, no map
+deliverable — telesales). Representative-facing files verified to contain ordinary approved
+leads only (113 of 126 usable, zero overlap with key accounts/held/rejected/excluded).
+
+Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/naseh/combined-2026-07-25/UB1-UB5-TERRITORY-RECONCILIATION-REPORT.md`
+
+**Next territory (Saad's UB6-UB11) requires separate owner authorisation.** No new branch
+created, no merge to `main`, no deployment.

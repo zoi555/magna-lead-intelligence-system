@@ -16,8 +16,14 @@ branches — do not confuse a commit SHA with a branch name anywhere in this doc
 ## Current state at time of audit
 
 - **Active branch:** `feature/mvp-vertical-slice-001`
-- **Local HEAD:** `e6f1b68` (123 commits ahead of `main`)
+- **Local HEAD:** `e6f1b68` (123 commits ahead of `main`, before this update)
 - **Remote HEAD (`origin/feature/mvp-vertical-slice-001`):** kept in sync — fully pushed after every commit this session
+- **Update 2026-07-25 (later still):** Naseh's full Sales Territory (UB1-UB5, 5 Postcode
+  Districts) processed and accepted on this same branch — UB1 reused from the accepted
+  2026-07-24 customer-master-exclusion-reprocess checkpoint after independently verifying hash
+  compatibility (zero new live calls for UB1), UB2-UB5 processed live end-to-end. No new code
+  changes were needed (map_required fix and ISS-0030/ISS-0031 fixes already in place). No new
+  branch created, no merge to `main`. See `docs/LEAD_PRODUCTION_HANDOVER.md` for full detail.
 - **Update 2026-07-25:** map_required resolver fix (commit `a8f94b4`) applied and Kunz's
   TW1-TW10 package corrected retroactively from existing evidence; Meer's full Sales Territory
   (TW11-TW20, 10 Postcode Districts) processed live end-to-end and accepted on this same branch,

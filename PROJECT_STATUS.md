@@ -762,7 +762,43 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   clean, `npm run build` succeeded.
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/meer/combined-2026-07-24/TW11-TW20-TERRITORY-RECONCILIATION-REPORT.md`.
-- **Next task**: owner authorisation required before starting UB2-UB5 (continuing Naseh's
-  UB1-UB5 territory, UB1 already complete) — same per-territory authorisation pattern. No new
-  branch created, no merge to `main`, no deployment; all work remains on
-  `feature/mvp-vertical-slice-001`.
+- **Next task (superseded, see below)**: owner authorisation was required before starting
+  UB2-UB5 — see the Naseh section below.
+
+### UB1-UB5 (Naseh's full Sales Territory) — live/reused, accepted — 2026-07-25
+
+- UB1 reused from the accepted 2026-07-24 customer-master-exclusion-reprocess checkpoint after
+  independently verifying compatibility (byte-exact customer-master SHA256, byte-exact
+  group-registry MD5, rules version `v2`, and a direct DB re-verification of UB1's geography
+  reconciliation — 646 candidates, 94 correctly carrying `geography_status='valid_geography'`,
+  confirmed as the expected post-fix state of an already-resolved historical defect, not a new
+  problem). A synthetic `.orchestrator-run-manifest.json` was built from UB1's existing immutable
+  checkpoints so it could join the standard combination pipeline. Zero new live discovery or
+  enrichment calls made for UB1 this session.
+- UB2, UB3, UB4, UB5 each processed fully live, sequentially, using the fully-fixed pipeline
+  (ISS-0030, ISS-0031, map_required resolver fix all already in place — no new code changes
+  needed), each independently DB-reconciled and zero-leakage-verified before proceeding to the
+  next district.
+- Territory totals: 4246 raw = 402 geography-valid + 3844 rejected (exact, every district). 322
+  candidates → 9 genuine cross-district duplicates removed → 313 unique. Permanent
+  `customer_master_exclusion` rule enforced: 71 exclusions found, zero leakage. Final: 126 usable
+  (89 premium, 37 releasable Level 1, 13 key accounts), 17 held for review, 74 hard-rejected, 25
+  excluded groups. Naseh's combined 107-field Master workbook and 108-column Sales Pro files
+  generated; all 197 exported Sales Pro Lead IDs verified present in the Master workbook's
+  Evidence Register.
+- No new defect found. The handover package was built correctly from the start
+  (`mapRequired=false` resolved from `sales-territories-v2.json`, no map file produced).
+- Standardised handover package produced:
+  `/Users/homemac/Data/aspectlead-lead-production/handover/naseh-ub1-ub5/` (6 files, no map
+  deliverable), representative-facing files verified to contain ordinary approved leads only,
+  zero leakage.
+- Representative Progress Register updated: Nauman, Manraj, Ayesha, Kunz, Meer, and Naseh now
+  ACCEPTED (6/13 representatives complete).
+- Full test/build gate re-run clean: `test-lead-production-territory-v2.ts`,
+  `test-discovery-run-recovery.ts`, `test-map-required.ts` ALL PASSED, `npm run typecheck`
+  clean, `npm run build` succeeded.
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/naseh/combined-2026-07-25/UB1-UB5-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task**: owner authorisation required before starting Saad's UB6-UB11 territory — same
+  per-territory authorisation pattern. No new branch created, no merge to `main`, no deployment;
+  all work remains on `feature/mvp-vertical-slice-001`.
