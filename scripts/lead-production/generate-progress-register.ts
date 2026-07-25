@@ -14,6 +14,7 @@ const KUNZ_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/kunz-t
 const MEER_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/meer-tw11-tw20";
 const NASEH_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/naseh-ub1-ub5";
 const SAAD_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/saad-ub6-ub11";
+const SAIF_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/saif-ha0-ha5";
 
 const REPRESENTATIVES = [
   {
@@ -102,7 +103,19 @@ const REPRESENTATIVES = [
     schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
     lastUpdated: "2026-07-25", nextAction: "None — territory complete, handed over, awaiting no further action.",
   },
-  { representative: "Saif", role: "telesales", salesTerritory: "HA0-HA5", totalDistricts: 6, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 6, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
+  {
+    representative: "Saif", role: "telesales", salesTerritory: "HA0-HA5",
+    totalDistricts: 6, districtsCompleted: 6, districtsHeld: 0, districtsRemaining: 0,
+    territoryStatus: "ACCEPTED", usable: 329, ordinaryNewLeads: 304, keyAccounts: 25,
+    customerExclusions: 46, groupExclusions: 50, held: 22, hardRejected: 257,
+    masterFilePath: `${SAIF_DIR}/Saif_HA0-HA5_Representative_Master.xlsx`,
+    salesProFilePath: `${SAIF_DIR}/Saif_HA0-HA5_SalesPro_New_Leads.csv`,
+    mapPath: "n/a (telesales — mapRequired=false, resolved from sales-territories-v2.json; no map file produced or referenced)",
+    reportPath: `${SAIF_DIR}/Saif_HA0-HA5_Lead_Production_Report.xlsx`,
+    latestCommit: "e339c95 (no new pipeline code required for HA0-HA5 — map_required fix and ISS-0030/ISS-0031 fixes already in place; all 6 districts processed live)",
+    schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
+    lastUpdated: "2026-07-25", nextAction: "None — territory complete, handed over, awaiting no further action.",
+  },
   { representative: "Shahzaib", role: "telesales", salesTerritory: "HA6-HA10", totalDistricts: 5, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 5, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
   { representative: "Tahira", role: "telesales", salesTerritory: "WD3-WD7", totalDistricts: 5, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 5, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
   { representative: "Wajahat", role: "telesales", salesTerritory: "WD17, WD18, WD19, WD23, WD24, WD25", totalDistricts: 6, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 6, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },

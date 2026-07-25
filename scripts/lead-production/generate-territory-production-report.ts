@@ -177,7 +177,31 @@ const SAAD_SOURCE_CALLS = [
 const SAAD_DEFECTS: string[][] = [];
 const SAAD_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during UB6-UB11 processing — all 6 districts processed fully live, sequentially, using the fully-fixed pipeline (map_required resolver, ISS-0030, ISS-0031 all already in place). Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
 
+const SAIF_DISTRICTS = [
+  ["HA0", 917, 146, 771, 127, 52, 29, 23, 4, 4, 55, 13, 3],
+  ["HA1", 974, 166, 808, 141, 69, 46, 23, 10, 2, 49, 8, 13],
+  ["HA2", 926, 158, 768, 132, 63, 46, 17, 1, 4, 49, 12, 4],
+  ["HA3", 971, 174, 797, 149, 70, 46, 24, 5, 7, 53, 6, 13],
+  ["HA4", 774, 110, 664, 90, 44, 30, 14, 3, 3, 29, 4, 10],
+  ["HA5", 830, 119, 711, 95, 39, 30, 9, 2, 5, 38, 6, 7],
+];
+const SAIF_SOURCE_CALLS = [
+  ["HA0", 120, 250], ["HA1", 122, 337], ["HA2", 124, 290], ["HA3", 130, 328], ["HA4", 76, 174], ["HA5", 79, 177],
+];
+const SAIF_DEFECTS: string[][] = [];
+const SAIF_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during HA0-HA5 processing — all 6 districts processed fully live, sequentially, using the fully-fixed pipeline (map_required resolver, ISS-0030, ISS-0031 all already in place). Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
+
 const TERRITORIES: Record<string, any> = {
+  saif: {
+    representative: "Saif", role: "Telesales", salesTerritory: "HA0-HA5", filePrefix: "Saif_HA0-HA5",
+    districts: SAIF_DISTRICTS, sourceCalls: SAIF_SOURCE_CALLS, defects: SAIF_DEFECTS, tests: SAIF_TESTS,
+    totalRaw: 5392, totalValid: 873, totalRejected: 4519, totalCandidates: 734, duplicatesRemoved: 30, uniqueCandidates: 704,
+    usable: 329, premium: 223, releasableL1: 106, keyAccounts: 25, held: 22, hardRejected: 257, customerExclusions: 46, excludedGroups: 50,
+    salesProNewLeads: 304, salesProKeyAccounts: 25, salesProCustExclusions: 46,
+    commitSha: "e339c95 (no new pipeline code required for HA0-HA5 processing — map_required fix and ISS-0030/ISS-0031 fixes already in place)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
+    handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/saif-ha0-ha5",
+    territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/saif/combined-2026-07-25/HA0-HA5-TERRITORY-RECONCILIATION-REPORT.md",
+  },
   saad: {
     representative: "Saad", role: "Telesales", salesTerritory: "UB6-UB11", filePrefix: "Saad_UB6-UB11",
     districts: SAAD_DISTRICTS, sourceCalls: SAAD_SOURCE_CALLS, defects: SAAD_DEFECTS, tests: SAAD_TESTS,
