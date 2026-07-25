@@ -245,7 +245,31 @@ const HASSAN_SOURCE_CALLS = [
 const HASSAN_DEFECTS: string[][] = [];
 const HASSAN_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED (including the ISS-0032 postcode-reference-validity guard, 111/111 districts confirmed valid). test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during EN1-EN5 processing. EN4's discovery run failed transiently (HTTP/2 stream timeout during provenance write) with the query fully complete (460 raw observations retained, 0 failed queries); recovered via the certified ISS-0031 --resume-from procedure (geography validation + consolidation resumed from retained raw evidence, zero new Just Eat call) exactly as designed. All 5 districts (each pre-validated against the postcode reference before any live call) processed using the fully-fixed pipeline (map_required resolver, ISS-0030, ISS-0031, ISS-0032 all already in place). Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
 
+const HALEEMA_DISTRICTS = [
+  ["EN6", 366, 75, 291, 56, 31, 18, 13, 3, 1, 18, 1, 5],
+  ["EN7", 384, 6, 378, 6, 4, 1, 3, 0, 0, 1, 0, 1],
+  ["EN8", 309, 114, 195, 97, 62, 39, 23, 3, 0, 25, 0, 10],
+  ["EN9", 211, 40, 171, 39, 19, 11, 8, 2, 0, 15, 0, 5],
+  ["EN10", 220, 21, 199, 21, 15, 9, 6, 0, 0, 5, 0, 1],
+  ["EN11", 265, 50, 215, 42, 26, 20, 6, 3, 0, 9, 1, 6],
+];
+const HALEEMA_SOURCE_CALLS = [
+  ["EN6", 51, 135], ["EN7", 5, 10], ["EN8", 87, 193], ["EN9", 34, 90], ["EN10", 20, 44], ["EN11", 35, 98],
+];
+const HALEEMA_DEFECTS: string[][] = [];
+const HALEEMA_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED (including the ISS-0032 postcode-reference-validity guard, 111/111 districts confirmed valid). test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during EN6-EN11 processing — all 6 districts (each pre-validated against the postcode reference before any live call) processed fully live, sequentially, using the fully-fixed pipeline (map_required resolver, ISS-0030, ISS-0031, ISS-0032 all already in place). Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json). This is the 13th and final representative territory of the full campaign.";
+
 const TERRITORIES: Record<string, any> = {
+  haleema: {
+    representative: "Haleema", role: "Telesales", salesTerritory: "EN6-EN11", filePrefix: "Haleema_EN6-EN11",
+    districts: HALEEMA_DISTRICTS, sourceCalls: HALEEMA_SOURCE_CALLS, defects: HALEEMA_DEFECTS, tests: HALEEMA_TESTS,
+    totalRaw: 1755, totalValid: 306, totalRejected: 1449, totalCandidates: 261, duplicatesRemoved: 6, uniqueCandidates: 255,
+    usable: 155, premium: 97, releasableL1: 58, keyAccounts: 11, held: 1, hardRejected: 69, customerExclusions: 2, excludedGroups: 28,
+    salesProNewLeads: 144, salesProKeyAccounts: 11, salesProCustExclusions: 2,
+    commitSha: "fda50d7 (no new pipeline code required for EN6-EN11 processing — map_required fix, ISS-0030/ISS-0031/ISS-0032 fixes already in place; all 6 districts pre-validated against the postcode reference)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
+    handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/haleema-en6-en11",
+    territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/haleema/combined-2026-07-25/EN6-EN11-TERRITORY-RECONCILIATION-REPORT.md",
+  },
   hassan: {
     representative: "Hassan", role: "Telesales", salesTerritory: "EN1-EN5", filePrefix: "Hassan_EN1-EN5",
     districts: HASSAN_DISTRICTS, sourceCalls: HASSAN_SOURCE_CALLS, defects: HASSAN_DEFECTS, tests: HASSAN_TESTS,

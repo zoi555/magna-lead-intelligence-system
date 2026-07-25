@@ -19,6 +19,7 @@ const SHAHZAIB_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/sh
 const TAHIRA_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/tahira-wd3-wd7";
 const WAJAHAT_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/wajahat-wd17-wd25";
 const HASSAN_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/hassan-en1-en5";
+const HALEEMA_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/haleema-en6-en11";
 
 const REPRESENTATIVES = [
   {
@@ -172,7 +173,19 @@ const REPRESENTATIVES = [
     schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
     lastUpdated: "2026-07-25", nextAction: "None — territory complete, handed over, awaiting no further action.",
   },
-  { representative: "Haleema", role: "telesales", salesTerritory: "EN6-EN11", totalDistricts: 6, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 6, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
+  {
+    representative: "Haleema", role: "telesales", salesTerritory: "EN6-EN11",
+    totalDistricts: 6, districtsCompleted: 6, districtsHeld: 0, districtsRemaining: 0,
+    territoryStatus: "ACCEPTED", usable: 155, ordinaryNewLeads: 144, keyAccounts: 11,
+    customerExclusions: 2, groupExclusions: 28, held: 1, hardRejected: 69,
+    masterFilePath: `${HALEEMA_DIR}/Haleema_EN6-EN11_Representative_Master.xlsx`,
+    salesProFilePath: `${HALEEMA_DIR}/Haleema_EN6-EN11_SalesPro_New_Leads.csv`,
+    mapPath: "n/a (telesales — mapRequired=false, resolved from sales-territories-v2.json; no map file produced or referenced)",
+    reportPath: `${HALEEMA_DIR}/Haleema_EN6-EN11_Lead_Production_Report.xlsx`,
+    latestCommit: "fda50d7 (no new pipeline code required for EN6-EN11 — map_required fix, ISS-0030/ISS-0031/ISS-0032 fixes already in place; all 6 districts pre-validated against the postcode reference and processed live)",
+    schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
+    lastUpdated: "2026-07-25", nextAction: "None — territory complete, handed over PROVISIONALLY (pending final commercial review — see PROJECT_STATUS.md), 13th and final representative territory.",
+  },
 ];
 
 const COLUMN_LABELS: Record<string, string> = {
