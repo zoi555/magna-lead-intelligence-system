@@ -16,6 +16,7 @@ const NASEH_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/naseh
 const SAAD_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/saad-ub6-ub11";
 const SAIF_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/saif-ha0-ha5";
 const SHAHZAIB_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/shahzaib-ha6-ha9";
+const TAHIRA_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/tahira-wd3-wd7";
 
 const REPRESENTATIVES = [
   {
@@ -130,7 +131,19 @@ const REPRESENTATIVES = [
     schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
     lastUpdated: "2026-07-25", nextAction: "None — territory complete, handed over, awaiting no further action.",
   },
-  { representative: "Tahira", role: "telesales", salesTerritory: "WD3-WD7", totalDistricts: 5, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 5, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
+  {
+    representative: "Tahira", role: "telesales", salesTerritory: "WD3-WD7",
+    totalDistricts: 5, districtsCompleted: 5, districtsHeld: 0, districtsRemaining: 0,
+    territoryStatus: "ACCEPTED", usable: 100, ordinaryNewLeads: 94, keyAccounts: 6,
+    customerExclusions: 4, groupExclusions: 29, held: 1, hardRejected: 49,
+    masterFilePath: `${TAHIRA_DIR}/Tahira_WD3-WD7_Representative_Master.xlsx`,
+    salesProFilePath: `${TAHIRA_DIR}/Tahira_WD3-WD7_SalesPro_New_Leads.csv`,
+    mapPath: "n/a (telesales — mapRequired=false, resolved from sales-territories-v2.json; no map file produced or referenced)",
+    reportPath: `${TAHIRA_DIR}/Tahira_WD3-WD7_Lead_Production_Report.xlsx`,
+    latestCommit: "e76ae70 (no new pipeline code required for WD3-WD7 — map_required fix, ISS-0030/ISS-0031/ISS-0032 fixes already in place; all 5 districts processed live)",
+    schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
+    lastUpdated: "2026-07-25", nextAction: "None — territory complete, handed over, awaiting no further action.",
+  },
   { representative: "Wajahat", role: "telesales", salesTerritory: "WD17, WD18, WD19, WD23, WD24, WD25", totalDistricts: 6, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 6, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
   { representative: "Hassan", role: "telesales", salesTerritory: "EN1-EN5", totalDistricts: 5, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 5, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation. (--request-plan-only smoke test only, no live discovery.)" },
   { representative: "Haleema", role: "telesales", salesTerritory: "EN6-EN11", totalDistricts: 6, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 6, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },

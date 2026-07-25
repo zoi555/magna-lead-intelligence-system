@@ -205,7 +205,30 @@ const SHAHZAIB_DEFECTS: string[][] = [
 ];
 const SHAHZAIB_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED, including the new ISS-0032 postcode-reference-validity regression guard (111/111 districts confirmed valid, HA10 confirmed absent). test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
 
+const TAHIRA_DISTRICTS = [
+  ["WD3", 517, 80, 437, 74, 41, 23, 18, 2, 1, 19, 2, 11],
+  ["WD4", 281, 18, 263, 14, 8, 5, 3, 0, 0, 6, 0, 0],
+  ["WD5", 586, 15, 571, 13, 10, 6, 4, 0, 0, 2, 0, 1],
+  ["WD6", 378, 92, 286, 77, 36, 24, 12, 2, 0, 23, 2, 16],
+  ["WD7", 321, 12, 309, 11, 8, 5, 3, 2, 0, 2, 0, 1],
+];
+const TAHIRA_SOURCE_CALLS = [
+  ["WD3", 61, 138], ["WD4", 14, 30], ["WD5", 12, 24], ["WD6", 59, 163], ["WD7", 10, 30],
+];
+const TAHIRA_DEFECTS: string[][] = [];
+const TAHIRA_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED (including the ISS-0032 postcode-reference-validity guard, 111/111 districts confirmed valid). test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during WD3-WD7 processing — all 5 districts processed fully live, sequentially, using the fully-fixed pipeline (map_required resolver, ISS-0030, ISS-0031, ISS-0032 all already in place). Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
+
 const TERRITORIES: Record<string, any> = {
+  tahira: {
+    representative: "Tahira", role: "Telesales", salesTerritory: "WD3-WD7", filePrefix: "Tahira_WD3-WD7",
+    districts: TAHIRA_DISTRICTS, sourceCalls: TAHIRA_SOURCE_CALLS, defects: TAHIRA_DEFECTS, tests: TAHIRA_TESTS,
+    totalRaw: 2083, totalValid: 217, totalRejected: 1866, totalCandidates: 189, duplicatesRemoved: 6, uniqueCandidates: 183,
+    usable: 100, premium: 61, releasableL1: 39, keyAccounts: 6, held: 1, hardRejected: 49, customerExclusions: 4, excludedGroups: 29,
+    salesProNewLeads: 94, salesProKeyAccounts: 6, salesProCustExclusions: 4,
+    commitSha: "e76ae70 (no new pipeline code required for WD3-WD7 processing — map_required fix, ISS-0030/ISS-0031/ISS-0032 fixes already in place)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
+    handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/tahira-wd3-wd7",
+    territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/tahira/combined-2026-07-25/WD3-WD7-TERRITORY-RECONCILIATION-REPORT.md",
+  },
   shahzaib: {
     representative: "Shahzaib", role: "Telesales", salesTerritory: "HA6-HA9", filePrefix: "Shahzaib_HA6-HA9",
     districts: SHAHZAIB_DISTRICTS, sourceCalls: SHAHZAIB_SOURCE_CALLS, defects: SHAHZAIB_DEFECTS, tests: SHAHZAIB_TESTS,
