@@ -218,7 +218,31 @@ const TAHIRA_SOURCE_CALLS = [
 const TAHIRA_DEFECTS: string[][] = [];
 const TAHIRA_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED (including the ISS-0032 postcode-reference-validity guard, 111/111 districts confirmed valid). test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during WD3-WD7 processing — all 5 districts processed fully live, sequentially, using the fully-fixed pipeline (map_required resolver, ISS-0030, ISS-0031, ISS-0032 all already in place). Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
 
+const WAJAHAT_DISTRICTS = [
+  ["WD17", 536, 149, 387, 123, 52, 29, 23, 5, 3, 48, 9, 11],
+  ["WD18", 493, 66, 427, 61, 34, 26, 8, 1, 2, 17, 4, 4],
+  ["WD19", 702, 31, 671, 27, 10, 4, 6, 0, 0, 12, 3, 2],
+  ["WD23", 715, 33, 682, 30, 18, 14, 4, 3, 0, 9, 2, 1],
+  ["WD24", 534, 74, 460, 67, 34, 25, 9, 2, 2, 20, 3, 8],
+  ["WD25", 642, 29, 613, 28, 13, 12, 1, 1, 0, 8, 0, 7],
+];
+const WAJAHAT_SOURCE_CALLS = [
+  ["WD17", 107, 245], ["WD18", 55, 118], ["WD19", 24, 52], ["WD23", 27, 73], ["WD24", 58, 171], ["WD25", 21, 48],
+];
+const WAJAHAT_DEFECTS: string[][] = [];
+const WAJAHAT_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED (including the ISS-0032 postcode-reference-validity guard, 111/111 districts confirmed valid). test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during WD17-WD25 processing — all 6 districts (each pre-validated against the postcode reference before any live call) processed fully live, sequentially, using the fully-fixed pipeline (map_required resolver, ISS-0030, ISS-0031, ISS-0032 all already in place). Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
+
 const TERRITORIES: Record<string, any> = {
+  wajahat: {
+    representative: "Wajahat", role: "Telesales", salesTerritory: "WD17, WD18, WD19, WD23, WD24, WD25", filePrefix: "Wajahat_WD17-WD25",
+    districts: WAJAHAT_DISTRICTS, sourceCalls: WAJAHAT_SOURCE_CALLS, defects: WAJAHAT_DEFECTS, tests: WAJAHAT_TESTS,
+    totalRaw: 3622, totalValid: 382, totalRejected: 3240, totalCandidates: 336, duplicatesRemoved: 10, uniqueCandidates: 326,
+    usable: 157, premium: 106, releasableL1: 51, keyAccounts: 12, held: 6, hardRejected: 109, customerExclusions: 21, excludedGroups: 33,
+    salesProNewLeads: 145, salesProKeyAccounts: 12, salesProCustExclusions: 21,
+    commitSha: "4229d7a (no new pipeline code required for WD17-WD25 processing — map_required fix, ISS-0030/ISS-0031/ISS-0032 fixes already in place; all 6 districts pre-validated against the postcode reference)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
+    handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/wajahat-wd17-wd25",
+    territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/wajahat/combined-2026-07-25/WD17-WD25-TERRITORY-RECONCILIATION-REPORT.md",
+  },
   tahira: {
     representative: "Tahira", role: "Telesales", salesTerritory: "WD3-WD7", filePrefix: "Tahira_WD3-WD7",
     districts: TAHIRA_DISTRICTS, sourceCalls: TAHIRA_SOURCE_CALLS, defects: TAHIRA_DEFECTS, tests: TAHIRA_TESTS,
