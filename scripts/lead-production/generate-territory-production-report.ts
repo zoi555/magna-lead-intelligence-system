@@ -163,7 +163,31 @@ const NASEH_SOURCE_CALLS = [
 const NASEH_DEFECTS: string[][] = [];
 const NASEH_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during UB1-UB5 processing. UB1 reused from the accepted 2026-07-24 customer-master-exclusion-reprocess checkpoint after verifying byte-exact customer-master SHA256, group-registry MD5, and rules-version compatibility — no new live discovery or enrichment calls made for UB1 this session (Google: 83 candidates processed historically across the original+supplemental live stages; Companies House: 185 combined/12 document requests historically). UB2-UB5 processed fully live this session. Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
 
+const SAAD_DISTRICTS = [
+  ["UB6", 580, 107, 473, 91, 40, 24, 16, 1, 2, 24, 13, 12],
+  ["UB7", 600, 72, 528, 66, 29, 20, 9, 4, 0, 22, 8, 7],
+  ["UB8", 691, 138, 553, 118, 46, 29, 17, 0, 5, 48, 11, 8],
+  ["UB9", 381, 23, 358, 23, 11, 9, 2, 2, 0, 5, 1, 6],
+  ["UB10", 952, 73, 879, 64, 29, 18, 11, 2, 2, 16, 8, 9],
+  ["UB11", 674, 4, 670, 4, 1, 1, 0, 0, 0, 1, 0, 2],
+];
+const SAAD_SOURCE_CALLS = [
+  ["UB6", 77, 189], ["UB7", 55, 140], ["UB8", 106, 228], ["UB9", 16, 44], ["UB10", 52, 116], ["UB11", 2, 4],
+];
+const SAAD_DEFECTS: string[][] = [];
+const SAAD_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during UB6-UB11 processing — all 6 districts processed fully live, sequentially, using the fully-fixed pipeline (map_required resolver, ISS-0030, ISS-0031 all already in place). Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
+
 const TERRITORIES: Record<string, any> = {
+  saad: {
+    representative: "Saad", role: "Telesales", salesTerritory: "UB6-UB11", filePrefix: "Saad_UB6-UB11",
+    districts: SAAD_DISTRICTS, sourceCalls: SAAD_SOURCE_CALLS, defects: SAAD_DEFECTS, tests: SAAD_TESTS,
+    totalRaw: 3878, totalValid: 417, totalRejected: 3461, totalCandidates: 366, duplicatesRemoved: 21, uniqueCandidates: 345,
+    usable: 151, premium: 99, releasableL1: 52, keyAccounts: 9, held: 8, hardRejected: 105, customerExclusions: 37, excludedGroups: 44,
+    salesProNewLeads: 142, salesProKeyAccounts: 9, salesProCustExclusions: 37,
+    commitSha: "16ad841 (no new pipeline code required for UB6-UB11 processing — map_required fix and ISS-0030/ISS-0031 fixes already in place)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
+    handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/saad-ub6-ub11",
+    territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/saad/combined-2026-07-25/UB6-UB11-TERRITORY-RECONCILIATION-REPORT.md",
+  },
   naseh: {
     representative: "Naseh", role: "Telesales", salesTerritory: "UB1-UB5", filePrefix: "Naseh_UB1-UB5",
     districts: NASEH_DISTRICTS, sourceCalls: NASEH_SOURCE_CALLS, defects: NASEH_DEFECTS, tests: NASEH_TESTS,
