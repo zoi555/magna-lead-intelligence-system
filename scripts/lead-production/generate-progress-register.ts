@@ -18,6 +18,7 @@ const SAIF_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/saif-h
 const SHAHZAIB_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/shahzaib-ha6-ha9";
 const TAHIRA_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/tahira-wd3-wd7";
 const WAJAHAT_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/wajahat-wd17-wd25";
+const HASSAN_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/hassan-en1-en5";
 
 const REPRESENTATIVES = [
   {
@@ -158,7 +159,19 @@ const REPRESENTATIVES = [
     schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
     lastUpdated: "2026-07-25", nextAction: "None — territory complete, handed over, awaiting no further action.",
   },
-  { representative: "Hassan", role: "telesales", salesTerritory: "EN1-EN5", totalDistricts: 5, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 5, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation. (--request-plan-only smoke test only, no live discovery.)" },
+  {
+    representative: "Hassan", role: "telesales", salesTerritory: "EN1-EN5",
+    totalDistricts: 5, districtsCompleted: 5, districtsHeld: 0, districtsRemaining: 0,
+    territoryStatus: "ACCEPTED", usable: 172, ordinaryNewLeads: 160, keyAccounts: 12,
+    customerExclusions: 4, groupExclusions: 38, held: 3, hardRejected: 116,
+    masterFilePath: `${HASSAN_DIR}/Hassan_EN1-EN5_Representative_Master.xlsx`,
+    salesProFilePath: `${HASSAN_DIR}/Hassan_EN1-EN5_SalesPro_New_Leads.csv`,
+    mapPath: "n/a (telesales — mapRequired=false, resolved from sales-territories-v2.json; no map file produced or referenced)",
+    reportPath: `${HASSAN_DIR}/Hassan_EN1-EN5_Lead_Production_Report.xlsx`,
+    latestCommit: "886ecfd (no new pipeline code required for EN1-EN5 — map_required fix, ISS-0030/ISS-0031/ISS-0032 fixes already in place; EN4 recovered via the certified ISS-0031 --resume-from procedure after a transient discovery failure)",
+    schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
+    lastUpdated: "2026-07-25", nextAction: "None — territory complete, handed over, awaiting no further action.",
+  },
   { representative: "Haleema", role: "telesales", salesTerritory: "EN6-EN11", totalDistricts: 6, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 6, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
 ];
 

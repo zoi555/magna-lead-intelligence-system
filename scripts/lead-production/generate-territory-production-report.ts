@@ -232,7 +232,30 @@ const WAJAHAT_SOURCE_CALLS = [
 const WAJAHAT_DEFECTS: string[][] = [];
 const WAJAHAT_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED (including the ISS-0032 postcode-reference-validity guard, 111/111 districts confirmed valid). test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during WD17-WD25 processing — all 6 districts (each pre-validated against the postcode reference before any live call) processed fully live, sequentially, using the fully-fixed pipeline (map_required resolver, ISS-0030, ISS-0031, ISS-0032 all already in place). Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
 
+const HASSAN_DISTRICTS = [
+  ["EN1", 542, 79, 463, 68, 40, 23, 17, 3, 0, 17, 0, 11],
+  ["EN2", 389, 73, 316, 66, 28, 20, 8, 3, 0, 27, 1, 10],
+  ["EN3", 564, 117, 447, 104, 50, 32, 18, 3, 3, 43, 1, 7],
+  ["EN4", 460, 36, 424, 34, 20, 12, 8, 1, 0, 9, 2, 3],
+  ["EN5", 473, 77, 396, 68, 39, 24, 15, 2, 0, 22, 0, 7],
+];
+const HASSAN_SOURCE_CALLS = [
+  ["EN1", 55, 123], ["EN2", 56, 130], ["EN3", 97, 247], ["EN4", 31, 70], ["EN5", 61, 146],
+];
+const HASSAN_DEFECTS: string[][] = [];
+const HASSAN_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED (including the ISS-0032 postcode-reference-validity guard, 111/111 districts confirmed valid). test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during EN1-EN5 processing. EN4's discovery run failed transiently (HTTP/2 stream timeout during provenance write) with the query fully complete (460 raw observations retained, 0 failed queries); recovered via the certified ISS-0031 --resume-from procedure (geography validation + consolidation resumed from retained raw evidence, zero new Just Eat call) exactly as designed. All 5 districts (each pre-validated against the postcode reference before any live call) processed using the fully-fixed pipeline (map_required resolver, ISS-0030, ISS-0031, ISS-0032 all already in place). Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
+
 const TERRITORIES: Record<string, any> = {
+  hassan: {
+    representative: "Hassan", role: "Telesales", salesTerritory: "EN1-EN5", filePrefix: "Hassan_EN1-EN5",
+    districts: HASSAN_DISTRICTS, sourceCalls: HASSAN_SOURCE_CALLS, defects: HASSAN_DEFECTS, tests: HASSAN_TESTS,
+    totalRaw: 2428, totalValid: 382, totalRejected: 2046, totalCandidates: 340, duplicatesRemoved: 7, uniqueCandidates: 333,
+    usable: 172, premium: 107, releasableL1: 65, keyAccounts: 12, held: 3, hardRejected: 116, customerExclusions: 4, excludedGroups: 38,
+    salesProNewLeads: 160, salesProKeyAccounts: 12, salesProCustExclusions: 4,
+    commitSha: "886ecfd (no new pipeline code required for EN1-EN5 processing — map_required fix, ISS-0030/ISS-0031/ISS-0032 fixes already in place; EN4 recovered via the certified ISS-0031 --resume-from procedure after a transient discovery failure)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
+    handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/hassan-en1-en5",
+    territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/hassan/combined-2026-07-25/EN1-EN5-TERRITORY-RECONCILIATION-REPORT.md",
+  },
   wajahat: {
     representative: "Wajahat", role: "Telesales", salesTerritory: "WD17, WD18, WD19, WD23, WD24, WD25", filePrefix: "Wajahat_WD17-WD25",
     districts: WAJAHAT_DISTRICTS, sourceCalls: WAJAHAT_SOURCE_CALLS, defects: WAJAHAT_DEFECTS, tests: WAJAHAT_TESTS,
