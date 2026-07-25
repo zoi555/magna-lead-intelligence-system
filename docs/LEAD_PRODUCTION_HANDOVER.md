@@ -825,5 +825,44 @@ zero overlap with key accounts/held/rejected/excluded).
 
 Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/tahira/combined-2026-07-25/WD3-WD7-TERRITORY-RECONCILIATION-REPORT.md`
 
-**Next territory (Wajahat's WD17/WD18/WD19/WD23/WD24/WD25) requires separate owner
-authorisation.** No new branch created, no merge to `main`, no deployment.
+## WD17/WD18/WD19/WD23/WD24/WD25 — Wajahat's full Sales Territory, ACCEPTED (2026-07-25)
+
+Before any live call was made, all six configured Postcode Districts (a non-contiguous list —
+WD17-WD19 and WD23-WD25, skipping WD20-WD22) were confirmed as real entries in the pipeline's own
+authoritative postcode reference data (ISS-0032 guard applied proactively). All 6 districts then
+run live end-to-end, sequentially, and individually accepted, using the fully-fixed pipeline
+(ISS-0030, ISS-0031, ISS-0032, and the map_required resolver fix all already in place), with
+independent per-district DB reconciliation and zero-leakage verification before proceeding to the
+next district.
+
+Territory totals: 3622 raw = 382 geography-valid + 3240 rejected (exact, every district). 336 raw
+candidates -> **10 genuine cross-district duplicates removed -> 326 unique candidates** = 21
+customer-master exclusions + 33 excluded groups + 157 usable (106 premium, 51 releasable L1, 12
+key accounts) + 6 held + 109 hard-rejected. All exported Sales Pro Lead IDs (145 new leads + 12
+key accounts + 21 customer-master exclusions = 178 of 326 total candidates) verified present in
+the Master workbook's Evidence Register (178/178). Zero customer-master leakage into any
+rep-facing/Sales Pro output.
+
+No new defect found. The handover package was built correctly from the start via the corrected
+`generate-representative-handover.ts` — `mapRequired=false` resolved from
+`sales-territories-v2.json`, no map file produced. No district hit the ISS-0030 HTTP/2 GOAWAY
+class or required the ISS-0031 evidence-completeness recovery procedure.
+
+Source calls (stated separately, all live this session): Google combined total 292
+(107+55+24+27+58+21). Companies House combined total 707 (245+118+52+73+171+48), documents total
+43 (14+6+2+6+15+0). No request exceeded its certified per-district cap (Google 800, Companies
+House 600 combined / 250 documents) on any of the 6 districts.
+
+Standardised handover package produced (**7 files**, no map deliverable — telesales), at exact
+path `/Users/homemac/Data/aspectlead-lead-production/handover/wajahat-wd17-wd25/`:
+`Wajahat_WD17-WD25_Representative_Master.xlsx`, `Wajahat_WD17-WD25_SalesPro_New_Leads.csv`,
+`Wajahat_WD17-WD25_Key_Accounts_Management_Review.xlsx`,
+`Wajahat_WD17-WD25_Customer_Master_Exclusions_Audit.xlsx`,
+`Wajahat_WD17-WD25_Lead_Production_Report.xlsx`, `Wajahat_WD17-WD25_Field_Provenance.csv`,
+`README.md`. Representative-facing files verified to contain ordinary approved leads only (145 of
+157 usable, zero overlap with key accounts/held/rejected/excluded).
+
+Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/wajahat/combined-2026-07-25/WD17-WD25-TERRITORY-RECONCILIATION-REPORT.md`
+
+**Next territory (Hassan's EN1-EN5) requires separate owner authorisation.** No new branch
+created, no merge to `main`, no deployment.

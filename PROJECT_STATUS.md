@@ -989,7 +989,50 @@ the owner supplied, plus HA10-containment checks (retained-evidence-only) and a 
   ALL PASSED, `npm run typecheck` clean, `npm run build` succeeded.
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/tahira/combined-2026-07-25/WD3-WD7-TERRITORY-RECONCILIATION-REPORT.md`.
-- **Next task**: owner authorisation required before starting Wajahat's
-  WD17/WD18/WD19/WD23/WD24/WD25 territory — same per-territory authorisation pattern. No new
-  branch created, no merge to `main`, no deployment; all work remains on
-  `feature/mvp-vertical-slice-001`.
+- **Next task (superseded, see below)**: owner authorisation was required before starting
+  Wajahat's WD17/WD18/WD19/WD23/WD24/WD25 territory — see the Wajahat section below.
+
+### WD17/WD18/WD19/WD23/WD24/WD25 (Wajahat's full Sales Territory) — live, accepted — 2026-07-25
+
+Preceded by a read-only verification of Tahira's stored WD3-WD7 documentation (manifest,
+reconciliation report, Lead Production Report xlsx, progress register) against the exact figures
+the owner supplied — all confirmed correct, no corrective commit made.
+
+- Before any live call, all six configured Postcode Districts (WD17, WD18, WD19, WD23, WD24,
+  WD25 — a non-contiguous list, skipping WD20-WD22) were confirmed as real entries in the
+  authoritative postcode reference (ISS-0032 guard applied proactively) — no invalid district
+  found.
+- All 6 districts run live end-to-end, sequentially, each independently DB-reconciled and
+  zero-leakage-verified before proceeding to the next, using the fully-fixed pipeline
+  (map_required resolver, ISS-0030, ISS-0031, ISS-0032 all already in place).
+- Territory totals: 3622 raw = 382 geography-valid + 3240 rejected (exact, every district). 336
+  candidates → 10 genuine cross-district duplicates removed → 326 unique. Permanent
+  `customer_master_exclusion` rule enforced: 21 exclusions found, zero leakage. Final: 157 usable
+  (106 premium, 51 releasable Level 1, 12 key accounts), 6 held for review, 109 hard-rejected, 33
+  excluded groups. Wajahat's combined 107-field Master workbook and 108-column Sales Pro files
+  generated; all 178 exported Sales Pro Lead IDs verified present in the Master workbook's
+  Evidence Register.
+- No new defect found. The handover package was built correctly from the start
+  (`mapRequired=false` resolved from `sales-territories-v2.json`, no map file produced).
+- Source calls (stated separately, all live this session): Google combined total 292
+  (107+55+24+27+58+21). Companies House combined total 707 (245+118+52+73+171+48), documents
+  total 43 (14+6+2+6+15+0). No request exceeded its certified per-district cap (Google 800,
+  Companies House 600 combined / 250 documents) on any of the 6 districts.
+- Standardised handover package produced (**7 files**):
+  `/Users/homemac/Data/aspectlead-lead-production/handover/wajahat-wd17-wd25/`
+  (`Wajahat_WD17-WD25_Representative_Master.xlsx`, `Wajahat_WD17-WD25_SalesPro_New_Leads.csv`,
+  `Wajahat_WD17-WD25_Key_Accounts_Management_Review.xlsx`,
+  `Wajahat_WD17-WD25_Customer_Master_Exclusions_Audit.xlsx`,
+  `Wajahat_WD17-WD25_Lead_Production_Report.xlsx`, `Wajahat_WD17-WD25_Field_Provenance.csv`,
+  `README.md`), representative-facing files verified to contain ordinary approved leads only,
+  zero leakage.
+- Representative Progress Register updated: Nauman, Manraj, Ayesha, Kunz, Meer, Naseh, Saad,
+  Saif, Shahzaib, Tahira, and Wajahat now ACCEPTED (11/13 representatives complete).
+- Full test/build gate re-run clean: `test-lead-production-territory-v2.ts` (111-district
+  postcode-reference guard re-confirmed), `test-discovery-run-recovery.ts`, `test-map-required.ts`
+  ALL PASSED, `npm run typecheck` clean, `npm run build` succeeded.
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/wajahat/combined-2026-07-25/WD17-WD25-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task**: owner authorisation required before starting Hassan's EN1-EN5 territory — same
+  per-territory authorisation pattern. No new branch created, no merge to `main`, no deployment;
+  all work remains on `feature/mvp-vertical-slice-001`.
