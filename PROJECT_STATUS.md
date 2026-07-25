@@ -819,6 +819,43 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   `Naseh_UB1-UB5_Lead_Production_Report.xlsx` (new "Source Calls Summary" sheet), and this
   document; `REPRESENTATIVE_PROGRESS_REGISTER.xlsx`/`.csv` were checked and found already correct
   (no change required). No code change — data-output and documentation only.
-- **Next task**: owner authorisation required before starting Saad's UB6-UB11 territory — same
+- **Next task (superseded, see below)**: owner authorisation was required before starting Saad's
+  UB6-UB11 territory — see the Saad section below.
+
+### UB6-UB11 (Saad's full Sales Territory) — live, accepted — 2026-07-25
+
+- All 6 UB Postcode Districts (UB6-UB11) run live end-to-end, sequentially, each independently
+  DB-reconciled and zero-leakage-verified before proceeding to the next, using the fully-fixed
+  pipeline (map_required resolver, ISS-0030, ISS-0031 all already in place — no new code changes
+  needed).
+- Territory totals: 3878 raw = 417 geography-valid + 3461 rejected (exact, every district). 366
+  candidates → 21 genuine cross-district duplicates removed → 345 unique. Permanent
+  `customer_master_exclusion` rule enforced: 37 exclusions found, zero leakage. Final: 151 usable
+  (99 premium, 52 releasable Level 1, 9 key accounts), 8 held for review, 105 hard-rejected, 44
+  excluded groups. Saad's combined 107-field Master workbook and 108-column Sales Pro files
+  generated; all 188 exported Sales Pro Lead IDs verified present in the Master workbook's
+  Evidence Register.
+- No new defect found. The handover package was built correctly from the start
+  (`mapRequired=false` resolved from `sales-territories-v2.json`, no map file produced).
+- Source calls (stated separately, all live this session): Google combined total 308
+  (77+55+106+16+52+2). Companies House combined total 721 (189+140+228+44+116+4), documents
+  total 37 (12+8+9+4+4+0). No request exceeded its certified per-district cap (Google 800,
+  Companies House 600 combined / 250 documents) on any of the 6 districts.
+- Standardised handover package produced (**7 files**):
+  `/Users/homemac/Data/aspectlead-lead-production/handover/saad-ub6-ub11/`
+  (`Saad_UB6-UB11_Representative_Master.xlsx`, `Saad_UB6-UB11_SalesPro_New_Leads.csv`,
+  `Saad_UB6-UB11_Key_Accounts_Management_Review.xlsx`,
+  `Saad_UB6-UB11_Customer_Master_Exclusions_Audit.xlsx`,
+  `Saad_UB6-UB11_Lead_Production_Report.xlsx`, `Saad_UB6-UB11_Field_Provenance.csv`,
+  `README.md`), representative-facing files verified to contain ordinary approved leads only,
+  zero leakage.
+- Representative Progress Register updated: Nauman, Manraj, Ayesha, Kunz, Meer, Naseh, and Saad
+  now ACCEPTED (7/13 representatives complete).
+- Full test/build gate re-run clean: `test-lead-production-territory-v2.ts`,
+  `test-discovery-run-recovery.ts`, `test-map-required.ts` ALL PASSED, `npm run typecheck`
+  clean, `npm run build` succeeded.
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/saad/combined-2026-07-25/UB6-UB11-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task**: owner authorisation required before starting Saif's HA0-HA5 territory — same
   per-territory authorisation pattern. No new branch created, no merge to `main`, no deployment;
   all work remains on `feature/mvp-vertical-slice-001`.
