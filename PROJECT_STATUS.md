@@ -1158,3 +1158,74 @@ final commercial review, not yet applied to any package:
   explicit instruction. No further lead-production work is authorised until the owner explicitly
   requests the commercial review pass described above. No new branch created, no merge to `main`,
   no deployment; all work remains on `feature/mvp-vertical-slice-001`.
+
+## COMMERCIAL REVIEW v1 APPLIED — all 13 representatives regenerated (2026-07-26)
+
+The approved commercial-review decision files (141 brands reviewed: 28 kept, 113 excluded as
+whole brands) were copied into
+`config/lead-production/commercial-review-v1/` (`corrected_brand_decisions.csv`,
+`brands_to_keep_final.csv`, `brands_to_exclude_final.csv`) and verified before use: 141/28/113
+row counts confirmed, zero overlap between keep/exclude, union exactly matches
+`corrected_brand_decisions.csv`, every row's own Decision label cross-checked against which file
+it actually appears in. A permanent pharmacy/chemist exclusion (requires BOTH business-type/
+category evidence AND name evidence) was added alongside the brand rule.
+
+**Pipeline changes** (code commits `98e17ee`, `2f9a23a`, `70e3e38`):
+- `scripts/lead-production/load-commercial-review.ts` — loads and fail-closed-validates the
+  registry on every run (never trusts a stale/partial load).
+- `scripts/lead-production/commercial-review-filter.ts` — normalised-name brand matching (exact
+  match required for single-word brands to protect generic words — Flames/Phoenix/Premier/Shell/
+  Aroma/Saffron/Georges — from false positives; multi-word brands additionally match a
+  branch-name-variant prefix, e.g. "Village Pizza Hounslow"), explicit keep-list override checked
+  first and unconditional, and the pharmacy/chemist dual-evidence rule.
+- `generate-master-export.ts` / `generate-salespro-export.ts` — new exclusion buckets applied
+  after existing rules (customer_master_exclusion, excluded_large_group) and before the
+  usable/key-account split, so a key account matching an approved exclusion is also removed. Every
+  exclusion recorded in `<prefix>-commercial-review-exclusion-audit.csv` (Lead ID, representative,
+  business name, matched rule, match basis, previous status, final status).
+- `generate-representative-handover.ts` — new Simplified Representative Workbook (the approved 20
+  CTO fields, "Business Name" as the first column instead of "Shop Name") and a management-only
+  Commercial Review Exclusions Audit workbook per territory.
+- `generate-cto-existing-lead-form.ts` — formalises the 20-column CTO extraction (built ad hoc in
+  the previous turn) into a tested, reusable pipeline component.
+- Regression tests: `scripts/test-lead-production-commercial-review.ts` (15 assertions covering
+  exact brand match, legal-company-name/group-identity match, explicit keep override, generic-word
+  false-positive protection, pharmacy/chemist dual-evidence rule, unaffected-independent
+  retention, and registry fail-closed behaviour) — ALL PASSED. Existing UB1/RM1 checkpoint tests
+  in `test-lead-production-master-export.ts` / `test-lead-production-salespro-export.ts` updated
+  for the new (correctly lower) usable counts and re-verified PASSING. `npm run typecheck` clean,
+  `npm run build` succeeded.
+
+**Reprocessing**: all 13 territories reprocessed from their existing `territory-run-manifest.json`
+(the earliest compatible post-enrichment checkpoint) — zero new discovery/enrichment calls, only
+the export/handover stages re-run against already-retained evidence. Every representative's
+handover package, Simplified Representative Workbook, 108-column Sales Pro export, 20-column CTO
+form, Lead Production Report, and (for Nauman/Manraj/Ayesha) New Leads Map regenerated. Zero
+excluded-brand/pharmacy/chemist leakage verified independently across every new-leads CSV, CTO
+file, and audit file; every surviving Lead ID re-verified against its territory's Master Evidence
+Register (0 missing across all 13).
+
+**Campaign totals (before -> after commercial-review-v1)**:
+- Usable: 2,700 -> 2,294 (-406)
+- Premium: 1,695 -> 1,496 (-199)
+- Releasable Level 1: 1,005 -> 798 (-207)
+- Ordinary new leads: 2,520 -> 2,118 (-402)
+- Key accounts: 180 -> 176 (-4; 4 key accounts across Kunz/Saad/Saif/Hassan matched an approved
+  exclude brand and were correctly removed, per "preserve key accounts unless separately excluded
+  by an approved rule")
+- Held: 108 -> 103 (-5), Hard-rejected: 1,853 -> 1,775 (-78)
+- Customer master exclusions: 407 (unchanged — independent rule), Excluded groups: 594 (unchanged)
+- New: Commercial-review brand exclusions: 489 (94 distinct brands matched, all genuine exact/
+  branch-variant matches, zero false positives found on inspection); pharmacy/chemist exclusions: 0
+  (no candidate in this Just-Eat-sourced dataset had both category and name evidence)
+- Sum check: 2,294 (usable) + 103 (held) + 1,775 (hard-rejected) + 407 (customer exclusions) + 594
+  (excluded groups) + 489 (commercial-review exclusions) = 5,662 (unique candidates, unchanged) ✓
+
+**Still open / not addressed this turn**: "other irrelevant business types" beyond the named
+brands and the pharmacy/chemist rule was not separately scoped or actioned this turn (no such
+category was specified). A single combined "final CTO handover package" across all 13
+representatives was not built — each representative's 20-column CTO form was regenerated
+individually, per the explicit instruction not to create a combined file (Turn I). **Final human
+sign-off is still required before any package is physically handed to a representative or the
+CTO** — this turn applies and verifies the approved commercial-review decisions; it does not
+itself constitute that sign-off.

@@ -878,3 +878,62 @@ integrity/ambiguity conditions.
   separate authorisation. KT1-KT24 territory data files (Master/Sales Pro workbooks, CSVs, this
   session's territory reports) are intentionally not committed to the repo — generated lead data
   lives outside git per project convention, at the paths cited above.
+
+## Session: 2026-07-26 — Commercial-review-v1 brand/pharmacy exclusion applied to all 13 territories
+
+Human request: apply the approved commercial-review decisions (141 brands reviewed: 28 kept, 113
+excluded as whole brands) plus a permanent pharmacy/chemist exclusion to the already-complete
+13-representative campaign, using only retained post-enrichment evidence — no new discovery/
+enrichment calls. The three decision CSVs did not exist on disk when first requested; the owner
+was asked where they were rather than the request being guessed at or fabricated, then supplied
+them at `config/lead-production/commercial-review-v1/`.
+
+- Verified the three files before writing any code: 141/28/113 row counts, zero keep/exclude
+  overlap, union exactly matches `corrected_brand_decisions.csv`, every row's Decision label
+  cross-checked against which file it actually appears in. All 5 checks passed.
+- Built `load-commercial-review.ts` (fail-closed registry loader, permanent regression guard —
+  not a one-off check) and `commercial-review-filter.ts` (normalised-name brand matching: exact
+  equality required for single-word brands to protect generic words from false positives,
+  multi-word brands additionally match a branch-name-variant prefix; explicit keep override
+  checked first; pharmacy/chemist rule requires both category and name evidence). 15-assertion
+  regression suite (`test-lead-production-commercial-review.ts`) — ALL PASSED.
+- Wired the new exclusion into `generate-master-export.ts` / `generate-salespro-export.ts`
+  (new buckets, removed before usable/key-account split, full exclusion audit CSV). Re-ran the
+  existing UB1/RM1 checkpoint tests against real data — 9 genuine UB1 brand matches found (Cake
+  Shop, The Plough, Sambal Express, German Doner Kebab, Pizza Hut Delivery, Karak Chaii, Naan
+  Staap, Amigos Burgers and Shakes, Tops Pizza), all verified as correct exact/branch-variant
+  matches, zero false positives; hardcoded test counts updated to the new (correctly lower)
+  baseline and re-verified PASSING.
+- Added the Simplified Representative Workbook (Business Name first column) and Commercial
+  Review Exclusions Audit workbook to `generate-representative-handover.ts`; formalised the
+  20-column CTO extraction (built ad hoc the previous turn) into
+  `generate-cto-existing-lead-form.ts`.
+- Reprocessed all 13 territories from their existing `territory-run-manifest.json` (zero new
+  discovery/enrichment calls): regenerated every Master/Sales Pro export, every handover package
+  (Simplified Workbook, 20-field CTO form, Field Provenance, Lead Production Report), and the 3
+  field-sales maps (Nauman/Manraj/Ayesha) from the newly filtered leads. 489 candidates newly
+  excluded campaign-wide (94 distinct real chains — Pizza Hut Delivery, Cake Box, Papa Johns,
+  Caffè Nero, German Doner Kebab, etc. — all inspected, zero false positives found; 0 pharmacy/
+  chemist matches in this dataset). Campaign totals: usable 2,700 -> 2,294, ordinary new leads
+  2,520 -> 2,118, key accounts 180 -> 176 (4 key accounts across Kunz/Saad/Saif/Hassan correctly
+  removed for matching an exclude brand). Sum check against the unchanged unique-candidates total
+  (5,662) verified exactly for all 13 representatives independently and campaign-wide.
+- Independently re-verified (not just trusting exit codes): zero leakage across every new-leads
+  CSV / CTO file / audit file for all 13 reps; every surviving Lead ID re-traced to its
+  territory's Master Evidence Register (0 missing across all 13); the 3 regenerated field-sales
+  maps' row counts match their territory's new ordinary-lead count exactly.
+- Updated `generate-territory-production-report.ts` and `generate-progress-register.ts`'s
+  hardcoded per-representative constants to the new regenerated numbers (sourced from the actual
+  new exports, not estimated) and regenerated `REPRESENTATIVE_PROGRESS_REGISTER.xlsx/csv` and all
+  13 `Lead_Production_Report.xlsx` files.
+- Commits: `98e17ee` (filter + exporters + registry), `2f9a23a` (simplified workbook + CTO
+  regenerator + rules version), `70e3e38` (report/register data updates), plus this docs commit.
+  `npm run typecheck` clean, `npm run build` succeeded throughout.
+- **Still open**: "other irrelevant business types" beyond the named brands/pharmacy-chemist was
+  not separately scoped this turn (not specified in the request). A single combined "final CTO
+  handover package" across all 13 representatives was not built (Turn I explicitly said not to
+  create a combined file; this turn only regenerated the per-representative files). **Final human
+  sign-off is still required before any package is physically handed to a representative or the
+  CTO** — this turn applies and verifies the decisions, it does not itself constitute that
+  sign-off. Application-development work (Phase 1-5) remains paused. No merge to `main`, no
+  deployment.

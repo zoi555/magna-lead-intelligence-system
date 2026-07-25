@@ -967,3 +967,18 @@ chains (e.g. Chaiiwala), exclusion of pharmacies and chemists, exclusion of othe
 business types, a simplified representative workbook layout, assembly of the final CTO handover
 package, and final regenerated campaign lists reflecting all of the above. None of these changes
 have been applied. No new branch created, no merge to `main`, no deployment.
+
+## COMMERCIAL REVIEW v1 APPLIED (2026-07-26)
+
+The approved commercial-review decisions (141 brands reviewed: 28 kept, 113 excluded as whole
+brands, plus a permanent pharmacy/chemist exclusion) are now applied to all 13 representative
+packages. Full detail — verification of the 3 approved decision files, pipeline changes, per-
+representative before/after counts, campaign totals, and what remains open — is in
+`PROJECT_STATUS.md`'s "COMMERCIAL REVIEW v1 APPLIED" section (2026-07-26). Summary: 2,700 -> 2,294
+usable, 2,520 -> 2,118 ordinary new leads, 180 -> 176 key accounts, 489 new commercial-review
+exclusions (0 pharmacy/chemist), zero leakage, every surviving Lead ID re-verified against its
+Master Evidence Register. Config: `config/lead-production/commercial-review-v1/`. Code commits
+`98e17ee`, `2f9a23a`, `70e3e38`.
+
+**Final human sign-off is still required before any package is physically handed to a
+representative or the CTO.**

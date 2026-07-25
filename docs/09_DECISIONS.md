@@ -976,3 +976,56 @@ logging the decision" even though the package was already present transitively.
 
 **See also:** `scripts/lead-production/website-adapter.ts`, `docs/10_BUGS_AND_FIXES.md`,
 `docs/11_ISSUES_LOG.md` (ISS-0030), `package.json`.
+
+## New versioned config layer: commercial-review-v1 brand/pharmacy exclusion (2026-07-26)
+
+### Decision
+
+Added a new, versioned configuration directory,
+`config/lead-production/commercial-review-v1/` (`corrected_brand_decisions.csv`,
+`brands_to_keep_final.csv`, `brands_to_exclude_final.csv`), holding the approved commercial
+review's brand decisions (141 brands reviewed: 28 kept, 113 excluded as whole brands), loaded and
+cross-validated by the new `scripts/lead-production/load-commercial-review.ts` (fails closed on
+any count/overlap/union/decision-label mismatch — never silently proceeds on a partial or
+corrupted registry). A permanent pharmacy/chemist exclusion (requires BOTH business-type/category
+evidence AND name evidence — neither alone is sufficient) was added alongside it in
+`scripts/lead-production/commercial-review-filter.ts`. Both are applied by
+`generate-master-export.ts` and `generate-salespro-export.ts` at export time, against
+already-enriched evidence only — no new discovery/enrichment call is required to apply this or
+any future commercial-review version.
+
+Brand matching is normalised-name-only (trading name + legal company name): single-word brand
+names (e.g. "Flames", "Phoenix", "Premier", "Shell", "Aroma", "Saffron") require exact normalised
+equality, never a substring/prefix match, to protect unrelated independent businesses that
+happen to share a generic word. Multi-word brand names additionally match a branch-name-variant
+prefix (e.g. "Village Pizza Hounslow" matches "Village Pizza") since a multi-word exact phrase is
+not the kind of coincidental overlap the generic-word protection exists to guard against. No
+domain-based matching is implemented — the approved registry files carry brand names only, no
+domains column, so domain matching was not invented to fill the gap. Explicit keep-list entries
+are checked first and unconditionally override any exclude match.
+
+### Reason
+
+The commercial review team supplied brand-level Keep/Exclude decisions, not a matching algorithm
+— the matching-safety design (exact-only for single words, prefix-with-word-boundary for
+multi-word) was this session's own judgement call, made explicit here because it is not
+independently derivable from the source CSVs alone, and directly implements the requirement "do
+not exclude unrelated independent businesses merely because they share generic words."
+Versioning the config directory by name (`commercial-review-v1`) follows the same convention as
+the existing large-group registry (`load-group-registry.ts`) so a future review round becomes
+`commercial-review-v2` without touching or invalidating this one.
+
+### Impact
+
+Applied to all 13 already-accepted representative territories without any new discovery/
+enrichment call: 489 candidates newly excluded campaign-wide (all brand matches; zero pharmacy/
+chemist matches in this dataset), reducing ordinary new leads from 2,520 to 2,118 and key accounts
+from 180 to 176. Every representative's handover package, Simplified Representative Workbook,
+Sales Pro export, CTO 20-field form, and Lead Production Report regenerated and re-verified
+(zero leakage, every surviving Lead ID re-traced to its Master Evidence Register). Full numbers:
+`PROJECT_STATUS.md`'s "COMMERCIAL REVIEW v1 APPLIED" section.
+
+**See also:** `scripts/lead-production/load-commercial-review.ts`,
+`scripts/lead-production/commercial-review-filter.ts`,
+`scripts/test-lead-production-commercial-review.ts`, `docs/LEAD_PRODUCTION_HANDOVER.md`,
+`PROJECT_STATUS.md`.

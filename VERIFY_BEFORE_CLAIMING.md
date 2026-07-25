@@ -178,6 +178,49 @@ No assistant, developer, or unfortunate human may claim the project works withou
   excluded; whether it would avoid the challenge is genuinely unknown. Preview Vercel deployment
   and mobile-width rendering remain unverified (no connected browser session, unchanged limitation).
 
+### 2026-07-26
+
+- Change tested: commercial-review-v1 brand + pharmacy/chemist exclusion filter, applied to all
+  13 already-accepted representative territories.
+- Command/manual check:
+  - Registry verification before any code was written: manually re-derived row counts (141/28/113),
+    keep/exclude overlap (0), union-vs-corrected match, and decision-label cross-check via an
+    independent Python script reading the raw CSVs — not assumed correct from the filenames alone.
+  - 15-assertion regression suite (`npm run test:lead-production-commercial-review`) — ALL PASSED,
+    including registry fail-closed behaviour against a deliberately corrupted fixture.
+  - Re-ran `test-lead-production-master-export.ts` / `test-lead-production-salespro-export.ts`
+    against real UB1/RM1 checkpoints; manually inspected the resulting
+    `commercial-review-exclusion-audit.csv` for UB1 (9 exclusions) and read every one of the 489
+    campaign-wide exclusion rows' `match_basis` — confirmed each is a genuine exact or
+    branch-name-variant match against an approved EXCLUDE brand (94 distinct real chains), zero
+    generic-word false positives.
+  - Independent zero-leakage check (Python, `csv.DictReader` — not the naive comma-split that
+    produced a false "leak" on the first attempt, caught and corrected before being reported) across
+    all 13 representatives' new-leads CSV, CTO 20-field file, and audit files: 0 leaked IDs, row
+    counts match exactly.
+  - Independent re-verification (separate script, not reused from the export scripts' own internal
+    assertions) that every surviving Lead ID in each of the 13 new-leads CSVs appears in that
+    territory's own Master Evidence Register sheet: 0 missing across all 13.
+  - Verified the 3 regenerated field-sales maps (Nauman/Manraj/Ayesha) have exactly as many rows as
+    their territory's new ordinary-lead count.
+  - `npm run typecheck` clean, `npm run build` succeeded, both re-run after every batch of code
+    changes (not just once at the end).
+- Result: commercial-review-v1 genuinely applied and independently verified — not just exit-code-
+  trusted. Campaign totals move from 2,700 usable / 2,520 ordinary new leads / 180 key accounts to
+  2,294 / 2,118 / 176, with the sum check against the unchanged 5,662 unique-candidates total
+  holding exactly for all 13 representatives and campaign-wide.
+- Evidence link/screenshot: `docs/09_DECISIONS.md` (new commercial-review-v1 decision entry),
+  `PROJECT_STATUS.md` ("COMMERCIAL REVIEW v1 APPLIED" section, full before/after table),
+  `docs/15_AI_WORK_LOG.md` (2026-07-26 session entry), per-territory
+  `<prefix>-commercial-review-exclusion-audit.csv` files.
+- Remaining risk: 0 pharmacy/chemist matches were found in this dataset — the rule is applied and
+  tested (fixture-proven to fire correctly when both category and name evidence are present) but
+  has not yet fired against real production data, so its real-data behaviour is unproven beyond the
+  fixture tests. "Other irrelevant business types" beyond the named brands and pharmacy/chemist was
+  not scoped or actioned this turn. Final human sign-off before physical handover to any
+  representative or the CTO has not been given — this verification covers correctness of the
+  applied rule, not business sign-off.
+
 ### YYYY-MM-DD HH:mm
 
 - Change tested:
