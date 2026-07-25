@@ -781,3 +781,45 @@ lead-production/discovery-engine test suites, typecheck, and build all re-verifi
 `scripts/lead-production/generate-territory-production-report.ts`,
 `scripts/lead-production/generate-progress-register.ts`, `scripts/test-map-required.ts`,
 `config/lead-production/sales-territories-v2.json`.
+
+## Fix — Shahzaib's config included "HA10", a non-existent postcode district (ISS-0032, 2026-07-25)
+
+**BUG:** `config/lead-production/sales-territories-v2.json` assigned Shahzaib the Sales Territory
+"HA6-HA10" (5 Postcode Districts), but HA10 does not exist — the HA postcode area (Harrow) only
+spans HA0-HA9. Nothing validated a configured Postcode District against the pipeline's own
+authoritative postcode reference before treating it as a live query unit; a live discovery run for
+"HA10" genuinely returned 0 raw observations (Just Eat had nothing to query), which correctly
+cascaded through 0 candidates at every downstream stage and halted the orchestrator with a
+`SHARED PIPELINE INTEGRITY FAILURE` at the Google stage's deliberate zero-candidate refusal. No
+data was fabricated or corrupted — the pipeline's defensive refusals behaved correctly once the
+config-level error had already been made. An audit of all 13 representatives confirmed HA10 was
+the only invalid Postcode District anywhere in the config.
+
+**FIX:**
+
+1. `config/lead-production/sales-territories-v2.json` — Shahzaib's assignment corrected from
+   `HA6-HA10` (5 districts) to `HA6-HA9` (4 districts, `districtCount: 4`); top-level
+   `totalDistricts` corrected `112` → `111`; a `corrections` array added recording the change,
+   its cause, and a pointer back to this entry and to ISS-0032.
+2. `scripts/test-lead-production-territory-v2.ts` — new regression check: every representative's
+   every configured Postcode District is resolved against `loadPostcodeReference()` and asserted
+   present (111 checks across all 13 representatives, including the 8 not yet live-processed at
+   the time of the fix), plus an explicit assertion that `HA10` itself is absent from the
+   reference — the exact guard that would have caught this before any live call was ever made.
+   `EXPECTED_COUNTS.Shahzaib` corrected `5` → `4`; all `112`-literal assertions updated to `111`.
+   The test now also loads `.env.local`/`.env` (`loadDotEnv()`, same pattern used by every other
+   script needing live Supabase access) since the new check calls `loadPostcodeReference()`,
+   which requires service credentials.
+3. **No output regeneration needed.** HA6, HA7, HA8, HA9 had already been run live and verified
+   before this was discovered — the defect never touched their raw observations, candidates, or
+   exports (HA10 produced zero raw records; there was nothing to prune from any accepted
+   district). Shahzaib's territory simply becomes HA6-HA9 (4 districts) going forward.
+
+**Regression suite:** `scripts/test-lead-production-territory-v2.ts`
+(`npm run test:lead-production-territory-v2`) — full suite re-verified passing, including the new
+111-district reference-validity check and the HA10-absence assertion. `npm run typecheck` and
+`npm run build` both re-verified clean.
+
+**See also:** `config/lead-production/sales-territories-v2.json`,
+`scripts/test-lead-production-territory-v2.ts`,
+`src/lib/discovery-engine/geography/reference.ts`.

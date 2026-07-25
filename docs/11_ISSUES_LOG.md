@@ -870,3 +870,49 @@ run resume from its own retained raw evidence with no new Just Eat call; `--repl
 `--resume-from=` were added to `scripts/je-run.ts`; and `run-comparison.ts` now refuses to treat
 an incomplete run's candidate count as a genuine zero-result. 9-scenario regression suite in
 `scripts/test-discovery-run-recovery.ts`.
+
+## ISS-0032 — Shahzaib's config included "HA10", which is not a real UK postcode district (2026-07-25)
+
+Date: 2026-07-25
+Severity: Medium
+Owner: Zoeb
+Status: **Fixed 2026-07-25** — see `docs/10_BUGS_AND_FIXES.md`. Regression guard added to
+`scripts/test-lead-production-territory-v2.ts` (`npm run test:lead-production-territory-v2`).
+
+### Problem
+
+`config/lead-production/sales-territories-v2.json` assigned Shahzaib the Sales Territory
+"HA6-HA10" (5 Postcode Districts: HA6, HA7, HA8, HA9, HA10). HA10 is not a real UK postcode
+district — the HA postcode area (Harrow) only spans HA0-HA9, confirmed against the pipeline's own
+authoritative postcode reference data (`loadPostcodeReference()`'s `districtsInArea("HA")`
+returns exactly `["HA0",...,"HA9"]`; `entry("HA10")` returns nothing). Nothing in
+`territory-assignment-v2.ts`'s config validation, nor `planTerritoryWithPlaces()`'s manual-input
+handling, cross-checks a configured/typed Postcode District against the reference before treating
+it as a valid query unit — `planTerritoryWithPlaces` returned `queryUnits: ["HA10"]` regardless.
+
+Caught live: a bounded discovery run for "HA10" completed successfully (`discovery_runs.status =
+"completed"`) with genuinely 0 raw observations (Just Eat found nothing to query against a
+non-existent area), which correctly cascaded to 0 Phase 1 candidates, 0 FSA candidates, and then a
+deliberate refusal in the Google stage (`REFUSING TO RUN LIVE: effective request cap is 0`),
+halting the orchestrator with a `SHARED PIPELINE INTEGRITY FAILURE`. No data was fabricated or
+corrupted at any stage — the pipeline's defensive refusals worked exactly as intended once the
+error had already been made at the config level.
+
+An audit of all 13 representatives' `postcodeDistricts` against the reference confirmed HA10 was
+the *only* invalid entry in the entire config.
+
+### Next action
+
+None — root-caused and fixed at the source (the config), not patched around.
+
+### Fix (2026-07-25)
+
+`config/lead-production/sales-territories-v2.json`: Shahzaib's assignment corrected to HA6-HA9 (4
+districts, `districtCount: 4`); top-level `totalDistricts` corrected 112 → 111; a `corrections`
+array added recording the change and its cause. HA6, HA7, HA8, HA9 (already live-processed and
+verified before this was discovered) required no rework — the defect never touched their data.
+`scripts/test-lead-production-territory-v2.ts` gained a new check that resolves every
+representative's every configured Postcode District against `loadPostcodeReference()` and asserts
+it exists, plus an explicit assertion that HA10 itself is absent — the exact regression guard that
+would have caught this before any live call was made. All 111 remaining districts (across all 13
+representatives, including the 5 not yet processed) were confirmed valid by this same check.
