@@ -701,5 +701,43 @@ zero overlap with key accounts/held/rejected/excluded).
 
 Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/saad/combined-2026-07-25/UB6-UB11-TERRITORY-RECONCILIATION-REPORT.md`
 
-**Next territory (Saif's HA0-HA5) requires separate owner authorisation.** No new branch
+## HA0-HA5 — Saif's full Sales Territory, ACCEPTED (2026-07-25)
+
+All 6 Postcode Districts (HA0, HA1, HA2, HA3, HA4, HA5) run live end-to-end, sequentially, and
+individually accepted, using the fully-fixed pipeline (ISS-0030, ISS-0031, and the map_required
+resolver fix all already in place — no new code changes were needed), with independent
+per-district DB reconciliation and zero-leakage verification before proceeding to the next
+district.
+
+Territory totals: 5392 raw = 873 geography-valid + 4519 rejected (exact, every district). 734 raw
+candidates -> **30 genuine cross-district duplicates removed -> 704 unique candidates** = 46
+customer-master exclusions + 50 excluded groups + 329 usable (223 premium, 106 releasable L1, 25
+key accounts) + 22 held + 257 hard-rejected. All exported Sales Pro Lead IDs (304 new leads + 25
+key accounts + 46 customer-master exclusions = 375 of 704 total candidates) verified present in
+the Master workbook's Evidence Register (375/375). Zero customer-master leakage into any
+rep-facing/Sales Pro output.
+
+No new defect found. The handover package was built correctly from the start via the corrected
+`generate-representative-handover.ts` — `mapRequired=false` resolved from
+`sales-territories-v2.json`, no map file produced. No district hit the ISS-0030 HTTP/2 GOAWAY
+class or required the ISS-0031 evidence-completeness recovery procedure.
+
+Source calls (stated separately, all live this session — no reused checkpoint for this
+territory): Google combined total 651 (120+122+124+130+76+79). Companies House combined total
+1556 (250+337+290+328+174+177), documents total 101 (10+33+16+22+10+10). No request exceeded its
+certified per-district cap (Google 800, Companies House 600 combined / 250 documents) on any of
+the 6 districts.
+
+Standardised handover package produced (**7 files**, no map deliverable — telesales), at exact
+path `/Users/homemac/Data/aspectlead-lead-production/handover/saif-ha0-ha5/`:
+`Saif_HA0-HA5_Representative_Master.xlsx`, `Saif_HA0-HA5_SalesPro_New_Leads.csv`,
+`Saif_HA0-HA5_Key_Accounts_Management_Review.xlsx`,
+`Saif_HA0-HA5_Customer_Master_Exclusions_Audit.xlsx`,
+`Saif_HA0-HA5_Lead_Production_Report.xlsx`, `Saif_HA0-HA5_Field_Provenance.csv`, `README.md`.
+Representative-facing files verified to contain ordinary approved leads only (304 of 329 usable,
+zero overlap with key accounts/held/rejected/excluded).
+
+Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/saif/combined-2026-07-25/HA0-HA5-TERRITORY-RECONCILIATION-REPORT.md`
+
+**Next territory (Shahzaib's HA6-HA10) requires separate owner authorisation.** No new branch
 created, no merge to `main`, no deployment.

@@ -856,6 +856,47 @@ Evidence: starter pack created and ZIP contents checked. This does not verify th
   clean, `npm run build` succeeded.
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/saad/combined-2026-07-25/UB6-UB11-TERRITORY-RECONCILIATION-REPORT.md`.
-- **Next task**: owner authorisation required before starting Saif's HA0-HA5 territory — same
-  per-territory authorisation pattern. No new branch created, no merge to `main`, no deployment;
-  all work remains on `feature/mvp-vertical-slice-001`.
+- **Next task (superseded, see below)**: owner authorisation was required before starting Saif's
+  HA0-HA5 territory — see the Saif section below.
+
+### HA0-HA5 (Saif's full Sales Territory) — live, accepted — 2026-07-25
+
+Preceded by a read-only verification of Saad's stored UB6-UB11 documentation (manifest,
+reconciliation report, Lead Production Report xlsx, progress register) against the exact figures
+the owner supplied — all confirmed correct, no corrective commit made.
+
+- All 6 HA Postcode Districts (HA0-HA5) run live end-to-end, sequentially, each independently
+  DB-reconciled and zero-leakage-verified before proceeding to the next, using the fully-fixed
+  pipeline (map_required resolver, ISS-0030, ISS-0031 all already in place — no new code changes
+  needed).
+- Territory totals: 5392 raw = 873 geography-valid + 4519 rejected (exact, every district). 734
+  candidates → 30 genuine cross-district duplicates removed → 704 unique. Permanent
+  `customer_master_exclusion` rule enforced: 46 exclusions found, zero leakage. Final: 329 usable
+  (223 premium, 106 releasable Level 1, 25 key accounts), 22 held for review, 257 hard-rejected,
+  50 excluded groups. Saif's combined 107-field Master workbook and 108-column Sales Pro files
+  generated; all 375 exported Sales Pro Lead IDs verified present in the Master workbook's
+  Evidence Register.
+- No new defect found. The handover package was built correctly from the start
+  (`mapRequired=false` resolved from `sales-territories-v2.json`, no map file produced).
+- Source calls (stated separately, all live this session): Google combined total 651
+  (120+122+124+130+76+79). Companies House combined total 1556 (250+337+290+328+174+177),
+  documents total 101 (10+33+16+22+10+10). No request exceeded its certified per-district cap
+  (Google 800, Companies House 600 combined / 250 documents) on any of the 6 districts.
+- Standardised handover package produced (**7 files**):
+  `/Users/homemac/Data/aspectlead-lead-production/handover/saif-ha0-ha5/`
+  (`Saif_HA0-HA5_Representative_Master.xlsx`, `Saif_HA0-HA5_SalesPro_New_Leads.csv`,
+  `Saif_HA0-HA5_Key_Accounts_Management_Review.xlsx`,
+  `Saif_HA0-HA5_Customer_Master_Exclusions_Audit.xlsx`,
+  `Saif_HA0-HA5_Lead_Production_Report.xlsx`, `Saif_HA0-HA5_Field_Provenance.csv`,
+  `README.md`), representative-facing files verified to contain ordinary approved leads only,
+  zero leakage.
+- Representative Progress Register updated: Nauman, Manraj, Ayesha, Kunz, Meer, Naseh, Saad, and
+  Saif now ACCEPTED (8/13 representatives complete).
+- Full test/build gate re-run clean: `test-lead-production-territory-v2.ts`,
+  `test-discovery-run-recovery.ts`, `test-map-required.ts` ALL PASSED, `npm run typecheck`
+  clean, `npm run build` succeeded.
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/saif/combined-2026-07-25/HA0-HA5-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task**: owner authorisation required before starting Shahzaib's HA6-HA10 territory —
+  same per-territory authorisation pattern. No new branch created, no merge to `main`, no
+  deployment; all work remains on `feature/mvp-vertical-slice-001`.
