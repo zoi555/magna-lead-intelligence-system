@@ -1082,6 +1082,79 @@ commit made.
   ALL PASSED, `npm run typecheck` clean, `npm run build` succeeded.
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/hassan/combined-2026-07-25/EN1-EN5-TERRITORY-RECONCILIATION-REPORT.md`.
-- **Next task**: owner authorisation required before starting Haleema's EN6-EN11 territory — same
-  per-territory authorisation pattern. No new branch created, no merge to `main`, no deployment;
-  all work remains on `feature/mvp-vertical-slice-001`.
+- **Next task (superseded, see below)**: owner authorisation was required before starting
+  Haleema's EN6-EN11 territory — see the Haleema section below.
+
+### EN6-EN11 (Haleema's full Sales Territory) — live, accepted — 2026-07-25 — 13th and FINAL representative
+
+Preceded by a read-only verification of Hassan's stored EN1-EN5 documentation (manifest,
+reconciliation report, Lead Production Report xlsx, progress register) against the exact figures
+the owner supplied — all confirmed correct, no corrective commit made.
+
+- Before any live call, all six configured Postcode Districts (EN6-EN11) were confirmed as real
+  entries in the authoritative postcode reference.
+- All 6 districts run live end-to-end, sequentially, each independently DB-reconciled and
+  zero-leakage-verified before proceeding to the next, using the fully-fixed pipeline
+  (map_required resolver, ISS-0030, ISS-0031, ISS-0032 all already in place).
+- Territory totals: 1755 raw = 306 geography-valid + 1449 rejected (exact, every district). 261
+  candidates → 6 genuine cross-district duplicates removed → 255 unique. Permanent
+  `customer_master_exclusion` rule enforced: 2 exclusions found, zero leakage. Final: 155 usable
+  (97 premium, 58 releasable Level 1, 11 key accounts), 1 held for review, 69 hard-rejected, 28
+  excluded groups. Haleema's combined 107-field Master workbook and 108-column Sales Pro files
+  generated; all 157 exported Sales Pro Lead IDs verified present in the Master workbook's
+  Evidence Register.
+- No new defect found.
+- Source calls (stated separately): Google combined total 232 (51+5+87+34+20+35). Companies House
+  combined total 570 (135+10+193+90+44+98), documents total 42 (12+0+10+10+0+10). No request
+  exceeded its certified per-district cap on any of the 6 districts.
+- Standardised handover package produced (**7 files**):
+  `/Users/homemac/Data/aspectlead-lead-production/handover/haleema-en6-en11/`
+  (`Haleema_EN6-EN11_Representative_Master.xlsx`, `Haleema_EN6-EN11_SalesPro_New_Leads.csv`,
+  `Haleema_EN6-EN11_Key_Accounts_Management_Review.xlsx`,
+  `Haleema_EN6-EN11_Customer_Master_Exclusions_Audit.xlsx`,
+  `Haleema_EN6-EN11_Lead_Production_Report.xlsx`, `Haleema_EN6-EN11_Field_Provenance.csv`,
+  `README.md`), representative-facing files verified to contain ordinary approved leads only,
+  zero leakage.
+- Representative Progress Register updated: **all 13 representatives now ACCEPTED (13/13
+  complete)** — Nauman, Manraj, Ayesha, Kunz, Meer, Naseh, Saad, Saif, Shahzaib, Tahira, Wajahat,
+  Hassan, Haleema.
+- Full test/build gate re-run clean: `test-lead-production-territory-v2.ts` (111-district
+  postcode-reference guard re-confirmed), `test-discovery-run-recovery.ts`, `test-map-required.ts`
+  ALL PASSED, `npm run typecheck` clean, `npm run build` succeeded.
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/haleema/combined-2026-07-25/EN6-EN11-TERRITORY-RECONCILIATION-REPORT.md`.
+
+## CAMPAIGN COMPLETE — 13/13 representatives, PROVISIONAL pending commercial review (2026-07-25)
+
+Live production is complete for all 13 representative Sales Territories (111 Postcode Districts).
+Full campaign completion report with per-representative and campaign-wide totals and sum proofs:
+`/Users/homemac/Data/aspectlead-lead-production/output/CAMPAIGN-COMPLETION-REPORT.md`.
+
+**Campaign totals**: 68,708 raw observations -> 5,842 pre-dedup candidates -> 180 cross-district
+duplicates removed -> 5,662 unique candidates -> 2,700 total usable (1,695 premium, 1,005
+releasable Level 1) -> 2,520 ordinary new leads + 180 key accounts. 108 held for review, 1,853
+hard-rejected, 407 customer-master exclusions, 594 excluded groups. Proof: 2,700 (usable) + 108
+(held) + 1,853 (hard-rejected) + 407 (customer exclusions) + 594 (excluded groups) = 5,662 (unique
+candidates). 3 field-sales representatives (Nauman, Manraj, Ayesha) each received an 8-file
+package including a map deliverable; 10 telesales representatives each received a 7-file package
+with no map — every count independently confirmed against the resolved `mapRequired` value for
+that representative.
+
+Four real defects were found and fixed during the campaign (ISS-0030 website HTTP/2 crash,
+ISS-0031 discovery-run-recovery, the map_required resolver defect, ISS-0032 postcode-reference
+validation) — every one root-caused at the pipeline or config source, regression-tested, and
+never patched only in an output file.
+
+**PROVISIONAL — DO NOT HAND OVER.** All 13 representative packages remain provisional pending a
+final commercial review, not yet applied to any package:
+- Exclusion of unwanted groups/chains (e.g. Chaiiwala).
+- Exclusion of pharmacies and chemists.
+- Exclusion of other irrelevant business types.
+- Simplified representative workbook layout for end-user handover.
+- Final CTO handover package (not yet assembled).
+- Final regenerated campaign lists reflecting all of the above.
+
+- **Next task**: application-development work (Phase 1-5, previously paused) remains paused per
+  explicit instruction. No further lead-production work is authorised until the owner explicitly
+  requests the commercial review pass described above. No new branch created, no merge to `main`,
+  no deployment; all work remains on `feature/mvp-vertical-slice-001`.

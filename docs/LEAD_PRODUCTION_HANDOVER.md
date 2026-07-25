@@ -909,5 +909,61 @@ zero overlap with key accounts/held/rejected/excluded).
 
 Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/hassan/combined-2026-07-25/EN1-EN5-TERRITORY-RECONCILIATION-REPORT.md`
 
-**Next territory (Haleema's EN6-EN11) requires separate owner authorisation.** No new branch
-created, no merge to `main`, no deployment.
+## EN6-EN11 — Haleema's full Sales Territory, ACCEPTED (2026-07-25) — 13th and FINAL representative
+
+Before any live call was made, all six configured Postcode Districts (EN6-EN11) were confirmed as
+real entries in the pipeline's own authoritative postcode reference data. All 6 districts then
+run live end-to-end, sequentially, and individually accepted, using the fully-fixed pipeline
+(ISS-0030, ISS-0031, ISS-0032, and the map_required resolver fix all already in place), with
+independent per-district DB reconciliation and zero-leakage verification before proceeding to the
+next district.
+
+Territory totals: 1755 raw = 306 geography-valid + 1449 rejected (exact, every district). 261 raw
+candidates -> **6 genuine cross-district duplicates removed -> 255 unique candidates** = 2
+customer-master exclusions + 28 excluded groups + 155 usable (97 premium, 58 releasable L1, 11
+key accounts) + 1 held + 69 hard-rejected. All exported Sales Pro Lead IDs (144 new leads + 11
+key accounts + 2 customer-master exclusions = 157 of 255 total candidates) verified present in
+the Master workbook's Evidence Register (157/157). Zero customer-master leakage into any
+rep-facing/Sales Pro output.
+
+No new defect found. The handover package was built correctly from the start via the corrected
+`generate-representative-handover.ts` — `mapRequired=false` resolved from
+`sales-territories-v2.json`, no map file produced.
+
+Source calls (stated separately, all live this session): Google combined total 232
+(51+5+87+34+20+35). Companies House combined total 570 (135+10+193+90+44+98), documents total 42
+(12+0+10+10+0+10). No request exceeded its certified per-district cap (Google 800, Companies
+House 600 combined / 250 documents) on any of the 6 districts.
+
+Standardised handover package produced (**7 files**, no map deliverable — telesales), at exact
+path `/Users/homemac/Data/aspectlead-lead-production/handover/haleema-en6-en11/`:
+`Haleema_EN6-EN11_Representative_Master.xlsx`, `Haleema_EN6-EN11_SalesPro_New_Leads.csv`,
+`Haleema_EN6-EN11_Key_Accounts_Management_Review.xlsx`,
+`Haleema_EN6-EN11_Customer_Master_Exclusions_Audit.xlsx`,
+`Haleema_EN6-EN11_Lead_Production_Report.xlsx`, `Haleema_EN6-EN11_Field_Provenance.csv`,
+`README.md`. Representative-facing files verified to contain ordinary approved leads only (144 of
+155 usable, zero overlap with key accounts/held/rejected/excluded).
+
+Full detail: `/Users/homemac/Data/aspectlead-lead-production/output/territories/haleema/combined-2026-07-25/EN6-EN11-TERRITORY-RECONCILIATION-REPORT.md`
+
+**This completes live production for all 13 representative territories (111 Postcode Districts
+in total).** No further live discovery, enrichment, or scoring work is authorised at this time.
+
+## CAMPAIGN COMPLETE — all 13 representatives, PROVISIONAL pending commercial review
+
+Full campaign completion report (13 representatives, all totals and sum proofs):
+`/Users/homemac/Data/aspectlead-lead-production/output/CAMPAIGN-COMPLETION-REPORT.md`.
+
+Campaign totals: 68,708 raw observations across 111 Postcode Districts -> 5,842 pre-dedup
+candidates -> 180 genuine cross-district duplicates removed -> 5,662 unique candidates -> 2,700
+total usable (1,695 premium, 1,005 releasable Level 1) -> 2,520 ordinary new leads + 180 key
+accounts. 108 held for review, 1,853 hard-rejected, 407 customer-master exclusions, 594 excluded
+groups. 3 field-sales representatives (Nauman, Manraj, Ayesha) received an 8-file package
+including a map deliverable; 10 telesales representatives received a 7-file package with no map.
+
+**ALL 13 REPRESENTATIVE PACKAGES REMAIN PROVISIONAL. DO NOT HAND OVER.** A final commercial
+review is required before any release to the sales team, covering: exclusion of unwanted groups/
+chains (e.g. Chaiiwala), exclusion of pharmacies and chemists, exclusion of other irrelevant
+business types, a simplified representative workbook layout, assembly of the final CTO handover
+package, and final regenerated campaign lists reflecting all of the above. None of these changes
+have been applied. No new branch created, no merge to `main`, no deployment.
