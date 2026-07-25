@@ -947,6 +947,49 @@ the owner supplied — all confirmed correct, no corrective commit made.
   `test-map-required.ts` ALL PASSED, `npm run typecheck` clean, `npm run build` succeeded.
 - Full reconciliation report (outside the repo, no lead data committed):
   `/Users/homemac/Data/aspectlead-lead-production/output/territories/shahzaib/combined-2026-07-25/HA6-HA9-TERRITORY-RECONCILIATION-REPORT.md`.
-- **Next task**: owner authorisation required before starting Tahira's WD3-WD7 territory — same
-  per-territory authorisation pattern. No new branch created, no merge to `main`, no deployment;
-  all work remains on `feature/mvp-vertical-slice-001`.
+- **Next task (superseded, see below)**: owner authorisation was required before starting
+  Tahira's WD3-WD7 territory — see the Tahira section below.
+
+### WD3-WD7 (Tahira's full Sales Territory) — live, accepted — 2026-07-25
+
+Preceded by a read-only verification of Shahzaib's stored HA6-HA9 documentation (manifest,
+reconciliation report, Lead Production Report xlsx, progress register) against the exact figures
+the owner supplied, plus HA10-containment checks (retained-evidence-only) and a re-run of the
+111-district postcode-reference guard — all confirmed correct, no corrective commit made.
+
+- All 5 Postcode Districts (WD3-WD7) — each pre-validated against the authoritative postcode
+  reference before any live call (ISS-0032 guard) — run live end-to-end, sequentially, each
+  independently DB-reconciled and zero-leakage-verified before proceeding to the next, using the
+  fully-fixed pipeline (map_required resolver, ISS-0030, ISS-0031, ISS-0032 all already in place).
+- Territory totals: 2083 raw = 217 geography-valid + 1866 rejected (exact, every district). 189
+  candidates → 6 genuine cross-district duplicates removed → 183 unique. Permanent
+  `customer_master_exclusion` rule enforced: 4 exclusions found, zero leakage. Final: 100 usable
+  (61 premium, 39 releasable Level 1, 6 key accounts), 1 held for review, 49 hard-rejected, 29
+  excluded groups. Tahira's combined 107-field Master workbook and 108-column Sales Pro files
+  generated; all 104 exported Sales Pro Lead IDs verified present in the Master workbook's
+  Evidence Register.
+- No new defect found. The handover package was built correctly from the start
+  (`mapRequired=false` resolved from `sales-territories-v2.json`, no map file produced).
+- Source calls (stated separately, all live this session): Google combined total 156
+  (61+14+12+59+10). Companies House combined total 385 (138+30+24+163+30), documents total 28
+  (8+2+0+16+2). No request exceeded its certified per-district cap (Google 800, Companies House
+  600 combined / 250 documents) on any of the 5 districts.
+- Standardised handover package produced (**7 files**):
+  `/Users/homemac/Data/aspectlead-lead-production/handover/tahira-wd3-wd7/`
+  (`Tahira_WD3-WD7_Representative_Master.xlsx`, `Tahira_WD3-WD7_SalesPro_New_Leads.csv`,
+  `Tahira_WD3-WD7_Key_Accounts_Management_Review.xlsx`,
+  `Tahira_WD3-WD7_Customer_Master_Exclusions_Audit.xlsx`,
+  `Tahira_WD3-WD7_Lead_Production_Report.xlsx`, `Tahira_WD3-WD7_Field_Provenance.csv`,
+  `README.md`), representative-facing files verified to contain ordinary approved leads only,
+  zero leakage.
+- Representative Progress Register updated: Nauman, Manraj, Ayesha, Kunz, Meer, Naseh, Saad,
+  Saif, Shahzaib, and Tahira now ACCEPTED (10/13 representatives complete).
+- Full test/build gate re-run clean: `test-lead-production-territory-v2.ts` (111-district
+  postcode-reference guard re-confirmed), `test-discovery-run-recovery.ts`, `test-map-required.ts`
+  ALL PASSED, `npm run typecheck` clean, `npm run build` succeeded.
+- Full reconciliation report (outside the repo, no lead data committed):
+  `/Users/homemac/Data/aspectlead-lead-production/output/territories/tahira/combined-2026-07-25/WD3-WD7-TERRITORY-RECONCILIATION-REPORT.md`.
+- **Next task**: owner authorisation required before starting Wajahat's
+  WD17/WD18/WD19/WD23/WD24/WD25 territory — same per-territory authorisation pattern. No new
+  branch created, no merge to `main`, no deployment; all work remains on
+  `feature/mvp-vertical-slice-001`.
