@@ -12,6 +12,7 @@ const MANRAJ_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/manr
 const AYESHA_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/ayesha-nw1-nw10";
 const KUNZ_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/kunz-tw1-tw10";
 const MEER_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/meer-tw11-tw20";
+const NASEH_DIR = "/Users/homemac/Data/aspectlead-lead-production/handover/naseh-ub1-ub5";
 
 const REPRESENTATIVES = [
   {
@@ -76,18 +77,16 @@ const REPRESENTATIVES = [
   },
   {
     representative: "Naseh", role: "telesales", salesTerritory: "UB1-UB5",
-    totalDistricts: 5, districtsCompleted: 1, districtsHeld: 0, districtsRemaining: 4,
-    territoryStatus: "in_progress", usable: 47, ordinaryNewLeads: 42, keyAccounts: 5,
-    customerExclusions: 20, groupExclusions: 0, held: 11, hardRejected: 36,
-    masterFilePath: "/Users/homemac/Data/aspectlead-lead-production/output/ub1/2026-07-23T13-30-00Z-release-package-v2/ub1-operationally-usable.csv",
-    salesProFilePath: "/Users/homemac/Data/aspectlead-lead-production/output/ub1/2026-07-23T13-30-00Z-release-package-v2/ub1-field-sales-ready.csv",
-    mapPath: "n/a (UB1 predates the standardised map-file convention introduced for RM1-RM14)",
-    reportPath: "/Users/homemac/Data/aspectlead-lead-production/output/ub1/2026-07-23T13-30-00Z-release-package-v2/ub1-release-summary.md",
-    latestCommit: "89c3be3 (UB1 release package) + customer_master_exclusion reprocess (2026-07-24, zero new external calls)",
-    schemaVersion: "UB1 v1 release package (predates the RM1-RM14/KT1-KT24 107-field Master / 108-column Sales Pro standard)",
-    rulesVersion: "qualification/scoring v2, customer_master_exclusion hard rule",
-    lastUpdated: "2026-07-24",
-    nextAction: "UB1 complete and reprocessed under customer_master_exclusion; UB2-UB5 not started — awaiting owner authorisation. Held/hard-rejected/premium/releasable breakdown above is the pre-reprocess release package snapshot (usable population and customer-exclusion count independently confirmed post-reprocess in docs/LEAD_PRODUCTION_HANDOVER.md); UB1 has not yet been repackaged into the standardised handover format used for RM1-RM14/KT1-KT24.",
+    totalDistricts: 5, districtsCompleted: 5, districtsHeld: 0, districtsRemaining: 0,
+    territoryStatus: "ACCEPTED", usable: 126, ordinaryNewLeads: 113, keyAccounts: 13,
+    customerExclusions: 71, groupExclusions: 25, held: 17, hardRejected: 74,
+    masterFilePath: `${NASEH_DIR}/Naseh_UB1-UB5_Representative_Master.xlsx`,
+    salesProFilePath: `${NASEH_DIR}/Naseh_UB1-UB5_SalesPro_New_Leads.csv`,
+    mapPath: "n/a (telesales — mapRequired=false, resolved from sales-territories-v2.json; no map file produced or referenced)",
+    reportPath: `${NASEH_DIR}/Naseh_UB1-UB5_Lead_Production_Report.xlsx`,
+    latestCommit: "98737f8 (no new pipeline code required for UB1-UB5 — map_required fix and ISS-0030/ISS-0031 fixes already in place; UB1 reused via verified checkpoint reuse, UB2-UB5 processed live)",
+    schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring v2, assignment v2",
+    lastUpdated: "2026-07-25", nextAction: "None — territory complete, handed over, awaiting no further action.",
   },
   { representative: "Saad", role: "telesales", salesTerritory: "UB6-UB11", totalDistricts: 6, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 6, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },
   { representative: "Saif", role: "telesales", salesTerritory: "HA0-HA5", totalDistricts: 6, districtsCompleted: 0, districtsHeld: 0, districtsRemaining: 6, territoryStatus: "not_started", usable: 0, ordinaryNewLeads: 0, keyAccounts: 0, customerExclusions: 0, groupExclusions: 0, held: 0, hardRejected: 0, masterFilePath: "", salesProFilePath: "", mapPath: "", reportPath: "", latestCommit: "n/a", schemaVersion: "n/a", rulesVersion: "n/a", lastUpdated: "2026-07-24", nextAction: "Not started — awaiting owner authorisation." },

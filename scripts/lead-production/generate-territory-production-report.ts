@@ -150,7 +150,30 @@ const MEER_SOURCE_CALLS = [
 const MEER_DEFECTS: string[][] = [];
 const MEER_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions), fixed and verified before TW11 started. npm run typecheck — clean. npm run build — succeeded. No lead-data defect found during TW11-TW20 processing. Handover package correctly produced with no map deliverable from the start (mapRequired=false resolved from sales-territories-v2.json).";
 
+const NASEH_DISTRICTS = [
+  ["UB1", 717, 107, 610, 94, 47, 30, 17, 5, 6, 16, 20, 5],
+  ["UB2", 791, 59, 732, 56, 24, 18, 6, 1, 3, 17, 10, 2],
+  ["UB3", 806, 102, 704, 93, 30, 21, 9, 2, 2, 20, 26, 15],
+  ["UB4", 761, 81, 680, 72, 27, 20, 7, 5, 7, 20, 15, 3],
+  ["UB5", 1171, 53, 1118, 7, 1, 1, 0, 0, 1, 4, 1, 0],
+];
+const NASEH_SOURCE_CALLS = [
+  ["UB1", 83, 185], ["UB2", 50, 146], ["UB3", 68, 178], ["UB4", 65, 170], ["UB5", 7, 10],
+];
+const NASEH_DEFECTS: string[][] = [];
+const NASEH_TESTS = "test-lead-production-territory-v2.ts — ALL PASSED. test-discovery-run-recovery.ts (ISS-0031) — ALL PASSED. test-map-required.ts — ALL PASSED (27 assertions). npm run typecheck — clean. npm run build — succeeded. No new lead-data or pipeline defect found during UB1-UB5 processing. UB1 reused from the accepted 2026-07-24 customer-master-exclusion-reprocess checkpoint after verifying byte-exact customer-master SHA256, group-registry MD5, and rules-version compatibility — no new live discovery or enrichment calls made for UB1 this session (Google: 83 candidates processed historically across the original+supplemental live stages; Companies House: 185 combined/12 document requests historically). UB2-UB5 processed fully live this session. Handover package correctly produced with no map deliverable (mapRequired=false resolved from sales-territories-v2.json).";
+
 const TERRITORIES: Record<string, any> = {
+  naseh: {
+    representative: "Naseh", role: "Telesales", salesTerritory: "UB1-UB5", filePrefix: "Naseh_UB1-UB5",
+    districts: NASEH_DISTRICTS, sourceCalls: NASEH_SOURCE_CALLS, defects: NASEH_DEFECTS, tests: NASEH_TESTS,
+    totalRaw: 4246, totalValid: 402, totalRejected: 3844, totalCandidates: 322, duplicatesRemoved: 9, uniqueCandidates: 313,
+    usable: 126, premium: 89, releasableL1: 37, keyAccounts: 13, held: 17, hardRejected: 74, customerExclusions: 71, excludedGroups: 25,
+    salesProNewLeads: 113, salesProKeyAccounts: 13, salesProCustExclusions: 71,
+    commitSha: "98737f8 (no new pipeline code required for UB1-UB5 processing — map_required fix and ISS-0030/ISS-0031 fixes already in place)", schemaVersion: "Master v1 (107 fields) / Sales Pro v1 (108 columns)", rulesVersion: "qualification/scoring rules v2, assignment v2",
+    handoverDir: "/Users/homemac/Data/aspectlead-lead-production/handover/naseh-ub1-ub5",
+    territoryReportPath: "/Users/homemac/Data/aspectlead-lead-production/output/territories/naseh/combined-2026-07-25/UB1-UB5-TERRITORY-RECONCILIATION-REPORT.md",
+  },
   ayesha: {
     representative: "Ayesha", role: "Field Sales", salesTerritory: "NW1-NW10", filePrefix: "Ayesha_NW1-NW10",
     districts: AYESHA_DISTRICTS, sourceCalls: AYESHA_SOURCE_CALLS, defects: AYESHA_DEFECTS, tests: AYESHA_TESTS,
