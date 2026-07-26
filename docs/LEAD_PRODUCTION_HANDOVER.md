@@ -972,13 +972,21 @@ have been applied. No new branch created, no merge to `main`, no deployment.
 
 The approved commercial-review decisions (141 brands reviewed: 28 kept, 113 excluded as whole
 brands, plus a permanent pharmacy/chemist exclusion) are now applied to all 13 representative
-packages. Full detail — verification of the 3 approved decision files, pipeline changes, per-
-representative before/after counts, campaign totals, and what remains open — is in
-`PROJECT_STATUS.md`'s "COMMERCIAL REVIEW v1 APPLIED" section (2026-07-26). Summary: 2,700 -> 2,294
-usable, 2,520 -> 2,118 ordinary new leads, 180 -> 176 key accounts, 489 new commercial-review
-exclusions (0 pharmacy/chemist), zero leakage, every surviving Lead ID re-verified against its
-Master Evidence Register. Config: `config/lead-production/commercial-review-v1/`. Code commits
-`98e17ee`, `2f9a23a`, `70e3e38`.
+packages. **Superseded by the release-verification fix below — see the corrected numbers there,
+not the first-pass figures originally recorded in this section.**
+
+## RELEASE VERIFICATION — pharmacy/chemist + brand-matching gaps found and fixed (2026-07-26)
+
+A read-only release-verification pass found and fixed two real defects (pharmacy/chemist
+exclusion rule was practically unfireable; two brand-matching gaps — "Superdrug" and "Pearl
+Chemist Group" branch naming) plus a Simplified Representative Workbook layout defect. Full
+detail: `PROJECT_STATUS.md`'s "RELEASE VERIFICATION" section, `docs/10_BUGS_AND_FIXES.md`,
+`docs/09_DECISIONS.md`. Final corrected totals: 2,700 -> 2,192 usable, 2,520 -> 2,016 ordinary new
+leads, 180 -> 176 key accounts, 702 commercial-review exclusions (672 brand + 30 pharmacy/chemist,
+up from 489 + 0). Zero leakage re-verified; every one of the 41 originally-flagged pharmacy/
+chemist candidates now correctly excluded; all 13 Simplified Representative Workbooks confirmed
+to use the identical approved 18-column layout. Config: `config/lead-production/commercial-review-v1/`.
+Code commits `98e17ee`, `2f9a23a`, `70e3e38`, `c59e93f`, `a178b97`, `f33f517`.
 
 **Final human sign-off is still required before any package is physically handed to a
 representative or the CTO.**

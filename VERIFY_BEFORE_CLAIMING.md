@@ -221,6 +221,47 @@ No assistant, developer, or unfortunate human may claim the project works withou
   representative or the CTO has not been given — this verification covers correctness of the
   applied rule, not business sign-off.
 
+### 2026-07-26 (same-day follow-up)
+
+- Change tested: release verification of the commercial-review-v1 work above — specifically
+  whether the reported "pharmacy/chemist exclusions = 0" was actually true, and whether the
+  Simplified Representative Workbook's layout matched what was approved.
+- Command/manual check:
+  - Did NOT trust the earlier "0 pharmacy/chemist exclusions" claim at face value — independently
+    keyword-searched every candidate (all 6 buckets, all 13 territories, not just the excluded
+    ones) for pharmacy/chemist/pharmaceutical/dispensary/Superdrug/Pearl Chemist. Found 41 real
+    matches, confirming the earlier commercial scan's ~20-record estimate was directionally
+    correct and the automated report's "0" was wrong.
+  - Root-caused (not just patched around) two distinct defects before writing any fix, then wrote
+    9 new regression assertions proving the fix works AND that the existing generic-word
+    false-positive protection (Phoenix/Premier) still holds.
+  - After the fix, re-ran the keyword search: all 41 originally-flagged candidates now excluded by
+    one rule or the other (0 remaining) — checked programmatically, not sampled.
+  - Read every one of the 213 newly-caught matches' business names campaign-wide (grouped by
+    matched brand) to check for false positives before trusting the larger number — found 107
+    distinct real UK chains (Shell, Londis, Wenzel's, Harvester, etc.), zero coincidental
+    generic-word matches.
+  - Independently recomputed brand/pharmacy rule overlap by evaluating BOTH rules against every
+    flagged candidate (not trusting the production code's single recorded final_exclusion_status,
+    which only records whichever rule fired first) — found 2 genuine overlaps.
+  - Rebuilt the Simplified Representative Workbook against the actual approved 18-column spec
+    (previously verified against nothing but the pipeline's own README-style comment) and added a
+    dedicated regression test asserting exact column order, Business Name first, Sales Pro Lead ID
+    last, and fail-closed behaviour on a missing source column.
+  - Re-ran the full zero-leakage check, Master Evidence Register cross-check, and field-sales map
+    row-count check for all 13 representatives after every regeneration (not just once at the
+    end). `npm run typecheck` clean, `npm run build` succeeded, both re-run after every fix.
+- Result: 2 real defects confirmed, root-caused, fixed, regression-tested, and the entire campaign
+  reprocessed and re-verified — not just accepted the original "0 pharmacy/chemist" claim. Final
+  corrected totals: 2,192 usable / 2,016 ordinary new leads / 176 key accounts / 702 commercial-
+  review exclusions (672 brand + 30 pharmacy/chemist).
+- Evidence link/screenshot: `docs/10_BUGS_AND_FIXES.md` (full defect writeup),
+  `PROJECT_STATUS.md` ("RELEASE VERIFICATION" section), `docs/09_DECISIONS.md`,
+  `docs/15_AI_WORK_LOG.md` (2026-07-26 follow-up entry).
+- Remaining risk: the dash-separator brand-matching relaxation has a documented, accepted residual
+  risk (no counter-example found in 702 real matches). Final human sign-off before physical
+  handover to any representative or the CTO has not been given.
+
 ### YYYY-MM-DD HH:mm
 
 - Change tested:

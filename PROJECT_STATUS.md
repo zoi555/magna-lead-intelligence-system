@@ -1161,6 +1161,11 @@ final commercial review, not yet applied to any package:
 
 ## COMMERCIAL REVIEW v1 APPLIED — all 13 representatives regenerated (2026-07-26)
 
+**SUPERSEDED by the release-verification fix below ("RELEASE VERIFICATION — pharmacy/chemist +
+brand-matching gaps found and fixed") — the campaign totals in this section are the FIRST-PASS
+numbers, before two real defects (pharmacy/chemist rule + two brand-matching gaps) were found and
+fixed. Kept here for the historical record; do not treat these totals as current.**
+
 The approved commercial-review decision files (141 brands reviewed: 28 kept, 113 excluded as
 whole brands) were copied into
 `config/lead-production/commercial-review-v1/` (`corrected_brand_decisions.csv`,
@@ -1229,3 +1234,59 @@ individually, per the explicit instruction not to create a combined file (Turn I
 sign-off is still required before any package is physically handed to a representative or the
 CTO** — this turn applies and verifies the approved commercial-review decisions; it does not
 itself constitute that sign-off.
+
+## RELEASE VERIFICATION — pharmacy/chemist + brand-matching gaps found and fixed (2026-07-26)
+
+A read-only release-verification pass (owner-requested, comparing production output against an
+earlier manual commercial scan that had identified ~20 possible pharmacy/chemist records)
+surfaced two genuine pipeline defects and one layout defect in the work above. Full technical
+detail: `docs/10_BUGS_AND_FIXES.md` ("commercial-review-v1 pharmacy/chemist rule unfireable + two
+brand-matching gaps"), `docs/09_DECISIONS.md` (matching-safety design record).
+
+**Found**: 41 real pharmacy/chemist candidates (Church Pharmacy, Woods Chemist, Superdrug branches,
+Pearl Chemist branches, etc.) that had NOT been excluded — pharmacy_chemist_exclusions was 0.
+Root causes: (1) the pharmacy/chemist rule required category evidence that real FSA/Google data
+almost never provides for pharmacies; (2) single-word brand "Superdrug" and multi-word brand
+"Pearl Chemist Group" both had real-world naming patterns the original matching logic didn't
+catch. Separately: the Simplified Representative Workbook used the wrong 20-CTO-field layout
+instead of the approved 18-column layout.
+
+**Fixed and reprocessed**: pharmacy/chemist rule now fires on name evidence alone (category is
+corroborating, not required); single-word brands additionally match a dash-separated branch name
+("Superdrug - Hornchurch") while remaining exact-only for a bare space (protecting "Phoenix Fried
+Chicken"/"Premier Kebab House"); a generic "Group" suffix is stripped from the brand side before
+multi-word comparison ("Pearl Chemist Group" now matches "Pearl Chemist Cobham"). Simplified
+Workbook rebuilt to the correct 18-column layout. All 13 territories reprocessed again from the
+same already-accepted checkpoints — no new discovery/enrichment call.
+
+**Final corrected campaign totals (13/13 representatives, superseding the first-pass numbers above)**:
+- Usable: 2,700 (original) -> 2,192 (final)
+- Ordinary new leads: 2,520 (original) -> 2,016 (final)
+- Key accounts: 180 (original) -> 176 (final, unchanged by this fix — the same 4 removed in the
+  first pass remain removed; no additional key account was newly caught)
+- Commercial-review exclusions: 489 (first pass) -> 702 (final) — 672 brand + 30 pharmacy/chemist
+  (was 489 brand + 0 pharmacy/chemist)
+- Independently-computed overlap between the brand rule and the pharmacy/chemist rule: 2
+  candidates (both "Pearl Chemist" branches — matched by both rules; the brand rule wins in
+  production since it is checked first, immaterial to the correct final exclusion outcome)
+- Sum check: 2,192 (usable) + 101 (held) + 1,666 (hard-rejected) + 407 (customer exclusions) + 594
+  (excluded groups) + 702 (commercial-review exclusions) = 5,662 (unique candidates, unchanged) ✓
+
+**Verified after the fix** (all independently re-checked, not just exit-code-trusted): zero
+leakage across every new-leads CSV / CTO file / Simplified Workbook / map for all 13
+representatives; every surviving Lead ID re-traced to its Master Evidence Register (0 missing);
+every one of the 41 originally-flagged pharmacy/chemist candidates now excluded by one rule or the
+other (0 remaining unexcluded); 69 keep-listed-brand candidates confirmed still present/eligible
+in final output; the 3 field-sales maps' row counts match their territory's final ordinary-lead
+count exactly; all 13 Simplified Representative Workbooks confirmed to use the identical approved
+18-column layout, Business Name first, Sales Pro Lead ID last.
+
+**Residual, documented risk**: the dash-separator relaxation for single-word brands carries a
+theoretical residual risk (an unrelated independent business coincidentally named "Word -
+Location" where Word matches an exclude brand) — no such case was found across 702 real matches,
+but it is not structurally impossible. "Other irrelevant business types" beyond the named brands
+and pharmacy/chemist remains out of scope. **Final human sign-off is still required before any
+package is physically handed to a representative or the CTO.**
+
+Code commits: `98e17ee`, `2f9a23a`, `70e3e38`, `c59e93f`, `a178b97`, `f33f517`. Application-
+development work remains paused; no merge to `main`, no deployment.

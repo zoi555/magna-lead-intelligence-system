@@ -823,3 +823,71 @@ the only invalid Postcode District anywhere in the config.
 **See also:** `config/lead-production/sales-territories-v2.json`,
 `scripts/test-lead-production-territory-v2.ts`,
 `src/lib/discovery-engine/geography/reference.ts`.
+
+## Fix — commercial-review-v1 pharmacy/chemist rule unfireable + two brand-matching gaps (2026-07-26)
+
+**BUG:** A release-verification pass (owner-requested, comparing production output against an
+earlier manual commercial scan that had identified ~20 possible pharmacy/chemist records)
+found 41 genuine pharmacy/chemist candidates across the 13 territories that the
+commercial-review-v1 filter had entirely missed:
+
+1. The pharmacy/chemist rule required BOTH business-type/category evidence AND name evidence.
+   Real FSA/Google category data for pharmacies in this dataset is almost always blank or a
+   generic value ("Retailers - other", "Caring Premises") — never literally "pharmacy"/"chemist"
+   — so the category-evidence requirement was practically unfireable. All 41 candidates had
+   unambiguous name evidence ("Church Pharmacy", "Woods Chemist", "Superdrug - Hornchurch") but
+   0 fired the rule.
+2. "Superdrug - Hornchurch" (and 8 other Superdrug branches) never matched the approved EXCLUDE
+   brand "Superdrug" — single-word brands were exact-match-only, by design, to protect against
+   generic words (Phoenix, Premier, Shell) coincidentally appearing in an unrelated independent's
+   name. "Pearl Chemist Cobham"/"PEARL CHEMIST BYFLEET" never matched EXCLUDE brand "Pearl
+   Chemist Group" because real branches omit the word "Group".
+
+Once these two brand-matching gaps were fixed (see below), applying them across the full
+111-district dataset surfaced far more matches than the initial 41-candidate scan alone — 672
+brand exclusions campaign-wide (up from 489), because several of the approved EXCLUDE brands
+(Shell, Londis, Wenzel's, Harvester, Superdrug) are multi-hundred-branch UK chains present as
+Just Eat convenience/grocery-delivery listings, not just food-service listings. Every new match
+was individually inspected; zero false positives found (see `docs/09_DECISIONS.md`).
+
+Separately, the first version of the Simplified Representative Workbook reused the 20 approved
+CTO fields verbatim (Shop Name, Region/Route, Customer NetSuite Account Code, etc.) instead of the
+actually-approved 18-column rep-facing layout (Business Name, Full Address, Postcode, Postcode
+District, Business Type, Cuisine Type, Phone, WhatsApp, Email, Website, Contact Person, Contact
+Position, Opening Hours, Lead Level, Commercial Score, Suggested Products, Sales Notes, Sales Pro
+Lead ID) — found by the same release-verification pass.
+
+**FIX:**
+
+1. `scripts/lead-production/commercial-review-filter.ts` — pharmacy/chemist rule: name evidence
+   (whole-word pharmacy/pharmacies/chemist/chemists/pharmaceutical/dispensary) is now sufficient
+   on its own; category evidence is recorded as corroboration when present but no longer
+   required. Brand matching: single-word brands additionally match when the candidate's RAW
+   (pre-normalisation) name has an explicit dash separator right after the brand word
+   ("Superdrug - X") — a bare space still does not match, so "Phoenix Fried Chicken"/"Premier
+   Kebab House" remain protected. A small set of generic trailing corporate-qualifier words
+   ("group") is stripped from the BRAND side only before multi-word prefix comparison.
+2. `scripts/lead-production/generate-representative-handover.ts` — Simplified Representative
+   Workbook rebuilt from the approved 18-column layout, sourced from the already-regenerated
+   108-column SalesPro_New_Leads.csv; single sheet, Business Name first, Sales Pro Lead ID last.
+3. Regenerated all 13 territories' Master/Sales Pro exports, handover packages, CTO forms, Field
+   Provenance, Lead Production Reports, progress register, and the 3 field-sales maps from the
+   same already-accepted checkpoints — no new discovery/enrichment call.
+
+**Regression suites:** `scripts/test-lead-production-commercial-review.ts` (24 assertions, 9 new)
+and `scripts/test-lead-production-simplified-workbook.ts` (new, 10 assertions) — ALL PASSED.
+Existing UB1/RM1 checkpoint tests re-verified against the new (correctly higher) exclusion
+counts. `npm run typecheck` clean, `npm run build` succeeded.
+
+**Verification after the fix:** zero leakage re-confirmed across every new-leads CSV / CTO file /
+Simplified Workbook / map for all 13 representatives; every surviving Lead ID re-traced to its
+Master Evidence Register; independently recomputed overlap between the brand and pharmacy/
+chemist rules (2 candidates, both "Pearl Chemist" branches, matched by both rules — the brand
+rule wins in production since it is checked first, which is immaterial to the correct final
+exclusion outcome); 69 keep-listed-brand candidates confirmed still present/eligible in final
+output, confirming the explicit keep-override still functions correctly after the fix.
+
+**See also:** `scripts/lead-production/commercial-review-filter.ts`,
+`scripts/lead-production/generate-representative-handover.ts`,
+`scripts/test-lead-production-commercial-review.ts`,
+`scripts/test-lead-production-simplified-workbook.ts`, `docs/09_DECISIONS.md`, `PROJECT_STATUS.md`.

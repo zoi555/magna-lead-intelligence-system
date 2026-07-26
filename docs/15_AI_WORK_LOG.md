@@ -937,3 +937,51 @@ them at `config/lead-production/commercial-review-v1/`.
   CTO** — this turn applies and verifies the decisions, it does not itself constitute that
   sign-off. Application-development work (Phase 1-5) remains paused. No merge to `main`, no
   deployment.
+
+## Session: 2026-07-26 (same-day follow-up) — Release verification found and fixed 2 real defects
+
+Human request: a read-only release verification of the commercial-review-v1 work above, comparing
+production output against an earlier manual scan that had flagged ~20 possible pharmacy/chemist
+records (e.g. Superdrug, Pearl Chemist Group) the automated report claimed were zero. Explicit
+instruction: do not regenerate unless a genuine defect is confirmed.
+
+- Searched every candidate (all 6 mutually-exclusive buckets, all 13 territories) for pharmacy/
+  chemist/pharmaceutical/dispensary/Superdrug/Pearl Chemist keywords: found 41 real matches, 0 of
+  which had been excluded. Root-caused two distinct defects rather than patching symptoms: (1)
+  the pharmacy/chemist rule required category evidence real FSA/Google data almost never provides
+  for pharmacies in this dataset; (2) single-word brand "Superdrug" and multi-word brand "Pearl
+  Chemist Group" both had real branch-naming patterns ("Superdrug - Hornchurch", "Pearl Chemist
+  Cobham") the original matching logic missed.
+- Fixed narrowly, preserving the explicit generic-word false-positive protection this session had
+  built in earlier: pharmacy/chemist name evidence is now sufficient alone; single-word brands
+  additionally match only when followed by an explicit dash separator (never a bare space, so
+  "Phoenix Fried Chicken"/"Premier Kebab House" remain protected); a generic "Group" suffix is
+  stripped from the brand side only. 9 new regression assertions added and passing.
+  Also found and fixed: the Simplified Representative Workbook used the wrong 20-CTO-field layout
+  instead of the approved 18-column layout (Business Name first, Sales Pro Lead ID last) — new
+  dedicated regression test file added (10 assertions).
+- Reprocessed all 13 territories again from the same already-accepted checkpoints (no new
+  discovery/enrichment call): 702 total commercial-review exclusions campaign-wide (up from 489;
+  672 brand + 30 pharmacy/chemist, up from 489 + 0). Every new match across all 13 territories
+  inspected by category — 94 (later 107) distinct real UK chains, zero false positives found,
+  including large ones (Shell, Londis, Wenzel's) whose scale only became visible once the
+  matching gaps were fixed and the rule ran against the full 111-district dataset rather than a
+  single-district spot check.
+- Independently recomputed rule overlap (not just trusting which rule "won" in production): 2
+  candidates (both "Pearl Chemist" branches) genuinely match both the brand and pharmacy/chemist
+  rules — recorded and reported, since the user explicitly required evaluating every applicable
+  rule rather than relying on the first match.
+- Re-verified from scratch (separate scripts, not reused from the exporters' own internal
+  assertions): zero leakage across every new-leads CSV/CTO file/Simplified Workbook/map for all 13
+  representatives; every surviving Lead ID re-traced to its Master Evidence Register; all 41
+  originally-flagged pharmacy/chemist candidates now excluded by one rule or the other (0
+  remaining); 69 keep-listed-brand candidates confirmed still present, proving the keep-override
+  still works after the fix; all 13 Simplified Workbooks confirmed identical layout.
+- Commits: `c59e93f` (filter fix), `a178b97` (report/register data update), `f33f517`
+  (Simplified Workbook layout fix + regression test), plus this docs commit. `npm run typecheck`
+  clean, `npm run build` succeeded throughout.
+- **Still open**: the dash-separator brand-matching relaxation carries a documented, accepted
+  residual risk (no counter-example found in 702 real matches, but not structurally impossible).
+  "Other irrelevant business types" beyond named brands/pharmacy-chemist remains unscoped. Final
+  human sign-off before physical handover remains outstanding. Application-development work
+  remains paused; no merge to `main`, no deployment.
