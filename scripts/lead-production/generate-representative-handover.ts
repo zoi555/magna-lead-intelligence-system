@@ -17,33 +17,50 @@ import * as XLSX from "xlsx";
 import { resolveMapRequired } from "./resolve-map-required";
 import { parseCsvObjects } from "./csv";
 
-// The approved CTO 20-field order (config/lead-production/cto-existing-field-mapping-v1.json),
-// with column 1 relabelled "Business Name" for the rep-facing simplified workbook — the CTO's
-// own approved label for that column remains "Shop Name" everywhere else (the CTO_Existing_Lead
-// _Form file, the Sales Pro export); this relabel exists only in this one rep-facing workbook.
-const SIMPLIFIED_WORKBOOK_SOURCE_COLUMNS = [
-  "Shop Name", "Contact Person", "Email", "Phone", "Whatsapp", "Customer NetSuite Account Code",
-  "Field Sales Rep", "Sales Rep", "Region/Route", "Postcode", "Inward Code",
-  "Lead Contact Position/Designation", "Terms", "Business Types", "Ordering Days",
-  "Pipeline Status/Stage", "Lead Type", "Lead Urgency", "Opening Hours", "Closing Hours",
+// Approved simplified-workbook layout (2026-07-26 release-verification correction — the first
+// version reused the 20 CTO fields verbatim, which does not match this approved layout; replaced
+// entirely, never patched in place). Sourced from the already-regenerated 108-column
+// SalesPro_New_Leads.csv (its own column labels are the CTO's approved ones, e.g. "Shop Name",
+// "Inward Code" for what we call postcode_district — a pre-existing, already-approved external
+// mapping, not something this file second-guesses). Operational sales fields only; the one
+// identifier column (Sales Pro Lead ID) is placed LAST, never before them. Every one of the 13
+// representative workbooks uses this exact same column order — never varied per representative.
+const SIMPLIFIED_WORKBOOK_COLUMNS: { label: string; sourceColumn: string }[] = [
+  { label: "Business Name", sourceColumn: "Shop Name" },
+  { label: "Full Address", sourceColumn: "Full Operating Address" },
+  { label: "Postcode", sourceColumn: "Postcode" },
+  { label: "Postcode District", sourceColumn: "Inward Code" },
+  { label: "Business Type", sourceColumn: "Business Types" },
+  { label: "Cuisine Type", sourceColumn: "Cuisine Type" },
+  { label: "Phone", sourceColumn: "Phone" },
+  { label: "WhatsApp", sourceColumn: "Whatsapp" },
+  { label: "Email", sourceColumn: "Email" },
+  { label: "Website", sourceColumn: "Website" },
+  { label: "Contact Person", sourceColumn: "Contact Person" },
+  { label: "Contact Position", sourceColumn: "Lead Contact Position/Designation" },
+  { label: "Opening Hours", sourceColumn: "Opening Hours" },
+  { label: "Lead Level", sourceColumn: "Final Lead Level" },
+  { label: "Commercial Score", sourceColumn: "Commercial Priority Score" },
+  { label: "Suggested Products", sourceColumn: "Suggested Product Categories" },
+  { label: "Sales Notes", sourceColumn: "Sales Conversation Notes" },
+  { label: "Sales Pro Lead ID", sourceColumn: "Permanent Lead ID" },
 ];
-const SIMPLIFIED_WORKBOOK_DISPLAY_LABELS: Record<string, string> = { "Shop Name": "Business Name" };
 
-/** Builds the simplified representative-facing workbook: the same approved 20 CTO fields, same
- *  values, same row order as the CTO_Existing_Lead_Form CSV, but as a single-sheet .xlsx with
- *  "Business Name" (not "Shop Name") as the first column — easier for a rep to browse than the
- *  full 108-column Sales Pro CSV or the full 107-field Master workbook. */
+/** Builds the simplified representative-facing workbook: the approved 18-column operational
+ *  layout (Business Name first, Sales Pro Lead ID last), single sheet, one row per final ordinary
+ *  usable lead — easier for a rep to browse than the full 108-column Sales Pro CSV or the full
+ *  107-field Master workbook. */
 async function buildSimplifiedRepresentativeWorkbook(salesProNewLeadsPath: string, outPath: string): Promise<number> {
   const { header, rows } = parseCsvObjects(await fs.readFile(salesProNewLeadsPath, "utf-8"));
-  const missing = SIMPLIFIED_WORKBOOK_SOURCE_COLUMNS.filter((c) => !header.includes(c));
-  if (missing.length) throw new Error(`buildSimplifiedRepresentativeWorkbook: source file ${salesProNewLeadsPath} is missing required column(s): ${missing.join(", ")}.`);
+  const missing = SIMPLIFIED_WORKBOOK_COLUMNS.filter((c) => !header.includes(c.sourceColumn));
+  if (missing.length) throw new Error(`buildSimplifiedRepresentativeWorkbook: source file ${salesProNewLeadsPath} is missing required column(s): ${missing.map((c) => c.sourceColumn).join(", ")}.`);
   const outRows = rows.map((r) => {
     const row: Record<string, string> = {};
-    for (const col of SIMPLIFIED_WORKBOOK_SOURCE_COLUMNS) row[SIMPLIFIED_WORKBOOK_DISPLAY_LABELS[col] ?? col] = r[col] ?? "";
+    for (const c of SIMPLIFIED_WORKBOOK_COLUMNS) row[c.label] = r[c.sourceColumn] ?? "";
     return row;
   });
   const wb = XLSX.utils.book_new();
-  const columns = SIMPLIFIED_WORKBOOK_SOURCE_COLUMNS.map((c) => SIMPLIFIED_WORKBOOK_DISPLAY_LABELS[c] ?? c);
+  const columns = SIMPLIFIED_WORKBOOK_COLUMNS.map((c) => c.label);
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(outRows, { header: columns }), "Ordinary New Leads");
   XLSX.writeFile(wb, outPath);
   return outRows.length;
