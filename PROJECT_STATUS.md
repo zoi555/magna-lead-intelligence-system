@@ -1290,3 +1290,49 @@ package is physically handed to a representative or the CTO.**
 
 Code commits: `98e17ee`, `2f9a23a`, `70e3e38`, `c59e93f`, `a178b97`, `f33f517`. Application-
 development work remains paused; no merge to `main`, no deployment.
+
+## CTO address section added — 26-column flat file + address companion file (2026-07-26)
+
+The 20-column `*_CTO_Existing_Lead_Form_20_Fields.csv` file was found to be structurally
+incomplete: it contains only the lead-level fields and omits the address section shown in the
+Magna Sales Pro screenshots and import template. **This was an instruction defect (the 20-column
+spec never asked for address fields), not a source-data defect** — the structured address fields
+(Address Line 1, Address Line 2, Town/City, Postcode) already exist in the 108-column Sales Pro
+export and were never re-parsed from a free-text address string.
+
+Two new files were added per representative, alongside (never replacing) the existing 20-column
+file, from `scripts/lead-production/generate-cto-with-address.ts` (commit `656c767`):
+- `*_CTO_Existing_Lead_Form_With_Address.csv` — 26 columns (the 20 approved fields + Address Line
+  1, Address Line 2, City, Address Postcode, Address Type, Default Address).
+- `*_CTO_Addresses.csv` — 8-column address companion file (Import Reference ID, Address Sequence,
+  Address Line 1, Address Line 2, City, Postcode, Address Type, Default Address), linked by
+  Permanent Lead ID.
+
+Zero new discovery/enrichment calls — built entirely from the already-regenerated, final-filtered
+`*_SalesPro_New_Leads.csv` and the existing accepted 20-column file (cross-checked for row
+alignment by Shop Name at every index before joining by position).
+
+| Rep | Final ordinary rows | 20-col rows | 26-col rows | Address-file rows | Counts equal | 26 cols | 8 cols | Blank Addr1 | Blank City | Blank Postcode | Postcode mismatches | Excluded-record leak | Status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Nauman | 293 | 293 | 293 | 293 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+| Manraj | 263 | 263 | 263 | 263 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+| Ayesha | 196 | 196 | 196 | 196 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+| Kunz | 140 | 140 | 140 | 140 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+| Meer | 125 | 125 | 125 | 125 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+| Naseh | 95 | 95 | 95 | 95 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+| Saad | 112 | 112 | 112 | 112 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+| Saif | 260 | 260 | 260 | 260 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+| Shahzaib | 128 | 128 | 128 | 128 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+| Tahira | 52 | 52 | 52 | 52 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+| Wajahat | 109 | 109 | 109 | 109 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+| Hassan | 129 | 129 | 129 | 129 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+| Haleema | 114 | 114 | 114 | 114 | ✓ | ✓ | ✓ | 0 | 0 | 0 | 0 | 0 | PASS |
+
+All 13 PASS. The existing 20-column file was confirmed untouched (file modification time
+unchanged) — kept for comparison as instructed, not overwritten. All 13 README files updated with
+a new "CTO Import Options" section explaining both import methods and their file tables extended
+to list the 2 new files. `npm run typecheck` clean, `npm run build` succeeded, all 8 lead-
+production regression suites (now including `test-lead-production-cto-with-address.ts`, 22
+assertions) re-verified PASSING.
+
+Code commit: `656c767`. Docs commit: (this commit).

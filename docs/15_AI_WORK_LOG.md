@@ -985,3 +985,28 @@ instruction: do not regenerate unless a genuine defect is confirmed.
   "Other irrelevant business types" beyond named brands/pharmacy-chemist remains unscoped. Final
   human sign-off before physical handover remains outstanding. Application-development work
   remains paused; no merge to `main`, no deployment.
+
+## Session: 2026-07-26 (second same-day follow-up) — CTO address section added
+
+Human request: the 20-column CTO file omits the address section shown in the Magna Sales Pro
+screenshots/import template — an instruction defect, not a source-data defect. Add a 26-column
+flat file (20 fields + address section) and an 8-column address companion file per representative,
+without overwriting the existing 20-column file, sourced from structured fields only (never
+re-parsed from the free-text address), stopping and reporting the exact Lead ID on any missing
+Address Line 1/City/Postcode.
+
+- Built `generate-cto-with-address.ts`: reads the existing 20-column file directly (preserves its
+  values exactly, per instruction) and the already-regenerated Sales Pro export's structured
+  address fields, cross-checking row alignment by Shop Name at every index before joining by
+  position (never assumed). 22 regression assertions: happy path, all 3 missing-field stop
+  conditions (each naming the exact Lead ID), postcode-mismatch detection, row-misalignment
+  refusal, duplicate-ID rejection.
+- Generated both files for all 13 representatives: 0 blank Address Line 1/City/Postcode across
+  2,016 rows, 0 postcode mismatches, 0 excluded-record leakage, row counts equal across all 4
+  files (new-leads/20-col/26-col/address-companion) for every representative. Confirmed the
+  original 20-column file's modification time unchanged — not overwritten.
+- Updated all 13 README files with a new "CTO Import Options" section and extended file tables
+  (data files, outside git, not committed).
+- Commit: `656c767` (code). `npm run typecheck` clean, `npm run build` succeeded, all 8 lead-
+  production regression suites re-verified PASSING.
+- Application-development work remains paused; no merge to `main`, no deployment.

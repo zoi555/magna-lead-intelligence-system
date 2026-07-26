@@ -990,3 +990,14 @@ Code commits `98e17ee`, `2f9a23a`, `70e3e38`, `c59e93f`, `a178b97`, `f33f517`.
 
 **Final human sign-off is still required before any package is physically handed to a
 representative or the CTO.**
+
+## CTO address section added (2026-07-26)
+
+The 20-column CTO file was structurally incomplete — it omitted the address section shown in the
+Magna Sales Pro screenshots/import template (an instruction defect, not a source-data defect).
+Two new files added per representative, alongside the unchanged 20-column file: a 26-column flat
+file (`*_CTO_Existing_Lead_Form_With_Address.csv`) and an 8-column address companion file
+(`*_CTO_Addresses.csv`), giving the CTO a choice of import method. Full verification table:
+`PROJECT_STATUS.md`'s "CTO address section added" section — all 13 representatives PASS (row
+counts equal across all 4 files, zero blank address fields, zero postcode mismatches, zero
+excluded-record leakage). Code commit `656c767`.
