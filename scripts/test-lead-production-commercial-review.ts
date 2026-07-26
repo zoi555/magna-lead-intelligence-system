@@ -34,7 +34,7 @@ async function main() {
   console.log("commercial-review-v1 exclusion filter — regression proofs:\n");
 
   console.log("1. Exact excluded-brand match:");
-  const registry = mkRegistry(["Flames", "Charcoal Grill", "Morley's"], ["Chaiiwala", "Village Pizza", "Phoenix", "Premier"]);
+  const registry = mkRegistry(["Flames", "Charcoal Grill", "Morley's"], ["Chaiiwala", "Village Pizza", "Phoenix", "Premier", "Superdrug", "Pearl Chemist Group"]);
   const chaiiwala = mkDossier({ tradingName: "Chaiiwala" });
   const r1 = evaluateBrandDecision(chaiiwala, registry);
   assert(r1.excluded === true, "candidate trading name exactly 'Chaiiwala' matches the EXCLUDE brand 'Chaiiwala'");
@@ -68,16 +68,47 @@ async function main() {
   const r4c = evaluateBrandDecision(royalIndiaLike, registry);
   assert(r4c.excluded === false && r4c.keepOverride === false, "'The Royal Spice Grill' matches neither keep nor exclude brand — an unrelated independent sharing generic words (Royal, Spice, Grill) is left completely untouched");
 
-  console.log("\n5. Pharmacy/chemist exclusion requires BOTH category and name evidence:");
+  console.log("\n5. Pharmacy/chemist exclusion: name evidence alone is sufficient (2026-07-26 fix — real FSA/Google category data for pharmacies in this dataset is almost always blank or generic, e.g. 'Retailers - other', so requiring category evidence made the rule practically unfireable; found via 41 genuine real-data misses):");
   const realPharmacy = mkDossier({ tradingName: "Green Cross Pharmacy", businessType: "Pharmacy/Chemist" });
   const r5 = evaluatePharmacyChemistExclusion(realPharmacy);
-  assert(r5.excluded === true, "trading name contains 'Pharmacy' AND business_type category also indicates pharmacy -> excluded");
-  const nameOnlyNoCategoryEvidence = mkDossier({ tradingName: "Pharmacy Fried Chicken", businessType: "Takeaway/sandwich shop" });
+  assert(r5.excluded === true, "trading name contains 'Pharmacy' AND business_type category also indicates pharmacy -> excluded (corroborated)");
+  const nameOnlyNoCategoryEvidence = mkDossier({ tradingName: "Church Pharmacy", businessType: "" });
   const r5b = evaluatePharmacyChemistExclusion(nameOnlyNoCategoryEvidence);
-  assert(r5b.excluded === false, "name contains 'Pharmacy' but category evidence is a takeaway, not a pharmacy -> NOT excluded (name alone is insufficient)");
+  assert(r5b.excluded === true, "'Church Pharmacy' with blank/no category evidence is still excluded — name evidence alone is sufficient (real production case)");
+  const chemistNameOnly = mkDossier({ tradingName: "Woods Chemist", businessType: "Retailers - other" });
+  const r5c = evaluatePharmacyChemistExclusion(chemistNameOnly);
+  assert(r5c.excluded === true, "'Woods Chemist' with a generic non-pharmacy category ('Retailers - other') is still excluded — name evidence alone is sufficient (real production case)");
+  const dispensaryName = mkDossier({ tradingName: "Riverside Dispensary", businessType: null });
+  const r5d = evaluatePharmacyChemistExclusion(dispensaryName);
+  assert(r5d.excluded === true, "'dispensary' keyword alone excludes");
+  const pharmaceuticalName = mkDossier({ tradingName: "Acme Pharmaceutical Supplies", businessType: null });
+  const r5e = evaluatePharmacyChemistExclusion(pharmaceuticalName);
+  assert(r5e.excluded === true, "'pharmaceutical' keyword alone excludes");
   const categoryOnlyNoNameEvidence = mkDossier({ tradingName: "Well Health Stop", businessType: "Pharmacy/Chemist" });
-  const r5c = evaluatePharmacyChemistExclusion(categoryOnlyNoNameEvidence);
-  assert(r5c.excluded === false, "category evidence indicates pharmacy but name has no pharmacy/chemist wording -> NOT excluded (category alone is insufficient)");
+  const r5f = evaluatePharmacyChemistExclusion(categoryOnlyNoNameEvidence);
+  assert(r5f.excluded === false, "category evidence alone (name has no pharmacy/chemist wording) is NOT sufficient — name evidence is required");
+
+  console.log("\n6a. Single-word brand dash-separated branch match (2026-07-26 fix — real gap: 'Superdrug - Hornchurch' never matched brand 'Superdrug'):");
+  const superdrugDash = mkDossier({ tradingName: "Superdrug - Hornchurch" });
+  const r6a = evaluateBrandDecision(superdrugDash, registry);
+  assert(r6a.excluded === true, "'Superdrug - Hornchurch' (dash separator) matches single-word EXCLUDE brand 'Superdrug'");
+  const superdrugEnDash = mkDossier({ tradingName: "Superdrug – Enfield" });
+  const r6a2 = evaluateBrandDecision(superdrugEnDash, registry);
+  assert(r6a2.excluded === true, "'Superdrug – Enfield' (en-dash separator) also matches");
+  const phoenixNoDash = mkDossier({ tradingName: "Phoenix Fried Chicken" });
+  const r6a3 = evaluateBrandDecision(phoenixNoDash, registry);
+  assert(r6a3.excluded === false, "'Phoenix Fried Chicken' (bare space, no dash) still does NOT match single-word EXCLUDE brand 'Phoenix' — generic-word protection is unaffected by the dash relaxation");
+  const premierNoDash = mkDossier({ tradingName: "Premier Kebab House" });
+  const r6a4 = evaluateBrandDecision(premierNoDash, registry);
+  assert(r6a4.excluded === false, "'Premier Kebab House' (bare space, no dash) still does NOT match single-word EXCLUDE brand 'Premier'");
+
+  console.log("\n6b. Brand-name trailing 'Group' suffix stripped before comparison (2026-07-26 fix — real gap: 'Pearl Chemist Group' never matched real branches 'Pearl Chemist Cobham'):");
+  const pearlChemistBranch = mkDossier({ tradingName: "Pearl Chemist Cobham" });
+  const r6b = evaluateBrandDecision(pearlChemistBranch, registry);
+  assert(r6b.excluded === true, "'Pearl Chemist Cobham' matches EXCLUDE brand 'Pearl Chemist Group' once the generic 'Group' suffix is stripped from the brand side");
+  const pearlChemistExact = mkDossier({ tradingName: "PEARL CHEMIST BYFLEET" });
+  const r6b2 = evaluateBrandDecision(pearlChemistExact, registry);
+  assert(r6b2.excluded === true, "case-insensitive: 'PEARL CHEMIST BYFLEET' also matches");
 
   console.log("\n6. Unaffected independent business retention — combined evaluator returns not-excluded and no matched rule:");
   const genuineIndependent = mkDossier({ tradingName: "Southall Tandoori Grill House", businessType: "Restaurant/Cafe/Canteen" });

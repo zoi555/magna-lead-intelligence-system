@@ -114,19 +114,19 @@ async function main() {
     // commercial-review-exclusion-audit.csv). 6 of the 9 were previously usable (47 -> 41); the
     // other 3 were already held/hard-rejected before this rule and are simply reclassified.
     const usableRows = XLSX.utils.sheet_to_json(wb.Sheets["Operationally Usable Leads"]) as any[];
-    assert(usableRows.length === 41, `Operationally Usable Leads has exactly 41 rows (got ${usableRows.length}) — down from 47 (6 commercial-review brand exclusions were previously usable)`);
+    assert(usableRows.length === 39, `Operationally Usable Leads has exactly 39 rows (got ${usableRows.length}) — down from 47 (6 commercial-review brand exclusions + 2 pharmacy/chemist name-evidence exclusions were previously usable)`);
     assert(usableRows.length > 0 && Object.keys(usableRows[0]).length === 107, `every usable row has exactly 107 fields (got ${Object.keys(usableRows[0] ?? {}).length})`);
     const premiumRows = XLSX.utils.sheet_to_json(wb.Sheets["Premium Level 0"]) as any[];
     assert(premiumRows.length === 26, `Premium Level 0 has exactly 26 rows (got ${premiumRows.length})`);
     const releasableRows = XLSX.utils.sheet_to_json(wb.Sheets["Releasable Level 1"]) as any[];
-    assert(releasableRows.length === 15, `Releasable Level 1 has exactly 15 rows (got ${releasableRows.length})`);
+    assert(releasableRows.length === 13, `Releasable Level 1 has exactly 13 rows (got ${releasableRows.length})`);
     const heldRows = XLSX.utils.sheet_to_json(wb.Sheets["Held-Review"]) as any[];
     assert(heldRows.length === 5, `Held-Review has exactly 5 rows (got ${heldRows.length}) — down from 6 (1 commercial-review brand exclusion, Amigos Burgers and Shakes, was previously held)`);
     const exclusionRows = XLSX.utils.sheet_to_json(wb.Sheets["Customer Master Exclusions"]) as any[];
     assert(exclusionRows.length === 20, `Customer Master Exclusions has exactly 20 rows (got ${exclusionRows.length})`);
     const excludedRows = XLSX.utils.sheet_to_json(wb.Sheets["Excluded Groups"]) as any[];
     const commercialReviewRows = XLSX.utils.sheet_to_json(wb.Sheets["Commercial Review Exclusions"]) as any[];
-    assert(commercialReviewRows.length === 9, `Commercial Review Exclusions has exactly 9 rows (got ${commercialReviewRows.length})`);
+    assert(commercialReviewRows.length === 12, `Commercial Review Exclusions has exactly 12 rows (got ${commercialReviewRows.length}) — 10 brand (incl. "Londis - Southall" via the dash-separated single-word-brand fix) + 2 pharmacy/chemist name-evidence exclusions ("Sherrys Chemist", "Queens Pharmacy") found after the 2026-07-26 rule fix`);
     const hardRejectRows = XLSX.utils.sheet_to_json(wb.Sheets["Hard Rejects"]) as any[];
     const total = usableRows.length + heldRows.length + hardRejectRows.length + exclusionRows.length + excludedRows.length + commercialReviewRows.length;
     assert(total === 94, `all 14 tabs' mutually-exclusive buckets sum to exactly 94 total UB1 candidates (got ${total})`);
