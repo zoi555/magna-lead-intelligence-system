@@ -23,6 +23,9 @@ import path from "node:path";
 import * as XLSX from "xlsx";
 import { parseCsvObjects, writeCsv } from "./csv";
 import { isValidUkPhone } from "./normalize";
+import { loadCandidateDossiers, type Dossier } from "./candidate-dossier";
+import { evaluateBusinessCategoryEligibility } from "./business-category-eligibility";
+import { mapCtoBusinessType, loadCtoBusinessTypeVocabulary, type CtoBusinessTypeVocabulary } from "./cto-business-type-mapping";
 
 function arg(name: string): string | undefined {
   const p = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -82,10 +85,17 @@ async function loadDistrictRaw(orchestratorDir: string) {
   const v2Rows = (await readJson(v2MasterFile)) as any[];
   const v2ById = new Map(v2Rows.map((r) => [r.candidateId, r]));
 
-  return { phase1ById, fsaById, googleById, fsaResAfterGoogleById, chById, profileById, officersByCandidate, pscsByCandidate, decisionMakersByCandidate, websiteById, groupRescreenById, v2ById };
+  // Full dossier objects — used only for the 3 new AspectLead-computed decision fields (Business
+  // Category Eligibility, CTO Business Type, Trading Status) added 2026-08-02, which are engine
+  // outputs (not a raw-source ??-priority chain) — invoked directly via the real, authoritative
+  // engine functions rather than mirrored/reconstructed, unlike every other field in this file.
+  const { dossiers } = await loadCandidateDossiers(dirs);
+  const dossierById = new Map(dossiers.map((d) => [d.candidateId, d]));
+
+  return { phase1ById, fsaById, googleById, fsaResAfterGoogleById, chById, profileById, officersByCandidate, pscsByCandidate, decisionMakersByCandidate, websiteById, groupRescreenById, v2ById, dossierById };
 }
 
-function buildRowsForCandidate(leadId: string, candidateId: string, raw: Awaited<ReturnType<typeof loadDistrictRaw>>): ProvenanceRow[] {
+function buildRowsForCandidate(leadId: string, candidateId: string, raw: Awaited<ReturnType<typeof loadDistrictRaw>>, vocabulary: CtoBusinessTypeVocabulary): ProvenanceRow[] {
   const rows: ProvenanceRow[] = [];
   const m = raw.v2ById.get(candidateId);
   if (!m) return rows;
@@ -382,6 +392,62 @@ function buildRowsForCandidate(leadId: string, candidateId: string, raw: Awaited
     });
   }
 
+  // Business Category Eligibility / CTO Business Type / Trading Status — the 3 new (2026-08-02)
+  // AspectLead-computed decision fields, run through the real authoritative engine functions
+  // against this candidate's full dossier (never reconstructed/mirrored, unlike the source-priority
+  // fields above — these are rule outputs, the same category as the qualification/scoring block).
+  {
+    const dossier = raw.dossierById.get(candidateId) as Dossier | undefined;
+    if (dossier) {
+      const businessCategory = evaluateBusinessCategoryEligibility(dossier);
+      push({
+        field: "Business Category Eligibility", finalValue: businessCategory.outcome, sourceStage: "Final-Scoring (business-category-eligibility.ts)",
+        provider: "AspectLead business-category eligibility rules (not an external data provider)",
+        sourceReference: "business-category-eligibility.ts (locked policy 2026-08-02)", retrievalDate: "", confidence: businessCategory.confidence,
+        previousValueOrSource: "n/a (computed once per candidate from all upstream evidence; not a source-priority field)",
+        replacedOrSupplemented: "n/a", transformation: businessCategory.evidenceSummary,
+        selectionReason: "Not sourced from any external provider — combined FSA/Google/website category evidence evaluated against the locked café/bubble-tea principal-operation rules.",
+      });
+
+      const isQualifiedForCto = dossier.qualificationStatus === "qualified" || dossier.qualificationStatus === "qualified_with_channel_limit";
+      if (isQualifiedForCto && businessCategory.outcome === "eligible_foodservice") {
+        const ctoMapping = mapCtoBusinessType(dossier, vocabulary);
+        push({
+          field: "CTO Business Type", finalValue: ctoMapping.selectedBusinessTypes.join(", "), sourceStage: "Final-Scoring (cto-business-type-mapping.ts)",
+          provider: "AspectLead CTO Business Type mapping rules (not an external data provider)",
+          sourceReference: `cto-business-type-mapping.ts against ${ctoMapping.vocabularyVersion}`, retrievalDate: "", confidence: ctoMapping.mappingConfidence,
+          previousValueOrSource: "n/a (computed once per candidate from all upstream evidence; not a source-priority field)",
+          replacedOrSupplemented: "n/a", transformation: `Mapping method: ${ctoMapping.mappingMethod}. Evidence: ${ctoMapping.sourceEvidence}`,
+          selectionReason: ctoMapping.mappingReason,
+        });
+      } else {
+        push({
+          field: "CTO Business Type", finalValue: "", sourceStage: "Final-Scoring (cto-business-type-mapping.ts)",
+          provider: "AspectLead CTO Business Type mapping rules (not an external data provider)",
+          sourceReference: "cto-business-type-mapping.ts", retrievalDate: "", confidence: "n/a",
+          previousValueOrSource: "n/a", replacedOrSupplemented: "n/a",
+          transformation: "Not computed — CTO Business Type mapping only ever runs for an already-eligible, qualified candidate.",
+          selectionReason: `Skipped: qualificationStatus="${dossier.qualificationStatus}", businessCategoryEligibility="${businessCategory.outcome}".`,
+        });
+      }
+
+      const f = dossier.fields;
+      const rawGoogleStatus = (f.google_business_status as string | null) ?? null;
+      const rawChStatus = (f.companies_house_status as string | null) ?? null;
+      const rawWebsiteClosure = (f.website_closure_evidence as string | null) ?? null;
+      push({
+        field: "Trading Status (Consolidated)", finalValue: `google=${rawGoogleStatus ?? "n/a"}; companiesHouse=${rawChStatus ?? "n/a"}; website=${rawWebsiteClosure ?? "n/a"}`,
+        sourceStage: "Final-Scoring (master-field-resolver.ts trading-status consolidation)",
+        provider: "AspectLead trading-status consolidation rules (not an external data provider)",
+        sourceReference: "master-field-resolver.ts (locked policy 2026-08-02)", retrievalDate: "",
+        confidence: "n/a (see Master export's own trading_status_confidence field for the consolidated result)",
+        previousValueOrSource: "n/a (raw per-source values shown in finalValue; consolidation logic is deterministic, not a source-priority pick)",
+        replacedOrSupplemented: "n/a", transformation: "Google permanently/temporarily-closed and Companies House dissolved/liquidation status take priority; website closure text is held as conflicting evidence when no CH/Google closure signal exists.",
+        selectionReason: "Combines all 3 independent closure/status signals rather than trusting any single source alone.",
+      });
+    }
+  }
+
   return rows;
 }
 
@@ -408,15 +474,19 @@ async function main() {
   const scope = evidenceRows.filter((r: any) => usableLeadIds.has(r["Lead ID"])).map((r: any) => ({ leadId: r["Lead ID"], candidateId: r["Candidate ID"], district: r["District"] }));
   console.log(`Provenance scope: ${scope.length} usable leads across ${districts.length} districts`);
 
+  const vocabulary = await loadCtoBusinessTypeVocabulary();
   const allRows: ProvenanceRow[] = [];
   for (const d of districts) {
     const districtScope = scope.filter((s) => s.district === d.district);
     if (!districtScope.length) continue;
     const raw = await loadDistrictRaw(d.outDir);
+    let districtRowCount = 0;
     for (const s of districtScope) {
-      allRows.push(...buildRowsForCandidate(s.leadId, s.candidateId, raw));
+      const rows = buildRowsForCandidate(s.leadId, s.candidateId, raw, vocabulary);
+      allRows.push(...rows);
+      districtRowCount += rows.length;
     }
-    console.log(`${d.district}: ${districtScope.length} leads, ${districtScope.length * 24} provenance rows`);
+    console.log(`${d.district}: ${districtScope.length} leads, ${districtRowCount} provenance rows`);
   }
 
   const columns = ["leadId", "field", "finalValue", "sourceStage", "provider", "sourceReference", "retrievalDate", "confidence", "previousValueOrSource", "replacedOrSupplemented", "transformation", "selectionReason"];
