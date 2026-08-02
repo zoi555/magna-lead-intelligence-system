@@ -936,3 +936,46 @@ shown the literal text "not_available" instead of a genuine blank whenever this 
 **See also:** `scripts/lead-production/generate-salespro-export.ts`,
 `scripts/lead-production/candidate-dossier.ts`, `scripts/lead-production/master-field-resolver.ts`,
 `VERIFY_BEFORE_CLAIMING.md` (2026-08-02 entry, full verification detail).
+
+## 2026-08-03 — Business Category Eligibility was informational-only, never actually excluded a candidate (found live, campaign-002 pilot)
+
+**BUG:** `evaluateBusinessCategoryEligibility()` (`business-category-eligibility.ts`) was wired
+into `resolveMasterFields()` on 2026-08-02 and correctly populated the "Business Category
+Eligibility" Master field, but neither exporter's `classify()` ever filtered on its
+`"excluded_non_food"` outcome — the locked instruction ("Conventional cafés/coffee shops excluded
+when café/coffee is the principal operation... Exclude bubble-tea businesses only where bubble
+tea/boba/milk tea is the principal operation") was an explicit RELEASE exclusion, not an
+informational field. Found while gathering café/bubble-tea exclusion counts for the campaign-002
+pilot report — checked real CM1/IG1/RM1 output and confirmed zero `excluded_non_food` candidates
+had actually leaked into "usable" so far (lucky, not by design — no real candidate in those 3
+districts happened to combine café/bubble-tea-principal evidence with otherwise-qualifying scoring
+until this was checked).
+
+**FIX:** Both `generate-master-export.ts`'s `classify()` and `generate-salespro-export.ts`'s
+equivalent inline logic now filter out `business_category_eligibility === "excluded_non_food"`
+BEFORE `usable`/`premium`/etc. are computed — same "filter before bucket classification" pattern
+already used for commercial-review brand/pharmacy exclusion. Deliberately does NOT gate on
+`"review_required_business_category"` or `"insufficient_category_evidence"` — per the engine's own
+design, ambiguous evidence goes to human review (visible via its own field on usable rows), never
+an automatic exclusion either way. New Master sheet "Business Category Exclusions" (13th->14th
+sheet, now 15 total) and a new Sales Pro `<prefix>-business-category-exclusion-audit.csv`, mirroring
+the existing commercial-review-exclusion-audit pattern.
+
+**Regression test:** new fixture-driven block in `test-lead-production-master-export.ts` proving
+`excluded_non_food` is excluded, `review_required_business_category`/`insufficient_category_evidence`
+are NOT auto-excluded, and reconciliation holds. Required exporting `classify`/`RowBundle` from
+`generate-master-export.ts` (previously private) and adding a `require.main === module` guard
+around its `main()` call (previously ran on import, same class of gap already fixed in
+`run-website-stage.ts`).
+
+**Verification against real data:** re-ran CM1/IG1/RM1's exports after the fix — CM1 and IG1
+unchanged (0 café/bubble-tea exclusions in either, confirming the earlier "lucky" zero-leak
+reading was correct); RM1 gained exactly 1 café/bubble-tea exclusion, reclassified from what was
+previously counted as an ordinary hard-reject (RM1's usable count is unchanged at 1 — the affected
+candidate was never going to be released either way, only its recorded exclusion reason changed).
+`npm run typecheck`/`build` clean; all 21 `test:lead-production-*` suites pass.
+
+**See also:** `scripts/lead-production/business-category-eligibility.ts`,
+`scripts/lead-production/generate-master-export.ts`,
+`scripts/lead-production/generate-salespro-export.ts`,
+`scripts/test-lead-production-master-export.ts`, `docs/09_DECISIONS.md`.

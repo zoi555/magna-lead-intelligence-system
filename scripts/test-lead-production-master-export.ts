@@ -8,6 +8,8 @@ import { spawnSync } from "node:child_process";
 import * as XLSX from "xlsx";
 import { computeLeadId, resolveMasterFields } from "./lead-production/master-field-resolver";
 import type { Dossier } from "./lead-production/candidate-dossier";
+import { classify, type RowBundle } from "./lead-production/generate-master-export";
+import { loadCommercialReviewRegistry } from "./lead-production/load-commercial-review";
 
 let fails = 0;
 const assert = (c: boolean, m: string) => { if (!c) { console.error("  ✗", m); fails++; } else console.log("  ✓", m); };
@@ -86,7 +88,32 @@ async function main() {
   assert(noScore.dataQualityGaps.includes("commercial_priority_score"), "the missing score is recorded as a data-quality gap, not silently dropped");
   assert(noScore.fields.final_lead_level === "Level 4", "final_lead_level is still populated (hard-gate failure always assigns level_4 even with no score) — only the score itself is genuinely absent");
 
-  console.log("\nEnd-to-end real UB1 checkpoint proof (129 fields — v2 schema, 107 v1 + 22 new — 14 tabs, customer_master_exclusion + commercial-review-v1 rules applied), reconciliation:");
+  console.log("\nBusiness Category Eligibility gate (2026-08-03 fix — previously informational-only, never actually excluded anything):");
+  {
+    const registry = await loadCommercialReviewRegistry("config/lead-production/commercial-review-v1");
+    const makeRowBundle = (candidateId: string, businessCategoryEligibility: string): RowBundle => {
+      const dossier = mkDossier({ candidateId, qualificationStatus: "qualified" });
+      const resolved = resolveMasterFields(dossier, { territory: "RM1", representative: "Test", role: "telesales", salesTerritory: "Test" });
+      resolved.fields.business_category_eligibility = businessCategoryEligibility;
+      return { dossier, resolved, district: "RM1" };
+    };
+    const rows: RowBundle[] = [
+      makeRowBundle("cafe-1", "excluded_non_food"),
+      makeRowBundle("review-1", "review_required_business_category"),
+      makeRowBundle("insufficient-1", "insufficient_category_evidence"),
+      makeRowBundle("eligible-1", "eligible_foodservice"),
+    ];
+    const buckets = classify(rows, registry, "Test");
+    assert(buckets.businessCategoryExcluded.length === 1 && buckets.businessCategoryExcluded[0].dossier.candidateId === "cafe-1", `excluded_non_food candidate is excluded from release (got ${buckets.businessCategoryExcluded.map((r) => r.dossier.candidateId).join(", ")})`);
+    assert(!buckets.usable.some((r) => r.dossier.candidateId === "cafe-1"), "the excluded_non_food candidate never appears in usable");
+    assert(buckets.usable.some((r) => r.dossier.candidateId === "review-1"), "review_required_business_category is NOT auto-excluded — remains usable (flagged for human review via its own field, never an automatic call either way)");
+    assert(buckets.usable.some((r) => r.dossier.candidateId === "insufficient-1"), "insufficient_category_evidence is NOT auto-excluded — remains usable");
+    assert(buckets.usable.some((r) => r.dossier.candidateId === "eligible-1"), "eligible_foodservice remains usable");
+    const total = buckets.customerMasterExclusions.length + buckets.excludedGroups.length + buckets.brandExcluded.length + buckets.pharmacyChemistExcluded.length + buckets.businessCategoryExcluded.length + buckets.usable.length + buckets.held.length + buckets.phoneResolutionExceptions.length + buckets.hardRejects.length;
+    assert(total === rows.length, `every fixture row lands in exactly one bucket (${rows.length} rows, ${total} partitioned) — reconciliation holds`);
+  }
+
+  console.log("\nEnd-to-end real UB1 checkpoint proof (129 fields — v2 schema, 107 v1 + 22 new — 15 tabs, customer_master_exclusion + commercial-review-v1 rules applied), reconciliation:");
   const D = "/Users/homemac/Data/aspectlead-lead-production/output/ub1";
   const V2_DIR = `${D}/2026-07-24T00-00-00Z-v2-customer-master-exclusion-reprocess`;
   const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "master-export-e2e-"));
@@ -103,8 +130,8 @@ async function main() {
   assert(combinedExists, "combined campaign workbook was written");
   if (combinedExists) {
     const wb = XLSX.readFile(combinedPath);
-    const EXPECTED_TABS = ["Operationally Usable Leads", "Premium Level 0", "Releasable Level 1", "Held-Review", "Hard Rejects", "Customer Master Exclusions", "Excluded Groups", "Commercial Review Exclusions", "Key Accounts", "Representative Summary", "Territory Summary", "District Summary", "Evidence Register", "Run Manifest"];
-    assert(wb.SheetNames.length === 14, `combined workbook has exactly 14 tabs (got ${wb.SheetNames.length}: ${wb.SheetNames.join(", ")})`);
+    const EXPECTED_TABS = ["Operationally Usable Leads", "Premium Level 0", "Releasable Level 1", "Held-Review", "Hard Rejects", "Customer Master Exclusions", "Excluded Groups", "Commercial Review Exclusions", "Business Category Exclusions", "Key Accounts", "Representative Summary", "Territory Summary", "District Summary", "Evidence Register", "Run Manifest"];
+    assert(wb.SheetNames.length === 15, `combined workbook has exactly 15 tabs (got ${wb.SheetNames.length}: ${wb.SheetNames.join(", ")})`);
     for (const tab of EXPECTED_TABS) assert(wb.SheetNames.includes(tab), `tab "${tab}" is present`);
     assert(!wb.SheetNames.includes("Active Customers") && !wb.SheetNames.includes("Reactivation"), "the old \"Active Customers\"/\"Reactivation\" tabs no longer exist — consolidated into \"Customer Master Exclusions\"");
     // 2026-07-26: commercial-review-v1 brand exclusion removed 9 UB1 candidates from the usable
@@ -129,7 +156,7 @@ async function main() {
     assert(commercialReviewRows.length === 12, `Commercial Review Exclusions has exactly 12 rows (got ${commercialReviewRows.length}) — 10 brand (incl. "Londis - Southall" via the dash-separated single-word-brand fix) + 2 pharmacy/chemist name-evidence exclusions ("Sherrys Chemist", "Queens Pharmacy") found after the 2026-07-26 rule fix`);
     const hardRejectRows = XLSX.utils.sheet_to_json(wb.Sheets["Hard Rejects"]) as any[];
     const total = usableRows.length + heldRows.length + hardRejectRows.length + exclusionRows.length + excludedRows.length + commercialReviewRows.length;
-    assert(total === 94, `all 14 tabs' mutually-exclusive buckets sum to exactly 94 total UB1 candidates (got ${total})`);
+    assert(total === 94, `all 15 tabs' mutually-exclusive buckets sum to exactly 94 total UB1 candidates (got ${total})`);
     const leadIdsInUsable = usableRows.map((r) => r["Permanent Lead ID"]);
     assert(leadIdsInUsable.every((id: string) => /^UB1-[0-9A-F]{8}$/.test(id)), "every usable row's Permanent Lead ID matches the required format");
     assert(new Set(leadIdsInUsable).size === leadIdsInUsable.length, "every usable row has a unique Permanent Lead ID");
