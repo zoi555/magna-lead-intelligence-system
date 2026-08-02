@@ -916,3 +916,46 @@ representative's every configured Postcode District against `loadPostcodeReferen
 it exists, plus an explicit assertion that HA10 itself is absent — the exact regression guard that
 would have caught this before any live call was made. All 111 remaining districts (across all 13
 representatives, including the 5 not yet processed) were confirmed valid by this same check.
+
+## ISS-0033 — Five-district pilot's named districts don't match `sales-territories-v2.json`, and RM1 is already owned (2026-08-02)
+
+Date: 2026-08-02
+Severity: High — **blocks the pilot; live discovery must not start until this is resolved by the
+owner**
+Owner: Zoeb
+Status: **Open, unresolved.** No territory config was changed and no live discovery has been run
+against any of the 5 named districts as a result.
+
+### Problem
+
+The owner's instruction named five district→representative→region pairings for the pilot:
+CM1→Kunz→East London, IG1→Naseh→East London, RM1→Saif→East London, DA1→Tahira→Southeast London,
+BR1→Hassan→Southeast London. Cross-checked directly against the live
+`config/lead-production/sales-territories-v2.json` (the same fail-closed-validated config
+`assertDistrictIsConfigured()` — added this session, see `docs/10_BUGS_AND_FIXES.md` — checks
+every candidate against): none of the 5 districts match their named representative's actual
+configured territory.
+
+- Kunz is configured for TW1-TW10 (West London), not CM1.
+- Naseh is configured for UB1-UB5 (West London), not IG1.
+- Saif is configured for HA0-HA5 (West London), not RM1.
+- Tahira is configured for WD3-WD7 (a different area), not DA1.
+- Hassan is configured for EN1-EN5, not BR1.
+
+Additionally, **RM1 is already owned by Nauman** from the completed first campaign wave (109
+usable leads already processed and delivered against RM1 as part of Nauman's real, accepted
+territory) — running a fresh RM1 discovery under Saif's name would create a duplicate, conflicting
+ownership of the same postcode district.
+
+### Next action
+
+Requires the owner to confirm one of: (a) the district list was correct and the rep/region
+pairings need correcting in the message, (b) the rep/region pairings were correct and the district
+list needs correcting, or (c) some other resolution for RM1 specifically (e.g. substitute a
+different district, or explicitly reassign RM1 knowing it duplicates Nauman's existing territory).
+No implementation work should touch `sales-territories-v2.json` or begin live discovery for any of
+the 5 named districts until this is confirmed.
+
+### Fix
+
+Not yet fixed — pending owner decision.

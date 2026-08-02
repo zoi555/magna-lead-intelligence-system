@@ -891,3 +891,48 @@ output, confirming the explicit keep-override still functions correctly after th
 `scripts/lead-production/generate-representative-handover.ts`,
 `scripts/test-lead-production-commercial-review.ts`,
 `scripts/test-lead-production-simplified-workbook.ts`, `docs/09_DECISIONS.md`, `PROJECT_STATUS.md`.
+
+## 2026-08-02 — Five-district-pilot mandatory corrections: 2 real bugs found during release verification
+
+Both found while independently verifying (not just typecheck/exit-code-trusting) the new CTO
+Business Type / Business Category Eligibility / trading-status / restricted-financials fields
+added to the Master (v2, 129 fields) and Sales Pro exporters this session.
+
+**BUG 1 — Sales Pro "Business Types" multi-value dropdown validation rejected every valid
+multi-value row.** `generate-salespro-export.ts`'s dropdown/type validator only split a cell into
+individual members for validation when the underlying field value was a raw array
+(`Array.isArray(raw)`). The new `cto_business_type` field is deliberately a single
+comma-joined string (per the CTO's explicit "comma-separate multiple values" requirement for this
+column), so the validator treated e.g. `"Pakistani Restaurant, Afghan Restaurant, Kebab Shop"` as
+one invalid value instead of 3 valid ones, and the exporter refused to write ANY output (correctly
+fail-closed, but would have blocked every real district export). Caught by the real end-to-end
+UB1-checkpoint test, not a fixture.
+
+**BUG 2 — restricted-financials fields could leak the literal string `"not_available"`.**
+`candidate-dossier.ts`'s `key_financial_values` (constructed earlier this session) read Companies
+House's `turnover_result`/`grossProfit_result`/`netAssets_result`/`employeeCount_result` verbatim
+with no `"not_available"` filter — unlike the adjacent `company_age_years`/`financial_strength_band`
+fields on the same object, which do filter it. Real UB1 `filed-accounts-data.csv` confirmed
+`turnover_result`/`grossProfit_result` is `"not_available"` for 9/9 candidates with any filed
+accounts (expected: UK micro-entities filing abbreviated accounts aren't required to report
+turnover) — without the fix, the new `turnover_gbp`/`gross_profit_gbp` Master fields would have
+shown the literal text "not_available" instead of a genuine blank whenever this was the case.
+
+**FIX:**
+
+1. `scripts/lead-production/generate-salespro-export.ts` — `buildRowAndValidate()`'s dropdown
+   validator now also splits a string cell on comma (trimming whitespace) when the column's
+   `fieldType === "Multi Select"`, validating each member independently — same outcome as the
+   array path, without requiring the field itself to be an array.
+2. `scripts/lead-production/candidate-dossier.ts` — `key_financial_values`'s 4 sub-fields
+   (`turnover`/`grossProfit`/`netAssets`/`employeeCount`) each now check `!== "not_available"`
+   before use, mirroring the existing `company_age_years`/`financial_strength_band` pattern.
+
+**Regression suites:** re-ran `test:lead-production-salespro-export` (real UB1 checkpoint,
+0 dropdown violations, unchanged 34/20/5 row counts), `test:lead-production-master-export`,
+`test:lead-production-customer-master-exclusion` — ALL PASSED. `npm run typecheck` and
+`npm run build` clean after every edit, not just once at the end.
+
+**See also:** `scripts/lead-production/generate-salespro-export.ts`,
+`scripts/lead-production/candidate-dossier.ts`, `scripts/lead-production/master-field-resolver.ts`,
+`VERIFY_BEFORE_CLAIMING.md` (2026-08-02 entry, full verification detail).

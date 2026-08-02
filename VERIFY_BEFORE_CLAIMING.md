@@ -262,10 +262,94 @@ No assistant, developer, or unfortunate human may claim the project works withou
   risk (no counter-example found in 702 real matches). Final human sign-off before physical
   handover to any representative or the CTO has not been given.
 
-### YYYY-MM-DD HH:mm
+### 2026-08-02
 
-- Change tested:
+- Change tested: five-district-pilot mandatory corrections — territory fail-closed validation,
+  website page-path traversal + closure-text detection, named-brand exclusion union +
+  matching-gap fixes, mandatory-phone gate (`phone_resolution_exception`), SIC/financials/
+  directors/PSCs wired into the dossier, new Business-Category Eligibility engine, new CTO
+  Business Type mapping engine (against the CTO's exact 57-value allow-list), Master schema v2
+  (107 v1 fields preserved + 22 new, programmatically verified byte-for-byte), Note 1/Note 2
+  generation, and field-provenance coverage for the 3 new decision fields.
 - Command/manual check:
-- Result:
-- Evidence link/screenshot:
-- Remaining risk:
+  - `npm run typecheck` — clean (0 errors) after every batch of edits, not just once at the end.
+  - `npm run build` — succeeded (full Next.js production build, all routes).
+  - All 20 `test:lead-production-*` regression suites run individually — every one exits 0, "ALL
+    PASSED"/"All ... assertions passed" (bridge, business-category, commercial-review, companies-
+    house, cto-business-type-mapping, cto-with-address, customer-master-exclusion,
+    final-group-rescreen, final-scoring, final-scoring-v2, fsa, full-territory, google,
+    master-export, public-profile, salespro-export, simplified-workbook, territory-v2, website,
+    website-page-paths).
+  - Real bug found and fixed during this pass: the Sales Pro exporter's dropdown/type validator
+    rejected every multi-value "Business Types" cell (e.g. "Pakistani Restaurant, Afghan
+    Restaurant, Kebab Shop") as a single invalid string, because `cto_business_type` is a
+    comma-joined string (per the CTO's explicit comma-separated format requirement), not an array
+    — the validator's array-only multi-value path never fired. Fixed by splitting "Multi Select"
+    fieldType cells on comma for validation; re-ran the real-UB1-checkpoint end-to-end test, 0
+    dropdown violations, 34/20/5 new-lead/customer-exclusion/key-account row counts unchanged.
+  - `test-lead-production-salespro-export.ts`'s schema cross-check was still reading
+    `master-schema-v1.json` (now stale — `cto_business_type` only exists in v2); updated to v2 and
+    re-ran — "every Sales Pro column's canonicalName exists in the 129-field Master vocabulary (0
+    orphan(s))".
+  - `test-lead-production-master-export.ts` had a hardcoded "exactly 107 fields per row"
+    assertion; updated to 129 (v2 = 107 v1 + 22 new) and re-ran — passes against real UB1
+    checkpoint data (39 usable rows, 129 fields each).
+  - Field-provenance coverage: no pre-existing automated test exists for
+    `generate-field-provenance.ts` (none did before this session either). Verified two ways
+    against real data: (1) a throwaway smoke script (`scripts/_tmp-smoke-provenance.ts`, deleted
+    after use, never committed) loaded real UB1 dossiers and called
+    `evaluateBusinessCategoryEligibility`/`mapCtoBusinessType` directly — 94 dossiers loaded, 77
+    eligible_foodservice, 45 CTO-mapped, output inspected and correct (e.g. "Kebabish Original" →
+    ["Pakistani Restaurant","Afghan Restaurant","Kebab Shop"], cuisine_specific, high confidence).
+    (2) Ran the real CLI end-to-end against Naseh's already-accepted UB1-UB5 territory (real
+    territory-run-manifest.json + real combined Master workbook, output written to the session
+    scratchpad only, deleted after inspection) — 108 usable leads, 36 provenance rows each (33
+    pre-existing + 3 new: Business Category Eligibility, CTO Business Type, Trading Status
+    (Consolidated)), spot-checked one full lead's 36 rows, all populated correctly with no thrown
+    errors.
+  - Release-verification gate: no separate gate script was built — the two exporters already
+    fail closed (Sales Pro: throws "Refusing to write Sales Pro export" on any dropdown/type
+    violation or blank/invalid phone; Master: throws "Reconciliation FAILED" on any bucket-count
+    mismatch) and both were exercised against real UB1 data above with zero violations. Building a
+    second, separate gate would duplicate enforcement that already exists at the source.
+  - Second real bug found and fixed while checking the new `turnover_gbp`/`gross_profit_gbp`/
+    `net_assets_gbp`/`employee_count` fields against real data: `candidate-dossier.ts`'s
+    `key_financial_values` (pre-existing code from earlier this session, not previously exercised
+    end-to-end) read Companies House's `turnover_result`/`grossProfit_result`/`netAssets_result`/
+    `employeeCount_result` verbatim with no `"not_available"` filter — unlike the adjacent
+    `company_age_years`/`financial_strength_band` fields, which do filter it. Confirmed against
+    real UB1 `filed-accounts-data.csv` (9 candidates with filed accounts): turnover/grossProfit
+    is `"not_available"` for 9/9 (expected — UK micro-entities aren't required to file it), which
+    would have leaked the literal string `"not_available"` into the Master export as a
+    fake-looking financial value. Fixed by applying the same filter to all 4 sub-fields; re-ran
+    `npm run typecheck` (clean) and the master-export/salespro-export/customer-master-exclusion
+    regression suites (all still ALL PASSED).
+- Result: every mandatory offline correction for the pilot is implemented, typechecked, built, and
+  regression-tested against real UB1/RM1/Naseh-UB1-UB5 data — one real bug found and fixed during
+  this verification pass (Business Types multi-value dropdown validation), not just accepted on a
+  green exit code.
+- Evidence link/screenshot: this session's file diffs (master-field-resolver.ts,
+  generate-master-export.ts, generate-salespro-export.ts, generate-field-provenance.ts,
+  candidate-dossier.ts, test-lead-production-salespro-export.ts,
+  test-lead-production-master-export.ts); `/tmp/out-test:lead-production-*.log` (this session, not
+  committed); `/tmp/build-out.log` (this session, not committed).
+- Remaining risk: **the five pilot districts (CM1, IG1, RM1, DA1, BR1) do not match the current
+  live `sales-territories-v2.json` configuration for the named representatives** (Kunz is
+  configured for TW1-TW10, Naseh for UB1-UB5, Saif for HA0-HA5, Tahira for WD3-WD7, Hassan for
+  EN1-EN5), and RM1 specifically is already owned by Nauman from the completed first campaign
+  wave — this conflict was identified earlier this session, reported to the owner, and remains
+  unresolved. No territory config was changed and no live discovery has been run against any of
+  the 5 named districts. Note 1/Note 2 content is composed only from fields already covered
+  elsewhere on the row (directors/PSCs/decision-maker/company age/group classification for Note 1;
+  FSA/Google/financial-strength/cuisine evidence for Note 2) — real production data has not yet
+  been visually reviewed by a human for tone/usefulness. `sic_code_descriptions` only covers the
+  15-code food-service-relevant subset already in the pipeline's SIC lookup table; codes outside
+  that subset are correctly left blank rather than guessed, but this means the field will be empty
+  for some real candidates. `turnover_gbp`/`gross_profit_gbp`/`net_assets_gbp`/`employee_count`
+  were checked against real UB1 filed-accounts data (see the bug fix above) —
+  `net_assets_gbp`/`employee_count` do populate for real candidates (e.g. net assets -£99,705, 4
+  employees); `turnover_gbp`/`gross_profit_gbp` were `null` for all 9 real UB1 candidates with
+  filed accounts (expected: UK micro-entities filing abbreviated accounts aren't required to
+  report turnover), so those two specific sub-fields remain functionally untested against a
+  genuinely populated real example — the code path is correct, but no real candidate in the
+  fixture data exercises it.

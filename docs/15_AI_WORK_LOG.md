@@ -1010,3 +1010,46 @@ Address Line 1/City/Postcode.
 - Commit: `656c767` (code). `npm run typecheck` clean, `npm run build` succeeded, all 8 lead-
   production regression suites re-verified PASSING.
 - Application-development work remains paused; no merge to `main`, no deployment.
+
+## Session: 2026-08-02 — Five-district-pilot mandatory corrections implemented; pilot itself blocked
+
+Owner instruction: implement every mandatory correction locked in this session's audits, run
+offline tests, and run the CM1/IG1/RM1/DA1/BR1 pilot only after tests pass. Also locked: the exact
+57-value CTO Business Type allow-list (supplied verbatim), the café/coffee-shop and bubble-tea
+"principal operation" eligibility rules, and every field in the "IMPORTANT OWNER DECISIONS" list
+(mandatory phone, preserve all existing columns, exact Sales Pro values, Note 1/Note 2 content
+rules).
+
+- Implemented and wired end-to-end (full detail: `docs/09_DECISIONS.md` 2026-08-02 entry):
+  `master-schema-v2.json` (129 fields, 107 v1 preserved + 22 new), the new Business Category
+  Eligibility engine, the new CTO Business Type mapping engine, the mandatory-phone gate
+  (`phone_resolution_exception`), SIC/financials/directors/PSCs wired into the dossier, trading-
+  status consolidation (Google + Companies House + website closure evidence), Note 1/Note 2
+  generation, and vocabulary-loading wired into both exporters' `resolveMasterFields()` call sites.
+- Extended `generate-field-provenance.ts` to cover the 3 new AspectLead-computed decision fields
+  (Business Category Eligibility, CTO Business Type, Trading Status) by calling the real engine
+  functions directly against each candidate's dossier — verified against real data two ways: a
+  throwaway smoke script against 94 real UB1 dossiers (77 eligible, 45 CTO-mapped, spot-checked
+  correct), and the real CLI end-to-end against Naseh's already-accepted UB1-UB5 territory (108
+  leads, 36 provenance rows each, all correct, zero errors). No separate release-verification gate
+  script was built — the two exporters already fail closed on dropdown/type/phone/reconciliation
+  violations, which was exercised and confirmed rather than assumed.
+- Found and fixed 2 real bugs during release verification (not just typecheck/exit-code-trusted —
+  full detail `docs/10_BUGS_AND_FIXES.md` 2026-08-02 entry): (1) the Sales Pro dropdown validator
+  rejected every valid multi-value "Business Types" cell because the new field is a comma-joined
+  string, not an array; (2) `key_financial_values` could leak the literal string "not_available"
+  into the new restricted-financial Master fields.
+- Fixed 2 stale test references surfaced by the schema/field changes: `test-lead-production-
+  salespro-export.ts`'s orphan-canonicalName cross-check was still reading `master-schema-v1.json`;
+  `test-lead-production-master-export.ts` had a hardcoded "107 fields per row" assertion. Both
+  updated to v2/129 and re-verified against real UB1 checkpoint data.
+- `npm run typecheck` and `npm run build` clean after every batch of edits; all 20
+  `test:lead-production-*` regression suites re-run individually, all ALL PASSED.
+- **Pilot is blocked, not run** — see ISS-0033 (`docs/11_ISSUES_LOG.md`): none of the 5 named
+  pilot districts match their named representative's actual configured territory in
+  `sales-territories-v2.json`, and RM1 is already owned by Nauman from the completed first
+  campaign wave. No territory config was changed and no live discovery was run against any of the
+  5 named districts. This must be resolved by the owner before the pilot can proceed.
+- Application-development work remains paused; no merge to `main`, no deployment; nothing
+  committed yet this session (working tree has this session's uncommitted implementation — see
+  `git status`).

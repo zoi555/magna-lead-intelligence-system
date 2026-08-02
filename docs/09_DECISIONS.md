@@ -1029,3 +1029,81 @@ Sales Pro export, CTO 20-field form, and Lead Production Report regenerated and 
 `scripts/lead-production/commercial-review-filter.ts`,
 `scripts/test-lead-production-commercial-review.ts`, `docs/LEAD_PRODUCTION_HANDOVER.md`,
 `PROJECT_STATUS.md`.
+
+## Five-district-pilot mandatory corrections: Master schema v2, Business Category Eligibility engine, CTO Business Type mapping engine, mandatory-phone gate (2026-08-02)
+
+### Decision
+
+Owner-directed implementation, ahead of the CM1/IG1/RM1/DA1/BR1 pilot (see ISS-0033 —
+**the pilot itself remains blocked, unresolved**), of every mandatory correction agreed this
+session:
+
+1. **`config/lead-production/master-schema-v2.json`** — new versioned Master schema, 129 fields
+   (all 107 v1 fields preserved byte-for-byte, verified programmatically; 22 new fields appended:
+   CTO Business Type + 4 mapping-metadata fields, Business Category Eligibility + 2 evidence
+   fields, Trading Status (7 fields: per-source raw values + consolidated final/reason/
+   confidence/retrieved-at), `sic_code_descriptions`, 4 restricted financial fields
+   (`turnover_gbp`/`gross_profit_gbp`/`net_assets_gbp`/`employee_count`), `note_1`/`note_2`).
+   Same additive-only versioning convention as `sales-territories-v2.json`/`master-schema-v1.json`
+   before it — v1 is never edited in place.
+2. **`scripts/lead-production/business-category-eligibility.ts`** (new module) — determines
+   `eligible_foodservice` / `excluded_non_food` / `review_required_business_category` /
+   `insufficient_category_evidence` from combined FSA/Google/website category evidence, per the
+   owner's exact café/coffee-shop and bubble-tea "principal operation" rules (a bare keyword alone
+   is never sufficient; conflicting evidence always routes to review, never an automatic call
+   either way). Runs independently of, and strictly before, CTO Business Type mapping — CTO
+   mapping never overrides this eligibility decision.
+3. **`scripts/lead-production/cto-business-type-mapping.ts`** (new module) — maps an
+   already-eligible, already-qualified candidate to 1-3 values from the CTO's exact 57-value
+   approved allow-list (`config/lead-production/cto-business-type-vocabulary-v1.json`, stored
+   verbatim from the CTO's own `dropdown_options.csv`, never invented/abbreviated/reworded).
+   Records method/confidence/reason/vocabulary-version per candidate; falls back to the allow-list's
+   own "Other" value, never a mismatched guess, when no cuisine/food-type/format evidence maps
+   cleanly.
+4. **Mandatory phone gate** — every released lead must have a valid UK phone
+   (`isValidUkPhone()`, consolidated into `normalize.ts` as the single shared validator, replacing
+   3 previously-duplicated implementations); a qualified candidate with no valid phone routes to
+   a new `phone_resolution_exception` status (held, not silently dropped, not silently released).
+5. **Notes** — Note 1 (ownership/directors/decision-maker intelligence, paragraph form) and Note 2
+   (concise bullet-point sales-conversion intelligence) are generated from evidence already present
+   elsewhere on the same row and stored as the two new `note_1`/`note_2` Master fields. Because the
+   approved Sales Pro schema has only one existing "Sales Conversation Notes" column (not two), the
+   existing `sales_conversation_notes` field is populated with both notes combined under clear
+   headers — a pragmatic interim decision, not an owner instruction, made because splitting an
+   approved existing CTO column into two was out of scope for an additive-only schema change.
+6. **Sales Pro "Business Types" column repointed** — `canonicalName` changed from the raw
+   `business_type` Master field (FSA/Google source category — kept, unchanged, still on Master as
+   its own field, never removed) to the new controlled `cto_business_type` field.
+   `pipeline_stage`'s default changed from `"1. Qualification"` to `"1. Follow Up"` (locked
+   instruction).
+
+### Reason
+
+All owner-locked decisions from this session's business-rule audits, now implemented rather than
+audited. The Note 1/Note 2 -> single-column combination and the "Café / Coffee Shop should not
+normally appear on released rows since cafés are excluded" eligibility note (enforced by #2 running
+strictly before #3) are the two points in this list requiring judgement beyond a literal
+transcription of the owner's instructions, so they're called out explicitly rather than left
+implicit in the diff.
+
+### Verification
+
+Two real bugs were found and fixed while independently verifying these against real UB1 data
+before reporting — see `docs/10_BUGS_AND_FIXES.md` (2026-08-02 entry) and
+`VERIFY_BEFORE_CLAIMING.md` (2026-08-02 entry) for full detail: (1) the Sales Pro dropdown
+validator rejected valid multi-value `cto_business_type` cells; (2) `key_financial_values` could
+leak the literal string `"not_available"` into restricted-financial Master fields.
+
+### Not altered
+
+`sales-territories-v2.json` (the pilot's district/representative conflict, ISS-0033, is
+unresolved — no territory config changed); Uber Eats/Deliveroo (out of scope, not touched); any
+already-accepted representative territory's existing exports (this is new schema/engine capability
+only — no already-delivered territory was reprocessed or regenerated as part of this change).
+
+**See also:** `scripts/lead-production/business-category-eligibility.ts`,
+`scripts/lead-production/cto-business-type-mapping.ts`,
+`scripts/lead-production/master-field-resolver.ts`,
+`config/lead-production/master-schema-v2.json`,
+`config/lead-production/cto-business-type-vocabulary-v1.json`, `docs/10_BUGS_AND_FIXES.md`,
+`docs/11_ISSUES_LOG.md` (ISS-0033), `VERIFY_BEFORE_CLAIMING.md`.
