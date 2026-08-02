@@ -21,15 +21,23 @@ import { normaliseName } from "./normalize";
 
 const DECISION_VALUES = new Set(["Keep", "Exclude Whole Brand"]);
 
+export interface BrandAliasEntry {
+  canonicalBrand: string;
+  aliases: string[];
+  domains: string[];
+  companyIdentifiers: string[];
+}
+
 export interface CommercialReviewRegistry {
   version: string; // directory name, e.g. "commercial-review-v1"
-  sourcePaths: { corrected: string; keep: string; exclude: string };
+  sourcePaths: { corrected: string; keep: string; exclude: string; aliases: string | null };
   keepBrands: string[]; // original names, as supplied
   excludeBrands: string[]; // original names, as supplied
   keepNormalised: Set<string>;
   excludeNormalised: Set<string>;
   keepOriginalByNormalised: Map<string, string>;
   excludeOriginalByNormalised: Map<string, string>;
+  aliasEntries: BrandAliasEntry[]; // additive layer — see brand-aliases-and-identifiers-v1.json; empty if the file doesn't exist for this registry version
 }
 
 function stripBom(raw: string): string {
@@ -109,8 +117,26 @@ export async function loadCommercialReviewRegistry(dir: string): Promise<Commerc
   for (const name of keepBrands) { const n = normaliseName(name); if (n) { keepNormalised.add(n); keepOriginalByNormalised.set(n, name); } }
   for (const name of excludeBrands) { const n = normaliseName(name); if (n) { excludeNormalised.add(n); excludeOriginalByNormalised.set(n, name); } }
 
+  // Additive alias/domain/company-identifier layer (locked policy 2026-08-02) — optional file;
+  // its absence is not an error (older registry versions won't have one), but if present, every
+  // canonicalBrand MUST already exist in brands_to_exclude_final.csv, fails closed otherwise, so
+  // an alias entry can never silently reference a brand that was never actually approved for
+  // exclusion.
+  const aliasesPath = path.join(dir, "brand-aliases-and-identifiers-v1.json");
+  let aliasEntries: BrandAliasEntry[] = [];
+  const aliasFileExists = await fs.access(aliasesPath).then(() => true).catch(() => false);
+  if (aliasFileExists) {
+    const parsed = JSON.parse(await fs.readFile(aliasesPath, "utf8")) as { entries: BrandAliasEntry[] };
+    for (const entry of parsed.entries) {
+      if (!excludeSet.has(entry.canonicalBrand)) {
+        throw new Error(`Commercial review registry (${version}): brand-aliases-and-identifiers-v1.json references canonicalBrand "${entry.canonicalBrand}", which is not in brands_to_exclude_final.csv — refusing to proceed on an alias entry for an unapproved brand.`);
+      }
+    }
+    aliasEntries = parsed.entries;
+  }
+
   return {
-    version, sourcePaths: { corrected: correctedPath, keep: keepPath, exclude: excludePath },
-    keepBrands, excludeBrands, keepNormalised, excludeNormalised, keepOriginalByNormalised, excludeOriginalByNormalised,
+    version, sourcePaths: { corrected: correctedPath, keep: keepPath, exclude: excludePath, aliases: aliasFileExists ? aliasesPath : null },
+    keepBrands, excludeBrands, keepNormalised, excludeNormalised, keepOriginalByNormalised, excludeOriginalByNormalised, aliasEntries,
   };
 }

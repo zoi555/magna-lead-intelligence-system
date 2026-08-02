@@ -1,0 +1,21 @@
+{
+  "version": "brand-aliases-and-identifiers-v1",
+  "note": "Additive layer on top of brands_to_exclude_final.csv / corrected_brand_decisions.csv — never edits those core Brand Name lists. Each entry's canonicalBrand MUST already exist in brands_to_exclude_final.csv (cross-checked on load, fails closed otherwise). Adds recognised alternate trading names, confirmed domains, and confirmed Companies House group identifiers, used only as ADDITIONAL exact-match evidence — never a fuzzy/substring match. Where no real, verified domain or company number is known, the array is left empty rather than guessed.",
+  "entries": [
+    {
+      "canonicalBrand": "Nisa Local",
+      "aliases": ["Nisa Express"],
+      "aliasRationale": "Real leaked candidate (2026-08-02 audit): 'Nisa Express' (TW15-7765B900) is the same Nisa Group convenience-store retail family as 'Nisa Local', trading under a different exact format name. 'Nisa Corner' (seen in 'Post Office: Nisa Corner', RM2-E01A06D3) is deliberately NOT added here — its brand identity is not independently confirmed, so it is left for review_required rather than auto-excluded, per the instruction not to use unrestricted fuzzy matching.",
+      "domains": [],
+      "companyIdentifiers": []
+    },
+    {
+      "canonicalBrand": "Greene King",
+      "aliases": [],
+      "aliasRationale": "Greene King's own confirmed pub-format sub-brands (Stonehouse, Sizzling Pubs) are separate, pre-existing entries in brands_to_exclude_final.csv, not aliases of 'Greene King' itself — kept as distinct brand entries since they are how these businesses actually trade, not merely another name for the same string.",
+      "domains": [],
+      "companyIdentifiers": ["00024694"],
+      "companyIdentifierRationale": "Greene King plc, Companies House company number 00024694 — public UK company registration data. Enables matching a candidate whose own decisive Companies House record shows this number (or a confirmed subsidiary/group relationship to it) as a Greene King-owned business even where the trading name alone gives no indication. No candidate in the historical dataset was found to carry this number directly (confirmed in the prior read-only audit) — this entry establishes the matching capability for future candidates, not a retroactive claim about existing data."
+    }
+  ]
+}

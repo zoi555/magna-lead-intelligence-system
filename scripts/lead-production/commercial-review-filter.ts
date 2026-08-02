@@ -36,8 +36,8 @@
 // requirement) — a keep-list brand can never be excluded by the brand rule.
 
 import type { Dossier } from "./candidate-dossier";
-import { normaliseName } from "./normalize";
-import type { CommercialReviewRegistry } from "./load-commercial-review";
+import { normaliseName, normaliseDomain, normaliseCompanyNumber } from "./normalize";
+import type { CommercialReviewRegistry, BrandAliasEntry } from "./load-commercial-review";
 
 export type CommercialReviewMatchedRule = "brand_exclusion" | "pharmacy_chemist_exclusion";
 
@@ -72,21 +72,90 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-// "Superdrug - Hornchurch" / "Superdrug – Hornchurch" — an explicit dash-style separator right
-// after the brand word, checked against the RAW (pre-normalisation) name so the distinction
-// between a real separator and a bare space survives (normaliseName collapses both to spaces).
-function matchesSingleWordBrandBranch(candidateRaw: string, brandOriginal: string): boolean {
-  if (!candidateRaw || !brandOriginal) return false;
-  const re = new RegExp(`^\\s*${escapeRegExp(brandOriginal)}\\s*[-–—]\\s+`, "i");
+// Locked policy (2026-08-02): support exact brand, branch-before-brand, brand-before-branch,
+// "@Brand", colon, brackets, aliases, confirmed domain and confirmed group identifiers — while
+// explicitly NEVER using unrestricted fuzzy/substring matching. Every pattern below is anchored
+// (start/end of string, or an explicit separator character) — never a bare "brand appears
+// anywhere in the name" substring test, which is exactly the kind of over-matching the original
+// single-word generic-word protection exists to prevent.
+//
+// All separator-based patterns are checked against the RAW (pre-normalisation) name so the
+// distinction between a real separator and a bare space survives (normaliseName collapses both
+// to spaces) — this is unchanged from the original design, just generalised to be symmetric
+// (brand-first AND brand-last) and to cover more separator characters, per two real, confirmed
+// leaks found in the 2026-08-02 audit: "New Hollands News & Wine - Nisa Local" (brand AFTER the
+// dash — the original design only checked brand-BEFORE) and "Bubblewala @Nisa Local" (an "@"
+// separator, not a dash at all).
+const SEPARATOR_CLASS = "[-–—:]"; // hyphen, en-dash, em-dash, colon
+
+// "Brand - Branch", "Brand: Branch" — brand first, at the very start of the raw name.
+function matchesBrandBeforeSeparator(candidateRaw: string, brandOriginal: string): boolean {
+  const re = new RegExp(`^\\s*${escapeRegExp(brandOriginal)}\\s*${SEPARATOR_CLASS}\\s+`, "i");
   return re.test(candidateRaw);
 }
 
-function matchesBrand(candidate: { raw: string; normalised: string }, brandOriginal: string, brandNormalised: string): boolean {
+// "Branch - Brand", "Branch: Brand" — brand last, at the very end of the raw name. This is the
+// pattern the original design was missing (Sizzling Pubs, Nisa Local leaks above).
+function matchesBrandAfterSeparator(candidateRaw: string, brandOriginal: string): boolean {
+  const re = new RegExp(`${SEPARATOR_CLASS}\\s*${escapeRegExp(brandOriginal)}\\s*$`, "i");
+  return re.test(candidateRaw);
+}
+
+// "Branch @Brand" — an explicit "@" immediately preceding the brand word, anywhere in the name.
+function matchesAtBrand(candidateRaw: string, brandOriginal: string): boolean {
+  const re = new RegExp(`@\\s*${escapeRegExp(brandOriginal)}\\b`, "i");
+  return re.test(candidateRaw);
+}
+
+// "Branch (Brand)" — brand appears exactly within a bracketed segment, anywhere in the name.
+function matchesBracketedBrand(candidateRaw: string, brandOriginal: string): boolean {
+  const re = new RegExp(`\\(\\s*${escapeRegExp(brandOriginal)}\\s*\\)`, "i");
+  return re.test(candidateRaw);
+}
+
+// Applies every anchored pattern for ONE brand string (the canonical name, or one of its
+// aliases) against one candidate name field. Never a bare substring test.
+function matchesOneBrandString(candidate: { raw: string; normalised: string }, brandOriginal: string, brandNormalised: string): boolean {
   const brandKey = brandComparisonKey(brandNormalised);
   if (!candidate.normalised || !brandKey) return false;
-  if (candidate.normalised === brandKey) return true;
-  if (brandKey.includes(" ")) return candidate.normalised.startsWith(`${brandKey} `);
-  return matchesSingleWordBrandBranch(candidate.raw, brandOriginal);
+  if (candidate.normalised === brandKey) return true; // exact
+  if (brandKey.includes(" ") && candidate.normalised.startsWith(`${brandKey} `)) return true; // multi-word prefix, e.g. "Village Pizza Hounslow"
+  if (matchesBrandBeforeSeparator(candidate.raw, brandOriginal)) return true;
+  if (matchesBrandAfterSeparator(candidate.raw, brandOriginal)) return true;
+  if (matchesAtBrand(candidate.raw, brandOriginal)) return true;
+  if (matchesBracketedBrand(candidate.raw, brandOriginal)) return true;
+  return false;
+}
+
+// Tries the canonical brand name, then every known alias for it (Nisa Local -> Nisa Express,
+// etc.) — an alias match is reported with the CANONICAL brand name for audit consistency (the
+// exclusion is "you matched brand X", not "you matched some alias string").
+function matchesBrand(candidate: { raw: string; normalised: string }, brandOriginal: string, brandNormalised: string, aliasEntry: BrandAliasEntry | undefined): boolean {
+  if (matchesOneBrandString(candidate, brandOriginal, brandNormalised)) return true;
+  if (aliasEntry) {
+    for (const alias of aliasEntry.aliases) {
+      if (matchesOneBrandString(candidate, alias, normaliseName(alias))) return true;
+    }
+  }
+  return false;
+}
+
+// Confirmed domain match: the candidate's own resolved website domain equals one of the brand's
+// known domains exactly (normalised host comparison, never a substring/subdomain guess).
+function matchesDomain(candidateDomain: string | null, aliasEntry: BrandAliasEntry | undefined): boolean {
+  if (!candidateDomain || !aliasEntry || aliasEntry.domains.length === 0) return false;
+  const normalisedCandidate = normaliseDomain(candidateDomain);
+  if (!normalisedCandidate) return false;
+  return aliasEntry.domains.some((d) => normaliseDomain(d) === normalisedCandidate);
+}
+
+// Confirmed group identifier match: the candidate's own decisive Companies House company number
+// equals one of the brand's known company numbers exactly.
+function matchesCompanyIdentifier(candidateCompanyNumber: string | null, aliasEntry: BrandAliasEntry | undefined): boolean {
+  if (!candidateCompanyNumber || !aliasEntry || aliasEntry.companyIdentifiers.length === 0) return false;
+  const normalisedCandidate = normaliseCompanyNumber(candidateCompanyNumber);
+  if (!normalisedCandidate) return false;
+  return aliasEntry.companyIdentifiers.some((c) => normaliseCompanyNumber(c) === normalisedCandidate);
 }
 
 export interface BrandDecisionResult {
@@ -98,11 +167,15 @@ export interface BrandDecisionResult {
 
 export function evaluateBrandDecision(dossier: Dossier, registry: CommercialReviewRegistry): BrandDecisionResult {
   const names = candidateNames(dossier);
+  const aliasByCanonical = new Map(registry.aliasEntries.map((e) => [e.canonicalBrand, e]));
+  const candidateDomain = (dossier.fields.website as string | null | undefined) ?? null;
+  const candidateCompanyNumber = (dossier.fields.companies_house_number as string | null | undefined) ?? null;
 
+  // Explicit keep rules are checked FIRST and unconditionally override any exclude match.
   for (const name of names) {
     for (const keepNorm of registry.keepNormalised) {
       const original = registry.keepOriginalByNormalised.get(keepNorm) ?? "";
-      if (matchesBrand(name, original, keepNorm)) {
+      if (matchesBrand(name, original, keepNorm, aliasByCanonical.get(original))) {
         return {
           excluded: false, keepOverride: true, matchedBrandName: original,
           matchBasis: `Explicit keep override: ${name.field} "${name.raw}" matches approved KEEP brand "${original}".`,
@@ -111,15 +184,30 @@ export function evaluateBrandDecision(dossier: Dossier, registry: CommercialRevi
     }
   }
 
+  // Name-based exclude matching (exact / separator / @ / brackets / alias) — every anchored
+  // pattern, never a bare substring.
   for (const name of names) {
     for (const excludeNorm of registry.excludeNormalised) {
       const original = registry.excludeOriginalByNormalised.get(excludeNorm) ?? "";
-      if (matchesBrand(name, original, excludeNorm)) {
+      if (matchesBrand(name, original, excludeNorm, aliasByCanonical.get(original))) {
         return {
           excluded: true, keepOverride: false, matchedBrandName: original,
           matchBasis: `${name.field} "${name.raw}" matches approved EXCLUDE brand "${original}".`,
         };
       }
+    }
+  }
+
+  // Confirmed-domain / confirmed-group-identifier matching (locked policy 2026-08-02) — fires
+  // independently of name evidence entirely, so a candidate whose trading name gives no
+  // indication of brand ownership (e.g. a franchisee operating under its own local name) can
+  // still be caught via its website domain or a decisive Companies House group relationship.
+  for (const [canonicalBrand, entry] of aliasByCanonical) {
+    if (matchesDomain(candidateDomain, entry)) {
+      return { excluded: true, keepOverride: false, matchedBrandName: canonicalBrand, matchBasis: `Website domain "${candidateDomain}" matches a confirmed domain for brand "${canonicalBrand}".` };
+    }
+    if (matchesCompanyIdentifier(candidateCompanyNumber, entry)) {
+      return { excluded: true, keepOverride: false, matchedBrandName: canonicalBrand, matchBasis: `Companies House number "${candidateCompanyNumber}" matches a confirmed group identifier for brand "${canonicalBrand}".` };
     }
   }
 
