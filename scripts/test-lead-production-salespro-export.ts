@@ -19,10 +19,10 @@ async function main() {
   const existing = schema.columns.filter((c: any) => c.origin === "Existing CTO Field");
   assert(existing.length === 20, `exactly 20 existing CTO columns (got ${existing.length})`);
   assert(schema.columns.length - existing.length === 88, "exactly 88 new columns");
-  const masterSchema = JSON.parse(await fs.readFile("config/lead-production/master-schema-v1.json", "utf8"));
+  const masterSchema = JSON.parse(await fs.readFile("config/lead-production/master-schema-v2.json", "utf8"));
   const masterNames = new Set(masterSchema.fields.map((f: any) => f.canonicalName));
   const orphans = schema.columns.filter((c: any) => !masterNames.has(c.canonicalName));
-  assert(orphans.length === 0, `every Sales Pro column's canonicalName exists in the 107-field Master vocabulary (${orphans.length} orphan(s))`);
+  assert(orphans.length === 0, `every Sales Pro column's canonicalName exists in the 129-field Master vocabulary (${orphans.length} orphan(s))`);
   const labels = schema.columns.map((c: any) => c.salesProFieldLabel);
   assert(new Set(labels).size === 108, "all 108 salesProFieldLabel column headers are unique strings");
 

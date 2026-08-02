@@ -1,4 +1,5 @@
-// Milestone 3 — the 107-field authoritative Master exporter. Read-only; makes no external
+// Milestone 3 — the authoritative Master exporter (129 fields as of the v2 schema, 2026-08-02).
+// Read-only; makes no external
 // call; never modifies any checkpoint it reads. Reuses candidate-dossier.ts (the same join
 // already accepted for the UB1 release package) and master-field-resolver.ts for field mapping
 // — never a parallel reimplementation of either.
@@ -21,6 +22,7 @@ import { dedupeAcrossDistricts, type DistrictCandidateForDedup, type DuplicateCl
 import { writeCsv } from "./csv";
 import { loadCommercialReviewRegistry, type CommercialReviewRegistry } from "./load-commercial-review";
 import { evaluateCommercialReviewExclusion } from "./commercial-review-filter";
+import { loadCtoBusinessTypeVocabulary, type CtoBusinessTypeVocabulary } from "./cto-business-type-mapping";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
 async function readJson(p: string): Promise<any> { return JSON.parse(await fs.readFile(p, "utf8")); }
@@ -28,18 +30,21 @@ async function readJson(p: string): Promise<any> { return JSON.parse(await fs.re
 interface DistrictInput { district: string; dirs: { phase1Dir: string; fsaDir: string; googleDir: string; chDir: string; websiteDir: string; publicProfileDir: string; groupRescreenDir: string; v2Dir: string } }
 
 async function loadMasterSchema(): Promise<{ canonicalName: string; masterFieldLabel: string; category: string }[]> {
-  const j = await readJson("config/lead-production/master-schema-v1.json");
+  // 2026-08-02: v2 — all 107 v1 fields preserved unchanged, 22 new fields appended (108-129).
+  // See master-schema-v2.json's own "supersedes"/"changelog" fields for the exact record.
+  const j = await readJson("config/lead-production/master-schema-v2.json");
   return j.fields.map((f: any) => ({ canonicalName: f.canonicalName, masterFieldLabel: f.masterFieldLabel, category: f.category }));
 }
 
 interface RowBundle { dossier: Dossier; resolved: ResolvedMasterRow; district: string }
 
 async function loadAllRows(districts: DistrictInput[], ctxFor: (district: string) => MasterFieldContext): Promise<{ rows: RowBundle[]; duplicatesRemoved: DuplicateCluster[] }> {
+  const vocabulary = await loadCtoBusinessTypeVocabulary();
   const out: RowBundle[] = [];
   for (const d of districts) {
     const { dossiers } = await loadCandidateDossiers(d.dirs);
     const ctx = ctxFor(d.district);
-    for (const dossier of dossiers) out.push({ dossier, resolved: resolveMasterFields(dossier, ctx), district: d.district });
+    for (const dossier of dossiers) out.push({ dossier, resolved: resolveMasterFields(dossier, ctx, vocabulary), district: d.district });
   }
   // Cross-district dedup only makes sense with more than one district — a single-district
   // export (UB1 validation, ad-hoc mode) has nothing to dedup against.
@@ -172,7 +177,7 @@ async function main() {
   }
 
   if (!representative || !role || !salesTerritory) { console.error("Could not resolve representative/role/sales-territory."); process.exit(1); }
-  console.log(`=== Master exporter (107 fields) — ${representative} (${role}), ${salesTerritory}, ${districts.length} district(s) ===`);
+  console.log(`=== Master exporter (129 fields, v2 schema) — ${representative} (${role}), ${salesTerritory}, ${districts.length} district(s) ===`);
 
   const commercialReviewDir = arg("commercial-review-dir") ?? "config/lead-production/commercial-review-v1";
   const commercialReviewRegistry = await loadCommercialReviewRegistry(commercialReviewDir);

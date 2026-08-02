@@ -1,8 +1,9 @@
 // Milestone 4 — the 108-column Magna Sales Pro exporter. Read-only; makes no external call.
 // Reuses candidate-dossier.ts + master-field-resolver.ts (Milestone 3) unchanged — every
-// Sales Pro column's canonicalName is drawn from the same 107-field Master vocabulary
+// Sales Pro column's canonicalName is drawn from the same Master vocabulary
 // (config/lead-production/salespro-schema-v1.json cross-validated 0 orphan canonicalNames
-// against master-schema-v1.json), so this exporter never re-derives a value independently.
+// against master-schema-v2.json, as of the 2026-08-02 CTO Business Type column repoint), so
+// this exporter never re-derives a value independently.
 //
 // Enforces: exact CTO labels/order (from the schema file, never hardcoded here), the 20
 // existing + 88 new fields, dropdown/type validation (refuses to WRITE a value outside a
@@ -23,6 +24,7 @@ import { writeCsv } from "./csv";
 import { loadCommercialReviewRegistry } from "./load-commercial-review";
 import { evaluateCommercialReviewExclusion } from "./commercial-review-filter";
 import { isValidUkPhone } from "./normalize";
+import { loadCtoBusinessTypeVocabulary } from "./cto-business-type-mapping";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
 async function readJson(p: string): Promise<any> { return JSON.parse(await fs.readFile(p, "utf8")); }
@@ -78,7 +80,14 @@ function buildRowAndValidate(columns: SalesProColumn[], bundle: RowBundle, role:
         const n = Number(cell);
         if (!Number.isFinite(n) || n < range.min || n > range.max) violations.push({ leadId: bundle.leadId, column: col.salesProFieldLabel, value: cell, reason: `"${cell}" is outside the allowed range ${range.min}-${range.max} for "${col.salesProFieldLabel}".` });
       } else {
-        const members = Array.isArray(raw) ? (raw as unknown[]).map(String) : [cell];
+        // "Multi Select" columns (e.g. Business Types) are written as one comma-separated cell
+        // (CTO's exact required format — see cto_business_type's transformationExportRule), so
+        // each comma-separated member is validated individually, not the whole joined string.
+        const members = Array.isArray(raw)
+          ? (raw as unknown[]).map(String)
+          : col.fieldType === "Multi Select"
+          ? cell.split(",").map((m) => m.trim()).filter((m) => m !== "")
+          : [cell];
         for (const m of members) if (!col.allowedValues.includes(m)) violations.push({ leadId: bundle.leadId, column: col.salesProFieldLabel, value: m, reason: `"${m}" is not one of the allowed values for "${col.salesProFieldLabel}": [${col.allowedValues.join(", ")}]` });
       }
     }
@@ -139,12 +148,13 @@ async function main() {
   const newCount = columns.filter((c) => c.origin !== "Existing CTO Field").length;
   if (existingCount !== 20 || newCount !== 88) throw new Error(`Schema drift: expected 20 existing + 88 new, got ${existingCount} existing + ${newCount} new.`);
 
+  const vocabulary = await loadCtoBusinessTypeVocabulary();
   let bundles: RowBundle[] = [];
   for (const d of districts) {
     const { dossiers } = await loadCandidateDossiers(d.dirs);
     const ctx: MasterFieldContext = { territory: d.district, representative: representative!, role: role!, salesTerritory: salesTerritory! };
     for (const dossier of dossiers) {
-      const resolved = resolveMasterFields(dossier, ctx);
+      const resolved = resolveMasterFields(dossier, ctx, vocabulary);
       bundles.push({ dossier, district: d.district, fields: resolved.fields, leadId: resolved.leadId, gaps: resolved.dataQualityGaps });
     }
   }

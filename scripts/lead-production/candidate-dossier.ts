@@ -161,6 +161,11 @@ export async function loadCandidateDossiers(dirs: DossierCheckpointDirs): Promis
       cuisine_service_model: { cuisineTags: website?.cuisineTags ?? [], serviceModel: website?.serviceModel ?? null },
       fsa_establishment_id: bestFsa?.fhrsId ?? null, fsa_business_name: bestFsa?.officialBusinessName ?? null,
       fsa_hygiene_rating: bestFsa?.hygieneRating ?? null, fsa_rating_status: bestFsa?.ratingStatus ?? null, fsa_rating_date: bestFsa?.ratingDate ?? null,
+      // Locked policy (2026-08-02): website closure-text evidence retained separately per source
+      // (never merged into a single opaque trading-status value) — populated by the new
+      // extractClosureEvidence() extraction (website-extraction.ts), previously not read here at
+      // all (a real, confirmed pre-existing gap: no website-based closure signal existed).
+      website_closure_evidence: website?.closureEvidence?.value ?? null,
       google_place_id: bestGoogle?.placeId ?? null, google_business_status: bestGoogle?.businessStatus ?? null,
       google_rating: bestGoogle?.rating ?? null, google_review_count: bestGoogle?.reviewCount ?? null, google_outcome: googleOutcome,
       companies_house_number: profile?.company_number ?? (chDecisive ? ch.plausibleCompanies?.[0]?.companyNumber ?? null : null),
@@ -173,7 +178,19 @@ export async function loadCandidateDossiers(dirs: DossierCheckpointDirs): Promis
       sic_codes: profile?.sic_codes ? profile.sic_codes.split(";").map((s: string) => s.trim()).filter(Boolean) : [],
       company_age_years: finCalc?.companyAgeYears_result && finCalc.companyAgeYears_result !== "not_available" ? finCalc.companyAgeYears_result : null,
       filed_accounts_available: !!filedAccounts && filedAccounts.accounts_type !== "",
-      key_financial_values: filedAccounts ? { turnover: filedAccounts.turnover_result, grossProfit: filedAccounts.grossProfit_result, netAssets: filedAccounts.netAssets_result, employeeCount: filedAccounts.employeeCount_result } : null,
+      // Real bug found and fixed 2026-08-02 (release verification for the new turnover_gbp/
+      // gross_profit_gbp/net_assets_gbp/employee_count Master fields): unlike company_age_years
+      // and financial_strength_band just above, this previously did NOT filter out the literal
+      // string "not_available" — real UB1 filed-accounts data shows turnover/grossProfit is
+      // "not_available" for the large majority of micro-entity filings (they're not required to
+      // file it), so the raw string would have leaked into the Master export as a fake-looking
+      // financial value instead of a genuine blank.
+      key_financial_values: filedAccounts ? {
+        turnover: filedAccounts.turnover_result !== "not_available" ? filedAccounts.turnover_result : null,
+        grossProfit: filedAccounts.grossProfit_result !== "not_available" ? filedAccounts.grossProfit_result : null,
+        netAssets: filedAccounts.netAssets_result !== "not_available" ? filedAccounts.netAssets_result : null,
+        employeeCount: filedAccounts.employeeCount_result !== "not_available" ? filedAccounts.employeeCount_result : null,
+      } : null,
       financial_strength_band: finCalc?.financialStrengthBand_result && finCalc.financialStrengthBand_result !== "not_available" ? finCalc.financialStrengthBand_result : null,
       directors: officers.filter((o) => o.officer_role === "director" && o.status === "current").map((o) => o.full_name),
       pscs: pscs.filter((p) => p.status === "current").map((p) => p.psc_name),

@@ -10,6 +10,8 @@
 
 import { createHash } from "node:crypto";
 import type { Dossier } from "./candidate-dossier";
+import { evaluateBusinessCategoryEligibility } from "./business-category-eligibility";
+import { mapCtoBusinessType, type CtoBusinessTypeVocabulary } from "./cto-business-type-mapping";
 
 export interface MasterFieldContext {
   territory: string; // Postcode District this candidate was discovered in, e.g. "RM1"
@@ -17,6 +19,21 @@ export interface MasterFieldContext {
   role: "telesales" | "field_sales";
   salesTerritory: string; // human label, e.g. "RM1-RM14"
 }
+
+// Small, real, publicly-documented UK SIC 2007 code descriptions — food-service-relevant subset
+// only (locked policy: "SIC descriptions must be collected... never fabricated for a code with
+// no known description"). Deliberately NOT a full SIC 2007 reference table — codes outside this
+// small set are reported with no description rather than a guessed one.
+const SIC_DESCRIPTIONS: Record<string, string> = {
+  "56101": "Licensed restaurants", "56102": "Unlicensed restaurants and cafes",
+  "56103": "Take-away food shops and mobile food stands", "56210": "Event catering activities",
+  "56290": "Other food service activities", "56301": "Licensed clubs",
+  "56302": "Public houses and bars", "10710": "Manufacture of bread; manufacture of fresh pastry goods and cakes",
+  "10890": "Manufacture of other food products n.e.c.", "46170": "Agents involved in the sale of food, beverages and tobacco",
+  "46381": "Wholesale of fish, crustaceans and molluscs", "46390": "Non-specialised wholesale of food, beverages and tobacco",
+  "47210": "Retail sale of fruit and vegetables in specialised stores", "47220": "Retail sale of meat and meat products in specialised stores",
+  "47230": "Retail sale of fish, crustaceans and molluscs in specialised stores",
+};
 
 export interface ResolvedMasterRow {
   leadId: string;
@@ -32,6 +49,40 @@ export function computeLeadId(territory: string, candidateId: string): string {
 function pick<T>(...values: (T | null | undefined)[]): T | null {
   for (const v of values) if (v !== null && v !== undefined && v !== "") return v;
   return null;
+}
+
+// Note 1/Note 2 (locked policy 2026-08-02) — composed only from evidence genuinely present on
+// the dossier, never fabricated. Explicitly never repeats phone/WhatsApp/address/Business Types/
+// Sales Rep/Region-Route/Pipeline Status/Lead Type/Lead Urgency, all of which are their own
+// dedicated fields elsewhere on this same row.
+function buildNote1OwnershipAndDecisionMaker(f: Record<string, unknown>, groupClass: string): string | null {
+  const parts: string[] = [];
+  const directors = (f.directors as string[]) ?? [];
+  const pscs = (f.pscs as string[]) ?? [];
+  const decisionMaker = f.ranked_decision_maker as { name: string; role: string } | null;
+  const companyAge = f.company_age_years as number | null;
+  if (directors.length) parts.push(`Current director(s): ${directors.join(", ")}.`);
+  if (pscs.length) parts.push(`Person(s) with significant control: ${pscs.join(", ")}.`);
+  if (decisionMaker) parts.push(`Ranked decision-maker: ${decisionMaker.name} (${decisionMaker.role}).`);
+  if (companyAge != null) parts.push(`Company has been trading/incorporated for approximately ${companyAge} year(s).`);
+  if (groupClass && groupClass !== "Unresolved") parts.push(`Ownership structure: ${groupClass}.`);
+  return parts.length ? parts.join(" ") : null;
+}
+
+function buildNote2SalesIntelligence(f: Record<string, unknown>, financialStrengthBand: string | null): string | null {
+  const bullets: string[] = [];
+  const hygieneRating = f.fsa_hygiene_rating as string | null;
+  const googleRating = f.google_rating as number | null;
+  const googleReviewCount = f.google_review_count as number | null;
+  const halal = f.halal_evidence as boolean | null; // note: not currently populated upstream (see halal_evidence: null elsewhere) — included defensively for when it is
+  const cuisineServiceModel = f.cuisine_service_model as { cuisineTags?: string[] } | null;
+  const cuisineTags = cuisineServiceModel?.cuisineTags ?? [];
+  if (hygieneRating) bullets.push(`FSA hygiene rating: ${hygieneRating}.`);
+  if (googleRating != null) bullets.push(`Google rating: ${googleRating}${googleReviewCount != null ? ` (${googleReviewCount} reviews)` : ""}.`);
+  if (financialStrengthBand) bullets.push(`Financial strength: ${financialStrengthBand}.`);
+  if (cuisineTags.length) bullets.push(`Cuisine/product evidence: ${cuisineTags.join(", ")}.`);
+  if (halal) bullets.push(`Halal evidence found on official website.`);
+  return bullets.length ? bullets.map((b) => `- ${b}`).join("\n") : null;
 }
 
 // Defensive substring-based enum mapping: never invent a value outside the allowed set. If no
@@ -68,9 +119,60 @@ function splitAddress(fullAddress: string | null): { line1: string | null; town:
   return { line1, town };
 }
 
-export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext): ResolvedMasterRow {
+// vocabulary is optional (backward-compatible with any caller not yet passing it) — when
+// omitted, cto_business_type is left null rather than guessed; loaded ONCE by the caller
+// (generate-master-export.ts/generate-salespro-export.ts's main()) and threaded through, never
+// re-read from disk per candidate.
+export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext, vocabulary?: CtoBusinessTypeVocabulary): ResolvedMasterRow {
   const f = dossier.fields;
   const leadId = computeLeadId(ctx.territory, dossier.candidateId);
+
+  // --- Business-category eligibility (locked policy 2026-08-02) — evaluated for EVERY
+  // candidate (the Master sheet is the canonical full dataset), independent of qualification
+  // status; never itself gates qualification/hard-rejection (that remains hard-gates.ts/
+  // qualification-v2.ts's job — this is category evidence, recorded, not enforced here). ---
+  const businessCategory = evaluateBusinessCategoryEligibility(dossier);
+
+  // --- CTO Business Type mapping — per explicit instruction, applies ONLY to a candidate that
+  // is (a) already business-category-eligible AND (b) a final qualified ordinary lead or key
+  // account (qualificationStatus qualified/qualified_with_channel_limit) — never an excluded,
+  // held, or rejected candidate, and never overriding the eligibility decision above. ---
+  const isQualifiedForCto = dossier.qualificationStatus === "qualified" || dossier.qualificationStatus === "qualified_with_channel_limit";
+  const ctoMapping = vocabulary && isQualifiedForCto && businessCategory.outcome === "eligible_foodservice" ? mapCtoBusinessType(dossier, vocabulary) : null;
+
+  // --- Trading status, retained separately per source (locked policy: "Google, Companies
+  // House, FSA, official website and platform evidence must be retained separately") ---
+  const rawGoogleStatus = (f.google_business_status as string | null) ?? null;
+  const rawChStatus = (f.companies_house_status as string | null) ?? null;
+  const rawWebsiteClosure = (f.website_closure_evidence as string | null) ?? null;
+  const googlePermanentlyClosed = rawGoogleStatus === "CLOSED_PERMANENTLY";
+  const googleTemporarilyClosed = rawGoogleStatus === "CLOSED_TEMPORARILY";
+  const chDissolvedOrLiquidation = rawChStatus === "dissolved" || rawChStatus === "liquidation";
+  let tradingStatusFinal: string; let tradingStatusReason: string; let tradingStatusConfidence: "High" | "Medium" | "Low";
+  if (googlePermanentlyClosed || chDissolvedOrLiquidation) {
+    tradingStatusFinal = "Permanently Closed";
+    tradingStatusReason = googlePermanentlyClosed ? `Google businessStatus: ${rawGoogleStatus}.` : `Companies House status: ${rawChStatus}.`;
+    tradingStatusConfidence = "High";
+  } else if (googleTemporarilyClosed) {
+    tradingStatusFinal = "Temporarily Closed";
+    tradingStatusReason = `Google businessStatus: ${rawGoogleStatus}.`;
+    tradingStatusConfidence = "High";
+  } else if (rawWebsiteClosure) {
+    // Website closure text alone is the weakest signal (locked policy: never auto-excludes by
+    // itself) — held as conflicting/uncertain rather than confidently "Permanently Closed".
+    tradingStatusFinal = "Conflicting Evidence - Held";
+    tradingStatusReason = `Website closure-text evidence found ("${rawWebsiteClosure}"), not corroborated by Google or Companies House — held for review rather than confidently closed.`;
+    tradingStatusConfidence = "Low";
+  } else if (rawGoogleStatus || rawChStatus) {
+    tradingStatusFinal = "Trading";
+    tradingStatusReason = `No closure signal from any source (Google: ${rawGoogleStatus ?? "no match"}; Companies House: ${rawChStatus ?? "no decisive match"}).`;
+    tradingStatusConfidence = "Medium";
+  } else {
+    tradingStatusFinal = "Unknown";
+    tradingStatusReason = "No trading-status evidence available from any source.";
+    tradingStatusConfidence = "Low";
+  }
+  const tradingStatusRetrievedAt = ((f.source_retrieval_dates as Record<string, string | null>) ?? {}).google ?? ((f.source_retrieval_dates as Record<string, string | null>) ?? {}).companies_house ?? null;
 
   const groupClass = matchEnum(f.group_franchise_classification as string, [
     ["shared_kitchen", "Shared Kitchen"], ["virtual_brand", "Virtual Brand"], ["key_account", "Key Account"],
@@ -138,6 +240,10 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext): 
   // the descriptive magna_customer_match_result field (derived only from the LAST stage that ran)
   // doesn't itself reflect an earlier stage's confirmation.
   const isExistingCustomer = dossier.v1Bucket === "customer_master_exclusion" || customerStatus === "Confirmed Active Customer" || customerStatus === "Confirmed Inactive Customer" || customerStatus === "Probable Match" || customerStatus === "Possible Match";
+
+  const financialStrengthBandValue = matchEnum(f.financial_strength_band as string, [["strong", "Strong"], ["moderate", "Moderate"], ["weak", "Weak"]]) ?? (f.filed_accounts_available === false ? "Insufficient Data" : null);
+  const note1 = buildNote1OwnershipAndDecisionMaker(f, groupClass);
+  const note2 = buildNote2SalesIntelligence(f, financialStrengthBandValue);
 
   const fields: Record<string, unknown> = {
     lead_id: leadId,
@@ -214,12 +320,19 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext): 
     incorporation_date: pick(f.incorporation_date as string),
     company_age_years: pick(f.company_age_years as number),
     sic_codes: (f.sic_codes as string[])?.length ? (f.sic_codes as string[]) : null,
+    sic_code_descriptions: (f.sic_codes as string[])?.length
+      ? (f.sic_codes as string[]).map((code) => SIC_DESCRIPTIONS[code] ?? null).filter((d): d is string => d !== null).join("; ") || null
+      : null,
     accounts_type: null,
     latest_accounts_date: null,
     accounts_overdue_indicator: null,
     company_size_band: null,
     financial_strength_band: matchEnum(f.financial_strength_band as string, [["strong", "Strong"], ["moderate", "Moderate"], ["weak", "Weak"]]) ?? (f.filed_accounts_available === false ? "Insufficient Data" : null),
     purchasing_capacity_band: null,
+    turnover_gbp: (f.key_financial_values as { turnover?: number | null } | null)?.turnover ?? null,
+    gross_profit_gbp: (f.key_financial_values as { grossProfit?: number | null } | null)?.grossProfit ?? null,
+    net_assets_gbp: (f.key_financial_values as { netAssets?: number | null } | null)?.netAssets ?? null,
+    employee_count: (f.key_financial_values as { employeeCount?: number | null } | null)?.employeeCount ?? null,
 
     magna_customer_match_status: customerStatus,
     netsuite_customer_account_code: null,
@@ -240,7 +353,27 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext): 
     catering_indicator: null,
     multi_site_opportunity: (f.business_structure_status as string) === "Group" ? "Potential" : null,
     estimated_commercial_potential: score == null ? "Unknown" : score >= 65 ? "High" : score >= 50 ? "Medium" : "Low",
-    sales_conversation_notes: null,
+    sales_conversation_notes: note1 && note2 ? `Note 1 — Ownership & Decision-Maker:\n${note1}\n\nNote 2 — Sales Intelligence:\n${note2}` : note1 ?? note2 ?? null,
+    note_1: note1,
+    note_2: note2,
+
+    business_category_eligibility: businessCategory.outcome,
+    business_category_evidence_summary: businessCategory.evidenceSummary ?? null,
+    business_category_confidence: businessCategory.confidence ?? null,
+
+    cto_business_type: ctoMapping?.selectedBusinessTypes.join(", ") ?? null,
+    cto_business_type_mapping_method: ctoMapping?.mappingMethod ?? null,
+    cto_business_type_mapping_confidence: ctoMapping?.mappingConfidence ?? null,
+    cto_business_type_mapping_reason: ctoMapping?.mappingReason ?? null,
+    cto_business_type_vocabulary_version: ctoMapping?.vocabularyVersion ?? null,
+
+    trading_status_google: rawGoogleStatus,
+    trading_status_companies_house: rawChStatus,
+    trading_status_website: rawWebsiteClosure,
+    trading_status_final: tradingStatusFinal,
+    trading_status_reason: tradingStatusReason,
+    trading_status_confidence: tradingStatusConfidence,
+    trading_status_retrieved_at: tradingStatusRetrievedAt,
 
     qualification_status: QUALIFICATION_STATUS_MAP[dossier.qualificationStatus] ?? dossier.qualificationStatus,
     final_lead_level: dossier.finalLevel ? LEVEL_MAP[dossier.finalLevel] ?? dossier.finalLevel : null,

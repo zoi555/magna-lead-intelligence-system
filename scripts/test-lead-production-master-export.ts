@@ -86,7 +86,7 @@ async function main() {
   assert(noScore.dataQualityGaps.includes("commercial_priority_score"), "the missing score is recorded as a data-quality gap, not silently dropped");
   assert(noScore.fields.final_lead_level === "Level 4", "final_lead_level is still populated (hard-gate failure always assigns level_4 even with no score) — only the score itself is genuinely absent");
 
-  console.log("\nEnd-to-end real UB1 checkpoint proof (107 fields, 14 tabs, customer_master_exclusion + commercial-review-v1 rules applied), reconciliation:");
+  console.log("\nEnd-to-end real UB1 checkpoint proof (129 fields — v2 schema, 107 v1 + 22 new — 14 tabs, customer_master_exclusion + commercial-review-v1 rules applied), reconciliation:");
   const D = "/Users/homemac/Data/aspectlead-lead-production/output/ub1";
   const V2_DIR = `${D}/2026-07-24T00-00-00Z-v2-customer-master-exclusion-reprocess`;
   const outDir = await fs.mkdtemp(path.join(os.tmpdir(), "master-export-e2e-"));
@@ -115,7 +115,7 @@ async function main() {
     // other 3 were already held/hard-rejected before this rule and are simply reclassified.
     const usableRows = XLSX.utils.sheet_to_json(wb.Sheets["Operationally Usable Leads"]) as any[];
     assert(usableRows.length === 39, `Operationally Usable Leads has exactly 39 rows (got ${usableRows.length}) — down from 47 (6 commercial-review brand exclusions + 2 pharmacy/chemist name-evidence exclusions were previously usable)`);
-    assert(usableRows.length > 0 && Object.keys(usableRows[0]).length === 107, `every usable row has exactly 107 fields (got ${Object.keys(usableRows[0] ?? {}).length})`);
+    assert(usableRows.length > 0 && Object.keys(usableRows[0]).length === 129, `every usable row has exactly 129 fields (v2 schema: 107 v1 + 22 new) (got ${Object.keys(usableRows[0] ?? {}).length})`);
     const premiumRows = XLSX.utils.sheet_to_json(wb.Sheets["Premium Level 0"]) as any[];
     assert(premiumRows.length === 26, `Premium Level 0 has exactly 26 rows (got ${premiumRows.length})`);
     const releasableRows = XLSX.utils.sheet_to_json(wb.Sheets["Releasable Level 1"]) as any[];
