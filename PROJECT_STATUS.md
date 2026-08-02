@@ -1335,4 +1335,47 @@ to list the 2 new files. `npm run typecheck` clean, `npm run build` succeeded, a
 production regression suites (now including `test-lead-production-cto-with-address.ts`, 22
 assertions) re-verified PASSING.
 
+## FIVE-DISTRICT PILOT — mandatory corrections implemented and offline-tested; PILOT BLOCKED (2026-08-02)
+
+**PILOT BLOCKED — see ISS-0033 (`docs/11_ISSUES_LOG.md`).** None of the 5 named pilot districts
+(CM1, IG1, RM1, DA1, BR1) match their named representative's actual configured territory in
+`config/lead-production/sales-territories-v2.json` (Kunz is TW1-TW10, Naseh is UB1-UB5, Saif is
+HA0-HA5, Tahira is WD3-WD7, Hassan is EN1-EN5), and RM1 is already owned by Nauman from the
+completed first campaign wave. **No territory config was changed and no live discovery has been
+run against any of the 5 named districts.** This requires an owner decision before the pilot can
+proceed — see ISS-0033 for the exact resolution options.
+
+Every mandatory implementation and offline-test correction agreed ahead of the pilot IS complete:
+
+- `config/lead-production/master-schema-v2.json` — 129-field Master schema (107 v1 fields
+  preserved byte-for-byte + 22 new: CTO Business Type + metadata, Business Category Eligibility +
+  evidence, Trading Status consolidation, `sic_code_descriptions`, restricted financials,
+  Note 1/Note 2).
+- New `business-category-eligibility.ts` engine (café/coffee-shop and bubble-tea
+  "principal-operation" rules) and `cto-business-type-mapping.ts` engine (maps only to the CTO's
+  exact 57-value approved allow-list, honest "Other" fallback, never invented).
+- Mandatory-phone gate (`phone_resolution_exception` status; `isValidUkPhone()` consolidated as
+  the single shared validator).
+- SIC codes, filed-accounts financials, directors, PSCs wired into the candidate dossier.
+- Note 1 (ownership/directors/decision-maker, paragraph form) and Note 2 (bullet-point sales
+  intelligence) generated and populated.
+- Territory fail-closed validation, website page-path traversal fix, website closure-text
+  detection, named-brand exclusion union + matching-gap fixes — all from earlier this session,
+  unchanged.
+- Field provenance (`generate-field-provenance.ts`) extended to cover the 3 new decision fields.
+
+**Verification, not just claimed:** `npm run typecheck` and `npm run build` clean; all 20
+`test:lead-production-*` regression suites individually re-run, all pass. Two real bugs were found
+and fixed during this verification pass (Sales Pro multi-value dropdown validation; a
+`"not_available"` string leak into restricted-financial fields) — full detail
+`docs/10_BUGS_AND_FIXES.md`, `VERIFY_BEFORE_CLAIMING.md` (2026-08-02 entries).
+
+**Commits:** `c26c15d` (field population + Notes + 2 bug fixes), `b88cc03` (field-provenance
+extension), `9a7c497` (docs), on top of this session's earlier `fdc9ee3`/`78d6c27`/`755cc82`/
+`277e19e`/`becab64`/`a8469a2`/`3eed9d2`/`896c3ca`/`cadbb23`/`467c674`.
+
+**Next action:** owner resolves ISS-0033 (which district/rep/RM1 pairing is correct). Once
+resolved, the pilot can run using the already-implemented and already-tested pipeline — no further
+code change is expected to be needed for the pilot itself.
+
 Code commit: `656c767`. Docs commit: (this commit).
