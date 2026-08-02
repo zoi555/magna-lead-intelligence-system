@@ -14,7 +14,7 @@ function mkDM(o: Partial<DecisionMakerCandidate> = {}): DecisionMakerCandidate {
 }
 function mkWebsite(publicTeamNames: string[]): WebsiteExtractedData {
   const NOT_FOUND = { value: null, sourceUrl: null, evidenceText: null, confidence: "not_available" as const };
-  return { candidateId: "c1", officialDomain: "test.co.uk", phone: NOT_FOUND, email: NOT_FOUND, hasContactForm: NOT_FOUND, address: NOT_FOUND, openingHours: NOT_FOUND, menuUrl: NOT_FOUND, cuisineTags: [], serviceModel: { delivery: NOT_FOUND, collection: NOT_FOUND, dineIn: NOT_FOUND, catering: NOT_FOUND }, productRangeTags: [], halalEvidence: NOT_FOUND, branchList: [], socialLinks: [], franchiseGroupClues: [], centralPurchasingClues: [], likelyMagnaProductRequirements: [], publicTeamNames, retrievalTimestamp: "" };
+  return { candidateId: "c1", officialDomain: "test.co.uk", phone: NOT_FOUND, email: NOT_FOUND, hasContactForm: NOT_FOUND, address: NOT_FOUND, openingHours: NOT_FOUND, menuUrl: NOT_FOUND, cuisineTags: [], serviceModel: { delivery: NOT_FOUND, collection: NOT_FOUND, dineIn: NOT_FOUND, catering: NOT_FOUND }, productRangeTags: [], halalEvidence: NOT_FOUND, closureEvidence: NOT_FOUND, branchList: [], socialLinks: [], franchiseGroupClues: [], centralPurchasingClues: [], likelyMagnaProductRequirements: [], publicTeamNames, retrievalTimestamp: "" };
 }
 
 async function main() {

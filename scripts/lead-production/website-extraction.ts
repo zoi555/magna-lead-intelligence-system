@@ -97,6 +97,39 @@ export function extractHalalEvidence(html: string, url: string): WebsiteEvidence
   return field(true, url, text.slice(Math.max(0, idx - 40), idx + 60).trim(), "high");
 }
 
+// Closure-text detection (locked policy 2026-08-02) — the pipeline previously had NO website-
+// based closure signal at all (only Google businessStatus / decisive Companies House
+// dissolution). Whole-phrase match only, explicit closure language — never a bare "closed"
+// (which false-positives on "closed Sundays"/"closed bank holidays"/"closed for Christmas Day"
+// opening-hours text, extremely common on real UK food-service sites). Every matched phrase is
+// retained as evidence text for human review, never auto-excluded on this signal alone — website
+// text is the weakest of the closure signals (a stale/unmaintained page, or the crawler hitting a
+// wrong/reused domain, can both produce a false positive) so this always feeds
+// review_required_business_category or a closure-review flag, never a silent hard-exclude by
+// itself.
+const CLOSURE_TEXT_PATTERNS = [
+  /permanently\s+closed/i,
+  /(?:this\s+(?:business|restaurant|shop|store|premises)\s+(?:has|is)\s+)?closed\s+down/i,
+  /no\s+longer\s+(?:trading|open|in\s+business|operating)/i,
+  /ceased\s+trading/i,
+  /(?:business|restaurant|shop|store)\s+has\s+closed/i,
+  /we\s+have\s+now\s+closed/i,
+  /sadly\s+(?:we\s+have\s+)?closed/i,
+  /closed\s+permanently/i,
+];
+export function extractClosureEvidence(html: string, url: string): WebsiteEvidenceField<string> {
+  const text = stripTags(html);
+  for (const pattern of CLOSURE_TEXT_PATTERNS) {
+    const m = pattern.exec(text);
+    if (m) {
+      const idx = m.index;
+      const snippet = text.slice(Math.max(0, idx - 60), idx + m[0].length + 60).trim();
+      return field(m[0], url, snippet, "medium"); // "medium", never "high" — website text alone never auto-excludes
+    }
+  }
+  return NOT_FOUND();
+}
+
 export function extractBranchList(html: string): string[] {
   const links = [...html.matchAll(/href="([^"]*(?:branch|location|find-us|store|outlet)[^"]*)"/gi)].map((m) => m[1]);
   return [...new Set(links)].slice(0, 20);

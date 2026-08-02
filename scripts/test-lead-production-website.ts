@@ -57,6 +57,30 @@ async function main() {
     assert(rHalal.value === true && rHalal.confidence === "high", "explicit 'halal' text IS retained as evidence, with the matched snippet");
   }
 
+  // --- Closure-text evidence (locked policy 2026-08-02): explicit phrases only, never a bare
+  // "closed" (which false-positives on ordinary opening-hours text) ---
+  {
+    const htmlOpeningHours = "<html><body>Open daily 12pm-11pm. Closed Sundays. Closed on Christmas Day and Boxing Day.</body></html>";
+    const rHours = extract.extractClosureEvidence(htmlOpeningHours, "https://x/");
+    assert(rHours.value === null, "ordinary opening-hours text ('Closed Sundays', 'Closed on Christmas Day') is NOT treated as closure evidence — a bare 'closed' must never fire this");
+
+    const htmlPermanent = "<html><body>We are sad to announce this restaurant has permanently closed. Thank you for your custom over the years.</body></html>";
+    const rPermanent = extract.extractClosureEvidence(htmlPermanent, "https://x/");
+    assert(rPermanent.value !== null && rPermanent.confidence === "medium", "explicit 'permanently closed' text IS retained as evidence, at medium (never high) confidence — website text alone never auto-excludes");
+
+    const htmlCeased = "<html><body>Please note we have ceased trading as of March 2026.</body></html>";
+    const rCeased = extract.extractClosureEvidence(htmlCeased, "https://x/");
+    assert(rCeased.value !== null, "'ceased trading' is recognised as closure evidence");
+
+    const htmlNoLonger = "<html><body>This business is no longer trading at this address.</body></html>";
+    const rNoLonger = extract.extractClosureEvidence(htmlNoLonger, "https://x/");
+    assert(rNoLonger.value !== null, "'no longer trading' is recognised as closure evidence");
+
+    const htmlNormal = "<html><body>Welcome to Tandoori Nights, serving the best curries in town since 1998.</body></html>";
+    const rNormal = extract.extractClosureEvidence(htmlNormal, "https://x/");
+    assert(rNormal.value === null, "an ordinary trading page produces no closure evidence at all");
+  }
+
   // --- Address extraction: only when a real UK postcode is present ---
   {
     const noPostcode = extract.extractAddress("<html><body>Find us in the heart of Southall.</body></html>", "https://x/");
@@ -87,6 +111,7 @@ async function main() {
       menuUrl: { value: "https://test.co.uk/menu", sourceUrl: "https://test.co.uk/menu", evidenceText: null, confidence: "high" },
       cuisineTags: ["kebab"], serviceModel: { delivery: { value: null, sourceUrl: null, evidenceText: null, confidence: "not_available" }, collection: { value: null, sourceUrl: null, evidenceText: null, confidence: "not_available" }, dineIn: { value: null, sourceUrl: null, evidenceText: null, confidence: "not_available" }, catering: { value: null, sourceUrl: null, evidenceText: null, confidence: "not_available" } },
       productRangeTags: ["chicken", "chips"], halalEvidence: { value: null, sourceUrl: null, evidenceText: null, confidence: "not_available" },
+      closureEvidence: { value: null, sourceUrl: null, evidenceText: null, confidence: "not_available" },
       branchList: [], socialLinks: [], franchiseGroupClues: [], centralPurchasingClues: [], likelyMagnaProductRequirements: ["chicken", "chips"], publicTeamNames: [], retrievalTimestamp: "",
     };
     const fit = calculateProductFit("c1", website);

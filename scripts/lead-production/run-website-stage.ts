@@ -92,7 +92,7 @@ function extractFromCrawl(candidateId: string, domain: string, htmlByUrl: Map<st
     candidateId, officialDomain: domain,
     phone: NOT_FOUND, email: NOT_FOUND, hasContactForm: NOT_FOUND, address: NOT_FOUND, openingHours: NOT_FOUND, menuUrl: NOT_FOUND,
     cuisineTags: [], serviceModel: { delivery: NOT_FOUND, collection: NOT_FOUND, dineIn: NOT_FOUND, catering: NOT_FOUND },
-    productRangeTags: [], halalEvidence: NOT_FOUND, branchList: [], socialLinks: [], franchiseGroupClues: [], centralPurchasingClues: [],
+    productRangeTags: [], halalEvidence: NOT_FOUND, closureEvidence: NOT_FOUND, branchList: [], socialLinks: [], franchiseGroupClues: [], centralPurchasingClues: [],
     likelyMagnaProductRequirements: [], publicTeamNames: [], retrievalTimestamp,
   };
   if (htmlByUrl.size === 0) return empty;
@@ -108,6 +108,7 @@ function extractFromCrawl(candidateId: string, domain: string, htmlByUrl: Map<st
     const hours = extract.extractOpeningHours(html, url); if (pick(merged.openingHours, hours)) merged.openingHours = hours;
     const menu = extract.extractMenuUrl(html, url); if (pick(merged.menuUrl, menu)) merged.menuUrl = menu;
     const halal = extract.extractHalalEvidence(html, url); if (pick(merged.halalEvidence, halal)) merged.halalEvidence = halal;
+    const closure = extract.extractClosureEvidence(html, url); if (pick(merged.closureEvidence, closure)) merged.closureEvidence = closure;
 
     merged.cuisineTags = [...new Set([...merged.cuisineTags, ...extract.extractCuisineTags(html)])];
     merged.productRangeTags = [...new Set([...merged.productRangeTags, ...extract.extractProductRangeTags(html)])];
@@ -143,14 +144,14 @@ function crawlRow(c: WebsiteCrawlResult): Record<string, unknown> {
   return { candidate_id: c.candidateId, domain: c.domain ?? "", crawl_outcome: c.crawlOutcome, pages_requested: c.pagesRequested, pages_retrieved: c.pagesRetrieved, robots_disallowed_paths: c.robotsDisallowedPaths.join(";"), retrieval_timestamp: c.retrievalTimestamp };
 }
 
-const EXTRACT_COLUMNS = ["candidate_id", "official_domain", "phone", "phone_confidence", "email", "email_confidence", "has_contact_form", "address", "opening_hours", "menu_url", "cuisine_tags", "delivery", "collection", "dine_in", "catering", "product_range_tags", "halal_evidence", "branch_count", "social_links", "franchise_group_clues", "central_purchasing_clues", "likely_magna_product_requirements", "public_team_names"] as const;
+const EXTRACT_COLUMNS = ["candidate_id", "official_domain", "phone", "phone_confidence", "email", "email_confidence", "has_contact_form", "address", "opening_hours", "menu_url", "cuisine_tags", "delivery", "collection", "dine_in", "catering", "product_range_tags", "halal_evidence", "closure_evidence", "closure_evidence_confidence", "branch_count", "social_links", "franchise_group_clues", "central_purchasing_clues", "likely_magna_product_requirements", "public_team_names"] as const;
 function extractRow(e: WebsiteExtractedData): Record<string, unknown> {
   return {
     candidate_id: e.candidateId, official_domain: e.officialDomain ?? "", phone: e.phone.value ?? "", phone_confidence: e.phone.confidence,
     email: e.email.value ?? "", email_confidence: e.email.confidence, has_contact_form: e.hasContactForm.value ?? "", address: e.address.value ?? "",
     opening_hours: e.openingHours.value ?? "", menu_url: e.menuUrl.value ?? "", cuisine_tags: e.cuisineTags.join(";"),
     delivery: e.serviceModel.delivery.value ?? "", collection: e.serviceModel.collection.value ?? "", dine_in: e.serviceModel.dineIn.value ?? "", catering: e.serviceModel.catering.value ?? "",
-    product_range_tags: e.productRangeTags.join(";"), halal_evidence: e.halalEvidence.value ?? "", branch_count: e.branchList.length,
+    product_range_tags: e.productRangeTags.join(";"), halal_evidence: e.halalEvidence.value ?? "", closure_evidence: e.closureEvidence.evidenceText ?? "", closure_evidence_confidence: e.closureEvidence.confidence, branch_count: e.branchList.length,
     social_links: e.socialLinks.join(";"), franchise_group_clues: e.franchiseGroupClues.join(";"), central_purchasing_clues: e.centralPurchasingClues.join(";"),
     likely_magna_product_requirements: e.likelyMagnaProductRequirements.join(";"), public_team_names: e.publicTeamNames.join(";"),
   };
@@ -264,6 +265,7 @@ async function main() {
       phone: extractedData.filter((e) => e.phone.value).length, email: extractedData.filter((e) => e.email.value).length,
       address: extractedData.filter((e) => e.address.value).length, menuUrl: extractedData.filter((e) => e.menuUrl.value).length,
       halalEvidence: extractedData.filter((e) => e.halalEvidence.value).length,
+      closureEvidence: extractedData.filter((e) => e.closureEvidence.value).length,
     },
     notice: "Public website evidence and product-fit indicators only. No final scoring, no LinkedIn/public-profile search, no candidate here is sales-ready.",
   };

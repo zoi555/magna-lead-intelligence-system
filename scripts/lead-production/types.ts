@@ -760,6 +760,7 @@ export interface WebsiteExtractedData {
   serviceModel: { delivery: WebsiteEvidenceField<boolean>; collection: WebsiteEvidenceField<boolean>; dineIn: WebsiteEvidenceField<boolean>; catering: WebsiteEvidenceField<boolean> };
   productRangeTags: string[];
   halalEvidence: WebsiteEvidenceField<boolean>; // true ONLY on explicit "halal" evidence — never inferred
+  closureEvidence: WebsiteEvidenceField<string>; // explicit closure text found on the site (locked policy 2026-08-02) — value is the matched phrase; true/false is not enough here, the phrase itself is the evidence a human reviews
   branchList: string[];
   socialLinks: string[];
   franchiseGroupClues: string[];
