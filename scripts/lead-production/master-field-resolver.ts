@@ -205,7 +205,7 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext): 
     google_business_status: matchEnum(f.google_business_status as string, [["operational", "Operational"], ["temporarily", "Temporarily Closed"], ["permanently", "Permanently Closed"]]) ?? "Unknown",
     google_rating: pick(f.google_rating as number),
     google_review_count: pick(f.google_review_count as number),
-    google_categories: null,
+    google_categories: (f.google_categories as string[])?.length ? (f.google_categories as string[]) : null,
     google_match_confidence: matchEnum(f.google_outcome as string, [["exact", "Exact"], ["strong_probable", "Strong Probable"], ["conflict", "Conflict"], ["no_match", "No Match"]]),
 
     companies_house_number: pick(f.companies_house_number as string),
@@ -213,7 +213,7 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext): 
     company_type: null,
     incorporation_date: pick(f.incorporation_date as string),
     company_age_years: pick(f.company_age_years as number),
-    sic_codes: null,
+    sic_codes: (f.sic_codes as string[])?.length ? (f.sic_codes as string[]) : null,
     accounts_type: null,
     latest_accounts_date: null,
     accounts_overdue_indicator: null,

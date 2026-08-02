@@ -151,6 +151,13 @@ export async function loadCandidateDossiers(dirs: DossierCheckpointDirs): Promis
       website: website?.officialDomain ?? bestGoogle?.website ?? null,
       verified_email: website?.email?.value ?? null,
       business_type: bestFsa?.businessType ?? bestGoogle?.primaryCategory ?? null,
+      // Real, confirmed pre-existing gap (found in the earlier read-only Business-Type Eligibility
+      // audit, 2026-08-02): Google's own `primaryCategory` is null for 100% of real historical
+      // candidates — `business_type` above has therefore been FSA-only in practice this whole
+      // campaign. `additionalCategories` is the field that actually carries real Google signal
+      // (confirmed: `establishment`/`food`/`restaurant`/`meal_takeaway` etc. present on the large
+      // majority of candidates) but was never read anywhere downstream until now.
+      google_categories: bestGoogle?.additionalCategories ?? [],
       cuisine_service_model: { cuisineTags: website?.cuisineTags ?? [], serviceModel: website?.serviceModel ?? null },
       fsa_establishment_id: bestFsa?.fhrsId ?? null, fsa_business_name: bestFsa?.officialBusinessName ?? null,
       fsa_hygiene_rating: bestFsa?.hygieneRating ?? null, fsa_rating_status: bestFsa?.ratingStatus ?? null, fsa_rating_date: bestFsa?.ratingDate ?? null,
@@ -159,6 +166,11 @@ export async function loadCandidateDossiers(dirs: DossierCheckpointDirs): Promis
       companies_house_number: profile?.company_number ?? (chDecisive ? ch.plausibleCompanies?.[0]?.companyNumber ?? null : null),
       companies_house_status: chDecisive ? (profile?.company_status ?? ch.companiesHouseStatus ?? null) : null,
       incorporation_date: profile?.incorporation_date ?? null,
+      // Locked policy (2026-08-02): SIC codes must be collected/retained/passed into the master
+      // dossier — captured from `company-profiles.csv`'s "sic_codes" column (semicolon-joined),
+      // previously dropped before this point (companies-house-adapter.ts/companies-house-match.ts
+      // already fetch and carry it this far; nothing downstream ever read it until now).
+      sic_codes: profile?.sic_codes ? profile.sic_codes.split(";").map((s: string) => s.trim()).filter(Boolean) : [],
       company_age_years: finCalc?.companyAgeYears_result && finCalc.companyAgeYears_result !== "not_available" ? finCalc.companyAgeYears_result : null,
       filed_accounts_available: !!filedAccounts && filedAccounts.accounts_type !== "",
       key_financial_values: filedAccounts ? { turnover: filedAccounts.turnover_result, grossProfit: filedAccounts.grossProfit_result, netAssets: filedAccounts.netAssets_result, employeeCount: filedAccounts.employeeCount_result } : null,
