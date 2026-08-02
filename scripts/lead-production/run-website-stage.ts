@@ -45,25 +45,36 @@ const PAGE_PATHS: { type: "home" | "contact" | "about" | "menu" | "locations"; p
   { type: "locations", paths: ["/locations", "/branches", "/find-us", "/stores"] },
 ];
 
-async function crawlDomain(domain: string, candidateId: string): Promise<{ crawl: WebsiteCrawlResult; htmlByUrl: Map<string, string> }> {
+export async function crawlDomain(domain: string, candidateId: string): Promise<{ crawl: WebsiteCrawlResult; htmlByUrl: Map<string, string> }> {
   const retrievalTimestamp = new Date().toISOString();
   const robots = await fetchRobotsRules(domain);
   const htmlByUrl = new Map<string, string>();
   const pages: WebsiteCrawlResult["pages"] = [];
   let pagesRequested = 0;
 
+  // Locked policy (2026-08-02): try each category's candidate paths in priority order, but stop
+  // at the FIRST genuinely useful page (2xx with non-trivial HTML) per category — never burn the
+  // shared 5-page budget trying every alternate once one has already worked. A path is "useful"
+  // once it returns real content; a disallowed/failed/empty attempt falls through to the next
+  // candidate path in the same category, still counted against the budget (a real request was
+  // made), never re-tried once a category succeeds.
+  const MIN_USEFUL_HTML_LENGTH = 200;
   for (const { type, paths } of PAGE_PATHS) {
     if (pagesRequested >= MAX_PAGES_PER_DOMAIN) break;
-    const candidatePath = paths[0];
-    if (isPathDisallowed(candidatePath, robots.disallowedPaths)) {
-      pages.push({ url: `https://${domain}${candidatePath}`, ok: false, statusCode: null, pageType: type, retrievalTimestamp, errorMessage: "Disallowed by robots.txt — never evaded." });
-      continue;
+    let categorySatisfied = false;
+    for (const candidatePath of paths) {
+      if (categorySatisfied || pagesRequested >= MAX_PAGES_PER_DOMAIN) break;
+      if (isPathDisallowed(candidatePath, robots.disallowedPaths)) {
+        pages.push({ url: `https://${domain}${candidatePath}`, ok: false, statusCode: null, pageType: type, retrievalTimestamp, errorMessage: "Disallowed by robots.txt — never evaded." });
+        continue;
+      }
+      const url = `https://${domain}${candidatePath}`;
+      pagesRequested++;
+      const res = await fetchPage(url);
+      const useful = res.ok && !!res.html && res.html.length >= MIN_USEFUL_HTML_LENGTH;
+      if (useful) { htmlByUrl.set(url, res.html!); categorySatisfied = true; }
+      pages.push({ url, ok: res.ok, statusCode: res.statusCode, pageType: type, retrievalTimestamp, errorMessage: res.errorMessage });
     }
-    const url = `https://${domain}${candidatePath}`;
-    pagesRequested++;
-    const res = await fetchPage(url);
-    if (res.ok && res.html) htmlByUrl.set(url, res.html);
-    pages.push({ url, ok: res.ok, statusCode: res.statusCode, pageType: type, retrievalTimestamp, errorMessage: res.errorMessage });
   }
 
   const crawlOutcome: WebsiteCrawlResult["crawlOutcome"] = htmlByUrl.size > 0 ? "crawled" : (robots.disallowedPaths.length > 0 && pages.every((p) => p.errorMessage?.includes("robots"))) ? "robots_fully_disallowed" : pages.some((p) => p.errorMessage) ? "unreachable" : "crawl_failed";
@@ -266,4 +277,7 @@ async function main() {
   console.log(`\nOutputs written to: ${outDir}`);
   process.exit(0);
 }
-main().catch((e) => { console.error(e); process.exit(1); });
+// Guarded so importing crawlDomain() (e.g. for the page-path-traversal regression test) does
+// not also trigger this CLI's own main() — matches the same pattern already used by
+// generate-cto-with-address.ts for the identical reason.
+if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
