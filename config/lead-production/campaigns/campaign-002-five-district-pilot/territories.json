@@ -1,0 +1,51 @@
+{
+  "campaignId": "campaign-002-five-district-pilot",
+  "campaignVersion": "v1",
+  "effectiveDate": "2026-08-03",
+  "sourceOfAllocation": "CC-provided allocation",
+  "description": "Five-district pilot (ISS-0033 resolution, 2026-08-03). The CC's newly supplied allocation below is authoritative for THIS campaign only. It does not modify, supersede, or replace config/lead-production/sales-territories-v2.json (the completed first campaign's frozen assignment) — that file is a separate, unmodified, historical record. See config/lead-production/campaigns/campaign-002-five-district-pilot/README.md and docs/09_DECISIONS.md / docs/11_ISSUES_LOG.md (ISS-0033) for full context.",
+  "rm1SpecialRule": "RM1 was assigned to Nauman in the completed first campaign (config/lead-production/sales-territories-v2.json, output/territories/nauman/rm1/). That historical assignment and its already-released leads are unchanged and untouched by this campaign. For campaign-002, newly discovered RM1 leads belong to Saif. Any business already present in Nauman's previously-released RM1 output (Operationally Usable Leads) must be deduplicated against and never released again under Saif for this campaign — see scripts/lead-production/district-reconciliation.ts's dedupeAgainstHistoricalCampaign() and scripts/lead-production/historical-campaign.ts.",
+  "totalDistricts": 5,
+  "assignments": [
+    {
+      "postcodeDistrict": "CM1",
+      "internalName": "Kunz",
+      "role": "telesales",
+      "salesProRepresentativeValue": "Syed Kunz U Abbas <Naqvikunz.naqvi@magnafoodservice.co.uk>",
+      "regionRoute": "East London",
+      "mapsRequired": false
+    },
+    {
+      "postcodeDistrict": "IG1",
+      "internalName": "Naseh",
+      "role": "telesales",
+      "salesProRepresentativeValue": "Muhammad <Nasehnaseh@magnafoodservice.co.uk>",
+      "regionRoute": "East London",
+      "mapsRequired": false
+    },
+    {
+      "postcodeDistrict": "RM1",
+      "internalName": "Saif",
+      "role": "telesales",
+      "salesProRepresentativeValue": "Muhammad <Saifullahsaifullah@magnafoodservice.co.uk>",
+      "regionRoute": "East London",
+      "mapsRequired": false
+    },
+    {
+      "postcodeDistrict": "DA1",
+      "internalName": "Tahira",
+      "role": "telesales",
+      "salesProRepresentativeValue": "Tahira <Abbasitahira@magnafoodservice.co.uk>",
+      "regionRoute": "Southeast London",
+      "mapsRequired": false
+    },
+    {
+      "postcodeDistrict": "BR1",
+      "internalName": "Hassan",
+      "role": "telesales",
+      "salesProRepresentativeValue": "Hassan <Asifh.asif@magnafoodservice.co.uk>",
+      "regionRoute": "Southeast London",
+      "mapsRequired": false
+    }
+  ]
+}

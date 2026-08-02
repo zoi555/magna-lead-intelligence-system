@@ -1107,3 +1107,77 @@ only — no already-delivered territory was reprocessed or regenerated as part o
 `config/lead-production/master-schema-v2.json`,
 `config/lead-production/cto-business-type-vocabulary-v1.json`, `docs/10_BUGS_AND_FIXES.md`,
 `docs/11_ISSUES_LOG.md` (ISS-0033), `VERIFY_BEFORE_CLAIMING.md`.
+
+## New pattern: campaign-scoped territory config, additive and separate from sales-territories-v2.json (2026-08-03, ISS-0033 resolution)
+
+### Decision
+
+Added a new config layer, `config/lead-production/campaigns/<campaign-id>/territories.json`, for
+territory assignments that apply to ONE campaign only and must never be merged into, or override,
+the historical `sales-territories-v2.json` (the completed first campaign's frozen assignment).
+First instance: `campaign-002-five-district-pilot` (CM1→Kunz, IG1→Naseh, RM1→Saif, DA1→Tahira,
+BR1→Hassan, all East/Southeast London), loaded/validated by the new
+`scripts/lead-production/campaign-territory.ts` — same fail-closed philosophy as
+`territory-assignment-v2.ts` (`assertCampaignDistrictIsConfigured()` throws
+`UnconfiguredCampaignDistrictError` for any district not explicitly in the campaign's own config,
+never falls back to a representative's first-campaign districts).
+
+Each campaign assignment carries an `internalName` (short, filesystem-safe, e.g. "Kunz" — used for
+output-directory naming/logging/orchestration) SEPARATE from `salesProRepresentativeValue` (the
+CC's exact required "Full Name <email>" string for the Sales Rep/Field Sales Rep export columns).
+These are never the same string: `campaignAssignmentToTerritoryRepresentative()` uses only
+`internalName` when adapting into the existing `TerritoryRepresentative` shape (which existing
+orchestration code uses for output paths), while the exact `salesProRepresentativeValue` is passed
+directly as the exporters' own new optional `--sales-rep-value=` ad-hoc CLI argument (falls back to
+`--representative=` when omitted — every existing call site/test is unaffected). Discovered live:
+the exact CC-supplied value contains characters (`<`, `>`, `@`, spaces) that are unsafe in a
+filename, and `generate-master-export.ts` builds its output filenames directly from the
+representative string.
+
+RM1 special rule: Nauman's historical RM1 ownership and already-released leads are completely
+unchanged (verified byte-for-byte, not just "not edited by hand" — see
+`scripts/test-lead-production-campaign-territory.ts`). Newly discovered RM1 candidates under Saif
+are checked against Nauman's real, already-released "Operationally Usable Leads" via a NEW
+capability, `dedupeAgainstHistoricalCampaign()` (added to `district-reconciliation.ts`, alongside
+— never replacing — the existing `dedupeAcrossDistricts()`), using the identical tiered
+identity-evidence hierarchy (company number > phone > domain > postcode+name-similarity, always
+postcode-corroborated) already accepted for cross-district dedup. The historical data itself is
+read-only reference data (`scripts/lead-production/historical-campaign.ts`'s
+`loadHistoricalUsableLeads()`) — never modified, reprocessed, or re-ranked. Scope is deliberately
+"usable" (released) leads only: a business a prior campaign held/rejected (e.g. for a missing
+phone, since fixed) is legitimately eligible for fresh evaluation in a new campaign — the
+requirement is "don't release the same business again," not "never re-evaluate."
+
+Both exporters gained 3 new optional, additive, backward-compatible CLI arguments:
+`--campaign-id=` (recorded in console output, the Representative/Territory/Run-Manifest summary
+sheets, and any historical-duplicates report — never invented, defaults to "n/a" when omitted),
+`--sales-rep-value=` (above), and `--historical-usable-workbook=` (enables cross-campaign dedup
+for whichever district(s) are in the current run; a no-op when omitted).
+
+### Reason
+
+The owner's five-district pilot allocation genuinely does not match `sales-territories-v2.json`
+for 4 of the 5 named representatives, and RM1 is already owned by Nauman (ISS-0033) — the owner
+explicitly confirmed this is a deliberate NEW campaign, not a correction to the first campaign's
+config, and gave an explicit instruction not to overwrite/delete/rewrite the historical
+configuration or ownership records. A parallel, additive, versioned config directory (mirroring
+the existing `commercial-review-v1`/`master-schema-v2` precedent of "new version = new file, old
+file untouched") is the only approach that satisfies both "use the new allocation for this
+campaign" and "never touch the historical record" simultaneously.
+
+### Verification
+
+10/10 of the owner's explicitly required regression tests pass
+(`npm run test:lead-production-campaign-territory`), including against REAL historical RM1 data
+(41 real Nauman RM1 leads, not a synthetic fixture alone) for the dedup proof, and a real
+byte-for-byte hash comparison (before/after the entire test run) proving neither
+`sales-territories-v2.json` nor Nauman's real historical Master workbook was touched.
+`npm run typecheck` and `npm run build` clean; all 21 `test:lead-production-*` suites (20 existing
++ this new one) re-run individually, all pass — zero regressions from the 3 new optional exporter
+arguments.
+
+**See also:** `config/lead-production/campaigns/campaign-002-five-district-pilot/territories.json`,
+`scripts/lead-production/campaign-territory.ts`, `scripts/lead-production/historical-campaign.ts`,
+`scripts/lead-production/district-reconciliation.ts`,
+`scripts/test-lead-production-campaign-territory.ts`, `docs/11_ISSUES_LOG.md` (ISS-0033),
+`VERIFY_BEFORE_CLAIMING.md`.

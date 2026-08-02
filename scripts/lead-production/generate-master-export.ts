@@ -18,7 +18,8 @@ import path from "node:path";
 import * as XLSX from "xlsx";
 import { loadCandidateDossiers, type Dossier } from "./candidate-dossier";
 import { resolveMasterFields, type ResolvedMasterRow, type MasterFieldContext } from "./master-field-resolver";
-import { dedupeAcrossDistricts, type DistrictCandidateForDedup, type DuplicateCluster } from "./district-reconciliation";
+import { dedupeAcrossDistricts, dedupeAgainstHistoricalCampaign, type DistrictCandidateForDedup, type DuplicateCluster, type HistoricalDuplicateMatch } from "./district-reconciliation";
+import { loadHistoricalUsableLeads } from "./historical-campaign";
 import { writeCsv } from "./csv";
 import { loadCommercialReviewRegistry, type CommercialReviewRegistry } from "./load-commercial-review";
 import { evaluateCommercialReviewExclusion } from "./commercial-review-filter";
@@ -38,7 +39,7 @@ async function loadMasterSchema(): Promise<{ canonicalName: string; masterFieldL
 
 interface RowBundle { dossier: Dossier; resolved: ResolvedMasterRow; district: string }
 
-async function loadAllRows(districts: DistrictInput[], ctxFor: (district: string) => MasterFieldContext): Promise<{ rows: RowBundle[]; duplicatesRemoved: DuplicateCluster[] }> {
+async function loadAllRows(districts: DistrictInput[], ctxFor: (district: string) => MasterFieldContext, historicalUsableWorkbook: string | null): Promise<{ rows: RowBundle[]; duplicatesRemoved: DuplicateCluster[]; historicalDuplicatesRemoved: HistoricalDuplicateMatch[] }> {
   const vocabulary = await loadCtoBusinessTypeVocabulary();
   const out: RowBundle[] = [];
   for (const d of districts) {
@@ -46,18 +47,49 @@ async function loadAllRows(districts: DistrictInput[], ctxFor: (district: string
     const ctx = ctxFor(d.district);
     for (const dossier of dossiers) out.push({ dossier, resolved: resolveMasterFields(dossier, ctx, vocabulary), district: d.district });
   }
+
   // Cross-district dedup only makes sense with more than one district — a single-district
   // export (UB1 validation, ad-hoc mode) has nothing to dedup against.
-  if (districts.length <= 1) return { rows: out, duplicatesRemoved: [] };
-  const dedupInput: DistrictCandidateForDedup[] = out.map((r) => ({
-    candidateId: r.dossier.candidateId, district: r.district, tradingName: r.dossier.tradingName,
-    postcode: r.dossier.postcode, phone: r.dossier.fields.telephone as string | null,
-    website: r.dossier.fields.website as string | null, companyNumber: r.dossier.fields.companies_house_number as string | null,
-    finalOutcome: r.dossier.qualificationStatus,
-  }));
-  const dedupResult = dedupeAcrossDistricts(dedupInput);
-  const keptIds = new Set(dedupResult.kept.map((c) => c.candidateId));
-  return { rows: out.filter((r) => keptIds.has(r.dossier.candidateId)), duplicatesRemoved: dedupResult.duplicateClusters };
+  let rows = out;
+  let duplicatesRemoved: DuplicateCluster[] = [];
+  if (districts.length > 1) {
+    const dedupInput: DistrictCandidateForDedup[] = out.map((r) => ({
+      candidateId: r.dossier.candidateId, district: r.district, tradingName: r.dossier.tradingName,
+      postcode: r.dossier.postcode, phone: r.dossier.fields.telephone as string | null,
+      website: r.dossier.fields.website as string | null, companyNumber: r.dossier.fields.companies_house_number as string | null,
+      finalOutcome: r.dossier.qualificationStatus,
+    }));
+    const dedupResult = dedupeAcrossDistricts(dedupInput);
+    const keptIds = new Set(dedupResult.kept.map((c) => c.candidateId));
+    rows = rows.filter((r) => keptIds.has(r.dossier.candidateId));
+    duplicatesRemoved = dedupResult.duplicateClusters;
+  }
+
+  // Cross-CAMPAIGN dedup (2026-08-03, ISS-0033 resolution) — checks this run's candidates
+  // against a PRIOR campaign's already-released population (read-only reference data, never
+  // itself modified). Applies regardless of single/multi-district mode — this is exactly the
+  // RM1 pilot's own single-district ad-hoc case (Saif's new RM1 discovery vs Nauman's historical
+  // RM1 "Operationally Usable Leads"). A no-op when historicalUsableWorkbook is not supplied
+  // (every existing call site/test is unaffected).
+  let historicalDuplicatesRemoved: HistoricalDuplicateMatch[] = [];
+  if (historicalUsableWorkbook) {
+    for (const d of districts) {
+      const historical = await loadHistoricalUsableLeads(historicalUsableWorkbook, d.district);
+      if (!historical.length) continue;
+      const dedupInput: DistrictCandidateForDedup[] = rows.filter((r) => r.district === d.district).map((r) => ({
+        candidateId: r.dossier.candidateId, district: r.district, tradingName: r.dossier.tradingName,
+        postcode: r.dossier.postcode, phone: r.dossier.fields.telephone as string | null,
+        website: r.dossier.fields.website as string | null, companyNumber: r.dossier.fields.companies_house_number as string | null,
+        finalOutcome: r.dossier.qualificationStatus,
+      }));
+      const result = dedupeAgainstHistoricalCampaign(dedupInput, historical);
+      const keptIds = new Set(result.kept.map((c) => c.candidateId));
+      rows = rows.filter((r) => r.district !== d.district || keptIds.has(r.dossier.candidateId));
+      historicalDuplicatesRemoved.push(...result.matches);
+    }
+  }
+
+  return { rows, duplicatesRemoved, historicalDuplicatesRemoved };
 }
 
 function toLabelRow(schema: { canonicalName: string; masterFieldLabel: string }[], resolved: ResolvedMasterRow): Record<string, unknown> {
@@ -145,6 +177,13 @@ async function main() {
   let representative = arg("representative");
   let role = arg("role") as "telesales" | "field_sales" | null;
   let salesTerritory = arg("sales-territory");
+  // Optional (2026-08-03, campaign-002): when the exact exported "Assigned Representative"/
+  // "Sales Rep" value must differ from the internal name used for output-directory/file naming
+  // (e.g. the CC's exact "Full Name <email>" Sales Pro value, which is not filesystem-safe),
+  // --sales-rep-value= overrides ONLY the value written into the exported field — `representative`
+  // itself stays the internal name for every filename/logging use below. Falls back to
+  // `representative` when omitted, so every existing call site is unaffected.
+  const salesRepValue = arg("sales-rep-value");
 
   if (territoryManifestPath) {
     const tm = await readJson(territoryManifestPath);
@@ -183,13 +222,24 @@ async function main() {
   const commercialReviewRegistry = await loadCommercialReviewRegistry(commercialReviewDir);
   console.log(`Commercial review registry: ${commercialReviewRegistry.version} (${commercialReviewRegistry.keepBrands.length} keep, ${commercialReviewRegistry.excludeBrands.length} exclude).`);
 
+  const campaignId = arg("campaign-id");
+  const historicalUsableWorkbook = arg("historical-usable-workbook");
+  if (campaignId) console.log(`Campaign: ${campaignId}`);
+
   const schema = await loadMasterSchema();
-  const { rows, duplicatesRemoved } = await loadAllRows(districts, (district) => ({ territory: district, representative: representative!, role: role!, salesTerritory: salesTerritory! }));
+  const { rows, duplicatesRemoved, historicalDuplicatesRemoved } = await loadAllRows(districts, (district) => ({ territory: district, representative: salesRepValue ?? representative!, role: role!, salesTerritory: salesTerritory! }), historicalUsableWorkbook);
   if (duplicatesRemoved.length) {
     console.log(`Cross-district dedup: ${duplicatesRemoved.length} duplicate(s) removed (same real premises independently discovered in two districts near a boundary).`);
     await fs.writeFile(path.join(outArg, "territory-reconciliation.csv"), writeCsv(
       ["tier", "kept_candidate_id", "kept_district", "dropped_candidate_id", "dropped_district"],
       duplicatesRemoved.map((c) => ({ tier: c.tier, kept_candidate_id: c.keptCandidateId, kept_district: c.keptDistrict, dropped_candidate_id: c.droppedCandidateId, dropped_district: c.droppedDistrict })),
+    ));
+  }
+  if (historicalDuplicatesRemoved.length) {
+    console.log(`Cross-campaign dedup: ${historicalDuplicatesRemoved.length} candidate(s) already present in a prior campaign's released output — excluded from this campaign's release, prior campaign ownership unchanged.`);
+    await fs.writeFile(path.join(outArg, "historical-campaign-duplicates.csv"), writeCsv(
+      ["campaign_id", "tier", "dropped_candidate_id", "dropped_district", "historical_lead_id", "historical_representative"],
+      historicalDuplicatesRemoved.map((m) => ({ campaign_id: campaignId ?? "", tier: m.tier, dropped_candidate_id: m.droppedCandidateId, dropped_district: m.droppedDistrict, historical_lead_id: m.historicalLeadId, historical_representative: m.historicalRepresentative })),
     ));
   }
 
@@ -240,9 +290,9 @@ async function main() {
   addSheet(combinedWb, "Commercial Review Exclusions", rowsFor([...buckets.brandExcluded, ...buckets.pharmacyChemistExcluded]));
   addSheet(combinedWb, "Key Accounts", rowsFor(buckets.keyAccounts));
 
-  const repSummaryRows = [{ Representative: representative, Role: role === "field_sales" ? "Field Sales" : "Telesales", "Sales Territory": salesTerritory, "Districts Included": districts.map((d) => d.district).join(", "), "Total Candidates": rows.length, Usable: buckets.usable.length, "Premium Level 0": buckets.premium.length, "Releasable Level 1": buckets.releasableL1.length, "Key Accounts": buckets.keyAccounts.length, "Held/Review": buckets.held.length + buckets.phoneResolutionExceptions.length, "Phone Resolution Exceptions": buckets.phoneResolutionExceptions.length, "Hard Rejects": buckets.hardRejects.length, "Customer Master Exclusions": buckets.customerMasterExclusions.length, "Excluded Groups": buckets.excludedGroups.length, "Commercial Review Brand Exclusions": buckets.brandExcluded.length, "Pharmacy/Chemist Exclusions": buckets.pharmacyChemistExcluded.length }];
+  const repSummaryRows = [{ "Campaign ID": campaignId ?? "n/a (first campaign / sales-territories-v2.json)", Representative: salesRepValue ?? representative, Role: role === "field_sales" ? "Field Sales" : "Telesales", "Sales Territory": salesTerritory, "Districts Included": districts.map((d) => d.district).join(", "), "Total Candidates": rows.length, Usable: buckets.usable.length, "Premium Level 0": buckets.premium.length, "Releasable Level 1": buckets.releasableL1.length, "Key Accounts": buckets.keyAccounts.length, "Held/Review": buckets.held.length + buckets.phoneResolutionExceptions.length, "Phone Resolution Exceptions": buckets.phoneResolutionExceptions.length, "Hard Rejects": buckets.hardRejects.length, "Customer Master Exclusions": buckets.customerMasterExclusions.length, "Excluded Groups": buckets.excludedGroups.length, "Commercial Review Brand Exclusions": buckets.brandExcluded.length, "Pharmacy/Chemist Exclusions": buckets.pharmacyChemistExcluded.length, "Historical Campaign Duplicates Excluded": historicalDuplicatesRemoved.length }];
   addSheet(combinedWb, "Representative Summary", repSummaryRows);
-  addSheet(combinedWb, "Territory Summary", [{ "Sales Territory": salesTerritory, Representative: representative, "District Count": districts.length, "Total Candidates": rows.length }]);
+  addSheet(combinedWb, "Territory Summary", [{ "Campaign ID": campaignId ?? "n/a (first campaign / sales-territories-v2.json)", "Sales Territory": salesTerritory, Representative: salesRepValue ?? representative, "District Count": districts.length, "Total Candidates": rows.length }]);
 
   const districtSummaryRows = districts.map((d) => {
     const inDistrict = rows.filter((r) => r.district === d.district);
@@ -260,7 +310,7 @@ async function main() {
   }));
   addSheet(combinedWb, "Evidence Register", evidenceRegisterRows, evidenceRegisterColumns);
 
-  const runManifestRows = [{ Representative: representative, Role: role, "Sales Territory": salesTerritory, "Districts": districts.map((d) => d.district).join(", "), "Generated At": new Date().toISOString(), "Total Candidates": rows.length, "Source Mode": territoryManifestPath ? "territory-manifest" : "single-district" }];
+  const runManifestRows = [{ "Campaign ID": campaignId ?? "n/a (first campaign / sales-territories-v2.json)", Representative: salesRepValue ?? representative, Role: role, "Sales Territory": salesTerritory, "Districts": districts.map((d) => d.district).join(", "), "Generated At": new Date().toISOString(), "Total Candidates": rows.length, "Source Mode": territoryManifestPath ? "territory-manifest" : "single-district" }];
   addSheet(combinedWb, "Run Manifest", runManifestRows);
 
   const combinedPath = path.join(outArg, `${representative.toLowerCase()}-master-combined.xlsx`);

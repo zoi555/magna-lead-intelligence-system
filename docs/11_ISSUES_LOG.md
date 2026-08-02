@@ -920,11 +920,13 @@ representatives, including the 5 not yet processed) were confirmed valid by this
 ## ISS-0033 — Five-district pilot's named districts don't match `sales-territories-v2.json`, and RM1 is already owned (2026-08-02)
 
 Date: 2026-08-02
-Severity: High — **blocks the pilot; live discovery must not start until this is resolved by the
-owner**
+Severity: High — **blocked the pilot; live discovery could not start until resolved by the owner**
 Owner: Zoeb
-Status: **Open, unresolved.** No territory config was changed and no live discovery has been run
-against any of the 5 named districts as a result.
+Status: **Resolved 2026-08-03.** The owner confirmed the CC's newly supplied district/
+representative/region allocation (see below) is authoritative for a NEW, separate campaign
+("campaign-002-five-district-pilot") — the completed first campaign's territory assignments
+(`sales-territories-v2.json`) are explicitly NOT to be treated as current for this run, and must
+not be overwritten, deleted, or rewritten. See "Resolution" below.
 
 ### Problem
 
@@ -956,6 +958,24 @@ different district, or explicitly reassign RM1 knowing it duplicates Nauman's ex
 No implementation work should touch `sales-territories-v2.json` or begin live discovery for any of
 the 5 named districts until this is confirmed.
 
-### Fix
+### Resolution (2026-08-03)
 
-Not yet fixed — pending owner decision.
+The owner supplied a new, explicit five-district allocation for a NEW campaign (CM1→Kunz,
+IG1→Naseh, RM1→Saif, DA1→Tahira, BR1→Hassan, all with exact Sales Pro representative
+values/emails and Region/Route), with an explicit RM1 special rule: Nauman's historical RM1
+ownership and already-released leads remain completely unchanged; newly discovered RM1 leads
+belong to Saif for this new campaign; any business already present in Nauman's previously-released
+RM1 output must be deduplicated against and never released again under Saif.
+
+Implemented as a new, additive, versioned campaign config —
+`config/lead-production/campaigns/campaign-002-five-district-pilot/territories.json` — loaded and
+validated by the new `scripts/lead-production/campaign-territory.ts` (fail-closed on any unlisted
+district, exactly the same philosophy as `assertDistrictIsConfigured()`). `sales-territories-v2.json`
+was NOT modified (verified byte-for-byte identical before/after, see
+`scripts/test-lead-production-campaign-territory.ts`). Cross-campaign deduplication is a new
+capability (`dedupeAgainstHistoricalCampaign()` in `district-reconciliation.ts`, loader in
+`historical-campaign.ts`) that checks freshly-discovered RM1 candidates against Nauman's real,
+already-released "Operationally Usable Leads" (read-only reference data, never itself modified)
+using the same tiered identity-evidence hierarchy already used for cross-district dedup. 10/10
+of the owner's required regression tests pass, including against real historical RM1 data (41 real
+Nauman RM1 leads). Full detail: `docs/09_DECISIONS.md` (2026-08-03 entry).

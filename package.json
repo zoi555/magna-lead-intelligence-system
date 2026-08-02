@@ -71,6 +71,7 @@
     "test:lead-production-cto-business-type-mapping": "tsx scripts/test-lead-production-cto-business-type-mapping.ts",
     "test:lead-production-simplified-workbook": "tsx scripts/test-lead-production-simplified-workbook.ts",
     "test:lead-production-cto-with-address": "tsx scripts/test-lead-production-cto-with-address.ts",
+    "test:lead-production-campaign-territory": "tsx scripts/test-lead-production-campaign-territory.ts",
     "test:apify-provenance": "tsx scripts/test-apify-provenance.ts",
     "test:borderline-provider": "tsx scripts/test-borderline-provider.ts",
     "test:ub1-benchmark": "tsx scripts/test-ub1-benchmark.ts",

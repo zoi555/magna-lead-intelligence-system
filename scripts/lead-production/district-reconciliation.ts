@@ -105,6 +105,87 @@ export function dedupeAcrossDistricts(candidates: DistrictCandidateForDedup[]): 
   return { kept, duplicateClusters };
 }
 
+// --- Cross-campaign dedup (2026-08-03, ISS-0033 resolution) ---
+//
+// A DIFFERENT problem from dedupeAcrossDistricts() above: that function merges duplicates found
+// WITHIN one run's own freshly-discovered candidate set. This one checks a freshly-discovered
+// candidate set against a FIXED, already-released, prior campaign's population (e.g. Nauman's
+// historical RM1 leads) that must never itself be modified, reprocessed, or re-ranked — it is
+// read-only reference data. Reuses the exact same tiered identity-evidence hierarchy and the
+// same postcode-corroboration safety rule (a shared company/phone/domain alone is not sufficient
+// — see the long comment above dedupeAcrossDistricts) for the same reason: the same real premises
+// discovered independently must match, but two different branches of the same chain must not.
+export interface HistoricalCampaignCandidate {
+  leadId: string;
+  representative: string; // the prior campaign's rep who owns this historical lead (never reassigned)
+  tradingName: string;
+  postcode: string | null;
+  phone: string | null;
+  website: string | null;
+  companyNumber: string | null;
+}
+
+export interface HistoricalDuplicateMatch {
+  tier: DuplicateEvidenceTier;
+  droppedCandidateId: string;
+  droppedDistrict: string;
+  historicalLeadId: string;
+  historicalRepresentative: string;
+}
+
+export interface HistoricalDedupeResult {
+  kept: DistrictCandidateForDedup[];
+  matches: HistoricalDuplicateMatch[];
+}
+
+export function dedupeAgainstHistoricalCampaign(newCandidates: DistrictCandidateForDedup[], historical: HistoricalCampaignCandidate[]): HistoricalDedupeResult {
+  const historicalByPostcode = new Map<string, HistoricalCampaignCandidate[]>();
+  for (const h of historical) {
+    const postcode = h.postcode ? normalisePostcode(h.postcode).canonical : null;
+    if (!postcode) continue; // no postcode = no safe corroborated match possible, per the tiering rule above
+    historicalByPostcode.set(postcode, [...(historicalByPostcode.get(postcode) ?? []), h]);
+  }
+
+  const kept: DistrictCandidateForDedup[] = [];
+  const matches: HistoricalDuplicateMatch[] = [];
+
+  for (const c of newCandidates) {
+    const companyNumber = c.companyNumber?.trim().toUpperCase() || null;
+    const phone = c.phone ? normalisePhone(c.phone).comparison : null;
+    const domain = c.website ? normaliseDomain(c.website) : null;
+    const postcode = c.postcode ? normalisePostcode(c.postcode).canonical : null;
+
+    let matchOf: HistoricalCampaignCandidate | null = null;
+    let tier: DuplicateEvidenceTier | null = null;
+
+    if (postcode) {
+      const pool = historicalByPostcode.get(postcode) ?? [];
+      for (const h of pool) {
+        const hCompanyNumber = h.companyNumber?.trim().toUpperCase() || null;
+        const hPhone = h.phone ? normalisePhone(h.phone).comparison : null;
+        const hDomain = h.website ? normaliseDomain(h.website) : null;
+        if (companyNumber && hCompanyNumber === companyNumber) { matchOf = h; tier = "exact_company_number"; break; }
+        if (phone && hPhone === phone) { matchOf = h; tier = "exact_phone"; break; }
+        if (domain && hDomain === domain) { matchOf = h; tier = "exact_domain"; break; }
+      }
+      if (!matchOf) {
+        // Same 0.6 confirm-only bar as dedupeAcrossDistricts — a wrongly-dropped candidate is a
+        // lost real sales opportunity, a strictly worse outcome than an occasional duplicate.
+        const identityMatch = pool.find((h) => nameSimilarity(normaliseName(h.tradingName), normaliseName(c.tradingName)) >= 0.6);
+        if (identityMatch) { matchOf = identityMatch; tier = "exact_postcode_and_identity"; }
+      }
+    }
+
+    if (matchOf && tier) {
+      matches.push({ tier, droppedCandidateId: c.candidateId, droppedDistrict: c.district, historicalLeadId: matchOf.leadId, historicalRepresentative: matchOf.representative });
+      continue;
+    }
+    kept.push(c);
+  }
+
+  return { kept, matches };
+}
+
 export interface DistrictInvariantCheck {
   district: string;
   rawCanonicalPopulation: number;

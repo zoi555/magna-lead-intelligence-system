@@ -19,12 +19,13 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { loadCandidateDossiers, type Dossier } from "./candidate-dossier";
 import { resolveMasterFields, type MasterFieldContext } from "./master-field-resolver";
-import { dedupeAcrossDistricts, type DistrictCandidateForDedup } from "./district-reconciliation";
+import { dedupeAcrossDistricts, dedupeAgainstHistoricalCampaign, type DistrictCandidateForDedup, type HistoricalDuplicateMatch } from "./district-reconciliation";
 import { writeCsv } from "./csv";
 import { loadCommercialReviewRegistry } from "./load-commercial-review";
 import { evaluateCommercialReviewExclusion } from "./commercial-review-filter";
 import { isValidUkPhone } from "./normalize";
 import { loadCtoBusinessTypeVocabulary } from "./cto-business-type-mapping";
+import { loadHistoricalUsableLeads } from "./historical-campaign";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
 async function readJson(p: string): Promise<any> { return JSON.parse(await fs.readFile(p, "utf8")); }
@@ -107,6 +108,11 @@ async function main() {
   let role = arg("role") as "telesales" | "field_sales" | null;
   let salesTerritory = arg("sales-territory");
   let territoryPrefix = arg("territory-prefix"); // used for output filenames when combining multiple districts
+  // See generate-master-export.ts for the same flag's rationale — overrides only the exported
+  // field value, never filenames. Falls back to `representative` when omitted.
+  const salesRepValue = arg("sales-rep-value");
+  const campaignId = arg("campaign-id");
+  const historicalUsableWorkbook = arg("historical-usable-workbook");
 
   if (territoryManifestPath) {
     const tm = await readJson(territoryManifestPath);
@@ -136,6 +142,7 @@ async function main() {
   if (!representative || !role || !salesTerritory || !territoryPrefix) { console.error("Could not resolve representative/role/sales-territory."); process.exit(1); }
 
   console.log(`=== Magna Sales Pro exporter (108 columns) — ${representative} (${role}), ${salesTerritory}, ${districts.length} district(s) ===`);
+  if (campaignId) console.log(`Campaign: ${campaignId}`);
 
   const commercialReviewDir = arg("commercial-review-dir") ?? "config/lead-production/commercial-review-v1";
   const commercialReviewRegistry = await loadCommercialReviewRegistry(commercialReviewDir);
@@ -152,7 +159,7 @@ async function main() {
   let bundles: RowBundle[] = [];
   for (const d of districts) {
     const { dossiers } = await loadCandidateDossiers(d.dirs);
-    const ctx: MasterFieldContext = { territory: d.district, representative: representative!, role: role!, salesTerritory: salesTerritory! };
+    const ctx: MasterFieldContext = { territory: d.district, representative: salesRepValue ?? representative!, role: role!, salesTerritory: salesTerritory! };
     for (const dossier of dossiers) {
       const resolved = resolveMasterFields(dossier, ctx, vocabulary);
       bundles.push({ dossier, district: d.district, fields: resolved.fields, leadId: resolved.leadId, gaps: resolved.dataQualityGaps });
@@ -171,6 +178,33 @@ async function main() {
     const removed = bundles.length - dedupResult.kept.length;
     bundles = bundles.filter((b) => keptIds.has(b.dossier.candidateId));
     if (removed) console.log(`Cross-district dedup: ${removed} duplicate(s) removed (same real premises independently discovered in two districts near a boundary).`);
+  }
+
+  // Cross-CAMPAIGN dedup (2026-08-03, ISS-0033 resolution) — see generate-master-export.ts's
+  // loadAllRows() for the full rationale. No-op when --historical-usable-workbook is not
+  // supplied (every existing call site/test is unaffected).
+  let historicalDuplicatesRemoved: HistoricalDuplicateMatch[] = [];
+  if (historicalUsableWorkbook) {
+    for (const d of districts) {
+      const historical = await loadHistoricalUsableLeads(historicalUsableWorkbook, d.district);
+      if (!historical.length) continue;
+      const dedupInput: DistrictCandidateForDedup[] = bundles.filter((b) => b.district === d.district).map((b) => ({
+        candidateId: b.dossier.candidateId, district: b.district, tradingName: b.dossier.tradingName,
+        postcode: b.dossier.postcode, phone: b.dossier.fields.telephone as string | null, website: b.dossier.fields.website as string | null,
+        companyNumber: b.dossier.fields.companies_house_number as string | null, finalOutcome: b.dossier.qualificationStatus,
+      }));
+      const result = dedupeAgainstHistoricalCampaign(dedupInput, historical);
+      const keptIds = new Set(result.kept.map((c) => c.candidateId));
+      bundles = bundles.filter((b) => b.district !== d.district || keptIds.has(b.dossier.candidateId));
+      historicalDuplicatesRemoved.push(...result.matches);
+    }
+    if (historicalDuplicatesRemoved.length) {
+      console.log(`Cross-campaign dedup: ${historicalDuplicatesRemoved.length} candidate(s) already present in a prior campaign's released output — excluded from this campaign's release, prior campaign ownership unchanged.`);
+      await fs.writeFile(path.join(outArg, `${territoryPrefix}-historical-campaign-duplicates.csv`), writeCsv(
+        ["campaign_id", "tier", "dropped_candidate_id", "dropped_district", "historical_lead_id", "historical_representative"],
+        historicalDuplicatesRemoved.map((m) => ({ campaign_id: campaignId ?? "", tier: m.tier, dropped_candidate_id: m.droppedCandidateId, dropped_district: m.droppedDistrict, historical_lead_id: m.historicalLeadId, historical_representative: m.historicalRepresentative })),
+      ));
+    }
   }
 
   // --- Strict exclusion from ordinary new-lead exports: held, hard-rejected, customer-master
@@ -198,7 +232,7 @@ async function main() {
     if (!result.excluded) continue;
     if (result.matchedRule === "brand_exclusion") brandExcluded.push(b); else pharmacyChemistExcluded.push(b);
     commercialReviewAudit.push({
-      lead_id: b.leadId, representative: representative!, business_name: b.dossier.tradingName,
+      lead_id: b.leadId, representative: salesRepValue ?? representative!, business_name: b.dossier.tradingName,
       matched_rule: result.matchedRule!, match_basis: result.matchBasis ?? "",
       previous_status: b.dossier.qualificationStatus, final_exclusion_status: result.matchedRule === "brand_exclusion" ? "excluded_brand_commercial_review" : "excluded_pharmacy_chemist",
     });
