@@ -146,7 +146,7 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext): 
     sales_territory: ctx.salesTerritory,
     postcode_district: ctx.territory,
     lead_type: leadType,
-    pipeline_stage: "1. Qualification", // CRM-workflow default for every freshly exported lead — not a data claim.
+    pipeline_stage: "1. Follow Up", // CRM-workflow default for every freshly exported lead — not a data claim. Corrected from "1. Qualification" per locked instruction 2026-08-02.
     lead_urgency: leadUrgency,
     last_verified_date: lastVerifiedDate,
     payment_terms: null, preferred_ordering_days: null,

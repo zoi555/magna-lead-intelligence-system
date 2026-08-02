@@ -184,13 +184,13 @@
       "columnOrder": 14,
       "salesProFieldLabel": "Business Types",
       "origin": "Existing CTO Field",
-      "mappedMasterField": "Business Type",
-      "canonicalName": "business_type",
+      "mappedMasterField": "CTO Business Type",
+      "canonicalName": "cto_business_type",
       "fieldType": "Multi Select",
       "required": true,
-      "allowedValues": [],
-      "exampleValue": "Butchers, Other",
-      "transformationExportRule": "Map to CTO-approved values; comma-separate multiple values.",
+      "allowedValues": ["Afghan Restaurant", "American Restaurant", "Bakeries and Pastry Shops", "Bakery Manufacturer", "Bar / Pub with Foodservice", "Barbecue / Grill", "Burger Restaurant", "Butchers", "Café / Coffee Shop", "Caribbean Restaurant", "Casual Dining Restaurant", "Caterer (On-site or Off-site)", "Charity / Religious Group Foodservice", "Chinese Restaurant", "Contract Catering / Institutional Catering", "Convenience Store with Foodservice", "Corporate Catering", "Delis and Sandwich Shops", "European Restaurant", "Event / Wedding Catering", "Fast Casual Restaurant", "Fine Dining Restaurant", "Fish and Chips Shop", "Fishmonger", "Food Distributor / Logistics Provider", "Fried Chicken Shop", "Frozen Food Manufacturer", "General Food Store", "General Wholesaler", "Healthcare / Hospital Catering", "Hotel Catering / Banquets", "Hotel with Restaurants", "Ice Cream Shop / Dessert Café", "Indian Restaurant", "Italian Restaurant", "Japanese Restaurant", "Juice Bar / Smoothie Bar", "Kebab Shop", "Mediterranean Restaurant", "Mexican", "Middle Eastern Restaurant", "Other", "Pakistani Restaurant", "Piri Piri Shop", "Pizza Shop", "Prepared Meals Manufacturer", "Quick-Service Restaurant (QSR)", "Resort Foodservice", "School / University Catering", "Shisha Lounge", "Specialty Ethnic Grocery with Foodservice", "Wholesale Butcher", "Wholesale Cash & Carry", "Wholesale Drinks Supplier", "Wholesale Foodservice Supplier", "Wine Bar with Foodservice", "Workplace Canteen"],
+      "exampleValue": "Pakistani Restaurant, Casual Dining Restaurant, Barbecue / Grill",
+      "transformationExportRule": "2026-08-02: canonicalName repointed from the raw \"business_type\" Master field (FSA/Google source category, kept as separate Prospect Category evidence — never removed, still on Master) to the new \"cto_business_type\" Master field (the controlled, post-eligibility CTO-mapped value). Map to CTO-approved values only; comma-separate multiple values; principal value first, up to two secondary values.",
       "implementationPriority": "Essential"
     },
     {
@@ -223,15 +223,15 @@
       "fieldType": "Single Select",
       "required": true,
       "allowedValues": [
-        "1. Qualification",
+        "1. Follow Up",
         "2. Contacting",
         "3. Engaged",
         "4. Opportunity",
         "5. Won",
         "6. Lost"
       ],
-      "exampleValue": "1. Qualification",
-      "transformationExportRule": "Set approved initial stage for new lead imports.",
+      "exampleValue": "1. Follow Up",
+      "transformationExportRule": "2026-08-02: initial stage value corrected from \"1. Qualification\" to \"1. Follow Up\" per explicit locked instruction — same position (stage 1), not an additional stage. Set approved initial stage for new lead imports.",
       "implementationPriority": "Essential"
     },
     {
