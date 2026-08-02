@@ -49,10 +49,18 @@ export async function consolidateRun(db: SupabaseClient, tenantId: string, runId
   // Missing, rejected, or unverifiable evidence is excluded here — never treated as valid by absence.
   const canonicalObservationIds = [...canonicalObservationBySourceId.values()];
   const validObservationIds = new Set<string>();
-  for (let i = 0; i < canonicalObservationIds.length; i += 500) {
+  // Real bug found and fixed 2026-08-03 (campaign-002-five-district-pilot, IG1 live run,
+  // 1192 raw outlets): a 500-item .in() batch of full UUIDs serialises to ~19,500 characters in
+  // the GET request's query string, exceeding the ~16KB header limit and failing with
+  // HeadersOverflowError ("Your request URL is 19765 characters"). UB1/most prior real districts
+  // never had enough canonical observations in one run to hit 500 in a single batch, so this was
+  // previously latent. IN_BATCH_SIZE=150 keeps a full-UUID batch (~39 chars/id incl. separator)
+  // to ~5,850 characters — comfortable headroom below the limit even with the rest of the URL.
+  const IN_BATCH_SIZE = 150;
+  for (let i = 0; i < canonicalObservationIds.length; i += IN_BATCH_SIZE) {
     const r = await db.from("provider_geography_validations").select("observation_id")
       .eq("run_id", runId).eq("tenant_id", tenantId).eq("source", "just_eat").eq("status", "valid_geography")
-      .in("observation_id", canonicalObservationIds.slice(i, i + 500));
+      .in("observation_id", canonicalObservationIds.slice(i, i + IN_BATCH_SIZE));
     if (r.error) throw new Error(`consolidateRun.validation: ${JSON.stringify(r.error)}`);
     for (const v of (r.data ?? []) as { observation_id: string | null }[]) if (v.observation_id) validObservationIds.add(v.observation_id);
   }
@@ -63,8 +71,8 @@ export async function consolidateRun(db: SupabaseClient, tenantId: string, runId
   if (!ids.length) return { outlets: 0, candidates: 0 };
 
   const outletRows: Record<string, any>[] = [];
-  for (let i = 0; i < ids.length; i += 500) {
-    const r = await db.from("je_outlets").select("*").eq("tenant_id", tenantId).in("je_outlet_id", ids.slice(i, i + 500));
+  for (let i = 0; i < ids.length; i += IN_BATCH_SIZE) {
+    const r = await db.from("je_outlets").select("*").eq("tenant_id", tenantId).in("je_outlet_id", ids.slice(i, i + IN_BATCH_SIZE));
     if (r.error) throw new Error(`consolidateRun.outlets: ${JSON.stringify(r.error)}`);
     outletRows.push(...(r.data ?? []));
   }
