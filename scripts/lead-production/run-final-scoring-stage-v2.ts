@@ -22,7 +22,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
 import { writeCsv, parseCsvObjects } from "./csv";
-import { normaliseName, nameSimilarity } from "./normalize";
+import { normaliseName, nameSimilarity, isValidUkPhone } from "./normalize";
 import { deriveGoogleOutcome } from "./google-match";
 import { evaluateHardGates, trustworthyCompaniesHouseStatus } from "./hard-gates";
 import { assessPhysicalPremises } from "./physical-premises";
@@ -246,6 +246,13 @@ async function main() {
 
     const phone = website?.phone?.value ?? correctedGoogleBest?.phone ?? null;
     const phoneSource: "website" | "google" | null = website?.phone?.value ? "website" : correctedGoogleBest?.phone ? "google" : null;
+    // Locked policy (2026-08-02) / order-of-operations fix: eligibility must be judged on the
+    // SAME validated phone value export-time uses (candidate-dossier.ts's resolvedPhone()) —
+    // previously this raw, unvalidated value fed hard-gates/channel-suitability directly, so a
+    // malformed number (e.g. an un-decoded tel: href artifact) could pass eligibility here and
+    // only get stripped later at export, silently changing the candidate's effective channel
+    // eligibility after the Level/qualification decision was already locked in.
+    const validPhone = isValidUkPhone(phone) ? phone : null;
     const lat = googleDecisive ? correctedGoogleBest?.latitude ?? null : null;
     const lng = googleDecisive ? correctedGoogleBest?.longitude ?? null : null;
     const hasWebsiteContact = website?.hasContactForm?.value === true || !!website?.email?.value;
@@ -265,7 +272,7 @@ async function main() {
       finalGroupClassification: (groupRescreen?.classification ?? "ownership_unresolved") as any,
       finalGroupDefaultOutcome: (groupRescreen?.defaultOutcome ?? null) as any,
       hasContactablePostcode: !!postcode,
-      hasAnyContactChannel: !!phone || hasWebsiteContact,
+      hasAnyContactChannel: !!validPhone || hasWebsiteContact,
     });
 
     const scoring = calculateScore({
@@ -284,7 +291,7 @@ async function main() {
     });
 
     const channel = calculateChannelSuitability({
-      candidateId, phone, phoneSource: phoneSource as any, physicalPremises, hasPostcode: !!postcode, latitude: lat, longitude: lng,
+      candidateId, phone: validPhone, phoneSource: phoneSource as any, physicalPremises, hasPostcode: !!postcode, latitude: lat, longitude: lng,
       hasOpeningHours: !!website?.openingHours?.value, hasWebsiteContact, decisionMakerConfidence,
       independentPurchasingFit: scoring.components.independentLocalPurchasingFit, identityConfidence,
     });
@@ -322,8 +329,8 @@ async function main() {
     const hasUnresolvedCustomerConflictAfter = hasUnresolvedCustomerConflictBefore && materiality.outcomeTier === "probable";
     const customerConflictMaterialityChanged = hasUnresolvedCustomerConflictBefore !== hasUnresolvedCustomerConflictAfter;
 
-    const finalOutcome = assignFinalOutcome(candidateId, gates, scoring, channel, hasUnresolvedCustomerConflictAfter);
-    const qualification = classifyQualificationV2({ hardGates: gates, materialCustomerConflict: hasUnresolvedCustomerConflictAfter, channelSuitability: channel, stagesWithDecisiveEvidence, totalStagesConsidered: 4 });
+    const finalOutcome = assignFinalOutcome(candidateId, gates, scoring, channel, hasUnresolvedCustomerConflictAfter, !!validPhone);
+    const qualification = classifyQualificationV2({ hardGates: gates, materialCustomerConflict: hasUnresolvedCustomerConflictAfter, channelSuitability: channel, hasValidPhone: !!validPhone, stagesWithDecisiveEvidence, totalStagesConsidered: 4 });
 
     const outcomeChanged = googleReclassified || customerConflictMaterialityChanged;
     const changeReasonParts: string[] = [];

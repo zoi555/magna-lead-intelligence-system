@@ -22,12 +22,21 @@ import type { HardGateResult, ChannelSuitabilityResult, ChannelSuitability } fro
 // run-final-scoring-stage-v2.ts, before a candidate ever reaches this function — it never
 // depends on hard gates, score, or channel, exactly like the other terminal buckets
 // (active/excluded-group/closed).
-export type QualificationStatusV2 = "qualified" | "qualified_with_channel_limit" | "held_for_customer_match_review" | "customer_master_exclusion" | "hard_rejected";
+// "phone_resolution_exception" (locked policy 2026-08-02): every released ordinary lead and key
+// account requires a valid UK phone — this is NOT modelled as a 12th hard gate (a missing/
+// unresolved phone is a recoverable data gap, not a genuine trading-status/legal disqualifier,
+// consistent with this file's existing "ownership_unresolved is not a hard gate" precedent) and
+// NOT folded into the existing "neither channel usable" hard_rejected branch (a candidate with a
+// perfectly good field-sales channel but no valid phone is a materially different, more
+// recoverable case than one with no channel at all). A distinct status keeps it separately
+// auditable and re-attemptable, matching Zoeb's explicit naming for this exact case.
+export type QualificationStatusV2 = "qualified" | "qualified_with_channel_limit" | "held_for_customer_match_review" | "customer_master_exclusion" | "hard_rejected" | "phone_resolution_exception";
 
 export interface QualificationV2Input {
   hardGates: HardGateResult;
   materialCustomerConflict: boolean; // from customer-match-materiality.ts's "probable" tier — a CONFIRMED match never reaches this function at all
   channelSuitability: ChannelSuitabilityResult;
+  hasValidPhone: boolean; // isValidUkPhone() result — website/Google recovery already applied upstream; this is the FINAL validated value, checked here regardless of channel type
   stagesWithDecisiveEvidence: number; // 0-4, same input already computed for scoring.ts's dataCompletenessConfidence
   totalStagesConsidered: number;
 }
@@ -70,6 +79,18 @@ export function classifyQualificationV2(input: QualificationV2Input): Qualificat
       qualificationStatus: "hard_rejected", channelEligibility: "neither",
       enrichmentCompletenessBand, enrichmentCompletenessFraction: completenessFraction,
       reason: "Passed every hard gate but has no usable telesales or field-sales channel (no verified phone, and no genuine visitable premises with coordinates).",
+    };
+  }
+
+  if (!input.hasValidPhone) {
+    // Locked policy (2026-08-02): a valid phone is mandatory for EVERY released lead, not just
+    // telesales ones — a field-sales-only candidate with a genuine premises but no valid phone
+    // must not be released either. This candidate has a usable channel (suitability !== "neither"
+    // was already checked above) but fails the separate, mandatory phone requirement.
+    return {
+      qualificationStatus: "phone_resolution_exception", channelEligibility: input.channelSuitability.suitability,
+      enrichmentCompletenessBand, enrichmentCompletenessFraction: completenessFraction,
+      reason: "Passed every hard gate and has a usable channel by the old definition, but no valid UK phone number was resolved from any recovery source (website, Google) — every released lead requires one. Held as a phone-resolution exception, not released, pending manual phone recovery or an approved override.",
     };
   }
 

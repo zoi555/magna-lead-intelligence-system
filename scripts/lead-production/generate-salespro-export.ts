@@ -22,6 +22,7 @@ import { dedupeAcrossDistricts, type DistrictCandidateForDedup } from "./distric
 import { writeCsv } from "./csv";
 import { loadCommercialReviewRegistry } from "./load-commercial-review";
 import { evaluateCommercialReviewExclusion } from "./commercial-review-filter";
+import { isValidUkPhone } from "./normalize";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
 async function readJson(p: string): Promise<any> { return JSON.parse(await fs.readFile(p, "utf8")); }
@@ -228,6 +229,16 @@ async function main() {
   const keyAccountIds = new Set(keyAccounts.map((b) => b.dossier.candidateId));
   const leaked = [...customerMasterExclusions, ...brandExcluded, ...pharmacyChemistExcluded].filter((b) => newLeadIds.has(b.dossier.candidateId) || keyAccountIds.has(b.dossier.candidateId));
   if (leaked.length) throw new Error(`SAFETY FAILURE: ${leaked.length} excluded candidate(s) also appear in the ordinary new-leads or key-accounts file: ${leaked.map((b) => b.dossier.candidateId).join(", ")}.`);
+
+  // Safety check (locked policy 2026-08-02): zero blank or invalid phones in released output.
+  // This is a backstop, not the primary gate — a phone_resolution_exception candidate should
+  // never reach `usable` at all (qualification-v2.ts already filters it out upstream); this
+  // re-verifies that guarantee defensively at the very last export step, exactly like the
+  // existing exclusion leak-check above.
+  const phoneViolations = [...newLeadRows, ...keyAccountRows].filter((row) => !isValidUkPhone(row["Phone"] as string | null));
+  if (phoneViolations.length) {
+    throw new Error(`SAFETY FAILURE: ${phoneViolations.length} released row(s) have a blank or invalid phone — every released ordinary lead and key account requires a valid UK phone. Lead ID(s): ${phoneViolations.map((r) => r["Permanent Lead ID"]).join(", ")}.`);
+  }
 
   await fs.writeFile(path.join(outArg, `${territoryPrefix}-salespro-new-leads.csv`), writeCsv(columnLabels, newLeadRows));
   // Audit-only — not one of the rep-facing/import categories. Representatives must not see or

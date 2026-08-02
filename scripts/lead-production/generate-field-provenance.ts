@@ -22,6 +22,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import * as XLSX from "xlsx";
 import { parseCsvObjects, writeCsv } from "./csv";
+import { isValidUkPhone } from "./normalize";
 
 function arg(name: string): string | undefined {
   const p = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -36,12 +37,7 @@ async function findFileEndingWith(dir: string, suffix: string): Promise<string> 
   return path.join(dir, match);
 }
 
-function isValidPhone(p: string | null | undefined): boolean {
-  if (!p) return false;
-  if (p.includes("%")) return false;
-  const digits = p.replace(/[\s().-]/g, "");
-  return /^(\+44|0)\d{9,10}$/.test(digits);
-}
+const isValidPhone = isValidUkPhone; // local alias — logic now lives in normalize.ts's single shared validator
 
 interface ProvenanceRow {
   leadId: string; field: string; finalValue: string; sourceStage: string; provider: string;

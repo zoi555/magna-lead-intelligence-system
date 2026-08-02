@@ -86,7 +86,7 @@ interface Buckets {
   // new discovery/enrichment call is made for this rule.
   brandExcluded: RowBundle[]; pharmacyChemistExcluded: RowBundle[];
   usable: RowBundle[]; premium: RowBundle[]; releasableL1: RowBundle[]; keyAccounts: RowBundle[];
-  held: RowBundle[]; hardRejects: RowBundle[];
+  held: RowBundle[]; phoneResolutionExceptions: RowBundle[]; hardRejects: RowBundle[];
   commercialReviewAudit: CommercialReviewAuditRow[];
 }
 
@@ -120,8 +120,14 @@ function classify(rows: RowBundle[], registry: CommercialReviewRegistry, represe
   const releasableL1 = usable.filter((r) => !premium.includes(r));
   const keyAccounts = usable.filter((r) => r.resolved.fields.key_account_indicator === "Yes");
   const held = remaining.filter((r) => r.dossier.qualificationStatus === "held_for_customer_match_review");
+  // Locked policy (2026-08-02): every released ordinary lead/key account requires a valid phone.
+  // Treated the same as held_for_customer_match_review — never rep-facing, held pending recovery,
+  // its own distinct bucket so reconciliation stays exact rather than silently dropping these
+  // candidates (which would previously have thrown "Reconciliation FAILED" — none of the
+  // pre-existing buckets accounted for this qualificationStatus value).
+  const phoneResolutionExceptions = remaining.filter((r) => r.dossier.qualificationStatus === "phone_resolution_exception");
   const hardRejects = remaining.filter((r) => r.dossier.qualificationStatus === "hard_rejected");
-  return { customerMasterExclusions, excludedGroups, brandExcluded, pharmacyChemistExcluded, usable, premium, releasableL1, keyAccounts, held, hardRejects, commercialReviewAudit };
+  return { customerMasterExclusions, excludedGroups, brandExcluded, pharmacyChemistExcluded, usable, premium, releasableL1, keyAccounts, held, phoneResolutionExceptions, hardRejects, commercialReviewAudit };
 }
 
 async function main() {
@@ -184,11 +190,11 @@ async function main() {
 
   // --- Reconciliation: every candidate must land in exactly one bucket. ---
   const buckets = classify(rows, commercialReviewRegistry, representative);
-  const partitioned = [...buckets.customerMasterExclusions, ...buckets.excludedGroups, ...buckets.brandExcluded, ...buckets.pharmacyChemistExcluded, ...buckets.usable, ...buckets.held, ...buckets.hardRejects];
+  const partitioned = [...buckets.customerMasterExclusions, ...buckets.excludedGroups, ...buckets.brandExcluded, ...buckets.pharmacyChemistExcluded, ...buckets.usable, ...buckets.held, ...buckets.phoneResolutionExceptions, ...buckets.hardRejects];
   if (partitioned.length !== rows.length) throw new Error(`Reconciliation FAILED: ${rows.length} total candidates but only ${partitioned.length} landed in a Master export bucket. Refusing to write an incomplete export.`);
   const uniqueIds = new Set(partitioned.map((r) => r.dossier.candidateId));
   if (uniqueIds.size !== rows.length) throw new Error(`Reconciliation FAILED: candidate appears in more than one Master export bucket (${rows.length} rows, ${uniqueIds.size} unique candidate IDs).`);
-  console.log(`Reconciliation: ${rows.length} total = ${buckets.customerMasterExclusions.length} customer-master exclusions + ${buckets.excludedGroups.length} excluded groups + ${buckets.brandExcluded.length} commercial-review brand exclusions + ${buckets.pharmacyChemistExcluded.length} pharmacy/chemist exclusions + ${buckets.usable.length} usable + ${buckets.held.length} held + ${buckets.hardRejects.length} hard-rejected. Zero overlap. ✓`);
+  console.log(`Reconciliation: ${rows.length} total = ${buckets.customerMasterExclusions.length} customer-master exclusions + ${buckets.excludedGroups.length} excluded groups + ${buckets.brandExcluded.length} commercial-review brand exclusions + ${buckets.pharmacyChemistExcluded.length} pharmacy/chemist exclusions + ${buckets.usable.length} usable + ${buckets.held.length} held + ${buckets.phoneResolutionExceptions.length} phone-resolution exceptions + ${buckets.hardRejects.length} hard-rejected. Zero overlap. ✓`);
   // Safety check: no customer-master-excluded, excluded-group, or commercial-review-excluded
   // candidate may ever appear in a rep-facing bucket (usable/premium/releasableL1/held/
   // keyAccounts) — enforced by construction above (removed before usable/held are even
@@ -222,20 +228,20 @@ async function main() {
   addSheet(combinedWb, "Operationally Usable Leads", rowsFor(buckets.usable));
   addSheet(combinedWb, "Premium Level 0", rowsFor(buckets.premium));
   addSheet(combinedWb, "Releasable Level 1", rowsFor(buckets.releasableL1));
-  addSheet(combinedWb, "Held-Review", rowsFor(buckets.held));
+  addSheet(combinedWb, "Held-Review", rowsFor([...buckets.held, ...buckets.phoneResolutionExceptions]));
   addSheet(combinedWb, "Hard Rejects", rowsFor(buckets.hardRejects));
   addSheet(combinedWb, "Customer Master Exclusions", rowsFor(buckets.customerMasterExclusions));
   addSheet(combinedWb, "Excluded Groups", rowsFor(buckets.excludedGroups));
   addSheet(combinedWb, "Commercial Review Exclusions", rowsFor([...buckets.brandExcluded, ...buckets.pharmacyChemistExcluded]));
   addSheet(combinedWb, "Key Accounts", rowsFor(buckets.keyAccounts));
 
-  const repSummaryRows = [{ Representative: representative, Role: role === "field_sales" ? "Field Sales" : "Telesales", "Sales Territory": salesTerritory, "Districts Included": districts.map((d) => d.district).join(", "), "Total Candidates": rows.length, Usable: buckets.usable.length, "Premium Level 0": buckets.premium.length, "Releasable Level 1": buckets.releasableL1.length, "Key Accounts": buckets.keyAccounts.length, "Held/Review": buckets.held.length, "Hard Rejects": buckets.hardRejects.length, "Customer Master Exclusions": buckets.customerMasterExclusions.length, "Excluded Groups": buckets.excludedGroups.length, "Commercial Review Brand Exclusions": buckets.brandExcluded.length, "Pharmacy/Chemist Exclusions": buckets.pharmacyChemistExcluded.length }];
+  const repSummaryRows = [{ Representative: representative, Role: role === "field_sales" ? "Field Sales" : "Telesales", "Sales Territory": salesTerritory, "Districts Included": districts.map((d) => d.district).join(", "), "Total Candidates": rows.length, Usable: buckets.usable.length, "Premium Level 0": buckets.premium.length, "Releasable Level 1": buckets.releasableL1.length, "Key Accounts": buckets.keyAccounts.length, "Held/Review": buckets.held.length + buckets.phoneResolutionExceptions.length, "Phone Resolution Exceptions": buckets.phoneResolutionExceptions.length, "Hard Rejects": buckets.hardRejects.length, "Customer Master Exclusions": buckets.customerMasterExclusions.length, "Excluded Groups": buckets.excludedGroups.length, "Commercial Review Brand Exclusions": buckets.brandExcluded.length, "Pharmacy/Chemist Exclusions": buckets.pharmacyChemistExcluded.length }];
   addSheet(combinedWb, "Representative Summary", repSummaryRows);
   addSheet(combinedWb, "Territory Summary", [{ "Sales Territory": salesTerritory, Representative: representative, "District Count": districts.length, "Total Candidates": rows.length }]);
 
   const districtSummaryRows = districts.map((d) => {
     const inDistrict = rows.filter((r) => r.district === d.district);
-    return { District: d.district, "Total Candidates": inDistrict.length, Usable: inDistrict.filter((r) => buckets.usable.includes(r)).length, Held: inDistrict.filter((r) => buckets.held.includes(r)).length, "Hard Rejects": inDistrict.filter((r) => buckets.hardRejects.includes(r)).length };
+    return { District: d.district, "Total Candidates": inDistrict.length, Usable: inDistrict.filter((r) => buckets.usable.includes(r)).length, Held: inDistrict.filter((r) => buckets.held.includes(r) || buckets.phoneResolutionExceptions.includes(r)).length, "Hard Rejects": inDistrict.filter((r) => buckets.hardRejects.includes(r)).length };
   });
   addSheet(combinedWb, "District Summary", districtSummaryRows);
 
@@ -262,7 +268,7 @@ async function main() {
   addSheet(repWb, "Usable", rowsFor(buckets.usable));
   addSheet(repWb, "Premium", rowsFor(buckets.premium));
   addSheet(repWb, "Releasable Level 1", rowsFor(buckets.releasableL1));
-  addSheet(repWb, "Held-Review", rowsFor(buckets.held));
+  addSheet(repWb, "Held-Review", rowsFor([...buckets.held, ...buckets.phoneResolutionExceptions]));
   addSheet(repWb, "Key Accounts", rowsFor(buckets.keyAccounts));
   addSheet(repWb, "District Summaries", districtSummaryRows);
   addSheet(repWb, "Evidence References", evidenceRegisterRows, evidenceRegisterColumns);
@@ -273,7 +279,7 @@ async function main() {
 
   console.log(`\nCombined workbook: ${combinedPath}`);
   console.log(`Representative workbook: ${repPath}`);
-  console.log(`Usable: ${buckets.usable.length} (${buckets.premium.length} premium, ${buckets.releasableL1.length} releasable-L1, ${buckets.keyAccounts.length} key accounts). Held: ${buckets.held.length}. Hard-rejected: ${buckets.hardRejects.length}. Customer master exclusions: ${buckets.customerMasterExclusions.length}. Excluded groups: ${buckets.excludedGroups.length}. Commercial-review brand exclusions: ${buckets.brandExcluded.length}. Pharmacy/chemist exclusions: ${buckets.pharmacyChemistExcluded.length}.`);
+  console.log(`Usable: ${buckets.usable.length} (${buckets.premium.length} premium, ${buckets.releasableL1.length} releasable-L1, ${buckets.keyAccounts.length} key accounts). Held: ${buckets.held.length} (+ ${buckets.phoneResolutionExceptions.length} phone-resolution exceptions). Hard-rejected: ${buckets.hardRejects.length}. Customer master exclusions: ${buckets.customerMasterExclusions.length}. Excluded groups: ${buckets.excludedGroups.length}. Commercial-review brand exclusions: ${buckets.brandExcluded.length}. Pharmacy/chemist exclusions: ${buckets.pharmacyChemistExcluded.length}.`);
   process.exit(0);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

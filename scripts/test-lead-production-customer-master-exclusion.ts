@@ -64,7 +64,7 @@ async function main() {
   console.log("  ✓ (architectural proof) generate-salespro-export.ts computes ordinaryNewLeads/keyAccounts only from `usable` (post-exclusion), AND runs an explicit post-hoc safety check that throws a SAFETY FAILURE if any customerMasterExclusions candidate ID is found in the new-leads set — verified with zero violations against real RM1/UB1 data below");
 
   console.log("\n10. Probable material customer match remains held (never excluded, never released):");
-  const q1 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: true, channelSuitability: mkChannel("both"), stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
+  const q1 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: true, channelSuitability: mkChannel("both"), hasValidPhone: true, stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
   assert(q1.qualificationStatus === "held_for_customer_match_review", `a probable (materialCustomerConflict=true) customer match is held_for_customer_match_review, not qualified or excluded (got "${q1.qualificationStatus}")`);
   const probableMateriality = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1AA", candidateName: "Curry Corner", candidatePhone: null, candidateDomain: null, candidateCompanyNumber: null, matchedCustomer: { postcode: "UB1 1AA", tradingName: "Curry Corner Express Kitchen", phone: null, domain: null, companyNumber: null } });
   assert(probableMateriality.outcomeTier === "probable" || probableMateriality.outcomeTier === "confirmed", `a genuine but moderate name correspondence at the same full postcode is at least "probable" (got "${probableMateriality.outcomeTier}", similarity evidence: ${probableMateriality.reason})`);

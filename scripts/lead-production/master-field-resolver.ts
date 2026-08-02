@@ -52,6 +52,7 @@ const QUALIFICATION_STATUS_MAP: Record<string, string> = {
   qualified: "Qualified", qualified_with_channel_limit: "Qualified with Channel Limit",
   held_for_customer_match_review: "Held for Customer Match Review", hard_rejected: "Hard Rejected",
   customer_master_exclusion: "Customer Master Exclusion",
+  phone_resolution_exception: "Phone Resolution Exception", // locked policy 2026-08-02 — held pending valid-phone recovery, never released
 };
 const LEVEL_MAP: Record<string, string> = { level_0: "Level 0", level_1: "Level 1", level_2: "Level 2", level_3: "Level 3", level_4: "Level 4" };
 

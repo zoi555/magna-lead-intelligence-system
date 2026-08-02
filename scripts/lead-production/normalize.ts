@@ -59,6 +59,20 @@ export function normalisePhone(raw: string | null | undefined): NormalisedPhoneR
   return { comparison: n.valid ? n.e164 : null, e164: n.valid ? n.e164 : null };
 }
 
+// Single source of truth for "is this a valid, releasable UK phone number" (locked policy
+// 2026-08-02: every released ordinary lead and key account requires one). Previously duplicated
+// independently in candidate-dossier.ts and generate-field-provenance.ts, AND — separately —
+// never applied at all to the RAW phone value used for scoring-time channel-suitability
+// eligibility in run-final-scoring-stage-v2.ts (a real order-of-operations gap: a candidate
+// could be scored as telesales-eligible on a malformed number that was only later stripped at
+// export). All phone-validity checks in this pipeline should now call this one function.
+export function isValidUkPhone(raw: string | null | undefined): boolean {
+  if (!raw) return false;
+  if (raw.includes("%")) return false; // catches un-decoded tel: href artifacts, e.g. "+44%2078854%2003976"
+  const digits = raw.replace(/[\s().-]/g, "");
+  return /^(\+44|0)\d{9,10}$/.test(digits);
+}
+
 const ADDRESS_ABBREVIATIONS: Record<string, string> = {
   rd: "road", st: "street", ave: "avenue", av: "avenue", ln: "lane", dr: "drive",
   cl: "close", ct: "court", pl: "place", sq: "square", gdns: "gardens", cres: "crescent",

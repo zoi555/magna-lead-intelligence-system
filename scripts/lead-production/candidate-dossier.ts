@@ -8,6 +8,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { parseCsvObjects } from "./csv";
+import { isValidUkPhone } from "./normalize";
 
 async function readJson(p: string): Promise<any> { return JSON.parse(await fs.readFile(p, "utf8")); }
 async function readCsvRows(p: string): Promise<Record<string, string>[]> { return (await parseCsvObjects(await fs.readFile(p, "utf8"))).rows; }
@@ -17,12 +18,7 @@ export async function findFileEndingWith(dir: string, suffix: string): Promise<s
   return path.join(dir, match);
 }
 
-function isValidPhone(p: string | null | undefined): boolean {
-  if (!p) return false;
-  if (p.includes("%")) return false;
-  const digits = p.replace(/[\s().-]/g, "");
-  return /^(\+44|0)\d{9,10}$/.test(digits);
-}
+const isValidPhone = isValidUkPhone; // local alias — logic now lives in normalize.ts's single shared validator
 
 // Explicit clean pass/fail labels — every hard gate always reads unambiguously as a pass or a
 // failure, never a bare gate name that could be misread as a positive claim.

@@ -8,7 +8,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { spawnSync } from "node:child_process";
-import { normaliseName, nameSimilarity } from "./lead-production/normalize";
+import { normaliseName, nameSimilarity, isValidUkPhone } from "./lead-production/normalize";
 import { decodeHtmlEntities } from "./lead-production/load-customers";
 import { assessCustomerMatchMateriality } from "./lead-production/customer-match-materiality";
 import { classifyQualificationV2 } from "./lead-production/qualification-v2";
@@ -41,6 +41,20 @@ async function main() {
     assert(!norm.split(" ").includes("t") && !norm.split(" ").includes("a"), `"t/a" does not leave behind spurious single-character tokens "t"/"a" (got "${norm}")`);
     const sim = nameSimilarity(norm, normaliseName("Oodles Wok - Southall"));
     assert(sim > 0.3, `"T/A" no longer drags a genuine same-postcode match below the identity floor (got ${sim.toFixed(2)})`);
+  }
+
+  // --- isValidUkPhone() — the single shared validator (2026-08-02), replacing three previously
+  // independently-duplicated copies (candidate-dossier.ts, generate-field-provenance.ts, and the
+  // formerly-unvalidated raw value used in run-final-scoring-stage-v2.ts's eligibility check) ---
+  {
+    assert(isValidUkPhone("020 8813 1010") === true, "a well-formed UK landline number is valid");
+    assert(isValidUkPhone("+44 20 8813 1010") === true, "a well-formed +44 international-format number is valid");
+    assert(isValidUkPhone("07123456789") === true, "a well-formed UK mobile number is valid");
+    assert(isValidUkPhone(null) === false, "null is invalid");
+    assert(isValidUkPhone("") === false, "empty string is invalid");
+    assert(isValidUkPhone("+44%2078854%2003976") === false, "an un-decoded tel: href artifact (containing '%') is invalid");
+    assert(isValidUkPhone("12345") === false, "too short to be a real UK number is invalid");
+    assert(isValidUkPhone("+65 4566 743") === false, "a non-UK international number is invalid");
   }
 
   // --- decodeHtmlEntities() ---
@@ -78,26 +92,38 @@ async function main() {
 
   // --- qualification-v2.ts ---
   {
-    const q1 = classifyQualificationV2({ hardGates: mkGates({ allPassed: false, failedGates: ["genuine_physical_premises"] }), materialCustomerConflict: false, channelSuitability: mkChannel("both"), stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
+    const q1 = classifyQualificationV2({ hardGates: mkGates({ allPassed: false, failedGates: ["genuine_physical_premises"] }), materialCustomerConflict: false, channelSuitability: mkChannel("both"), hasValidPhone: true, stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
     assert(q1.qualificationStatus === "hard_rejected", "a hard-gate failure is always hard_rejected regardless of channel/conflict");
 
-    const q2 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: true, channelSuitability: mkChannel("both"), stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
+    const q2 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: true, channelSuitability: mkChannel("both"), hasValidPhone: true, stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
     assert(q2.qualificationStatus === "held_for_customer_match_review", "a material (probable-tier) customer conflict overrides an otherwise-passing candidate");
 
-    const q3 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: false, channelSuitability: mkChannel("neither"), stagesWithDecisiveEvidence: 1, totalStagesConsidered: 4 });
+    const q3 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: false, channelSuitability: mkChannel("neither"), hasValidPhone: false, stagesWithDecisiveEvidence: 1, totalStagesConsidered: 4 });
     assert(q3.qualificationStatus === "hard_rejected" && q3.channelEligibility === "neither", "passing every hard gate but having no usable channel is not releasable");
 
-    const q4 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: false, channelSuitability: mkChannel("both"), stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
-    assert(q4.qualificationStatus === "qualified", "passing every hard gate, no conflict, both channels usable -> qualified");
+    const q4 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: false, channelSuitability: mkChannel("both"), hasValidPhone: true, stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
+    assert(q4.qualificationStatus === "qualified", "passing every hard gate, no conflict, both channels usable, valid phone -> qualified");
 
-    const q5 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: false, channelSuitability: mkChannel("telesales_only"), stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
+    const q5 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: false, channelSuitability: mkChannel("telesales_only"), hasValidPhone: true, stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
     assert(q5.qualificationStatus === "qualified_with_channel_limit" && q5.channelEligibility === "telesales_only", "usable via only one channel -> qualified_with_channel_limit, not qualified");
 
     // Section 4's core requirement: qualification never depends on stagesWithDecisiveEvidence
     // (a proxy for score/completeness) once hard gates + conflict + channel all check out.
-    const qLow = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: false, channelSuitability: mkChannel("both"), stagesWithDecisiveEvidence: 0, totalStagesConsidered: 4 });
+    const qLow = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: false, channelSuitability: mkChannel("both"), hasValidPhone: true, stagesWithDecisiveEvidence: 0, totalStagesConsidered: 4 });
     assert(qLow.qualificationStatus === "qualified", "low enrichment completeness alone does not block qualification — only affects the completeness band");
     assert(qLow.enrichmentCompletenessBand === "minimal", "enrichment completeness band is still reported (informational, not gating)");
+
+    // Locked policy 2026-08-02: mandatory valid phone, checked independently of channel type —
+    // a candidate with a perfectly good field-sales (or even "both") channel but no VALID phone
+    // must become phone_resolution_exception, not qualified/qualified_with_channel_limit.
+    const q6 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: false, channelSuitability: mkChannel("field_sales_only"), hasValidPhone: false, stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
+    assert(q6.qualificationStatus === "phone_resolution_exception", "field_sales_only with no valid phone -> phone_resolution_exception, NOT qualified_with_channel_limit (a field-sales lead still requires a valid phone under the locked policy)");
+
+    const q7 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: false, channelSuitability: mkChannel("both"), hasValidPhone: false, stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
+    assert(q7.qualificationStatus === "phone_resolution_exception", "channel suitability \"both\" (which implies SOME phone signal triggered telesales eligibility upstream) but the FINAL validated phone is false -> still phone_resolution_exception, never silently released as qualified");
+
+    const q8 = classifyQualificationV2({ hardGates: mkGates(), materialCustomerConflict: false, channelSuitability: mkChannel("telesales_only"), hasValidPhone: true, stagesWithDecisiveEvidence: 4, totalStagesConsidered: 4 });
+    assert(q8.qualificationStatus === "qualified_with_channel_limit", "telesales_only WITH a valid phone still qualifies normally — the new check only blocks the invalid-phone case, never a genuinely valid one");
   }
 
   // --- deriveGoogleOutcome() (the extracted decision function used for zero-new-call reprocessing) ---

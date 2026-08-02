@@ -17,6 +17,7 @@ export function assignFinalOutcome(
   scoring: ScoringResult | null,
   channelSuitability: ChannelSuitabilityResult | null,
   hasUnresolvedCustomerConflict: boolean,
+  hasValidPhone: boolean = true, // defaults true so existing v1 callers (which never validated phone here) are unaffected — only run-final-scoring-stage-v2.ts passes this explicitly
 ): FinalOutcomeResult {
   const reasonTags: RejectionReasonTag[] = [];
 
@@ -42,6 +43,15 @@ export function assignFinalOutcome(
   if (channelSuitability && channelSuitability.suitability === "neither") {
     reasonTags.push("channel_rejection");
     return { candidateId, level: "level_2", levelReason: `Passed all hard gates but has no usable telesales or field-sales channel (no phone, no verified/probable premises with coordinates) — score ${scoring.totalScore}/${scoring.maxPossibleScore}.`, reasonTags, hardGates, scoring, channelSuitability };
+  }
+
+  if (!hasValidPhone) {
+    // Locked policy (2026-08-02): mirrors qualification-v2.ts's phone_resolution_exception —
+    // kept consistent with the same "held for controlled review, not scored to Level 0/1"
+    // treatment already used for hasUnresolvedCustomerConflict above, so Level and
+    // qualification_status never disagree about whether this candidate is really releasable.
+    reasonTags.push("channel_rejection");
+    return { candidateId, level: "level_3", levelReason: `Passed all hard gates and has a usable channel by the old definition, but no valid UK phone number was resolved — every released lead requires one. Held for phone-resolution review rather than scored to Level 0/1 (score ${scoring.totalScore}/${scoring.maxPossibleScore}).`, reasonTags, hardGates, scoring, channelSuitability };
   }
 
   if (scoring.totalScore >= LEVEL_0_MIN_SCORE) {
