@@ -122,3 +122,22 @@ export function findRepresentativeForDistrict(config: SalesTerritoriesV2Config, 
 export function findRepresentative(config: SalesTerritoriesV2Config, name: string): TerritoryRepresentative | null {
   return config.representatives.find((r) => r.representative.toLowerCase() === name.toLowerCase()) ?? null;
 }
+
+// Locked policy (2026-08-02): "Unlisted postcode districts are excluded... Unknown or
+// unassigned districts fail closed." A district with valid AREA+number FORMAT but that is not
+// actually assigned to any representative in the live config must never be silently treated as
+// "no owner, proceed anyway" — it must throw, so a candidate can never be released under a
+// district this config doesn't recognise. This is the release-time counterpart to
+// findRepresentativeForDistrict()'s soft lookup above (which returns null and is otherwise dead
+// code in the production path — kept for the test suite and this new caller).
+export class UnconfiguredDistrictError extends TerritoryAssignmentValidationError {}
+
+export function assertDistrictIsConfigured(config: SalesTerritoriesV2Config, district: string): TerritoryRepresentative {
+  const rep = findRepresentativeForDistrict(config, district);
+  if (!rep) {
+    throw new UnconfiguredDistrictError(
+      `Postcode District "${district.toUpperCase()}" is not assigned to any representative in ${config.assignmentVersion} — failing closed rather than releasing an unassigned-territory candidate. Add it to a representative's postcodeDistricts (and re-validate) before this district can produce released leads.`,
+    );
+  }
+  return rep;
+}

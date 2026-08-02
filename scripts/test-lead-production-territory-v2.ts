@@ -18,6 +18,7 @@ import { spawnSync } from "node:child_process";
 import {
   loadSalesTerritoriesV2, validateSalesTerritoriesV2, expandPostcodeDistrictRange,
   findRepresentativeForDistrict, findRepresentative, TerritoryAssignmentValidationError,
+  assertDistrictIsConfigured, UnconfiguredDistrictError,
   type SalesTerritoriesV2Config,
 } from "./lead-production/territory-assignment-v2";
 import { dedupeAcrossDistricts, checkDistrictInvariant, deriveTerritoryStatus, type DistrictCandidateForDedup } from "./lead-production/district-reconciliation";
@@ -211,6 +212,16 @@ async function main() {
   assert(deriveTerritoryStatus([{ district: "RM1", status: "held_for_source_failure", invariantBalanced: true, hasLevel1Releasable: false }, { district: "RM2", status: "held_for_data_quality", invariantBalanced: true, hasLevel1Releasable: false }]).status === "held_for_source_failure", "source failure takes precedence over data-quality hold");
   assert(deriveTerritoryStatus([{ district: "RM1", status: "complete", invariantBalanced: true, hasLevel1Releasable: true }]).status === "accepted_with_level_1_review", "all complete + a releasable Level 1 present -> accepted_with_level_1_review");
   assert(deriveTerritoryStatus([{ district: "RM1", status: "complete", invariantBalanced: true, hasLevel1Releasable: false }]).status === "accepted_for_release", "all complete, balanced, no Level 1 pending -> accepted_for_release");
+
+  console.log("\nUnconfigured-district fail-closed behaviour (locked policy 2026-08-02):");
+  const knownReal = assertDistrictIsConfigured(config, "RM1");
+  assert(knownReal.representative === "Nauman", `a configured district ("RM1") resolves and returns its real owner (got "${knownReal.representative}")`);
+  let threwForUnconfigured = false;
+  try { assertDistrictIsConfigured(config, "ZZ99"); } catch (e) { threwForUnconfigured = e instanceof UnconfiguredDistrictError; }
+  assert(threwForUnconfigured, "a syntactically-valid but unassigned district (\"ZZ99\") throws UnconfiguredDistrictError rather than silently proceeding");
+  let threwForCM1 = false;
+  try { assertDistrictIsConfigured(config, "CM1"); } catch (e) { threwForCM1 = e instanceof UnconfiguredDistrictError; }
+  assert(threwForCM1, "CM1 (not in the current 111-district config) throws rather than silently passing — must be added to sales-territories-v2.json before the pilot can process it");
 
   console.log("\nEnd-to-end smoke test: run-sales-territory.ts --request-plan-only for Hassan (EN1-EN5, 5 districts, zero live calls):");
   const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "sales-territory-smoke-"));
