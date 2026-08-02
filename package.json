@@ -67,6 +67,7 @@
     "test:lead-production-salespro-export": "tsx scripts/test-lead-production-salespro-export.ts",
     "test:lead-production-customer-master-exclusion": "tsx scripts/test-lead-production-customer-master-exclusion.ts",
     "test:lead-production-commercial-review": "tsx scripts/test-lead-production-commercial-review.ts",
+    "test:lead-production-business-category": "tsx scripts/test-lead-production-business-category.ts",
     "test:lead-production-simplified-workbook": "tsx scripts/test-lead-production-simplified-workbook.ts",
     "test:lead-production-cto-with-address": "tsx scripts/test-lead-production-cto-with-address.ts",
     "test:apify-provenance": "tsx scripts/test-apify-provenance.ts",
