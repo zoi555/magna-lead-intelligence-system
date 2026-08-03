@@ -66,6 +66,7 @@
     "test:lead-production-master-field-resolver": "tsx scripts/test-lead-production-master-field-resolver.ts",
     "test:lead-production-campaign-master-combined": "tsx scripts/test-lead-production-campaign-master-combined.ts",
     "test:lead-production-cto-final-review": "tsx scripts/test-lead-production-cto-final-review.ts",
+    "test:lead-production-owner-review-pack": "tsx scripts/test-lead-production-owner-review-pack.ts",
     "lead-production:salespro-export": "tsx scripts/lead-production/generate-salespro-export.ts",
     "test:lead-production-salespro-export": "tsx scripts/test-lead-production-salespro-export.ts",
     "test:lead-production-customer-master-exclusion": "tsx scripts/test-lead-production-customer-master-exclusion.ts",
