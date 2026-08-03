@@ -1140,3 +1140,75 @@ probable/review cases (2 previously known + 7 new). `npm run typecheck`/`build` 
 `/Users/homemac/Data/aspectlead-lead-production/input/customer-masters/2026-08-03/` (versioned
 authoritative customer-master package), `docs/11_ISSUES_LOG.md` (ISS-0034 follow-up),
 `VERIFY_BEFORE_CLAIMING.md` (2026-08-03 follow-up entry).
+
+## 2026-08-04 — probable matches were never actually removed from releasable outputs; a confirmed match sat in Held-Review instead of Customer Master Exclusions; entity-resolution configuration audit
+
+**BUG 9 (critical, self-discovered):** `verify-customer-leakage.ts`'s PROBABLE tier was report-only
+— it never removed a probable-matched lead from "Operationally Usable Leads" (or its Premium Level
+0/Releasable Level 1/Key Accounts overlay subsets). Direct XLSX inspection proved all 5
+probable-matched leads from the prior pass were still present in the releasable population.
+**FIX:** new `scripts/lead-production/hold-probable-customer-matches.ts` moves every probable
+match into Held-Review and strips it from the overlay sheets. Run against the real combined
+workbook: Usable 175 → 170, Held-Review 61 → 66.
+
+**BUG 10:** the UK phone comparison path (`normalisePhone`/`normaliseUkPhone`, used for ALL
+customer matching) did not handle multiple phone numbers concatenated in one cell — unlike the
+separate `resolveValidUkPhone()` used for candidate-phone export. Confirmed on 17 real "Office
+Phone" cells in the authoritative customer master (e.g. "2045121102/Adnan- 07564235791").
+**FIX:** new `extractAllUkPhoneComparisons()` in `normalize.ts` regex-extracts every embedded UK
+number and normalises each independently; wired into `verify-customer-leakage.ts`'s customer
+index. No new matches surfaced in the current population, but the phone index is now complete.
+
+**BUG 11:** every exact-postcode candidate with only weak name correspondence was silently
+dropped (`continue`, no record at all) rather than being logged as an explicitly-resolved "cleared"
+candidate — violating the owner's "postcode must be a mandatory trigger, never silently
+unresolved" rule, even though it never affected a real release decision. **FIX:** the per-pair
+evaluation logic was extracted into a single shared `evaluateLeadCustomerPair()` (used by both the
+unchanged release-decision path and a new audit-only `traceLeadCandidates()`), and the silent
+`continue` was replaced with an explicit `tier: "clear"` result that the audit trail can report.
+Zero behavioural change to the release path — all 30 then-existing `test:lead-production-*` suites
+re-ran green immediately after the refactor, before any other change was made.
+
+**BUG 12 (critical, self-discovered via the new entity-resolution candidate trace):** lead
+IG1-202F5195 ("Monster Burger") independently resolves CONFIRMED (exact trading-name alias +
+exact postcode IG1 4NF against inactive customer F362, "Food Villa Ltd T/A Monster Burger
+(Closed)") but was sitting in Held-Review, not Customer Master Exclusions — held there by an
+earlier, unrelated pipeline stage's own generic "business-name-overlap conflict" flag, from before
+this session's alias+postcode confirmation rule existed. Never release-blocking (Held-Review is
+not a releasable sheet), but a real categorisation defect the owner's reconciliation rules require
+to be caught. **FIX:** new `scripts/lead-production/exclude-confirmed-customer-matches.ts` scans
+BOTH Usable and Held-Review (never assumes a sheet's placement is already correct) and moves any
+CONFIRMED-tier lead into Customer Master Exclusions. Run against the real workbook: Held-Review
+66 → 65, Customer Master Exclusions 19 → 20; Usable unchanged at 170.
+
+**Entity-resolution configuration audit:** built a 20-case hand-labelled calibration set
+(`scripts/lead-production/run-entity-resolution-calibration.ts` + versioned CSV under
+`/Users/homemac/Data/aspectlead-lead-production/input/customer-masters/2026-08-03/`) covering
+every real pilot leak/probable case, 5 real true-negatives, and 8 synthetic engineered cases
+(active/inactive customer controls, minor spelling difference, legal-name-only match, duplicate
+NetSuite accounts). Result: 100% precision/recall on CONFIRMED decisions, 0 false
+positives/negatives — explicitly caveated as a small hand-curated set, not a statistically powered
+sample. New `scripts/lead-production/generate-entity-resolution-audit.ts` adds 9 sheets to
+`campaign-002-existing-customer-leakage-audit.xlsx` (Entity Resolution Configuration, Phone/
+Postcode/Address/Fuzzy-Name Trigger Candidates, Calibration Results, False Positive/Negative
+Controls, Customer Match Reconciliation, Confirmed & Probable Detail) and regenerates the
+zero-leakage certificate with the new documentation fields.
+
+**Final reconciliation (by distinct lead, highest tier wins, across the full Usable + Held-Review
++ Customer Master Exclusions population, 255 leads independently re-checked):** 20 confirmed found
+and removed (0 remaining anywhere releasable), 7 probable held (0 remaining anywhere releasable),
+170 cleared, 170 final released.
+
+**Verification:** all 31 `test:lead-production-*` suites (2 new this pass) individually re-run,
+ALL PASSED; `npm run typecheck`/`build` clean.
+
+**See also:** `scripts/lead-production/hold-probable-customer-matches.ts`,
+`scripts/lead-production/exclude-confirmed-customer-matches.ts`,
+`scripts/lead-production/generate-entity-resolution-audit.ts`,
+`scripts/lead-production/run-entity-resolution-calibration.ts`,
+`scripts/lead-production/verify-customer-leakage.ts`,
+`scripts/test-lead-production-hold-probable-matches.ts`,
+`scripts/test-lead-production-exclude-confirmed-matches.ts`,
+`scripts/test-lead-production-entity-resolution-calibration.ts`,
+`docs/11_ISSUES_LOG.md` (ISS-0034 follow-up), `docs/09_DECISIONS.md`,
+`VERIFY_BEFORE_CLAIMING.md` (2026-08-04 entry).

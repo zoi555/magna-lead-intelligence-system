@@ -528,3 +528,52 @@ cap, Notes rewrite, Lead Urgency recalibration, cross-representative combined Ma
   that decision is reserved for the owner. Two older customer-master files
   (`magna-customers-master.csv`, `magna-customers.csv`) remain on disk, archived but not deleted,
   and must not be assumed current for any future campaign without checking the checksum first.
+
+## 2026-08-04 — entity-resolution configuration audit; reconciliation-count contradiction resolved; probable-hold enforcement gap and one confirmed-but-misplaced match found and fixed
+
+- Claim: the customer-suppression system now enforces, not merely reports, its own tier decisions,
+  and produces one unambiguous reconciliation table across the full candidate population.
+- Evidence: found and fixed 3 real defects, none discovered by assumption — all by direct
+  inspection/re-derivation. (1) Probable-tier matches were report-only; direct XLSX inspection
+  proved 5 probable leads were still present in "Operationally Usable Leads" — fixed with
+  `hold-probable-customer-matches.ts`, run against the real workbook (Usable 175 → 170,
+  Held-Review 61 → 66). (2) Exact-postcode candidates with weak name correspondence were silently
+  dropped with no audit record — fixed by extracting a single shared `evaluateLeadCustomerPair()`
+  function used by both the release-decision path and a new audit-only candidate trace; zero
+  behavioural change confirmed by re-running all 30 then-existing `test:lead-production-*` suites
+  immediately after the refactor, before any further change. (3) A genuinely CONFIRMED match
+  (IG1-202F5195 "Monster Burger" — exact trading-name alias + exact postcode against inactive
+  customer F362) was found sitting in Held-Review rather than Customer Master Exclusions, held
+  there by an earlier unrelated pipeline stage's own flag — fixed with
+  `exclude-confirmed-customer-matches.ts`, which scans BOTH Usable and Held-Review rather than
+  trusting either sheet's placement. Run against the real workbook: Held-Review 66 → 65, Customer
+  Master Exclusions 19 → 20 (Usable unchanged at 170, so CTO/Sales Pro exports required no
+  regeneration).
+- Reconciliation (by distinct lead, highest tier wins, 255-lead full Usable + Held-Review +
+  Customer Master Exclusions population, independently re-checked, never trusted from any sheet's
+  existing placement): 20 confirmed found and removed, 0 remaining anywhere releasable; 7 probable
+  held, 0 remaining anywhere releasable; 170 cleared; 170 final released. Full per-lead detail
+  (Lead ID/district/rep/trading name/matched customer/account code/evidence/decision/current
+  location/presence in Master+CTO+SalesPro) in the new "Confirmed & Probable Detail" sheet.
+- Entity-resolution calibration: 20 hand-labelled cases (7 real pilot cases, 5 real
+  true-negatives, 8 synthetic engineered cases), run through the SAME production verification
+  function used for real releases — 100% precision/recall on CONFIRMED decisions, 0 false
+  positives/negatives. Explicitly NOT claimed as a statistically powered result — see the
+  printed/recorded caveat on every calibration output.
+- `npm run typecheck`/`build` clean; all 31 `test:lead-production-*` suites (2 new this pass)
+  individually re-run, ALL PASSED.
+- Files: `scripts/lead-production/hold-probable-customer-matches.ts`,
+  `scripts/lead-production/exclude-confirmed-customer-matches.ts`,
+  `scripts/lead-production/generate-entity-resolution-audit.ts`,
+  `scripts/lead-production/run-entity-resolution-calibration.ts`,
+  `scripts/lead-production/verify-customer-leakage.ts`,
+  `scripts/lead-production/normalize.ts` (multi-number phone-cell extraction),
+  `scripts/test-lead-production-hold-probable-matches.ts`,
+  `scripts/test-lead-production-exclude-confirmed-matches.ts`,
+  `scripts/test-lead-production-entity-resolution-calibration.ts`. Not pushed.
+- Remaining risk: the owner-review pack's OWN regeneration for this specific correction pass was
+  NOT re-run in this turn — its Held-Review/Customer Master Exclusions row counts are one pass
+  stale (66/19 vs the corrected 65/20); the Usable/CTO/Sales Pro population itself is unaffected
+  and unchanged at 170. 7 probable/held cases still require a human decision (unchanged from the
+  2026-08-03 entry, minus the one now-confirmed "Monster Burger" case). The permanent live
+  customer-master pointer remains `pending_owner_review`, not switched by this session.

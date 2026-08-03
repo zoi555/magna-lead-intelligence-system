@@ -1473,3 +1473,48 @@ held probable cases. Owner-review workbook regenerated — no longer outstanding
 
 **Next action:** owner reviews the 9 probable/held cases and approves (or rejects)
 `CustomersProjects81.csv` as the permanent live customer-master snapshot before any push.
+
+## Current state — 2026-08-04 (entity-resolution configuration audit; reconciliation-count contradiction resolved)
+
+The owner flagged an apparent contradiction in the 2026-08-03 reporting ("2 confirmed leaks" vs
+"0 confirmed, 9 probable... the 2 above" silently reusing "2" for a different pair) and required a
+single unambiguous reconciliation table plus a full entity-resolution configuration/calibration
+audit. Resolved the ambiguity: "2 confirmed leaks" = Al Qasr Restaurant + Munchies Peri Peri
+(board-caught, 2026-08-03); "the 2 above" = Franzos - Ilford + Chocoberry - Ilford, a wholly
+different, PROBABLE-tier pair — imprecise pronoun reuse in the prior report, now disambiguated.
+
+While building the required reconciliation (counted by distinct lead, full 255-lead Usable +
+Held-Review + Customer Master Exclusions population, independently re-derived rather than trusted
+from any sheet's placement), found and fixed 3 further real defects: (1) probable matches were
+report-only and never actually removed from the releasable population — fixed with
+`hold-probable-customer-matches.ts` (Usable 175 → 170); (2) exact-postcode candidates with weak
+name correspondence were silently dropped with no audit record — fixed by extracting a shared
+per-pair evaluation function, zero behavioural change to release decisions; (3) a genuinely
+CONFIRMED match ("Monster Burger", IG1-202F5195) was sitting in Held-Review, not Customer Master
+Exclusions, held there by an earlier unrelated pipeline flag — fixed with
+`exclude-confirmed-customer-matches.ts` (Held-Review 66 → 65, Customer Master Exclusions 19 → 20).
+
+Built a 20-case hand-labelled entity-resolution calibration set run through the production
+verifier itself: 100% precision/recall on confirmed decisions, 0 false positives/negatives
+(explicitly not claimed as statistically powered). Added 9 sheets to the leakage-audit workbook
+(now 18 sheets total) documenting every matching algorithm's actual implementation, every
+phone/postcode/address/fuzzy-name trigger candidate considered, calibration results, and the final
+reconciliation. Regenerated the zero-leakage certificate with the new documentation fields.
+
+**Final reconciliation:** 20 confirmed found and removed (0 remaining anywhere releasable), 7
+probable held (0 remaining anywhere releasable), 170 cleared, 170 final released.
+
+`npm run typecheck`/`build` clean; all 31 `test:lead-production-*` suites (2 new this pass)
+individually re-run, ALL PASSED.
+
+**Commit:** `a21e3de` (code/tests/config only), on top of `42d8eb7`/`fa97306`/`49c03d6`. Not
+pushed.
+
+**Outstanding:** the owner-review pack's OWN regeneration for this correction pass was not re-run
+(its Held-Review/Customer Master Exclusions row counts are one pass stale — 66/19 vs the corrected
+65/20; Usable/CTO/Sales Pro are unaffected, unchanged at 170). 7 probable/held cases still require
+a human decision. The permanent live customer-master pointer remains `pending_owner_review`.
+
+**Next action:** owner reviews the reconciliation table, the entity-resolution configuration audit,
+and the 7 remaining probable/held cases; approves (or rejects) `CustomersProjects81.csv` as the
+permanent live customer-master snapshot before any push.

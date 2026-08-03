@@ -985,9 +985,11 @@ Nauman RM1 leads). Full detail: `docs/09_DECISIONS.md` (2026-08-03 entry).
 Date: 2026-08-03
 Severity: **Critical — real existing customers were released as "new leads" to representatives.**
 Owner: Zoeb (escalated from a board review)
-Status: **Resolved 2026-08-03.** 2 real confirmed leaks found and fixed; independent verifier
-proves 0 confirmed leaks in the corrected 175-lead released population. Full technical detail:
-`docs/10_BUGS_AND_FIXES.md` (2026-08-03 entry).
+Status: **Resolved 2026-08-04 (entity-resolution configuration audit).** Full reconciliation as of
+2026-08-04: 20 confirmed customer matches found and removed, 0 remaining anywhere releasable; 7
+probable matches held, 0 remaining anywhere releasable; 170 leads cleared and released. See the
+2026-08-04 update below for the full reconciliation and 2 further defects found/fixed. Full
+technical detail: `docs/10_BUGS_AND_FIXES.md` (2026-08-03 and 2026-08-04 entries).
 
 ### Problem
 
@@ -1079,3 +1081,60 @@ correctly-held probable/review cases. The owner-review workbook (previously flag
 above) was regenerated in this same pass — no longer outstanding. Full detail:
 `docs/10_BUGS_AND_FIXES.md`, `VERIFY_BEFORE_CLAIMING.md` (2026-08-03 follow-up entries). Certificate:
 `/Users/homemac/Downloads/campaign-002-zero-customer-leakage-certificate.json`.
+
+### Update (2026-08-04) — reconciliation-count contradiction resolved; entity-resolution configuration audit; 3 further defects found and fixed
+
+The owner flagged an apparent contradiction in the 2026-08-03 reporting: "2 confirmed leaks" (Al
+Qasr, Munchies) was reported separately from "0 confirmed, 9 probable... the 2 above" — the second
+"2" silently referred to a DIFFERENT pair (Franzos - Ilford, Chocoberry - Ilford) without ever
+disambiguating the reuse of "2". Resolved by producing one reconciliation table, counted by
+distinct lead (not by lead-customer candidate pair — a single lead can genuinely match several
+customer records, e.g. real case "Morley's Downham" matches 14 separate NetSuite accounts) across
+the FULL population every candidate ever passed through (Usable + Held-Review + Customer Master
+Exclusions, 255 leads), independently re-derived rather than trusted from any sheet's placement.
+
+**3 further real defects found and fixed** (full technical detail in
+`docs/10_BUGS_AND_FIXES.md`'s 2026-08-04 entry):
+- Probable matches were report-only and never actually removed from the releasable population
+  (5 probable leads still present in "Operationally Usable Leads" at the time of the 2026-08-03
+  report) — fixed with `hold-probable-customer-matches.ts`.
+- Exact-postcode candidates with weak name correspondence were silently dropped with no record at
+  all, rather than an explicitly-resolved "cleared" candidate — violating the "postcode is a
+  mandatory trigger, never silently unresolved" rule (never release-blocking, but an audit-trail
+  gap) — fixed by extracting a shared per-pair evaluation function, zero behavioural change to the
+  release decision (all 30 then-existing test suites re-ran green immediately after the refactor).
+- A genuinely CONFIRMED customer match (IG1-202F5195, "Monster Burger" — exact trading-name alias
+  + exact postcode against inactive customer F362) was sitting in Held-Review, not Customer Master
+  Exclusions, held there by an earlier unrelated pipeline stage's own "business-name-overlap"
+  flag from before this session's alias+postcode confirmation rule existed. Never
+  release-blocking, but a real categorisation defect — fixed with
+  `exclude-confirmed-customer-matches.ts`, which scans BOTH Usable and Held-Review rather than
+  trusting either sheet's placement.
+
+**Entity-resolution configuration audit:** documented every matching algorithm's actual
+implementation (source file, function, normalisation rules, thresholds — see the new "Entity
+Resolution Configuration" sheet) and built a 20-case hand-labelled calibration set (7 real pilot
+cases, 5 real true-negatives, 8 synthetic engineered cases) achieving 100% precision/recall on
+CONFIRMED decisions, 0 false positives/negatives — explicitly caveated as a small hand-curated set,
+not a statistically powered sample.
+
+**Final reconciliation (distinct leads, highest tier wins, 255-lead full population
+independently re-checked):**
+1. Confirmed found: 20
+2. Confirmed removed: 20
+3. Confirmed remaining in any releasable output: 0
+4. Probable held: 7
+5. Probable remaining in any releasable output: 0
+6. Cleared leads: 170
+7. Final released leads: 170
+
+The leakage-audit workbook now has 18 sheets (9 new this pass: Entity Resolution Configuration,
+Phone/Postcode/Address/Fuzzy-Name Trigger Candidates, Calibration Results, False Positive/Negative
+Controls, Customer Match Reconciliation, Confirmed & Probable Detail). Certificate regenerated
+with the new documentation fields (trigger rules, algorithm/threshold summary, calibration
+results, `zeroConfirmedOrProbableRemaining: true`). All 31 `test:lead-production-*` suites
+individually re-run, ALL PASSED; `npm run typecheck`/`build` clean. The owner-review pack's OWN
+regeneration for this specific correction pass was NOT re-run in this turn (Held-Review/Customer
+Master Exclusions row counts in that workbook are one pass stale — 66/19 vs the corrected 65/20;
+the Usable/CTO/Sales Pro population itself is unaffected, unchanged at 170) — flagged so it isn't
+silently assumed current.

@@ -1153,3 +1153,50 @@ stopped per explicit instruction. Full detail: `docs/10_BUGS_AND_FIXES.md`,
    in ISS-0034 rather than silently left stale.
 10. Committed the fix (commit `fa97306`, code/tests/config only) but did NOT push — the explicit
     instruction required owner review of the leakage audit before any push.
+
+## 2026-08-04 — entity-resolution configuration audit; reconciliation-count contradiction resolved
+
+1. Resolved an apparent contradiction the owner flagged in the 2026-08-03 report: "2 confirmed
+   leaks" (Al Qasr, Munchies — board-caught) had been reported separately from "0 confirmed, 9
+   probable... the 2 above", where "the 2" silently referred to a DIFFERENT pair (Franzos -
+   Ilford, Chocoberry - Ilford, a probable-tier pair) — imprecise pronoun reuse, not a data error.
+   Disambiguated explicitly and produced one reconciliation table.
+2. Counted the reconciliation by DISTINCT LEAD (highest tier wins across all that lead's
+   candidate matches), not by raw lead-customer candidate pair — a single lead can genuinely match
+   several customer records (real case: "Morley's Downham" matches 14 separate NetSuite accounts),
+   and pair-counting would have reproduced the same kind of ambiguous count already flagged.
+3. Traced the FULL candidate population — Operationally Usable Leads + Held-Review + Customer
+   Master Exclusions, 255 leads — independently re-derived, never trusted from any sheet's
+   existing placement.
+4. Found and fixed 3 real defects while building the trace: probable matches were report-only and
+   never actually removed from the releasable population (fixed with
+   `hold-probable-customer-matches.ts`, Usable 175 → 170); exact-postcode candidates with weak
+   name correspondence were silently dropped with no audit record (fixed by extracting a shared
+   `evaluateLeadCustomerPair()` used by both the release-decision path and a new audit-only
+   candidate trace, zero behavioural change verified by re-running all 30 then-existing test
+   suites immediately after the refactor); a genuinely CONFIRMED match ("Monster Burger",
+   IG1-202F5195) was sitting in Held-Review instead of Customer Master Exclusions, held there by
+   an earlier unrelated pipeline flag (fixed with `exclude-confirmed-customer-matches.ts`,
+   Held-Review 66 → 65, Customer Master Exclusions 19 → 20).
+5. Also fixed a real pre-existing gap: the UK phone comparison path used for all customer matching
+   did not handle multiple phone numbers concatenated in one customer-master cell (confirmed on 17
+   real "Office Phone" rows) — added `extractAllUkPhoneComparisons()`.
+6. Built a 20-case hand-labelled entity-resolution calibration set (7 real pilot cases, 5 real
+   true-negatives, 8 synthetic engineered cases) run through the SAME production verification
+   function used for real releases — 100% precision/recall on confirmed decisions, 0 false
+   positives/negatives, explicitly caveated as not a statistically powered sample.
+7. Documented every matching algorithm's actual implementation (source file, function,
+   normalisation rules, thresholds, honest gaps) and added 9 new sheets to the leakage-audit
+   workbook (18 sheets total): Entity Resolution Configuration, Phone/Postcode/Address/Fuzzy-Name
+   Trigger Candidates, Calibration Results, False Positive/Negative Controls, Customer Match
+   Reconciliation, Confirmed & Probable Detail.
+8. Regenerated the zero-leakage certificate with the new documentation fields (trigger rules,
+   algorithm/threshold summary, calibration results, `zeroConfirmedOrProbableRemaining: true`),
+   tied to the exact committed code (`verifierCommitHash: a21e3de...`).
+9. Final reconciliation: 20 confirmed found and removed (0 remaining anywhere releasable), 7
+   probable held (0 remaining anywhere releasable), 170 cleared, 170 final released.
+10. `npm run typecheck`/`build` clean; all 31 `test:lead-production-*` suites (2 new this pass)
+    individually re-run, ALL PASSED.
+11. Committed the fix (commit `a21e3de`, code/tests/config only) but did NOT push — did not
+    approve/switch the permanent live customer-master pointer — did not run new districts or make
+    any live provider calls, per the explicit instructions this pass operated under.

@@ -1294,3 +1294,53 @@ the project's established style (`normalize.ts`'s `SUFFIX_WORDS`) — never a ge
 `scripts/lead-production/match-customers.ts`, `scripts/lead-production/customer-match-
 materiality.ts`, `scripts/test-lead-production-customer-suppression-fix.ts`,
 `scripts/test-lead-production-customer-leakage-verifier.ts`.
+
+## 2026-08-04 (ISS-0034 follow-up) — "no probable/confirmed match may be release-ready" is enforced by two standing hold/exclusion tools, not just reported
+
+**Decision:** a report-only verdict is not enough — `verify-customer-leakage.ts`'s tiers must be
+mechanically enforced. Added two permanent, reusable tools (never one-off patches):
+`scripts/lead-production/hold-probable-customer-matches.ts` moves every PROBABLE-tier lead from
+"Operationally Usable Leads" into "Held-Review" (and strips it from the Premium Level 0/Releasable
+Level 1/Key Accounts overlay subset views, per the established overlay-vs-disjoint sheet
+distinction); `scripts/lead-production/exclude-confirmed-customer-matches.ts` moves every
+CONFIRMED-tier lead found in EITHER Usable OR Held-Review into "Customer Master Exclusions" —
+deliberately checking both sheets rather than trusting a lead's current placement, since a
+confirmed match was found sitting in Held-Review under an earlier, unrelated hold reason.
+
+**Decision:** the per-lead-per-customer comparison logic in `verify-customer-leakage.ts` was
+extracted into one shared `evaluateLeadCustomerPair()` function, used by both the release-decision
+path (`verifyLeadAgainstIndex()`, unchanged contract — only confirmed/probable ever returned) and a
+new audit-only `traceLeadCandidates()` (returns every candidate considered, including ones that
+explicitly resolve "clear"). Rationale: two independently-maintained copies of the same matching
+logic can silently drift apart; a single source of truth cannot. This also closed a real gap where
+an exact-postcode-weak-name candidate was silently dropped with no record at all rather than
+logged as an explicitly-resolved "cleared" candidate — the owner's rule requires phone/postcode to
+be mandatory triggers that are always explicitly resolved, never silently invisible.
+
+**Decision:** reconciliation counts (confirmed/probable/cleared/released) are always reported by
+DISTINCT LEAD, taking the highest tier across all of that lead's candidate matches — never by raw
+lead-customer candidate pair. Rationale: a single lead can genuinely match several customer
+records (real case: "Morley's Downham" matches 14 separate NetSuite accounts for the same
+franchise/duplicate-account business), and counting pairs instead of leads would overstate the
+true affected-lead count and reproduce the exact kind of ambiguous count the owner already flagged
+as a contradiction in the 2026-08-03 report.
+
+**Decision:** a hand-curated 20-case calibration set is checked into
+`/Users/homemac/Data/aspectlead-lead-production/input/customer-masters/2026-08-03/` and run
+through the SAME production verification function used for real releases
+(`run-entity-resolution-calibration.ts`) — never a separate/parallel scoring implementation.
+Explicitly documented as NOT a statistically powered sample; precision/recall figures describe
+behaviour on this labelled set only.
+
+**Verification:** see `docs/10_BUGS_AND_FIXES.md` and `docs/11_ISSUES_LOG.md` (ISS-0034,
+2026-08-04 entries) for full technical detail, the final reconciliation table, and the one real
+newly-discovered defect (a confirmed match sitting in Held-Review) this pass found and fixed.
+
+**See also:** `scripts/lead-production/hold-probable-customer-matches.ts`,
+`scripts/lead-production/exclude-confirmed-customer-matches.ts`,
+`scripts/lead-production/generate-entity-resolution-audit.ts`,
+`scripts/lead-production/run-entity-resolution-calibration.ts`,
+`scripts/lead-production/verify-customer-leakage.ts`,
+`scripts/test-lead-production-hold-probable-matches.ts`,
+`scripts/test-lead-production-exclude-confirmed-matches.ts`,
+`scripts/test-lead-production-entity-resolution-calibration.ts`.
