@@ -353,3 +353,84 @@ No assistant, developer, or unfortunate human may claim the project works withou
   report turnover), so those two specific sub-fields remain functionally untested against a
   genuinely populated real example — the code path is correct, but no real candidate in the
   fixture data exercises it.
+
+### 2026-08-03 — five-district-pilot owner-review corrections: brand registry, CTO Business Type
+cap, Notes rewrite, Lead Urgency recalibration, cross-representative combined Master + CTO file
+
+- Change tested: (1) `commercial-review-filter.ts` trademark-symbol brand matching fix (Chaiiwala®
+  now matches) + Black Sheep Coffee added to the exclude registry (owner correction, resolving a
+  duplicate-brand conflict with a stale "Keep" entry from the original 141-brand review). (2)
+  `cto-business-type-mapping.ts` Tier-1 cuisine loop was missing the `selected.length < 3` cap
+  that Tier 2 already had — fixed, capped at 3 total values on every tier. (3) Note 1/Note 2
+  generation rewritten to the owner's detailed spec (Note 1 = people/ownership only; Note 2 =
+  business-specific sales-conversion intelligence, never repeating dedicated columns) — wires in
+  website-extraction.ts fields (productRangeTags, likelyMagnaProductRequirements, halalEvidence,
+  branchList, franchiseGroupClues, centralPurchasingClues, publicTeamNames) that were already
+  computed and persisted into every stored checkpoint but never read downstream. (4) Lead Urgency
+  recalibrated: Hot Lead now requires a key account OR genuinely unusual evidenced opportunity
+  (multi-site/group, major catering, an unusually high review count, or exceptional financial
+  strength) — never qualification/score alone; confirmed the approved `salespro-schema-v1.json`
+  allowedValues are `["Hot Lead","Warm Lead","Standard Lead","Low Priority"]` (no "Cold Lead") and
+  mapped the "Cold" concept to "Standard Lead". (5) New `generate-campaign-master-combined.ts`
+  merges N per-representative Master workbooks into one canonical cross-campaign workbook,
+  correctly distinguishing the 7 mutually-exclusive candidate buckets from the 3 overlay/subset
+  sheets (Premium Level 0, Releasable Level 1, Key Accounts) so reconciliation is never
+  double-counted. (6) New `generate-cto-final-review.ts` builds the unified telesales/field-sales
+  CTO review file (exact approved 20 headers + exact approved 6 address columns + Note 1/Note 2,
+  28 columns, never renamed/reordered).
+- Evidence: `npx tsc --noEmit` clean throughout. `npm run build` succeeds (all routes compile).
+  25 lead-production test suites run individually, all ALL PASSED, zero failures: phone-validation,
+  business-category, cto-business-type-mapping, commercial-review, master-export, salespro-export,
+  master-field-resolver, campaign-master-combined, cto-final-review, cto-with-address,
+  simplified-workbook, campaign-territory, customer-master-exclusion, bridge, fsa, google,
+  companies-house, website, website-page-paths, public-profile, final-group-rescreen,
+  final-scoring, final-scoring-v2, full-territory, territory-v2. Regenerated all 5
+  campaign-002-five-district-pilot district exports (CM1/IG1/RM1/DA1/BR1) from the already-stored,
+  phone-fix-reprocessed checkpoints (zero live provider calls — verified via each district's
+  `postprocess-revision-manifest.json`) and confirmed by direct row lookup: all 15 owner-confirmed
+  EXCLUDE decisions land in the correct Business Category Exclusions/Commercial Review Exclusions
+  sheet; Da Raffaele Bistro (BR1-D6486F07) correctly remains usable (owner's explicit retain); Bobo
+  & Cha (DA1-015ED52A) correctly lands in Held-Review with `review_required_business_category` and
+  its full stored evidence. Combined Master workbook: 524 total candidates across 5 districts, 7
+  disjoint buckets sum to exactly 524 (177 usable/62 held/98 hard-rejected/16 customer-master/67
+  excluded-groups/77 commercial-review/27 business-category), 131 columns per row (129 Master + 2
+  companion). CTO final-review file: 177 rows, 28 columns, all "Trading" status, all Lead Urgency
+  values within the 4 approved dropdown values. A real pre-existing gap was found and fixed while
+  verifying: the trademark-symbol fix also caught a real UB1 leak ("Chaiiwala® - Southall") that
+  had been silently sitting in the usable population — updated the real-UB1 test assertions to
+  match (36→35 usable, 25→24 premium) rather than treating the shift as a regression.
+- Files: `scripts/lead-production/commercial-review-filter.ts`,
+  `scripts/lead-production/cto-business-type-mapping.ts`,
+  `scripts/lead-production/master-field-resolver.ts`,
+  `scripts/lead-production/candidate-dossier.ts`,
+  `scripts/lead-production/generate-campaign-master-combined.ts` (new),
+  `scripts/lead-production/generate-cto-final-review.ts` (new), and matching test files; commits
+  `cd29b52`, `7fd4c6c`, `f299edd` (pre-existing, verified), `e52a167`, `0f1ec29`, `0e3b8b9`,
+  `74380a5`, `c4d34fd`. None pushed to `origin/feature/mvp-vertical-slice-001` yet.
+- The owner-review workbook (`/Users/homemac/Downloads/campaign-002-five-district-pilot-owner-
+  review.xlsx`, a 15-sheet bespoke audit pack, originally hand-built in an earlier turn with no
+  committed generator) was regenerated by `generate-owner-review-pack.ts` (commit `c4d34fd`) and
+  independently re-verified: typecheck clean, 33/33 real-checkpoint test assertions pass, all 15
+  owner-confirmed exclusions + Da Raffaele's retention confirmed present with correct outcomes,
+  Bobo & Cha confirmed in Review Required, Pilot Summary's per-district totals cross-checked
+  byte-for-byte against the combined Master workbook's own Representative Summary. Hot Leads
+  shrank 145→85 (the recalibrated urgency policy correctly narrows it); Exclusions grew 164→187
+  (matches the exact sum of the 4 disjoint exclusion buckets). One deliberate content change (not
+  a structural change — the same 5 columns) was reviewed and accepted: "Sales Pro Validation" now
+  reports genuine missing-required-Master-field gaps from each district's already-existing
+  `salespro-required-field-gaps.csv`, rather than the prior version's Note-blankness grading,
+  which is now redundant with the separate "Note Quality Review" sheet. Three genuinely
+  underivable values are honestly left blank rather than guessed (Pilot Summary's
+  pre-consolidation raw-discovery count; the per-row source-provenance summary; "New Campaign Lead
+  ID" for a historical duplicate that was dropped before Lead ID assignment).
+- `sales-territories-v2.json`
+  (Kunz=TW1-TW10, Naseh=UB1-UB5, Saif=HA0-HA5, Tahira=WD3-WD7, Hassan=EN1-EN5) still does not
+  match the pilot's single-district assignments (CM1/IG1/RM1/DA1/BR1) — this is the already-
+  resolved ISS-0033 (see `docs/11_ISSUES_LOG.md`, resolved 2026-08-03): the owner confirmed a
+  separate, additive campaign config (`config/lead-production/campaigns/campaign-002-five-
+  district-pilot/territories.json`) is authoritative for this pilot, `sales-territories-v2.json`
+  is deliberately untouched, and RM1 candidates are cross-campaign-deduped against Nauman's real
+  historical RM1 output (`--historical-usable-workbook`, used in this turn's RM1 export — 42 real
+  historical duplicates correctly excluded). No live discovery run was made against any district
+  this session — every export used only already-stored, already-phone-fix-reprocessed
+  checkpoints.

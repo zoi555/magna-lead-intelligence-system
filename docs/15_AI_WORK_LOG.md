@@ -1053,3 +1053,64 @@ rules).
 - Application-development work remains paused; no merge to `main`, no deployment; nothing
   committed yet this session (working tree has this session's uncommitted implementation — see
   `git status`).
+
+## 2026-08-03 — owner-review correction pass (post-pilot)
+
+ISS-0033 was resolved earlier the same day (see `docs/11_ISSUES_LOG.md`) and the pilot ran across
+all 5 districts. This entry covers the owner's follow-up correction pass after reviewing the
+pilot's output. All work reads only already-stored checkpoint/export data — no live provider call,
+no new district run, matching the explicit instruction this pass operated under.
+
+1. Verified git commit state honestly before doing anything else (a prior turn had wrongly
+   claimed commits were pushed when 2 were still local-only) — corrected the claim before
+   proceeding.
+2. Fixed a duplicate-brand registry conflict (Black Sheep Coffee) and a trademark-symbol brand-
+   matching bug (Chaiiwala®) — commit `cd29b52`. Corrected the registry's own documented counts.
+3. Updated 2 real-UB1 test assertions after the trademark-symbol fix correctly caught a real leak
+   ("Chaiiwala® - Southall") that had been sitting in the usable population — commit `7fd4c6c`.
+4. Fixed the CTO Business Type mapper's missing Tier-1 cap (max 3 values on every tier, not just
+   Tier 2) — commit `e52a167`.
+5. Rewrote Note 1 (people/ownership only) and Note 2 (business sales-conversion intelligence
+   only, never generic filler) to the owner's detailed spec; wired in 7 website-extraction.ts
+   fields that were already computed and persisted per candidate but never read downstream.
+   Recalibrated Lead Urgency so Hot Lead requires a key account or genuinely unusual evidenced
+   opportunity, never qualification alone — resolved the "Cold Lead" vs. approved-dropdown-value
+   conflict by mapping to "Standard Lead" — commit `0f1ec29`.
+6. Regenerated all 5 campaign-002 district exports from already-stored, phone-fix-reprocessed
+   checkpoints and verified by direct Lead ID lookup: all 15 owner-confirmed EXCLUDE decisions
+   land correctly, Da Raffaele Bistro (the owner's explicit retain) remains usable, Bobo & Cha
+   correctly routes to `review_required_business_category` with its full evidence reported.
+7. Built `generate-campaign-master-combined.ts` (merges the 5 representatives' per-district Master
+   workbooks into one canonical cross-campaign workbook, 524 candidates, 7 disjoint buckets
+   reconciling exactly, RM1 historical duplicate evidence kept in a separate companion sheet) —
+   commit `0e3b8b9`. Found and fixed my own bug mid-build: Premium Level 0/Releasable Level
+   1/Key Accounts are subset VIEWS of Operationally Usable Leads, not additional disjoint
+   candidates — an early version of the merge tool double-counted them.
+8. Built `generate-cto-final-review.ts` (unified telesales/field-sales CTO review file, exact
+   approved 20+6+2 = 28-column header, 177 rows) — commit `74380a5`.
+9. Regenerated the 15-sheet owner-review workbook at the same Downloads path (delegated to a
+   forked sub-task with full session context) — `generate-owner-review-pack.ts`, commit
+   `c4d34fd`. Verified independently afterward (not just trusted): typecheck clean, 33/33 test
+   assertions pass, Hot Leads shrunk 145→85 (the recalibrated urgency policy), Exclusions grew
+   164→187 (matches the exact sum of the 4 disjoint exclusion buckets), all 15 owner exclusions +
+   Da Raffaele's retention confirmed present with correct outcomes, Bobo & Cha confirmed in Review
+   Required with its evidence, Pilot Summary's per-district totals cross-checked against the
+   combined Master workbook's own Representative Summary (byte-for-byte matching counts). One
+   deliberate, disclosed content change reviewed and accepted: "Sales Pro Validation" now reports
+   genuine missing-required-Master-field gaps (from each district's own already-existing
+   `salespro-required-field-gaps.csv`, real pre-existing pipeline data, not invented) rather than
+   the prior version's Note-blankness grading — the latter is now redundant with the separate
+   "Note Quality Review" sheet, so the reinterpretation is a correction, not scope creep. Three
+   columns genuinely could not be derived from stored data and are honestly left blank rather than
+   guessed (Pilot Summary's pre-consolidation raw-discovery count; the per-row source-provenance
+   summary; the historical-duplicate sheet's "New Campaign Lead ID" for a candidate that was
+   dropped before Lead ID assignment).
+10. Ran the full validation suite: `npm run typecheck`/`build` clean; all 25
+    `test:lead-production-*` suites individually re-run, all ALL PASSED.
+11. Updated `VERIFY_BEFORE_CLAIMING.md`, `docs/09_DECISIONS.md`, `docs/10_BUGS_AND_FIXES.md`,
+    `PROJECT_STATUS.md` (this file) with full verification evidence before reporting anything as
+    done.
+- Per the explicit instruction this pass operated under: generated Master/CTO/owner-review
+  workbooks and local campaign data were written to `/Users/homemac/Downloads/` and never
+  committed; code/tests/config/docs commits were made but NOT pushed to
+  `origin/feature/mvp-vertical-slice-001` — awaiting owner review of the Downloads deliverables.

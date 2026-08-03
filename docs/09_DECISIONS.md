@@ -1181,3 +1181,76 @@ arguments.
 `scripts/lead-production/district-reconciliation.ts`,
 `scripts/test-lead-production-campaign-territory.ts`, `docs/11_ISSUES_LOG.md` (ISS-0033),
 `VERIFY_BEFORE_CLAIMING.md`.
+
+## 2026-08-03 — Note 1/Note 2 rewrite, Lead Urgency recalibration, cross-representative combined
+Master + unified CTO file
+
+**Decision:** Note 1 is restricted to people/ownership content only (current directors, PSCs,
+ranked decision-maker with a humanised role, legal company name only when it genuinely differs
+from the trading name, company age, group/multi-site ownership, and website-sourced named
+individuals referenced alongside an owner/manager/founder/director title). Note 2 is restricted to
+business-specific sales-conversion intelligence (principal menu specialities, likely Magna product
+requirements, catering/bulk-order evidence, multi-site/expansion evidence, service format, halal
+evidence, a high-volume indicator only above a genuine threshold, and a specific evidence-driven
+call approach) and never repeats a field that already has its own dedicated Master/CTO column.
+Both are blank rather than filled with generic filler when no genuine evidence exists for that
+specific business — this is a hard requirement, not a nice-to-have, because generic notes are
+worse than no notes for a telesales rep deciding how to open a call.
+
+**Reason:** owner correction — the prior Note 1/Note 2 implementation mixed ownership and sales
+content and used generic FSA-rating/Google-rating filler that could be attached to any restaurant.
+
+**Implementation:** `candidate-dossier.ts` now wires in `productRangeTags`,
+`likelyMagnaProductRequirements`, `halalEvidence`, `branchList`, `franchiseGroupClues`,
+`centralPurchasingClues`, `publicTeamNames` — fields `website-extraction.ts` has always computed
+and persisted into every stored `website-extracted-data.json` checkpoint at crawl time
+(`run-website-stage.ts`), but that nothing downstream ever read (the same "computed but never
+wired" pattern as the `google_categories`/SIC-code gaps fixed earlier this campaign — see the
+2026-08-02 entry above). This is reading already-stored checkpoint data only, never a new crawl.
+
+**Decision:** Lead Urgency recalibrated. Hot Lead requires a key account OR a genuinely unusual
+evidenced opportunity (Companies House multi-site/group classification, 3+ website branch/
+location links, major catering capability, an unusually high Google review count (>=300), or
+exceptional financial strength) — never qualification/score alone ("do not classify most
+qualified leads as Hot merely because they passed qualification", an explicit owner instruction).
+Warm Lead is a normal qualified/contactable level_0/level_1 lead. The approved
+`salespro-schema-v1.json` Lead Urgency `allowedValues` are `["Hot Lead", "Warm Lead", "Standard
+Lead", "Low Priority"]` — "Cold Lead" is NOT an approved value and is never invented/emitted; a
+qualified-but-lower-value/narrower-opportunity lead maps to "Standard Lead" instead, the nearest
+approved value, per this project's "never invent, only choose from the approved live dropdown
+allow-list" discipline.
+
+**Decision:** added two new generator scripts rather than extending `generate-master-export.ts`/
+`generate-salespro-export.ts` in place, because campaign-002-five-district-pilot assigns 5
+representatives to 5 different single districts each — no single invocation of the existing
+per-representative exporters naturally produces a combined-across-representatives view.
+`generate-campaign-master-combined.ts` merges N already-generated per-district Master workbooks
+(read-only, no re-derivation) into one canonical workbook + flat CSV, preserving the 129-column
+Master schema exactly and correctly distinguishing the 7 mutually-exclusive candidate buckets from
+the 3 overlay/subset sheets (Premium Level 0, Releasable Level 1, Key Accounts — each already a
+subset of Operationally Usable Leads) so reconciliation and the CSV are never double-counted.
+`generate-cto-final-review.ts` builds one unified CTO review format for both telesales and field
+sales from that combined workbook's "Operationally Usable Leads" sheet — the exact approved 20 CTO
+headers, then the exact approved 6 address columns from the already-approved 26-column exporter,
+then exactly "Note 1"/"Note 2" — never renaming/reordering/inventing a header. No field-sales-only
+column beyond "Field Sales Rep" (already one of the 20) had provable repository evidence of an
+approved exact label, so none was invented — reported explicitly instead, per the owner's explicit
+"if their exact labels cannot be proven, report that separately rather than inventing labels; do
+not block generation" instruction.
+
+**Verification:** all 15 owner-confirmed EXCLUDE decisions (chains, vape shops, cafés, bubble-tea,
+newsagents) and the explicit Da Raffaele Bistro retain confirmed by direct Lead ID lookup against
+freshly regenerated real campaign-002 exports. Bobo & Cha (DA1-015ED52A) confirmed landing in
+Held-Review with `review_required_business_category`. Combined Master: 524 candidates across 5
+districts, 7 disjoint buckets sum to exactly 524. CTO final-review: 177 rows, 28 columns, all
+"Trading" status. `npm run typecheck`/`build` clean; 25 `test:lead-production-*` suites
+individually re-run, all ALL PASSED. Full detail: `VERIFY_BEFORE_CLAIMING.md` (2026-08-03 entry),
+`docs/10_BUGS_AND_FIXES.md` (2026-08-03 entry).
+
+**See also:** `scripts/lead-production/master-field-resolver.ts`,
+`scripts/lead-production/candidate-dossier.ts`,
+`scripts/lead-production/generate-campaign-master-combined.ts`,
+`scripts/lead-production/generate-cto-final-review.ts`,
+`scripts/test-lead-production-master-field-resolver.ts`,
+`scripts/test-lead-production-campaign-master-combined.ts`,
+`scripts/test-lead-production-cto-final-review.ts`, `config/lead-production/salespro-schema-v1.json`.

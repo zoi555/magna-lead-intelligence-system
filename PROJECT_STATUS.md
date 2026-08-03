@@ -1379,3 +1379,43 @@ resolved, the pilot can run using the already-implemented and already-tested pip
 code change is expected to be needed for the pilot itself.
 
 Code commit: `656c767`. Docs commit: (this commit).
+
+## Current state — 2026-08-03 (five-district pilot: owner-review corrections applied, files generated)
+
+ISS-0033 (above) is resolved (2026-08-03) — the pilot ran using a new, additive campaign config,
+`sales-territories-v2.json` untouched. This entry covers the owner's follow-up correction pass
+after reviewing the pilot's first output.
+
+- 3 real bugs found and fixed: Chaiiwala®/trademark-symbol brand matching (also caught a real
+  UB1 leak, "Chaiiwala® - Southall"), a Black Sheep Coffee keep/exclude registry conflict, and a
+  missing max-3 cap on the CTO Business Type mapper's Tier-1 cuisine loop.
+- Note 1/Note 2 rewritten to the owner's detailed spec (people/ownership only vs. business sales-
+  conversion intelligence, never generic filler); wires in website-extraction.ts fields that were
+  already computed and persisted per candidate but never read downstream.
+- Lead Urgency recalibrated — Hot Lead requires a key account or genuinely unusual evidenced
+  opportunity, never qualification alone; "Cold Lead" (not an approved dropdown value) maps to
+  "Standard Lead".
+- All 15 owner-confirmed EXCLUDE decisions + the Da Raffaele Bistro retain verified correct
+  against freshly regenerated real campaign-002 exports (zero live provider calls — reprocessed
+  from already-stored, phone-fix-corrected checkpoints). Bobo & Cha correctly routes to
+  `review_required_business_category`.
+- Two new generator scripts: `generate-campaign-master-combined.ts` (merges the 5
+  representatives' per-district Master workbooks into one canonical cross-campaign workbook —
+  524 candidates, 7 disjoint buckets reconciling exactly) and `generate-cto-final-review.ts`
+  (unified telesales/field-sales CTO review file — 177 rows, exact approved 28-column header).
+- Generated to `/Users/homemac/Downloads/` (not committed, per locked policy — generated
+  data workbooks are never committed): the combined Master workbook + CSV, the CTO final-review
+  file + CSV, and a regenerated owner-review workbook (see `docs/15_AI_WORK_LOG.md` for the
+  owner-review-pack regeneration detail).
+
+**Verification, not just claimed:** `npm run typecheck`/`build` clean; all 25
+`test:lead-production-*` suites individually re-run, all ALL PASSED. Full detail:
+`VERIFY_BEFORE_CLAIMING.md`, `docs/09_DECISIONS.md`, `docs/10_BUGS_AND_FIXES.md` (all 2026-08-03
+entries).
+
+**Commits:** `e99eabc`, `892f3bc`, `f299edd` (pre-existing this session), `cd29b52`, `7fd4c6c`,
+`e52a167`, `0f1ec29`, `0e3b8b9`, `74380a5`, `c4d34fd` (this correction pass) — none pushed to
+`origin/feature/mvp-vertical-slice-001` yet.
+
+**Next action:** owner reviews the regenerated Downloads deliverables; push the code/test/config
+commits once approved.

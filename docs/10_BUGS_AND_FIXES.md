@@ -979,3 +979,46 @@ candidate was never going to be released either way, only its recorded exclusion
 `scripts/lead-production/generate-master-export.ts`,
 `scripts/lead-production/generate-salespro-export.ts`,
 `scripts/test-lead-production-master-export.ts`, `docs/09_DECISIONS.md`.
+
+## 2026-08-03 — owner-review corrections: three real bugs found and fixed
+
+- **BUG:** `commercial-review-filter.ts`'s raw-string separator regexes (brand-before/brand-after/
+  @brand/bracketed-brand patterns) used `\s*` between the brand word and the separator, which does
+  not consume a trademark symbol. Real leak: "Chaiiwala® - Ilford Lane" (IG1-34DC85F9) never
+  matched the already-registered "Chaiiwala" exclude brand, and the same pattern was silently
+  leaking a second real candidate, "Chaiiwala® - Southall" (UB1), into the usable population.
+  **FIX:** added an optional `TRADEMARK_SYMBOL_CLASS = "[®™©]?"` into all 4 separator patterns.
+  Real-UB1 regression: usable 36→35, Premium 25→24 (the leaked Chaiiwala® candidate correctly
+  moved to Commercial Review Exclusions) — the real-checkpoint test assertions were updated to
+  match, not silently left stale.
+- **BUG:** adding "Black Sheep Coffee" to the exclude-brand CSVs triggered `load-commercial-
+  review.ts`'s fail-closed duplicate-brand detection, because it was already present with an
+  explicit "Keep" decision from the original 141-brand review (`brands_to_keep_final.csv` +
+  `corrected_brand_decisions.csv`). **FIX:** removed the stale "Keep" entries, keeping only the
+  owner's current "Exclude Whole Brand" decision as authoritative; corrected the registry's own
+  documented counts (27 keep / 118 exclude / 145 reviewed — the README previously said 28/118/146,
+  which double-counted the reclassification as a new addition rather than a move).
+- **BUG:** `cto-business-type-mapping.ts`'s Tier-1 cuisine-tag loop was missing the
+  `selected.length < 3` guard that Tier 2 already had, so a business with many website cuisine
+  tags could emit far more than the approved 1-principal + up-to-2-secondary limit (a real case
+  earlier this session, "Heernus Kitchen African Restaurant", produced 9 values). **FIX:** added
+  the same cap Tier 2 already used. Regression tests (`test-lead-production-cto-business-type-
+  mapping.ts` sections 9-10) prove no scenario, across any tier combination, can ever emit a 4th
+  value.
+- **Non-bug corrections (owner spec changes, not defects):** Note 1/Note 2 rewritten to the
+  owner's detailed spec (see `docs/09_DECISIONS.md`); Lead Urgency recalibrated so Hot Lead
+  requires a key account or genuinely unusual evidenced opportunity, never qualification alone.
+
+**Verification:** `npm run typecheck`/`build` clean. All 25 `test:lead-production-*` suites
+individually re-run, all ALL PASSED. All 15 owner-confirmed EXCLUDE decisions and the Da Raffaele
+Bistro retain verified by direct Lead ID lookup against freshly regenerated campaign-002 exports
+(built from already-stored, phone-fix-reprocessed checkpoints — zero live provider calls). Bobo &
+Cha (DA1-015ED52A) verified landing in Held-Review with `review_required_business_category` and
+its full stored evidence.
+
+**See also:** `scripts/lead-production/commercial-review-filter.ts`,
+`scripts/lead-production/cto-business-type-mapping.ts`, `config/lead-production/commercial-
+review-v1/`, `scripts/test-lead-production-commercial-review.ts`,
+`scripts/test-lead-production-cto-business-type-mapping.ts`, `scripts/test-lead-production-master-
+export.ts`, `scripts/test-lead-production-salespro-export.ts`, `docs/09_DECISIONS.md`,
+`VERIFY_BEFORE_CLAIMING.md` (2026-08-03 entry).
