@@ -106,10 +106,14 @@ async function main() {
     const buckets = classify(rows, registry, "Test");
     assert(buckets.businessCategoryExcluded.length === 1 && buckets.businessCategoryExcluded[0].dossier.candidateId === "cafe-1", `excluded_non_food candidate is excluded from release (got ${buckets.businessCategoryExcluded.map((r) => r.dossier.candidateId).join(", ")})`);
     assert(!buckets.usable.some((r) => r.dossier.candidateId === "cafe-1"), "the excluded_non_food candidate never appears in usable");
-    assert(buckets.usable.some((r) => r.dossier.candidateId === "review-1"), "review_required_business_category is NOT auto-excluded — remains usable (flagged for human review via its own field, never an automatic call either way)");
-    assert(buckets.usable.some((r) => r.dossier.candidateId === "insufficient-1"), "insufficient_category_evidence is NOT auto-excluded — remains usable");
+    // 2026-08-04 owner-review correction: the locked policy is a 4-way split (eligible->release,
+    // unsuitable->exclude, conflicting->review, insufficient->hold) — review_required_business_
+    // category and insufficient_category_evidence now BOTH hold (never auto-released as usable),
+    // reversing the earlier "flagged but still usable" behaviour.
+    assert(buckets.businessCategoryReviewRequired.some((r) => r.dossier.candidateId === "review-1") && !buckets.usable.some((r) => r.dossier.candidateId === "review-1"), "review_required_business_category is held for review, never auto-released as usable");
+    assert(buckets.businessCategoryReviewRequired.some((r) => r.dossier.candidateId === "insufficient-1") && !buckets.usable.some((r) => r.dossier.candidateId === "insufficient-1"), "insufficient_category_evidence is held for review, never auto-released as usable");
     assert(buckets.usable.some((r) => r.dossier.candidateId === "eligible-1"), "eligible_foodservice remains usable");
-    const total = buckets.customerMasterExclusions.length + buckets.excludedGroups.length + buckets.brandExcluded.length + buckets.pharmacyChemistExcluded.length + buckets.businessCategoryExcluded.length + buckets.usable.length + buckets.held.length + buckets.phoneResolutionExceptions.length + buckets.hardRejects.length;
+    const total = buckets.customerMasterExclusions.length + buckets.excludedGroups.length + buckets.brandExcluded.length + buckets.pharmacyChemistExcluded.length + buckets.businessCategoryExcluded.length + buckets.businessCategoryReviewRequired.length + buckets.usable.length + buckets.held.length + buckets.phoneResolutionExceptions.length + buckets.hardRejects.length;
     assert(total === rows.length, `every fixture row lands in exactly one bucket (${rows.length} rows, ${total} partitioned) — reconciliation holds`);
   }
 
@@ -141,22 +145,31 @@ async function main() {
     // commercial-review-exclusion-audit.csv). 6 of the 9 were previously usable (47 -> 41); the
     // other 3 were already held/hard-rejected before this rule and are simply reclassified.
     const usableRows = XLSX.utils.sheet_to_json(wb.Sheets["Operationally Usable Leads"]) as any[];
-    assert(usableRows.length === 39, `Operationally Usable Leads has exactly 39 rows (got ${usableRows.length}) — down from 47 (6 commercial-review brand exclusions + 2 pharmacy/chemist name-evidence exclusions were previously usable)`);
+    // 2026-08-04 owner-review correction: "insufficient_category_evidence"/"review_required_
+    // business_category" candidates now hold instead of releasing — real UB1 data: 3 usable
+    // candidates moved from Operationally Usable Leads into Held-Review as a result (39 -> 36).
+    assert(usableRows.length === 36, `Operationally Usable Leads has exactly 36 rows (got ${usableRows.length}) — down from 39 (3 candidates with review_required/insufficient business-category evidence moved to held, per the 2026-08-04 4-way policy correction)`);
     assert(usableRows.length > 0 && Object.keys(usableRows[0]).length === 129, `every usable row has exactly 129 fields (v2 schema: 107 v1 + 22 new) (got ${Object.keys(usableRows[0] ?? {}).length})`);
     const premiumRows = XLSX.utils.sheet_to_json(wb.Sheets["Premium Level 0"]) as any[];
-    assert(premiumRows.length === 26, `Premium Level 0 has exactly 26 rows (got ${premiumRows.length})`);
+    assert(premiumRows.length === 25, `Premium Level 0 has exactly 25 rows (got ${premiumRows.length})`);
     const releasableRows = XLSX.utils.sheet_to_json(wb.Sheets["Releasable Level 1"]) as any[];
-    assert(releasableRows.length === 13, `Releasable Level 1 has exactly 13 rows (got ${releasableRows.length})`);
+    assert(releasableRows.length === 11, `Releasable Level 1 has exactly 11 rows (got ${releasableRows.length})`);
     const heldRows = XLSX.utils.sheet_to_json(wb.Sheets["Held-Review"]) as any[];
-    assert(heldRows.length === 5, `Held-Review has exactly 5 rows (got ${heldRows.length}) — down from 6 (1 commercial-review brand exclusion, Amigos Burgers and Shakes, was previously held)`);
+    assert(heldRows.length === 8, `Held-Review has exactly 8 rows (got ${heldRows.length}) — up from 5 (3 candidates with review_required/insufficient business-category evidence now held here, per the 2026-08-04 4-way policy correction)`);
     const exclusionRows = XLSX.utils.sheet_to_json(wb.Sheets["Customer Master Exclusions"]) as any[];
     assert(exclusionRows.length === 20, `Customer Master Exclusions has exactly 20 rows (got ${exclusionRows.length})`);
     const excludedRows = XLSX.utils.sheet_to_json(wb.Sheets["Excluded Groups"]) as any[];
     const commercialReviewRows = XLSX.utils.sheet_to_json(wb.Sheets["Commercial Review Exclusions"]) as any[];
     assert(commercialReviewRows.length === 12, `Commercial Review Exclusions has exactly 12 rows (got ${commercialReviewRows.length}) — 10 brand (incl. "Londis - Southall" via the dash-separated single-word-brand fix) + 2 pharmacy/chemist name-evidence exclusions ("Sherrys Chemist", "Queens Pharmacy") found after the 2026-07-26 rule fix`);
     const hardRejectRows = XLSX.utils.sheet_to_json(wb.Sheets["Hard Rejects"]) as any[];
-    const total = usableRows.length + heldRows.length + hardRejectRows.length + exclusionRows.length + excludedRows.length + commercialReviewRows.length;
-    assert(total === 94, `all 15 tabs' mutually-exclusive buckets sum to exactly 94 total UB1 candidates (got ${total})`);
+    // 2026-08-04: businessCategoryExclusionRows was missing from this sum entirely (a pre-
+    // existing gap, never surfaced because real UB1 data had 0 café/bubble-tea exclusions until
+    // the trading-name-evidence extension found 3 real ones: "Beans & Nuts Cafe by DFS", "Bubble
+    // Chaai Lab", "Susegad Cafe").
+    const businessCategoryExclusionRows = XLSX.utils.sheet_to_json(wb.Sheets["Business Category Exclusions"]) as any[];
+    assert(businessCategoryExclusionRows.length === 3, `Business Category Exclusions has exactly 3 rows (got ${businessCategoryExclusionRows.length}) — real UB1 café/bubble-tea-principal businesses found by the 2026-08-04 trading-name-evidence extension`);
+    const total = usableRows.length + heldRows.length + hardRejectRows.length + exclusionRows.length + excludedRows.length + commercialReviewRows.length + businessCategoryExclusionRows.length;
+    assert(total === 94, `all 16 tabs' mutually-exclusive buckets sum to exactly 94 total UB1 candidates (got ${total})`);
     const leadIdsInUsable = usableRows.map((r) => r["Permanent Lead ID"]);
     assert(leadIdsInUsable.every((id: string) => /^UB1-[0-9A-F]{8}$/.test(id)), "every usable row's Permanent Lead ID matches the required format");
     assert(new Set(leadIdsInUsable).size === leadIdsInUsable.length, "every usable row has a unique Permanent Lead ID");

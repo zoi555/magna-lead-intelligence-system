@@ -242,18 +242,30 @@ async function main() {
 
   // 2026-08-03: real gap found and fixed during campaign-002 live pilot verification — see
   // generate-master-export.ts's classify() for the full rationale. Only the unambiguous
-  // "excluded_non_food" outcome is gated; "review_required_business_category" is never
-  // auto-excluded here either.
+  // "excluded_non_food" outcome is gated here.
   const businessCategoryExcluded = afterCommercialReview.filter((b) => b.fields.business_category_eligibility === "excluded_non_food");
   const businessCategoryExcludedSet = new Set(businessCategoryExcluded);
-  const remaining = afterCommercialReview.filter((b) => !businessCategoryExcludedSet.has(b));
+  const afterBusinessCategoryExclusion = afterCommercialReview.filter((b) => !businessCategoryExcludedSet.has(b));
+  // 2026-08-04: owner-review correction — "review_required_business_category" and
+  // "insufficient_category_evidence" now also HOLD (never auto-released as usable), per the
+  // locked 4-way policy: eligible->release, unsuitable->exclude, conflicting->review,
+  // insufficient->hold. See generate-master-export.ts's classify() for the full rationale.
+  const businessCategoryReviewRequired = afterBusinessCategoryExclusion.filter((b) => b.fields.business_category_eligibility === "review_required_business_category" || b.fields.business_category_eligibility === "insufficient_category_evidence");
+  const businessCategoryReviewRequiredSet = new Set(businessCategoryReviewRequired);
+  const remaining = afterBusinessCategoryExclusion.filter((b) => !businessCategoryReviewRequiredSet.has(b));
 
   const usable = remaining.filter((b) => b.dossier.qualificationStatus === "qualified" || b.dossier.qualificationStatus === "qualified_with_channel_limit");
   const keyAccounts = usable.filter((b) => b.fields.key_account_indicator === "Yes");
   const ordinaryNewLeads = usable.filter((b) => !keyAccounts.includes(b));
 
   console.log(`Ordinary new leads: ${ordinaryNewLeads.length}. Key accounts: ${keyAccounts.length}.`);
-  console.log(`Excluded from ordinary export: ${customerMasterExclusions.length} customer-master exclusions (audit-only), ${excludedGroups.length} excluded groups, ${brandExcluded.length} commercial-review brand exclusions, ${pharmacyChemistExcluded.length} pharmacy/chemist exclusions, ${businessCategoryExcluded.length} café/bubble-tea business-category exclusions, ${remaining.length - usable.length} held/hard-rejected.`);
+  console.log(`Excluded from ordinary export: ${customerMasterExclusions.length} customer-master exclusions (audit-only), ${excludedGroups.length} excluded groups, ${brandExcluded.length} commercial-review brand exclusions, ${pharmacyChemistExcluded.length} pharmacy/chemist exclusions, ${businessCategoryExcluded.length} café/bubble-tea business-category exclusions, ${businessCategoryReviewRequired.length} business-category review-required/insufficient-evidence (held), ${remaining.length - usable.length} held/hard-rejected.`);
+  if (businessCategoryReviewRequired.length) {
+    await fs.writeFile(path.join(outArg, `${territoryPrefix}-business-category-review-required.csv`), writeCsv(
+      ["lead_id", "representative", "business_name", "business_category_eligibility", "business_category_evidence_summary"],
+      businessCategoryReviewRequired.map((b) => ({ lead_id: b.leadId, representative: salesRepValue ?? representative!, business_name: b.dossier.tradingName, business_category_eligibility: b.fields.business_category_eligibility, business_category_evidence_summary: b.fields.business_category_evidence_summary })),
+    ));
+  }
   if (businessCategoryExcluded.length) {
     await fs.writeFile(path.join(outArg, `${territoryPrefix}-business-category-exclusion-audit.csv`), writeCsv(
       ["lead_id", "representative", "business_name", "business_category_eligibility", "business_category_evidence_summary"],

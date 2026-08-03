@@ -73,6 +73,56 @@ async function main() {
   const r8b = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Bubble Croffle" }));
   assert(r8b.outcome !== "excluded_non_food", `"Bubble Croffle" (WD17-D3CC5BF0) — likely bubble-WAFFLE dessert style, not bubble tea, no explicit tea/boba/milk-tea phrase -> never auto-excluded on the bare word (got "${r8b.outcome}")`);
 
+  console.log("\n9. Vape/e-cigarette shops (2026-08-04 owner-review extension) — real cases:");
+  const r9a = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Evapo Vape Shop – Dartford", googleCategories: ["point_of_interest", "store", "establishment"] }));
+  assert(r9a.outcome === "excluded_non_food", `"Evapo Vape Shop – Dartford" (DA1-E53575D3) -> excluded_non_food (got "${r9a.outcome}")`);
+  const r9b = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "VPZ High Street", googleCategories: ["point_of_interest", "store", "establishment"] }));
+  assert(r9b.outcome === "excluded_non_food", `"VPZ High Street" (BR1-12783085) -> excluded_non_food (got "${r9b.outcome}")`);
+
+  console.log("\n10. Newsagents (2026-08-04 owner-review extension) — real case:");
+  const r10 = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Keyshop Newsagent", googleCategories: ["convenience_store", "food_store", "food"] }));
+  assert(r10.outcome === "excluded_non_food", `"Keyshop Newsagent" (BR1-E3444FC1) -> excluded_non_food even with Google's generic "food" tag present (got "${r10.outcome}")`);
+
+  console.log("\n11. Trading-name café evidence (2026-08-04 owner-review extension) — real cases, generic Google food/restaurant co-tags must NOT override a name-confirmed café:");
+  const r11a = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Nick's Cafe", googleCategories: ["coffee_shop", "cafe", "food_store", "point_of_interest", "food", "store", "establishment"], businessType: "Restaurant/Cafe/Canteen" }));
+  assert(r11a.outcome === "excluded_non_food", `"Nick's Cafe" (BR1-9DE60E86) -> excluded_non_food (got "${r11a.outcome}")`);
+  const r11b = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Buddy's Cafe", googleCategories: ["cafe", "breakfast_restaurant", "meal_takeaway", "restaurant", "point_of_interest", "food", "establishment"], businessType: "Restaurant/Cafe/Canteen" }));
+  assert(r11b.outcome === "excluded_non_food", `"Buddy's Cafe" (BR1-780C9004) -> excluded_non_food even with Google "restaurant"/"meal_takeaway" co-tags (got "${r11b.outcome}")`);
+  const r11c = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Stonehenge Cafe", googleCategories: ["coffee_shop", "cafe", "british_restaurant", "food_store", "store", "restaurant", "food", "point_of_interest", "establishment"], businessType: "Restaurant/Cafe/Canteen" }));
+  assert(r11c.outcome === "excluded_non_food", `"Stonehenge Cafe" (BR1-51BDE09A) -> excluded_non_food (got "${r11c.outcome}")`);
+  // Regression guard: a cuisine-specific name word alongside "Cafe" still protects a genuine
+  // restaurant that merely has "Cafe" in its name.
+  const r11d = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Tandoori Nights Cafe", googleCategories: ["cafe", "restaurant"] }));
+  assert(r11d.outcome === "eligible_foodservice", `"Tandoori Nights Cafe" — cuisine-specific name word protects it from the café-name rule (got "${r11d.outcome}")`);
+
+  console.log("\n12. Bare bubble/bobo name word CORROBORATED by Google \"tea_house\" category (2026-08-04 owner-review extension) — real cases:");
+  const r12a = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Bubble G", googleCategories: ["tea_house", "point_of_interest", "establishment"], businessType: "Takeaway/sandwich shop" }));
+  assert(r12a.outcome === "excluded_non_food", `"Bubble G" (IG1-1AB4F337) -> excluded_non_food (bare "bubble" + Google tea_house corroboration) (got "${r12a.outcome}")`);
+  const r12b = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Bubble CiTea - Bromley", googleCategories: ["cafe", "tea_house", "point_of_interest", "food", "establishment"] }));
+  assert(r12b.outcome === "excluded_non_food", `"Bubble CiTea - Bromley" (BR1-5328926C) -> excluded_non_food (got "${r12b.outcome}")`);
+  const r12c = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Bobo & Cha - Dartford", googleCategories: ["tea_house", "point_of_interest", "establishment"] }));
+  assert(r12c.outcome === "review_required_business_category", `"Bobo & Cha - Dartford" (DA1-015ED52A) — "Bobo"+"Cha" compound name is a LOWER-confidence signal than "Bubble"+tea_house (owner-confirmed distinction) -> review_required, not an automatic exclude (got "${r12c.outcome}")`);
+  // Regression guard: the bare word alone, with NO Google tea_house corroboration, must still NOT
+  // be auto-excluded (the original locked-policy protection, unchanged).
+  const r12d = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Bubbles", googleCategories: [] }));
+  assert(r12d.outcome !== "excluded_non_food", `"Bubbles" with no Google tea_house category -> still never auto-excluded on the bare word alone (got "${r12d.outcome}")`);
+
+  console.log("\n13. Google non-food category conflicting with a food-suggestive trading name (2026-08-04 owner-review extension) — real Google-mismatch cases, now review_required instead of an automatic exclude:");
+  const r13a = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Spag Bowl - Dartford", googleCategories: ["real_estate_agency"] }));
+  assert(r13a.outcome === "review_required_business_category", `"Spag Bowl - Dartford" — "Bowl" name evidence vs Google real_estate_agency mismatch -> review_required (got "${r13a.outcome}")`);
+  const r13b = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Chihuahua Tacos - Dartford", googleCategories: ["real_estate_agency"] }));
+  assert(r13b.outcome === "review_required_business_category", `"Chihuahua Tacos - Dartford" — "Tacos" name evidence vs Google mismatch -> review_required (got "${r13b.outcome}")`);
+  const r13c = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Hail Caesar - Dartford", googleCategories: ["real_estate_agency"] }));
+  assert(r13c.outcome === "review_required_business_category", `"Hail Caesar - Dartford" — "Caesar" name evidence vs Google mismatch -> review_required (got "${r13c.outcome}")`);
+  const r13d = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Doneritzy - Dartford", googleCategories: ["real_estate_agency"] }));
+  assert(r13d.outcome === "review_required_business_category", `"Doneritzy - Dartford" — "doner" substring name evidence vs Google mismatch -> review_required (got "${r13d.outcome}")`);
+  // No name-based food evidence available -> still correctly excluded (genuinely nothing to
+  // corroborate against); real cases the audit could not upgrade.
+  const r13e = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Top Dixie", googleCategories: ["beauty_salon"] }));
+  assert(r13e.outcome === "excluded_non_food", `"Top Dixie" — no food-suggestive name evidence available -> remains excluded_non_food (got "${r13e.outcome}")`);
+  const r13f = evaluateBusinessCategoryEligibility(mkDossier({ tradingName: "Core Downham", googleCategories: ["gym"] }));
+  assert(r13f.outcome === "excluded_non_food", `"Core Downham" — no food-suggestive name evidence available -> remains excluded_non_food (got "${r13f.outcome}")`);
+
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);
   process.exit(fails === 0 ? 0 : 1);
 }
