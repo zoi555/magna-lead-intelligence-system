@@ -159,6 +159,18 @@ export async function loadCandidateDossiers(dirs: DossierCheckpointDirs): Promis
       // majority of candidates) but was never read anywhere downstream until now.
       google_categories: bestGoogle?.additionalCategories ?? [],
       cuisine_service_model: { cuisineTags: website?.cuisineTags ?? [], serviceModel: website?.serviceModel ?? null },
+      // 2026-08-04 Note 1/Note 2 rewrite: website-extraction.ts has always computed these fields
+      // at crawl time (run-website-stage.ts) and persisted them into website-extracted-data.json,
+      // but nothing downstream ever read them until now — a real, confirmed pre-existing gap
+      // (the same pattern as google_categories/sic_codes above). Wiring in already-stored
+      // checkpoint data only — no new crawl, no live call.
+      product_range_tags: website?.productRangeTags ?? [],
+      likely_magna_product_requirements: website?.likelyMagnaProductRequirements ?? [],
+      halal_website_evidence: website?.halalEvidence?.value ? { evidenceText: website.halalEvidence.evidenceText as string | null } : null,
+      branch_list: website?.branchList ?? [],
+      franchise_group_clues: website?.franchiseGroupClues ?? [],
+      central_purchasing_clues: website?.centralPurchasingClues ?? [],
+      public_team_names: website?.publicTeamNames ?? [],
       fsa_establishment_id: bestFsa?.fhrsId ?? null, fsa_business_name: bestFsa?.officialBusinessName ?? null,
       fsa_hygiene_rating: bestFsa?.hygieneRating ?? null, fsa_rating_status: bestFsa?.ratingStatus ?? null, fsa_rating_date: bestFsa?.ratingDate ?? null,
       // Locked policy (2026-08-02): website closure-text evidence retained separately per source

@@ -51,37 +51,99 @@ function pick<T>(...values: (T | null | undefined)[]): T | null {
   return null;
 }
 
-// Note 1/Note 2 (locked policy 2026-08-02) — composed only from evidence genuinely present on
-// the dossier, never fabricated. Explicitly never repeats phone/WhatsApp/address/Business Types/
-// Sales Rep/Region-Route/Pipeline Status/Lead Type/Lead Urgency, all of which are their own
-// dedicated fields elsewhere on this same row.
-function buildNote1OwnershipAndDecisionMaker(f: Record<string, unknown>, groupClass: string): string | null {
+// Humanises a raw enum-ish evidence string (e.g. "owner_director" -> "Owner/Director") for
+// note text only — never used to populate an approved-dropdown field, so no allow-list applies.
+function humaniseRole(raw: string): string {
+  return raw.split(/[_\s]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join("/");
+}
+
+// Note 1/Note 2 (locked policy 2026-08-02, rewritten 2026-08-04 per owner spec) — composed only
+// from evidence genuinely present on the dossier, never fabricated; blank where no reliable
+// evidence exists rather than invented filler. Explicitly never repeats Shop Name/Phone/
+// WhatsApp/Email/address/postcode/Business Types/Sales Rep/Region-Route/Pipeline Status/Lead
+// Type/Lead Urgency, all of which are their own dedicated fields elsewhere on this same row.
+//
+// Note 1 — PEOPLE/OWNERSHIP ONLY: current directors, verified owner/founder, manager/purchaser,
+// legal company name where different from the trading name, company age, group/multi-site
+// ownership, relevant decision-maker context. No business/sales content belongs here.
+function buildNote1OwnershipAndDecisionMaker(f: Record<string, unknown>, groupClass: string, tradingName: string): string | null {
   const parts: string[] = [];
   const directors = (f.directors as string[]) ?? [];
   const pscs = (f.pscs as string[]) ?? [];
   const decisionMaker = f.ranked_decision_maker as { name: string; role: string } | null;
   const companyAge = f.company_age_years as number | null;
+  const legalCompanyName = f.legal_company_name as string | null;
+  const publicTeamNames = (f.public_team_names as string[]) ?? [];
+
   if (directors.length) parts.push(`Current director(s): ${directors.join(", ")}.`);
   if (pscs.length) parts.push(`Person(s) with significant control: ${pscs.join(", ")}.`);
-  if (decisionMaker) parts.push(`Ranked decision-maker: ${decisionMaker.name} (${decisionMaker.role}).`);
+  if (decisionMaker) parts.push(`Ranked decision-maker: ${decisionMaker.name} (${humaniseRole(decisionMaker.role)}).`);
+  // Website team-name extraction only fires when a name appears directly next to an owner/
+  // manager/founder/director/chef title (website-extraction.ts's extractPublicTeamNames) — a
+  // genuine, if role-unspecific, corroborating signal of who runs the business day to day.
+  if (publicTeamNames.length) parts.push(`Website identifies named individual(s) referenced alongside an owner/manager/founder/director title: ${publicTeamNames.join(", ")}.`);
+  if (legalCompanyName && legalCompanyName.trim().toLowerCase() !== tradingName.trim().toLowerCase()) parts.push(`Trades as "${tradingName}"; registered legal company name is "${legalCompanyName}".`);
   if (companyAge != null) parts.push(`Company has been trading/incorporated for approximately ${companyAge} year(s).`);
   if (groupClass && groupClass !== "Unresolved") parts.push(`Ownership structure: ${groupClass}.`);
   return parts.length ? parts.join(" ") : null;
 }
 
-function buildNote2SalesIntelligence(f: Record<string, unknown>, financialStrengthBand: string | null): string | null {
+// Note 2 — BUSINESS-SPECIFIC SALES-CONVERSION INTELLIGENCE ONLY: principal menu specialities,
+// likely Magna product requirements, catering/bulk-order evidence, number of sites, high-volume
+// indicators, dine-in/takeaway/delivery format, halal/specialist-product signals, expansion
+// indicators, and a specific call approach. Never generic text that could be attached to every
+// restaurant — every bullet is conditional on genuine evidence for THIS candidate.
+type ServiceModelField = { value: unknown; evidenceText: string | null; confidence: string };
+function buildNote2SalesIntelligence(f: Record<string, unknown>): string | null {
   const bullets: string[] = [];
-  const hygieneRating = f.fsa_hygiene_rating as string | null;
-  const googleRating = f.google_rating as number | null;
-  const googleReviewCount = f.google_review_count as number | null;
-  const halal = f.halal_evidence as boolean | null; // note: not currently populated upstream (see halal_evidence: null elsewhere) — included defensively for when it is
-  const cuisineServiceModel = f.cuisine_service_model as { cuisineTags?: string[] } | null;
+  const cuisineServiceModel = f.cuisine_service_model as { cuisineTags?: string[]; serviceModel?: Record<"delivery" | "collection" | "dineIn" | "catering", ServiceModelField> | null } | null;
   const cuisineTags = cuisineServiceModel?.cuisineTags ?? [];
-  if (hygieneRating) bullets.push(`FSA hygiene rating: ${hygieneRating}.`);
-  if (googleRating != null) bullets.push(`Google rating: ${googleRating}${googleReviewCount != null ? ` (${googleReviewCount} reviews)` : ""}.`);
-  if (financialStrengthBand) bullets.push(`Financial strength: ${financialStrengthBand}.`);
-  if (cuisineTags.length) bullets.push(`Cuisine/product evidence: ${cuisineTags.join(", ")}.`);
-  if (halal) bullets.push(`Halal evidence found on official website.`);
+  const productRangeTags = (f.product_range_tags as string[]) ?? [];
+  const likelyMagnaProducts = (f.likely_magna_product_requirements as string[]) ?? [];
+  const halalEvidence = f.halal_website_evidence as { evidenceText: string | null } | null;
+  const branchList = (f.branch_list as string[]) ?? [];
+  const franchiseClues = (f.franchise_group_clues as string[]) ?? [];
+  const centralPurchasingClues = (f.central_purchasing_clues as string[]) ?? [];
+  const googleReviewCount = f.google_review_count as number | null;
+  const serviceModel = cuisineServiceModel?.serviceModel ?? null;
+
+  const menuSpecialities = [...new Set([...cuisineTags, ...productRangeTags])];
+  if (menuSpecialities.length) bullets.push(`Principal menu specialities: ${menuSpecialities.join(", ")}.`);
+  if (likelyMagnaProducts.length) bullets.push(`Likely Magna product requirements: ${likelyMagnaProducts.join(", ")}.`);
+
+  const hasCatering = serviceModel?.catering?.value === true;
+  if (hasCatering) bullets.push(`Catering/bulk-order evidence found on official website${serviceModel?.catering?.evidenceText ? ` ("${serviceModel.catering.evidenceText}")` : ""}.`);
+
+  if (branchList.length || franchiseClues.length) {
+    const siteParts: string[] = [];
+    if (branchList.length) siteParts.push(`website lists ${branchList.length} branch/location link(s)`);
+    if (franchiseClues.length) siteParts.push(`franchise/group language found: ${franchiseClues.join(", ")}`);
+    bullets.push(`Multi-site evidence: ${siteParts.join("; ")}.`);
+  }
+  if (centralPurchasingClues.length) bullets.push(`Expansion/central-purchasing indicators: ${centralPurchasingClues.join(", ")}.`);
+
+  if (googleReviewCount != null && googleReviewCount >= 100) bullets.push(`High-volume indicator: ${googleReviewCount} Google reviews.`);
+
+  const formatParts: string[] = [];
+  if (serviceModel?.dineIn?.value === true) formatParts.push("dine-in");
+  if (serviceModel?.collection?.value === true) formatParts.push("takeaway/collection");
+  if (serviceModel?.delivery?.value === true) formatParts.push("delivery");
+  if (formatParts.length) bullets.push(`Service format: ${formatParts.join(", ")}.`);
+
+  if (halalEvidence) bullets.push(`Halal evidence found on official website${halalEvidence.evidenceText ? ` ("${halalEvidence.evidenceText}")` : ""}.`);
+
+  // A specific, evidence-driven call approach — never a generic script. Only the strongest
+  // available signal is used; if no genuine signal exists, no call-approach line is added.
+  const callApproach =
+    hasCatering ? "Call approach: lead with Magna's bulk/catering supply capability — website shows catering evidence." :
+    halalEvidence ? "Call approach: lead with halal-certified product range — halal evidence found on official website." :
+    (branchList.length || franchiseClues.length || centralPurchasingClues.length) ? "Call approach: position as a multi-site/growing account — expansion evidence found." :
+    (googleReviewCount != null && googleReviewCount >= 100) ? "Call approach: position volume-based pricing — strong customer footfall signal." :
+    likelyMagnaProducts.length ? `Call approach: lead with the ${likelyMagnaProducts[0]} product range.` :
+    menuSpecialities.length ? `Call approach: tailor pitch to the ${menuSpecialities[0]} menu range.` :
+    null;
+  if (callApproach) bullets.push(callApproach);
+
   return bullets.length ? bullets.map((b) => `- ${b}`).join("\n") : null;
 }
 
@@ -214,7 +276,28 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext, v
   const leadType = isKeyAccount ? "Key Account" : "New Lead";
 
   const score = f.commercial_score as number | null;
-  const leadUrgency = dossier.finalLevel === "level_0" && (score ?? 0) >= 65 ? "Hot Lead" : dossier.finalLevel === "level_0" || dossier.finalLevel === "level_1" ? "Warm Lead" : "Standard Lead";
+  // Lead Urgency (recalibrated 2026-08-04 per owner correction — "Do not classify most qualified
+  // leads as Hot merely because they passed qualification"):
+  //   Hot Lead  = a key account, OR an unusually strong EVIDENCED opportunity (multi-site/group,
+  //               major catering capability, exceptionally high customer volume, or exceptional
+  //               financial strength) — never awarded on qualification/score alone.
+  //   Warm Lead = a normal qualified/contactable target fitting Magna's profile.
+  //   [nearest approved value to "Cold Lead"] = "Standard Lead" — the approved v1 schema's
+  //               allowedValues are ["Hot Lead", "Warm Lead", "Standard Lead", "Low Priority"];
+  //               "Cold Lead" is not itself an approved value and is never invented/emitted —
+  //               a fully qualified/contactable lead of lower expected value or narrower
+  //               opportunity maps to "Standard Lead" instead (see docs/09_DECISIONS.md).
+  const cuisineServiceModelForUrgency = f.cuisine_service_model as { serviceModel?: Record<"catering", { value: unknown }> | null } | null;
+  const hasMajorCateringEvidence = cuisineServiceModelForUrgency?.serviceModel?.catering?.value === true;
+  const hasMultiSiteEvidence = (groupClass !== "Independent Single Site" && groupClass !== "Unresolved") || ((f.branch_list as string[])?.length ?? 0) >= 3 || ((f.franchise_group_clues as string[])?.length ?? 0) > 0;
+  const hasHighVolumeEvidence = ((f.google_review_count as number) ?? 0) >= 300;
+  const hasExceptionalFinancials = ((f.financial_strength_band as string | null)?.toLowerCase().includes("strong") ?? false);
+  const hasUnusuallyStrongOpportunity = hasMultiSiteEvidence || hasMajorCateringEvidence || hasHighVolumeEvidence || hasExceptionalFinancials;
+  const isQualifiedAndContactable = dossier.qualificationStatus === "qualified" || dossier.qualificationStatus === "qualified_with_channel_limit";
+  const leadUrgency =
+    isKeyAccount || hasUnusuallyStrongOpportunity ? "Hot Lead" :
+    isQualifiedAndContactable && (dossier.finalLevel === "level_0" || dossier.finalLevel === "level_1") ? "Warm Lead" :
+    "Standard Lead";
 
   const sourceDates = (f.source_retrieval_dates as Record<string, string | null>) ?? {};
   const lastVerifiedDate = Object.values(sourceDates).filter(Boolean).sort().pop() ?? null;
@@ -241,9 +324,8 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext, v
   // doesn't itself reflect an earlier stage's confirmation.
   const isExistingCustomer = dossier.v1Bucket === "customer_master_exclusion" || customerStatus === "Confirmed Active Customer" || customerStatus === "Confirmed Inactive Customer" || customerStatus === "Probable Match" || customerStatus === "Possible Match";
 
-  const financialStrengthBandValue = matchEnum(f.financial_strength_band as string, [["strong", "Strong"], ["moderate", "Moderate"], ["weak", "Weak"]]) ?? (f.filed_accounts_available === false ? "Insufficient Data" : null);
-  const note1 = buildNote1OwnershipAndDecisionMaker(f, groupClass);
-  const note2 = buildNote2SalesIntelligence(f, financialStrengthBandValue);
+  const note1 = buildNote1OwnershipAndDecisionMaker(f, groupClass, dossier.tradingName);
+  const note2 = buildNote2SalesIntelligence(f);
 
   const fields: Record<string, unknown> = {
     lead_id: leadId,
