@@ -42,7 +42,8 @@ function mkCustomer(o: Partial<CustomerRecord> = {}): CustomerRecord {
     isActive: o.isActive ?? (statusOutcome === "active" || statusOutcome === "excluded_non_prospect"),
     tradingName: o.tradingName ?? `Customer ${custSeq}`, legalName: o.legalName ?? null,
     companyNumber: o.companyNumber ?? null, address: o.address ?? null, postcode: o.postcode ?? null,
-    phone: o.phone ?? null, email: o.email ?? null, parentGroupAccount: o.parentGroupAccount ?? null,
+    phone: o.phone ?? null, alternatePhones: o.alternatePhones ?? [], email: o.email ?? null, alternateEmails: o.alternateEmails ?? [],
+    parentGroupAccount: o.parentGroupAccount ?? null,
     lastOrderDate: o.lastOrderDate ?? null, assignedSalesperson: o.assignedSalesperson ?? null,
   };
 }

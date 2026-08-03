@@ -46,7 +46,13 @@ export interface CustomerRecord {
   address: string | null;
   postcode: string | null;
   phone: string | null;
+  // Real gap fixed 2026-08-03 (customer-suppression forensic audit): a NetSuite export can carry
+  // a genuine phone/email for the same customer under more than one column (e.g. "Office Phone",
+  // "Invoice WhatsApp Number", "Invoice Email Address") — these are collected here and compared
+  // ALONGSIDE, never instead of, the primary phone/email at every matching stage.
+  alternatePhones: string[];
   email: string | null;
+  alternateEmails: string[];
   parentGroupAccount: string | null;
   lastOrderDate: string | null;
   assignedSalesperson: string | null;

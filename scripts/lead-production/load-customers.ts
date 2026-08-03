@@ -50,7 +50,20 @@ export const CUSTOMER_FIELD_SPECS: FieldSpec[] = [
   // "billing zip" (NetSuite) added alongside the existing aliases.
   { key: "postcode", aliases: ["post code", "post_code", "site postcode", "billing zip"], required: false },
   { key: "phone", aliases: ["telephone", "tel", "phone number", "contact number"], required: false },
+  // Real gap found and fixed 2026-08-03 (customer-suppression forensic audit, board escalation):
+  // a real NetSuite export can carry a phone/contact number under more than one column ("Phone"
+  // AND "Office Phone" AND "Invoice WhatsApp Number") for the SAME customer, but only the single
+  // "phone" field above was ever compared against — a real confirmed leak case ("Al Shukraan Ltd
+  // T/A Al Qasr Restaurant", customer A632) was only reachable via its "Office Phone" column, not
+  // "Phone". These extra columns are collected into alternatePhones (see CustomerRecord) and
+  // compared alongside the primary phone at every matching stage — never treated as a replacement
+  // for it, since some exports genuinely only have the one "Phone" column.
+  { key: "officePhone", aliases: ["office phone", "office_phone", "secondary phone", "alt phone", "alternative phone"], required: false },
+  { key: "invoiceWhatsApp", aliases: ["invoice whatsapp number", "whatsapp", "whatsapp number"], required: false },
   { key: "email", aliases: ["email address", "contact email"], required: false },
+  // Same real gap, for email/domain — "Invoice Email Address" is a distinct real NetSuite column
+  // from "Email" and can carry a different, still-genuine domain for the same customer.
+  { key: "invoiceEmail", aliases: ["invoice email address", "invoice email", "billing email"], required: false },
   { key: "parentGroupAccount", aliases: ["parent account", "group account", "parent_group", "parent/group", "parent group account"], required: false },
   { key: "lastOrderDate", aliases: ["last_order_date", "last order", "last order date"], required: false },
   { key: "assignedSalesperson", aliases: ["sales rep", "sales_rep", "salesperson", "rep", "account manager"], required: false },
@@ -146,6 +159,8 @@ export async function loadCustomerFile(filePath: string): Promise<LoadedCustomer
       address: get(row, "address"),
       postcode: get(row, "postcode"),
       phone: get(row, "phone"),
+      alternatePhones: [get(row, "officePhone"), get(row, "invoiceWhatsApp")].filter((v): v is string => !!v),
+      alternateEmails: [get(row, "invoiceEmail")].filter((v): v is string => !!v),
       email: get(row, "email"),
       parentGroupAccount: get(row, "parentGroupAccount"),
       lastOrderDate: get(row, "lastOrderDate"),

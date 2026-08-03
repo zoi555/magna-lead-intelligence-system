@@ -74,22 +74,22 @@ async function main() {
 
   // --- customer-match-materiality.ts ---
   {
-    const r1 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1NN", candidateName: "Kebabish Original", candidatePhone: null, candidateDomain: null, candidateCompanyNumber: null, matchedCustomer: { postcode: "LU1 1EH", tradingName: "KEBABISH", phone: "01582483848", domain: null, companyNumber: null } });
+    const r1 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1NN", candidateName: "Kebabish Original", candidatePhone: null, candidateDomain: null, candidateCompanyNumber: null, matchedCustomer: { postcode: "LU1 1EH", tradingName: "KEBABISH", phone: "01582483848", alternatePhones: [], domain: null, domains: [], companyNumber: null } });
     assert(r1.material === false, "a matched customer in a materially different postal district is NOT material, regardless of name similarity");
 
-    const r2 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 2NN", candidateName: "Ali Baba's", candidatePhone: null, candidateDomain: null, candidateCompanyNumber: null, matchedCustomer: { postcode: "UB1 2NN", tradingName: "Ali Baba's Ltd T/A Ali Baba's", phone: "02085787786", domain: null, companyNumber: null } });
+    const r2 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 2NN", candidateName: "Ali Baba's", candidatePhone: null, candidateDomain: null, candidateCompanyNumber: null, matchedCustomer: { postcode: "UB1 2NN", tradingName: "Ali Baba's Ltd T/A Ali Baba's", phone: "02085787786", alternatePhones: [], domain: null, domains: [], companyNumber: null } });
     assert(r2.material === true && (r2.evidenceTier === "exact_postcode_and_strong_identity" || r2.evidenceTier === "exact_postcode_and_moderate_identity"), `exact postcode + genuine name correspondence IS material (got tier="${r2.evidenceTier}", outcomeTier="${r2.outcomeTier}")`);
 
-    const r3 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1RR", candidateName: "CakeCo (South Road)", candidatePhone: null, candidateDomain: null, candidateCompanyNumber: null, matchedCustomer: { postcode: "UB1 1SU", tradingName: "ROOSTERS PIRI PIRI (SOUTH ROAD)", phone: null, domain: null, companyNumber: null } });
+    const r3 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1RR", candidateName: "CakeCo (South Road)", candidatePhone: null, candidateDomain: null, candidateCompanyNumber: null, matchedCustomer: { postcode: "UB1 1SU", tradingName: "ROOSTERS PIRI PIRI (SOUTH ROAD)", phone: null, alternatePhones: [], domain: null, domains: [], companyNumber: null } });
     assert(r3.material === false, "same postal district but a different specific postcode, matched only on a generic locality word, is NOT material");
 
-    const r4 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1AA", candidateName: "Totally Different Name", candidatePhone: "020 1234 5678", candidateDomain: null, candidateCompanyNumber: null, matchedCustomer: { postcode: "TW1 1AA", tradingName: "Also A Different Name Entirely", phone: "020 1234 5678", domain: null, companyNumber: null } });
+    const r4 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1AA", candidateName: "Totally Different Name", candidatePhone: "020 1234 5678", candidateDomain: null, candidateCompanyNumber: null, matchedCustomer: { postcode: "TW1 1AA", tradingName: "Also A Different Name Entirely", phone: "020 1234 5678", alternatePhones: [], domain: null, domains: [], companyNumber: null } });
     assert(r4.material === true && r4.evidenceTier === "exact_phone", "an exact phone match is material even with dissimilar names/postcodes");
 
-    const r5 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1AA", candidateName: "X", candidatePhone: null, candidateDomain: null, candidateCompanyNumber: "01234567", matchedCustomer: { postcode: "TW1 1AA", tradingName: "Y", phone: null, domain: null, companyNumber: "1234567" } });
+    const r5 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1AA", candidateName: "X", candidatePhone: null, candidateDomain: null, candidateCompanyNumber: "01234567", matchedCustomer: { postcode: "TW1 1AA", tradingName: "Y", phone: null, alternatePhones: [], domain: null, domains: [], companyNumber: "1234567" } });
     assert(r5.material === true && r5.evidenceTier === "exact_company_number", "an exact Companies House number match is material (zero-padding normalised)");
 
-    const r6 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1AA", candidateName: "X", candidatePhone: null, candidateDomain: "example.co.uk", candidateCompanyNumber: null, matchedCustomer: { postcode: "TW1 1AA", tradingName: "Y", phone: null, domain: "www.example.co.uk", companyNumber: null } });
+    const r6 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1AA", candidateName: "X", candidatePhone: null, candidateDomain: "example.co.uk", candidateCompanyNumber: null, matchedCustomer: { postcode: "TW1 1AA", tradingName: "Y", phone: null, alternatePhones: [], domain: "www.example.co.uk", domains: [], companyNumber: null } });
     assert(r6.material === true && r6.evidenceTier === "exact_domain", "an exact verified domain match is material");
 
     const r7 = assessCustomerMatchMateriality({ candidatePostcode: "UB1 1AA", candidateName: "X", candidatePhone: null, candidateDomain: null, candidateCompanyNumber: null, matchedCustomer: null });

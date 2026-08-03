@@ -50,7 +50,16 @@ export interface MatchedCustomerRecord {
   postcode: string | null;
   tradingName: string;
   phone: string | null;
+  // Real gap fixed 2026-08-03 (customer-suppression forensic audit, board escalation): the only
+  // real call site (run-final-scoring-stage-v2.ts) was passing a hardcoded `domain: null` here,
+  // making the exact_domain confirmation route below permanently dead code in production even
+  // though a genuine domain match existed for a real leaked pilot candidate ("Munchies Peri Peri
+  // - Bromley" vs customer M289's invoice email domain). `alternatePhones`/`domains` accept every
+  // phone/domain the matched customer record carries — never just one — matching CustomerRecord's
+  // own alternatePhones/alternateEmails-derived domains.
+  alternatePhones: string[];
   domain: string | null;
+  domains: string[];
   companyNumber: string | null;
 }
 
@@ -90,15 +99,28 @@ export function assessCustomerMatchMateriality(input: CustomerMatchMaterialityIn
   }
 
   const candPhone = input.candidatePhone ? normalisePhone(input.candidatePhone).comparison : null;
-  const custPhone = cust.phone ? normalisePhone(cust.phone).comparison : null;
-  if (candPhone && custPhone && candPhone === custPhone) {
+  const custPhones = [cust.phone, ...cust.alternatePhones].map((p) => (p ? normalisePhone(p).comparison : null)).filter((p): p is string => !!p);
+  if (candPhone && custPhones.includes(candPhone)) {
     return { material: true, outcomeTier: "confirmed", evidenceTier: "exact_phone", reason: `Exact normalised phone match (${candPhone}).` };
   }
 
+  // Model-defect fix (2026-08-03, customer-suppression forensic audit): a domain match ALONE
+  // was treated as confirmed, unconditionally — but a shared email/website domain can legitimately
+  // be shared across unrelated businesses (a reseller, a shared agency-built site template, a
+  // franchise's central booking domain used by non-affiliated operators) with no other
+  // corroboration at all. The owner's explicit rule requires "exact verified website/email domain
+  // PLUS corroborating name/postcode" for CONFIRMED — domain alone, with a differing trading name
+  // and no postcode agreement, is material enough to hold for review (PROBABLE), never enough on
+  // its own for a permanent hard exclusion.
   const candDomain = input.candidateDomain ? normaliseDomain(input.candidateDomain) : null;
-  const custDomain = cust.domain ? normaliseDomain(cust.domain) : null;
-  if (candDomain && custDomain && candDomain === custDomain) {
-    return { material: true, outcomeTier: "confirmed", evidenceTier: "exact_domain", reason: `Exact verified domain match (${candDomain}).` };
+  const custDomains = [cust.domain, ...cust.domains].map((d) => (d ? normaliseDomain(d) : null)).filter((d): d is string => !!d);
+  if (candDomain && custDomains.includes(candDomain)) {
+    const domainNameSim = nameSimilarity(normaliseName(input.candidateName), normaliseName(cust.tradingName));
+    const domainPostcodeAgrees = !!normalisePostcode(input.candidatePostcode).outward && normalisePostcode(input.candidatePostcode).outward === normalisePostcode(cust.postcode).outward;
+    if (domainNameSim >= IDENTITY_NAME_SIM_FLOOR || domainPostcodeAgrees) {
+      return { material: true, outcomeTier: "confirmed", evidenceTier: "exact_domain", reason: `Exact verified domain match (${candDomain}) plus corroborating ${domainNameSim >= IDENTITY_NAME_SIM_FLOOR ? `name (similarity ${domainNameSim.toFixed(2)})` : "postcode district"}.` };
+    }
+    return { material: true, outcomeTier: "probable", evidenceTier: "exact_domain", reason: `Exact verified domain match (${candDomain}) but the trading name ("${cust.tradingName}") and postal district differ — held for review, not confirmed without corroboration.` };
   }
 
   // Foundational geographic gate: the matched customer's OWN registered postcode must be in the

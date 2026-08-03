@@ -314,10 +314,20 @@ async function main() {
     const priorMatchedCustomerId = chCustRes?.prior_matched_customer_id || null;
     const matchedCustomer = priorMatchedCustomerId ? customerById.get(priorMatchedCustomerId) : null;
     const hasUnresolvedCustomerConflictBefore = chCustRes?.resolution_outcome === "unresolved_customer_match_after_companies_house" && !!priorMatchedCustomerId;
+    // Real gap fixed 2026-08-03 (customer-suppression forensic audit, board escalation): this
+    // call previously passed a hardcoded `domain: null`, which made customer-match-materiality
+    // .ts's exact_domain confirmation route permanently dead code in production — the customer
+    // master has no explicit website/domain column, only Email/Invoice Email Address, so the
+    // domain must be derived from those (same pattern already used in customer-resolution-after-
+    // google.ts). alternatePhones is threaded through too (Office Phone / Invoice WhatsApp
+    // Number), never just the single primary phone.
+    const custDomainsForMateriality = matchedCustomer
+      ? [matchedCustomer.email, ...matchedCustomer.alternateEmails].map((e) => (e && e.includes("@") ? e.split("@")[1] : null)).filter((d): d is string => !!d)
+      : [];
     const materiality = assessCustomerMatchMateriality({
       candidatePostcode: postcode, candidateName: tradingName, candidatePhone: phone, candidateDomain: website?.officialDomain ?? null,
       candidateCompanyNumber: chDecisive ? chResult?.plausibleCompanies?.[0]?.companyNumber ?? null : null,
-      matchedCustomer: matchedCustomer ? { postcode: matchedCustomer.postcode, tradingName: matchedCustomer.tradingName, phone: matchedCustomer.phone, domain: null, companyNumber: matchedCustomer.companyNumber } : null,
+      matchedCustomer: matchedCustomer ? { postcode: matchedCustomer.postcode, tradingName: matchedCustomer.tradingName, phone: matchedCustomer.phone, alternatePhones: matchedCustomer.alternatePhones, domain: custDomainsForMateriality[0] ?? null, domains: custDomainsForMateriality, companyNumber: matchedCustomer.companyNumber } : null,
     });
     if (hasUnresolvedCustomerConflictBefore && materiality.outcomeTier === "confirmed") {
       masterRows.push({

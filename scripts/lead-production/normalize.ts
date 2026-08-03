@@ -125,8 +125,24 @@ export interface NormalisedPostcodeResult {
   outward: string | null;   // district, e.g. "UB1"
 }
 
+// Model-defect fix (2026-08-03, customer-suppression forensic audit): real NetSuite customer
+// exports routinely carry a trailing comma left over from address-field concatenation (e.g.
+// "IG1 4BS," — confirmed on 538/7762, 6.9%, of real non-blank customer postcodes in
+// magna-customers.csv). classifyPostcode() treats ANY non-postcode character, including a lone
+// trailing comma, as `level: "invalid"` and returns a fully blank result (both canonical AND
+// outward null) — silently disabling postcode-based customer matching for those rows entirely,
+// not merely degrading it. Real leaked case: "Al Shukraan Ltd T/A Al Qasr Restaurant" (customer
+// A632, postcode "IG1 4BS,") never matched IG1-21A3E429 "Al Qasr Restaurant" (candidate postcode
+// "IG1 4BS") despite an identical postcode and 0.67 name similarity, because the district gate in
+// customer-match-materiality.ts saw two null outward codes and refused to proceed. Only leading/
+// trailing non-alphanumeric junk is stripped — never internal characters, which could mask a
+// genuinely different postcode.
+function stripPostcodeJunk(s: string): string {
+  return s.replace(/^[^A-Za-z0-9]+/, "").replace(/[^A-Za-z0-9]+$/, "").trim();
+}
+
 export function normalisePostcode(raw: string | null | undefined): NormalisedPostcodeResult {
-  const s = (raw ?? "").toString().trim();
+  const s = stripPostcodeJunk((raw ?? "").toString().trim());
   if (!s) return { canonical: null, outward: null };
   const c = classifyPostcode(s);
   if (c.level === "invalid") return { canonical: null, outward: null };

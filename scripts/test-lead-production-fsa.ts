@@ -31,7 +31,7 @@ function mkCustomer(o: Partial<CustomerRecord> = {}): CustomerRecord {
     rowIndex: 1, customerId: o.customerId ?? "C1", status: o.status ?? "CUSTOMER-Closed Won", lifecycleSource: "inactive_flag",
     lifecycleRawValue: o.isActive === false ? "Yes" : "No", statusOutcome: o.isActive === false ? "inactive" : "active",
     isActive: o.isActive ?? true, tradingName: o.tradingName ?? "Test Diner Ltd", legalName: null, companyNumber: null,
-    address: null, postcode: o.postcode ?? "UB1 1AA", phone: null, email: null, parentGroupAccount: null, lastOrderDate: null, assignedSalesperson: null,
+    address: null, postcode: o.postcode ?? "UB1 1AA", phone: null, alternatePhones: [], email: null, alternateEmails: [], parentGroupAccount: null, lastOrderDate: null, assignedSalesperson: null,
   };
 }
 

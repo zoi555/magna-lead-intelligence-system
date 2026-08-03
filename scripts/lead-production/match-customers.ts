@@ -27,6 +27,20 @@ const PROBABLE_NAME_SIM = 0.3;  // probable-tier floor: postcode match + at leas
 const WEAK_NAME_SIM = 0.3;      // weak-tier floor: name similarity alone
 const PHONE_CONFLICT_FLOOR = 0.15; // below this, a shared phone number is NOT auto-confirmed (flatly conflicting name)
 
+// Model-defect fix (2026-08-03, customer-suppression forensic audit): a name similarity purely
+// from a shared TOWN/AREA suffix (a real, common pattern in this pipeline's trading names, e.g.
+// "Franzos - Ilford" vs an unrelated inactive customer "Peri Peri Chicken Bites (Ilford)") was
+// enough to clear PHONE_CONFLICT_FLOOR on its own (0.2 > 0.15) and wrongly auto-confirm two
+// genuinely unrelated businesses as the same customer purely because a shared/reassigned phone
+// number happened to also share a locality word. Stripped ONLY for the phone-conflict check —
+// never for the postcode-gated probable/weak tiers below, where an independent postcode match
+// already establishes genuine geographic corroboration. Small, explicit, pilot-district-scoped
+// list — never a general gazetteer.
+const LOCATION_SUFFIX_WORDS = new Set(["ilford", "chelmsford", "bromley", "dartford", "romford", "london"]);
+function stripLocationSuffix(normalisedName: string): string {
+  return normalisedName.split(" ").filter((t) => t && !LOCATION_SUFFIX_WORDS.has(t)).join(" ");
+}
+
 interface PairEvaluation {
   tier: MatchTier;
   rules: EvidenceRule[];
@@ -54,8 +68,8 @@ function evaluatePair(candidate: OperationalCandidate, customer: CustomerRecord)
   if (candCompanyNumber && custCompanyNumber && candCompanyNumber === custCompanyNumber) rules.push("exact_company_number");
 
   const candPhone = normalisePhone(candidate.phone).comparison;
-  const custPhone = normalisePhone(customer.phone).comparison;
-  const phonesEqual = !!candPhone && !!custPhone && candPhone === custPhone;
+  const custPhoneCandidates = [customer.phone, ...customer.alternatePhones].map((p) => normalisePhone(p).comparison).filter((p): p is string => !!p);
+  const phonesEqual = !!candPhone && custPhoneCandidates.includes(candPhone);
 
   const candPostcode = normalisePostcode(candidate.postcode).canonical;
   const custPostcode = normalisePostcode(customer.postcode).canonical;
@@ -67,7 +81,11 @@ function evaluatePair(candidate: OperationalCandidate, customer: CustomerRecord)
   const parentExactMatch = !!parentGroupNorm && (parentGroupNorm === candName || (!!candBrand && parentGroupNorm === candBrand));
   if (parentExactMatch) rules.push("verified_parent_branch_relationship");
 
-  if (phonesEqual && bestNameSim >= PHONE_CONFLICT_FLOOR) rules.push("exact_normalised_telephone");
+  const phoneConflictSim = Math.max(
+    candName && custTrading ? nameSimilarity(stripLocationSuffix(candName), stripLocationSuffix(custTrading)) : 0,
+    candName && custLegal ? nameSimilarity(stripLocationSuffix(candName), stripLocationSuffix(custLegal)) : 0,
+  );
+  if (phonesEqual && phoneConflictSim >= PHONE_CONFLICT_FLOOR) rules.push("exact_normalised_telephone");
 
   if (rules.length) {
     const directIdentity = rules.some((r) => r === "exact_company_number" || r === "exact_postcode_exact_name" || r === "exact_normalised_telephone");

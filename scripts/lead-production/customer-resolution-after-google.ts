@@ -60,9 +60,12 @@ export function resolveCustomerMatchAfterGoogle(
   // appears among them — none of these routes accepts postcode or name-overlap alone.
 
   if (gPlace) {
-    const custPhone = normalisePhone(matchedCustomer.phone).comparison;
+    // Real gap fixed 2026-08-03 (customer-suppression forensic audit): compare against every
+    // phone column the customer master carries (Phone + Office Phone + Invoice WhatsApp Number),
+    // never just the primary one — see CustomerRecord.alternatePhones.
+    const custPhones = [matchedCustomer.phone, ...matchedCustomer.alternatePhones].map((p) => normalisePhone(p).comparison).filter((p): p is string => !!p);
     const googlePhone = normalisePhone(gPlace.phone).comparison;
-    if (custPhone && googlePhone && custPhone === googlePhone) {
+    if (googlePhone && custPhones.includes(googlePhone)) {
       evidenceUsed.push(`Exact normalised telephone match: customer "${matchedCustomer.tradingName}" phone matches Google's listed phone for "${gPlace.officialName}".`);
       evidenceUsed.push(`Magna Inactive field is authoritative for lifecycle: isActive=${matchedCustomer.isActive} (source: ${matchedCustomer.lifecycleSource}, raw value "${matchedCustomer.lifecycleRawValue}")`);
       return { ...base, resolutionOutcome: outcome(matchedCustomer.isActive), evidenceUsed };
