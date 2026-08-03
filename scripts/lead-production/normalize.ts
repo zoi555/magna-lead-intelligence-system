@@ -66,11 +66,44 @@ export function normalisePhone(raw: string | null | undefined): NormalisedPhoneR
 // eligibility in run-final-scoring-stage-v2.ts (a real order-of-operations gap: a candidate
 // could be scored as telesales-eligible on a malformed number that was only later stripped at
 // export). All phone-validity checks in this pipeline should now call this one function.
+// Real defect found and fixed 2026-08-04 (campaign-002 five-district-pilot phone-exception
+// audit): all 8 real phone_resolution_exception candidates had a genuinely valid, recoverable UK
+// number that this function rejected outright — un-decoded tel: href URL-encoding
+// ("%2001279713560", "0203%204111%20095"), a redundant national "0" retained after a "+44"
+// prefix ("+4402075179955", 13 digits instead of 12), and two numbers concatenated in one field
+// ("02085488877|02033406787"). The FAST PATH below is UNCHANGED from the original simple check
+// and returns the value verbatim for every number that already passed before (zero formatting/
+// behaviour change for already-accepted data) — the RECOVERY path only engages for a raw value
+// the fast path rejects, and never invents a number that isn't genuinely present in the raw text.
+export function resolveValidUkPhone(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const original = raw.toString();
+
+  // Fast path: identical to the original check. Preserves the original string's own formatting
+  // (spacing, brackets) exactly as supplied for every number already correctly recognised.
+  const simpleDigits = original.replace(/[\s().-]/g, "");
+  if (/^(\+44|0)\d{9,10}$/.test(simpleDigits)) return original;
+
+  // Recovery path: only reached when the raw value failed the simple check above.
+  let decoded = original;
+  try { decoded = decodeURIComponent(original); } catch { /* not URL-encoded / not decodable — use as-is */ }
+  const segments = decoded.split(/[|/;]|\bor\b/i).map((s) => s.trim()).filter(Boolean);
+  for (const segment of segments.length ? segments : [decoded]) {
+    const withoutExtension = segment.replace(/\s*(ext\.?|extn\.?|x)\s*\d+\s*$/i, ""); // trailing extension suffix
+    const hasPlus = /^\s*\+/.test(withoutExtension);
+    let digits = withoutExtension.replace(/[^\d]/g, ""); // also strips hidden/non-breaking/invisible characters
+    if (!digits) continue;
+    // Redundant national "0" retained right after a "+44"/"0044" country-code prefix.
+    if (hasPlus && digits.startsWith("440") && digits.length === 13) digits = "44" + digits.slice(3);
+    else if (!hasPlus && digits.startsWith("00440") && digits.length === 15) digits = "0044" + digits.slice(5);
+    const candidate = (hasPlus ? "+" : "") + digits;
+    if (/^(\+44|0)\d{9,10}$/.test(candidate)) return candidate;
+  }
+  return null;
+}
+
 export function isValidUkPhone(raw: string | null | undefined): boolean {
-  if (!raw) return false;
-  if (raw.includes("%")) return false; // catches un-decoded tel: href artifacts, e.g. "+44%2078854%2003976"
-  const digits = raw.replace(/[\s().-]/g, "");
-  return /^(\+44|0)\d{9,10}$/.test(digits);
+  return resolveValidUkPhone(raw) !== null;
 }
 
 const ADDRESS_ABBREVIATIONS: Record<string, string> = {

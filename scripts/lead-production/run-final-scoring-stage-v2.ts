@@ -22,7 +22,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
 import { writeCsv, parseCsvObjects } from "./csv";
-import { normaliseName, nameSimilarity, isValidUkPhone } from "./normalize";
+import { normaliseName, nameSimilarity, isValidUkPhone, resolveValidUkPhone } from "./normalize";
 import { deriveGoogleOutcome } from "./google-match";
 import { evaluateHardGates, trustworthyCompaniesHouseStatus } from "./hard-gates";
 import { assessPhysicalPremises } from "./physical-premises";
@@ -244,15 +244,21 @@ async function main() {
     const websiteCrawled = !!website?.officialDomain;
     const stagesWithDecisiveEvidence = [googleDecisive, fsaDecisive, chDecisive, websiteCrawled].filter(Boolean).length;
 
-    const phone = website?.phone?.value ?? correctedGoogleBest?.phone ?? null;
-    const phoneSource: "website" | "google" | null = website?.phone?.value ? "website" : correctedGoogleBest?.phone ? "google" : null;
-    // Locked policy (2026-08-02) / order-of-operations fix: eligibility must be judged on the
-    // SAME validated phone value export-time uses (candidate-dossier.ts's resolvedPhone()) —
-    // previously this raw, unvalidated value fed hard-gates/channel-suitability directly, so a
-    // malformed number (e.g. an un-decoded tel: href artifact) could pass eligibility here and
-    // only get stripped later at export, silently changing the candidate's effective channel
-    // eligibility after the Level/qualification decision was already locked in.
-    const validPhone = isValidUkPhone(phone) ? phone : null;
+    // Real defect found and fixed 2026-08-04 (campaign-002 phone-exception audit): this used to
+    // be a plain `website?.phone?.value ?? correctedGoogleBest?.phone ?? null` chain, which only
+    // falls through to Google when the website value is null/undefined — NOT when it's present
+    // but invalid (garbled/wrong-country/malformed). candidate-dossier.ts's resolvedPhone() has
+    // always had the correct 3-tier fallback (website-if-valid -> google-if-website-invalid ->
+    // google-if-none); this scoring-stage phone selection now mirrors it exactly, so eligibility
+    // is judged on the SAME source-selection logic export-time uses, not a narrower one that
+    // silently discarded an already-valid Google phone whenever a website value merely existed.
+    const websitePhoneRaw = website?.phone?.value ?? null;
+    const googlePhoneRaw = correctedGoogleBest?.phone ?? null;
+    let phone: string | null; let phoneSource: "website" | "google" | null;
+    if (isValidUkPhone(websitePhoneRaw)) { phone = resolveValidUkPhone(websitePhoneRaw); phoneSource = "website"; }
+    else if (isValidUkPhone(googlePhoneRaw)) { phone = resolveValidUkPhone(googlePhoneRaw); phoneSource = "google"; }
+    else { phone = null; phoneSource = null; }
+    const validPhone = phone;
     const lat = googleDecisive ? correctedGoogleBest?.latitude ?? null : null;
     const lng = googleDecisive ? correctedGoogleBest?.longitude ?? null : null;
     const hasWebsiteContact = website?.hasContactForm?.value === true || !!website?.email?.value;

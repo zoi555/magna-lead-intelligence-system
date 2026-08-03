@@ -8,7 +8,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { parseCsvObjects } from "./csv";
-import { isValidUkPhone } from "./normalize";
+import { isValidUkPhone, resolveValidUkPhone } from "./normalize";
 
 async function readJson(p: string): Promise<any> { return JSON.parse(await fs.readFile(p, "utf8")); }
 async function readCsvRows(p: string): Promise<Record<string, string>[]> { return (await parseCsvObjects(await fs.readFile(p, "utf8"))).rows; }
@@ -95,9 +95,9 @@ export async function loadCandidateDossiers(dirs: DossierCheckpointDirs): Promis
     const google = googleById.get(candidateId);
     const googlePhone = google?.plausibleResults?.[0]?.phone ?? null;
     const websitePhone = website?.phone?.value ?? null;
-    if (isValidPhone(websitePhone)) return { phone: websitePhone, source: "website", note: null as string | null };
-    if (websitePhone && !isValidPhone(websitePhone) && isValidPhone(googlePhone)) return { phone: googlePhone, source: "google_places", note: `Website-extracted phone "${websitePhone}" failed validation — substituted the verified Google Places phone.` };
-    if (isValidPhone(googlePhone)) return { phone: googlePhone, source: "google_places", note: null };
+    if (isValidPhone(websitePhone)) return { phone: resolveValidUkPhone(websitePhone), source: "website", note: null as string | null };
+    if (websitePhone && !isValidPhone(websitePhone) && isValidPhone(googlePhone)) return { phone: resolveValidUkPhone(googlePhone), source: "google_places", note: `Website-extracted phone "${websitePhone}" failed validation — substituted the verified Google Places phone.` };
+    if (isValidPhone(googlePhone)) return { phone: resolveValidUkPhone(googlePhone), source: "google_places", note: null };
     return { phone: null, source: null, note: null };
   }
 

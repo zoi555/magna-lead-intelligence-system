@@ -22,7 +22,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import * as XLSX from "xlsx";
 import { parseCsvObjects, writeCsv } from "./csv";
-import { isValidUkPhone } from "./normalize";
+import { isValidUkPhone, resolveValidUkPhone } from "./normalize";
 import { loadCandidateDossiers, type Dossier } from "./candidate-dossier";
 import { evaluateBusinessCategoryEligibility } from "./business-category-eligibility";
 import { mapCtoBusinessType, loadCtoBusinessTypeVocabulary, type CtoBusinessTypeVocabulary } from "./cto-business-type-mapping";
@@ -201,17 +201,17 @@ function buildRowsForCandidate(leadId: string, candidateId: string, raw: Awaited
     const websitePhone = website?.phone?.value ?? null;
     let finalVal: string | null, source: string, provider: string, ref: string, date: string, prevValSrc: string, replaced: string, transform: string, reason: string, confidence: string;
     if (isValidPhone(websitePhone)) {
-      finalVal = websitePhone; source = "Website"; provider = "Official business website (crawled)"; ref = website?.phone?.sourceUrl ?? ""; date = websiteDate;
+      finalVal = resolveValidUkPhone(websitePhone); source = "Website"; provider = "Official business website (crawled)"; ref = website?.phone?.sourceUrl ?? ""; date = websiteDate;
       confidence = website?.phone?.confidence ?? "n/a";
       prevValSrc = googlePhone && googlePhone !== websitePhone ? `Google alternate (not selected): ${googlePhone}` : "n/a (no differing alternate)";
-      replaced = "Retained (website preferred by priority order)"; transform = "Validated against UK phone format before acceptance."; reason = "Website-extracted phone is preferred over Google Places when it passes UK phone format validation.";
+      replaced = "Retained (website preferred by priority order)"; transform = websitePhone !== finalVal ? `Recovered from raw value "${websitePhone}" (URL-decoding/multi-number-split/redundant-leading-zero normalisation) then validated against UK phone format.` : "Validated against UK phone format before acceptance."; reason = "Website-extracted phone is preferred over Google Places when it passes UK phone format validation (after normalisation).";
     } else if (websitePhone && isValidPhone(googlePhone)) {
-      finalVal = googlePhone; source = "Google"; provider = "Google Places"; ref = googleRef; date = googleDate; confidence = googleConfidence;
-      prevValSrc = `Website value rejected (failed validation): ${websitePhone}`;
-      replaced = "Replaced (website value failed UK phone format validation)"; transform = "Website value discarded after failing isValidPhone(); Google Places value substituted.";
-      reason = "Website-extracted phone existed but did not match UK phone format — Google Places used as the validated fallback.";
+      finalVal = resolveValidUkPhone(googlePhone); source = "Google"; provider = "Google Places"; ref = googleRef; date = googleDate; confidence = googleConfidence;
+      prevValSrc = `Website value rejected (failed validation even after normalisation): ${websitePhone}`;
+      replaced = "Replaced (website value failed UK phone format validation)"; transform = "Website value discarded after failing isValidPhone() even after normalisation; Google Places value substituted.";
+      reason = "Website-extracted phone existed but did not match UK phone format even after normalisation — Google Places used as the validated fallback.";
     } else if (isValidPhone(googlePhone)) {
-      finalVal = googlePhone; source = "Google"; provider = "Google Places"; ref = googleRef; date = googleDate; confidence = googleConfidence;
+      finalVal = resolveValidUkPhone(googlePhone); source = "Google"; provider = "Google Places"; ref = googleRef; date = googleDate; confidence = googleConfidence;
       prevValSrc = "n/a (website had no phone value)"; replaced = "Supplemented (website had no phone)"; transform = "Validated against UK phone format before acceptance.";
       reason = "No website phone was extracted; Google Places was the only source with a valid phone.";
     } else {

@@ -52,7 +52,13 @@ async function main() {
     assert(isValidUkPhone("07123456789") === true, "a well-formed UK mobile number is valid");
     assert(isValidUkPhone(null) === false, "null is invalid");
     assert(isValidUkPhone("") === false, "empty string is invalid");
-    assert(isValidUkPhone("+44%2078854%2003976") === false, "an un-decoded tel: href artifact (containing '%') is invalid");
+    // 2026-08-04 update: an un-decoded tel: href artifact is no longer rejected outright — the
+    // campaign-002 phone-exception audit found 8 real candidates with exactly this class of raw
+    // value, each containing a genuinely valid, recoverable UK number obscured by URL-encoding.
+    // This fixture decodes to "+44 78854 03976" -> a valid-format UK mobile once normalised; see
+    // test-lead-production-phone-validation.ts for the full real-case regression suite.
+    assert(isValidUkPhone("+44%2078854%2003976") === true, "an un-decoded tel: href artifact IS recoverable when it contains a genuine UK number underneath the URL-encoding");
+    assert(isValidUkPhone("%2Ggarbage%notarealnumber") === false, "a % artifact with no genuine recoverable UK number underneath is still invalid");
     assert(isValidUkPhone("12345") === false, "too short to be a real UK number is invalid");
     assert(isValidUkPhone("+65 4566 743") === false, "a non-UK international number is invalid");
   }
