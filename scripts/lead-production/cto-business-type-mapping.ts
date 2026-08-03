@@ -104,7 +104,7 @@ export function mapCtoBusinessType(dossier: Dossier, vocabulary: CtoBusinessType
   // named approved cuisine-restaurant type).
   for (const tag of cuisineTags) {
     const mapped = CUISINE_TO_APPROVED[tag];
-    if (mapped && vocabulary.values.includes(mapped) && !selected.includes(mapped)) {
+    if (mapped && vocabulary.values.includes(mapped) && !selected.includes(mapped) && selected.length < 3) {
       selected.push(mapped);
       if (method === "fallback_other") { method = "cuisine_specific"; confidence = "high"; reason = `Website cuisine tag "${tag}" maps directly to approved value "${mapped}".`; }
     }

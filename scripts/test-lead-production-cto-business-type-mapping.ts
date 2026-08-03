@@ -77,6 +77,26 @@ async function main() {
   assert(typeof r8.mappingReason === "string" && r8.mappingReason.length > 0, "mappingReason is recorded");
   assert(r8.vocabularyVersion === "cto-business-type-vocabulary-v1", `vocabularyVersion is recorded (got "${r8.vocabularyVersion}")`);
 
+  console.log("\n9. Tier-1 cuisine loop is capped at 3 total values (2026-08-04 fix — real gap: the Tier-1 loop had no `selected.length < 3` guard, so a business with many website cuisine tags, e.g. \"Heernus Kitchen African Restaurant\", could emit far more than the approved 1-principal + up-to-2-secondary limit):");
+  const manyCuisineTags = ["indian", "pakistani", "chinese", "italian", "japanese", "caribbean", "mexican", "turkish", "lebanese"];
+  const r9a = mapCtoBusinessType(mkDossier({ cuisineTags: manyCuisineTags }), vocab);
+  assert(r9a.selectedBusinessTypes.length === 3, `9 distinct cuisine tags (each mapping to a DIFFERENT approved value) still cap at 3 total (got ${r9a.selectedBusinessTypes.length}: ${JSON.stringify(r9a.selectedBusinessTypes)})`);
+  const r9b = mapCtoBusinessType(mkDossier({ cuisineTags: manyCuisineTags, productRangeTags: ["fried chicken", "pizza", "kebab"] }), vocab);
+  assert(r9b.selectedBusinessTypes.length === 3, `Tier 1 filling all 3 slots leaves no room for Tier 2 food-type matches — still capped at 3 total (got ${r9b.selectedBusinessTypes.length}: ${JSON.stringify(r9b.selectedBusinessTypes)})`);
+  assert(r9b.selectedBusinessTypes.every((v) => vocab.values.includes(v)), "every value in the capped result is still from the approved list");
+
+  console.log("\n10. Cap applies uniformly across every mapping tier — no scenario can ever produce a 4th value:");
+  const capScenarios = [
+    mkDossier({ cuisineTags: manyCuisineTags }), // Tier 1 alone
+    mkDossier({ cuisineTags: ["indian", "pakistani"], productRangeTags: ["fried chicken", "pizza", "kebab", "burger"] }), // Tier 1 + Tier 2
+    mkDossier({ cuisineTags: manyCuisineTags, businessType: "Restaurant/Cafe/Canteen" }), // Tier 1 + Tier 3 (Tier 3 only fires when selected is empty, so this proves it never pushes past 3 either)
+    mkDossier({ productRangeTags: ["fried chicken", "pizza", "kebab", "burger"] }), // Tier 2 alone with 4 candidate matches
+  ];
+  for (const s of capScenarios) {
+    const r = mapCtoBusinessType(s, vocab);
+    assert(r.selectedBusinessTypes.length <= 3, `no scenario emits more than 3 values (got ${r.selectedBusinessTypes.length}: ${JSON.stringify(r.selectedBusinessTypes)})`);
+  }
+
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);
   process.exit(fails === 0 ? 0 : 1);
 }
