@@ -481,3 +481,50 @@ cap, Notes rewrite, Lead Urgency recalibration, cross-representative combined Ma
   a code defect. Per the explicit instruction this pass operated under: the CTO lead file was
   regenerated for audit-completeness only (matching the corrected 175-lead population) and is
   explicitly NOT cleared for release/import/team use pending owner review of the leakage audit.
+
+### 2026-08-03 (same day, follow-up) — re-verified against the authoritative CustomersProjects81.csv; 3 new verifier false positives caught and fixed
+
+- Change tested: the audit above was found to have used the wrong customer file
+  (`magna-customers.csv`, SHA-256 `86413f03...`) instead of the owner's actually-authoritative
+  export (`CustomersProjects81.csv`, SHA-256 `f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1`,
+  8050 rows, 4558 active/3492 inactive) — confirmed genuinely different files via checksum, not
+  assumed. Located the sole copy of `CustomersProjects81.csv` on disk (searched
+  `~/Downloads ~/Desktop ~/Documents`), built a versioned local customer-master package
+  (`/Users/homemac/Data/aspectlead-lead-production/input/customer-masters/2026-08-03/`: raw
+  byte-for-byte snapshot verified against the source checksum, manifest, 8050-row identity index,
+  77,386-row alias index, quality report with all 10 required worksheets), verified the existing
+  loader (`load-customers.ts`) already handles this exact 84-column schema correctly with zero
+  code changes needed (8050/8050 rows loaded, 4558/3492 lifecycle split exact), and archived both
+  prior customer-master files (`magna-customers-master.csv` and `magna-customers.csv`) without
+  deleting either.
+- Evidence: reran the full pilot (all 5 districts, zero live provider calls) against the
+  authoritative file. The released usable-lead-ID SET came back byte-identical to the prior
+  (wrong-file) result — same 175 leads, same 2 real leaks (Al Qasr Restaurant, Munchies Peri Peri-
+  Bromley) correctly excluded — so the earlier PASS conclusion held, but had not been formally
+  proven against the right source until this pass. While extending the independent verifier's
+  identifier coverage (trading-name aliases, full address, company/legal name — required by the
+  audit brief), found and fixed 3 real false-positive defects in the NEW routes themselves, caught
+  by the verifier's own regression suite before ever reaching a certificate: an exact T/A alias
+  match alone was wrongly auto-confirmed (real: "Spice Hut", shared by 5 unrelated customers); an
+  exact address match alone was wrongly auto-confirmed (real: "Kings Diner" at the same address as
+  an unrelated customer with a flatly different name); a shared brand-domain match with no
+  geographic agreement was wrongly auto-confirmed (real: "PHAT Buns - Romford" vs a different-
+  company, different-town franchisee sharing only the brand domain). All 3 fixed to match the
+  owner's own explicit corroboration rules. Final result across Master, CTO, and all 5 Sales Pro
+  exports: **PASS, 0 confirmed leaks**, 9 correctly-held probable/review cases. `npm run
+  typecheck`/`build` clean; 27 `test:lead-production-*` suites individually re-run, all ALL
+  PASSED, including 4 new/updated regression assertions with the real false-positive cases as
+  permanent fixtures. Regenerated the owner-review workbook (previously the one outstanding item)
+  against the corrected 175-lead population — no longer outstanding.
+- Files: `scripts/lead-production/verify-customer-leakage.ts`,
+  `scripts/test-lead-production-customer-leakage-verifier.ts`; commits `fa97306` through `42d8eb7`.
+  Not pushed.
+- Remaining risk: 9 probable/held cases require a human decision (Franzos - Ilford, Chocoberry -
+  Ilford, 5× Spice Hut alias matches, PHAT Buns - Romford possible-franchise, Kings Diner
+  same-address) — none released, none silently excluded. The customer-master package's
+  `approvalStatus` is deliberately left `pending_owner_review` in both the manifest and the
+  campaign pointer file — this session did not and cannot unilaterally approve
+  `CustomersProjects81.csv` as the permanent live customer-master snapshot for future campaigns;
+  that decision is reserved for the owner. Two older customer-master files
+  (`magna-customers-master.csv`, `magna-customers.csv`) remain on disk, archived but not deleted,
+  and must not be assumed current for any future campaign without checking the checksum first.

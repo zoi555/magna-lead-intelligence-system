@@ -1044,3 +1044,38 @@ The owner-review workbook (15-sheet audit pack) and CTO-review file were regener
 the corrected 175-lead population where already covered by existing generator scripts; the owner-
 review pack's OWN regeneration for this specific correction pass was not re-run in this turn (out
 of scope for the time available) — flagged so it isn't silently assumed current.
+
+### Update (2026-08-03, same day, follow-up) — wrong authoritative source used for the original audit; re-verified
+
+The owner flagged that the customer file used for the audit above
+(`/Users/homemac/Data/aspectlead-lead-production/input/magna-customers.csv`, 7925 rows) was NOT
+the file the owner had actually supplied as authoritative
+(`CustomersProjects81.csv`, 8050 rows, 4558 active/3492 inactive). Confirmed via SHA-256 — the two
+files are genuinely different (`86413f03...` vs `f1b23cce...`). The board-escalated result above
+was therefore run against the wrong source file and had to be independently re-proven, not merely
+assumed still valid.
+
+**Re-verification result:** reran the full pilot against the authoritative
+`CustomersProjects81.csv` (versioned snapshot, checksum-verified, see
+`/Users/homemac/Data/aspectlead-lead-production/input/customer-masters/2026-08-03/`). The released
+usable-lead-ID set came back byte-identical to the earlier (wrong-file) result — same 175 leads,
+same 2 real leaks (Al Qasr Restaurant, Munchies Peri Peri- Bromley) correctly excluded. The
+original PASS conclusion held, but had not been formally proven against the right file until this
+pass.
+
+**3 further real defects found and fixed** while extending the verifier's identifier coverage
+(trading-name aliases, full address, company/legal name) to close remaining gaps the audit brief
+required — all 3 were false-positive risks in the NEW routes themselves, caught before they could
+ever reach a certificate: an exact T/A alias alone (e.g. "Spice Hut", shared by 5 unrelated
+customers) was wrongly auto-confirmed; an exact address match alone (e.g. "Kings Diner" occupying
+the same premises as an unrelated customer "Madoona's Ltd T/A Morley's") was wrongly auto-
+confirmed; a shared brand-wide domain with no geographic agreement (e.g. "PHAT Buns - Romford" vs
+a different-company, different-town franchisee "Cha Sha Hounslow Ltd T/A Phat buns hounslow") was
+wrongly auto-confirmed. All 3 now correctly require the same corroboration/geographic-gate
+discipline already used elsewhere in this codebase.
+
+**Final result:** PASS across Master, CTO, and all 5 Sales Pro exports — 0 confirmed leaks, 9
+correctly-held probable/review cases. The owner-review workbook (previously flagged Outstanding
+above) was regenerated in this same pass — no longer outstanding. Full detail:
+`docs/10_BUGS_AND_FIXES.md`, `VERIFY_BEFORE_CLAIMING.md` (2026-08-03 follow-up entries). Certificate:
+`/Users/homemac/Downloads/campaign-002-zero-customer-leakage-certificate.json`.

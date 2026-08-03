@@ -1096,3 +1096,47 @@ google.ts`, `scripts/lead-production/customer-match-materiality.ts`,
 `scripts/test-lead-production-customer-suppression-fix.ts`,
 `scripts/test-lead-production-customer-leakage-verifier.ts`, `docs/11_ISSUES_LOG.md` (ISS-0034),
 `docs/09_DECISIONS.md`, `VERIFY_BEFORE_CLAIMING.md` (2026-08-03 entry).
+
+## 2026-08-03 (same day, follow-up) — wrong authoritative customer file used for the first audit; 3 new verifier false positives found and fixed
+
+**BUG (process, not code):** the customer-suppression audit above was run against `magna-
+customers.csv`, not the file the owner had actually supplied as authoritative
+(`CustomersProjects81.csv`). Confirmed via SHA-256 that these are genuinely different files (7925
+vs 8050 rows). Re-ran the full pilot against the authoritative file: the released usable-lead-ID
+set came back byte-identical (same 175 leads, same 2 real leaks), so the PASS conclusion held, but
+had not been formally proven against the correct source until this pass.
+
+**BUG 6:** `verify-customer-leakage.ts`'s new exact-trading-name-alias route treated an alias match
+as confirmed on its own. A T/A-parsed alias is exactly as reusable/generic as a bare trading name —
+real case: "Spice Hut" is an exact alias shared by 5 completely unrelated customers in different
+towns. The owner's own rule requires "exact trading-name alias + postcode" for confirmed — alias
+alone is not enough. **FIX:** alias match now requires postcode agreement to confirm; without it,
+held as probable.
+
+**BUG 7:** the new exact-full-address route treated an address match as confirmed regardless of
+name evidence. Real case: "Kings Diner" occupies the same premises as an unrelated existing
+customer, "Madoona's Ltd T/A Morley's" — a flatly different business name (a genuine "different
+operator moved into the old premises" case). The owner's rule explicitly lists "same address with
+uncertain operator" as probable, never confirmed on address alone. **FIX:** address match now
+requires the name not to conflict, plus postcode or name corroboration, to confirm.
+
+**BUG 8:** the domain-confirmation route accepted name-similarity corroboration with NO geographic
+agreement at all. Real case: "PHAT Buns - Romford" (legal entity "Phat Buns London Ltd") shares
+only its brand-wide domain (phatbuns.co.uk) with "Cha Sha Hounslow Ltd T/A Phat buns hounslow" — a
+different company, in a different town, using a location-prefixed email on the same shared brand
+domain: a textbook multi-franchise-location pattern, not the same business. **FIX:** domain +
+name-corroboration now also requires the same postal district, matching the "foundational
+geographic gate" principle already used throughout this codebase
+(`customer-match-materiality.ts`).
+
+**Verification:** all 3 new bugs were caught by extending the verifier's own regression suite
+before they ever reached a certificate. Final result against the authoritative source, across
+Master, CTO, and all 5 Sales Pro exports: **PASS, 0 confirmed leaks**, 9 correctly-held
+probable/review cases (2 previously known + 7 new). `npm run typecheck`/`build` clean; 27
+`test:lead-production-*` suites individually re-run, all ALL PASSED.
+
+**See also:** `scripts/lead-production/verify-customer-leakage.ts`,
+`scripts/test-lead-production-customer-leakage-verifier.ts`,
+`/Users/homemac/Data/aspectlead-lead-production/input/customer-masters/2026-08-03/` (versioned
+authoritative customer-master package), `docs/11_ISSUES_LOG.md` (ISS-0034 follow-up),
+`VERIFY_BEFORE_CLAIMING.md` (2026-08-03 follow-up entry).

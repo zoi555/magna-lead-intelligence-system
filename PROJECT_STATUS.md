@@ -1453,3 +1453,23 @@ which customer-master file (`magna-customers.csv` vs `magna-customers-master.csv
 genuinely approved snapshot going forward; decide Franzos - Ilford and Chocoberry - Ilford
 (currently held, not released); approve before any push or before the CTO file is used by the
 team.
+
+## Current state — 2026-08-03 (same day, follow-up: re-verified against the true authoritative customer file)
+
+The customer-master file used above (`magna-customers.csv`) was NOT the owner's actually-
+authoritative export. Located the real one (`CustomersProjects81.csv`, 8050 rows, 4558 active/
+3492 inactive, SHA-256 `f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1`),
+confirmed via checksum it's genuinely different, built a versioned local customer-master package
+(`/Users/homemac/Data/aspectlead-lead-production/input/customer-masters/2026-08-03/`), and reran
+the full pilot against it. The released usable-lead-ID set came back byte-identical (same 175
+leads, same 2 real leaks) — the prior PASS conclusion held, now formally proven against the
+correct source. While extending the verifier's identifier coverage, found and fixed 3 new false-
+positive defects in the new routes themselves before they ever reached a certificate (T/A-alias-
+alone, address-alone, and domain-without-geographic-agreement all wrongly auto-confirmed). Final
+result: **PASS** across Master, CTO, and all 5 Sales Pro exports — 0 confirmed leaks, 9 correctly-
+held probable cases. Owner-review workbook regenerated — no longer outstanding.
+
+**Commit:** `42d8eb7` (code/tests only), on top of `fa97306`/`49c03d6`. Not pushed.
+
+**Next action:** owner reviews the 9 probable/held cases and approves (or rejects)
+`CustomersProjects81.csv` as the permanent live customer-master snapshot before any push.
