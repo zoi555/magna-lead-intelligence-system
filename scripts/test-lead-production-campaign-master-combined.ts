@@ -109,7 +109,15 @@ async function main() {
     assert(realUsable.length > 0, `real combined workbook has usable rows (got ${realUsable.length})`);
     assert(Object.keys(realUsable[0]).length === 131, `real combined rows have 131 columns (got ${Object.keys(realUsable[0]).length})`);
     const districtsPresent = new Set(realUsable.map((r) => r["Postcode District"]));
-    for (const d of ["CM1", "IG1", "RM1", "DA1", "BR1"]) assert(districtsPresent.has(d), `real combined workbook includes district ${d} in Operationally Usable Leads`);
+    for (const d of ["CM1", "IG1", "DA1", "BR1"]) assert(districtsPresent.has(d), `real combined workbook includes district ${d} in Operationally Usable Leads`);
+    // RM1 deliberately has ZERO usable rows as of the 2026-08-03 entity-resolution audit: RM1's
+    // only usable-population lead (RM1-015EC5DD, "PHAT Buns - Romford") is a probable customer
+    // match, correctly moved to Held-Review by hold-probable-customer-matches.ts. Losing RM1 from
+    // this sheet is the correct outcome of that fix, not a regression — assert it explicitly so a
+    // future unrelated change that silently drops RM1 rows still gets caught.
+    const realHeld = XLSX.utils.sheet_to_json(realWb.Sheets["Held-Review"], { defval: null }) as Record<string, unknown>[];
+    assert(!districtsPresent.has("RM1"), "RM1 has zero rows in Operationally Usable Leads (its one candidate is a held probable customer match, not released)");
+    assert(realHeld.some((r) => r["Permanent Lead ID"] === "RM1-015EC5DD"), "RM1-015EC5DD (PHAT Buns - Romford) is present in Held-Review, not silently dropped");
     const historicalSheetName = realWb.SheetNames.find((n) => n.startsWith("RM1 Historical"));
     assert(!!historicalSheetName && historicalSheetName.length <= 31, `RM1 historical duplicates sheet name exists and is not silently truncated mid-word by Excel's 31-char limit (got "${historicalSheetName}")`);
     const historicalRows = historicalSheetName ? (XLSX.utils.sheet_to_json(realWb.Sheets[historicalSheetName], { defval: null }) as unknown[]) : [];

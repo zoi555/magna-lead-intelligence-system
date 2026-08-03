@@ -54,6 +54,28 @@ export interface NormalisedPhoneResult {
   e164: string | null;
 }
 
+// Model-defect fix (2026-08-03, entity-resolution audit): a raw customer-master field routinely
+// carries MORE THAN ONE phone number plus free-text annotation in the same cell — real, confirmed
+// on 17 rows of the authoritative customer master's "Office Phone" column alone, e.g.
+// "2045121102/Adnan- 07564235791" (two genuine numbers + a name) or "7888103285 - Nidhi (W/A
+// Order)" (one genuine number + an annotation). normalisePhone() alone strips ALL non-digit
+// characters before validating, so a multi-number cell concatenates every number's digits into
+// one long invalid string and the whole field silently yields nothing. This extracts every
+// digit-run bounded by non-phone-ish characters as an independent candidate and normalises each
+// one separately — a genuine number is recovered regardless of how many others (or how much
+// annotation text) share the same cell. Never invents a number that isn't a literal digit-run
+// already present in the raw text.
+const PHONE_CANDIDATE_RE = /\+?\d[\d\s().-]{6,}\d/g;
+export function extractAllUkPhoneComparisons(raw: string | null | undefined): string[] {
+  const s = (raw ?? "").toString();
+  const results = new Set<string>();
+  for (const candidate of s.match(PHONE_CANDIDATE_RE) ?? []) {
+    const n = normalisePhone(candidate);
+    if (n.comparison) results.add(n.comparison);
+  }
+  return [...results];
+}
+
 export function normalisePhone(raw: string | null | undefined): NormalisedPhoneResult {
   const n = normaliseUkPhone(raw ?? "");
   return { comparison: n.valid ? n.e164 : null, e164: n.valid ? n.e164 : null };

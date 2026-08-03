@@ -98,7 +98,7 @@ async function main() {
     assert(cert.result === "PASS", `real zero-leakage certificate reports PASS (got "${cert.result}")`);
     assert(cert.masterResult === "PASS" && cert.ctoResult === "PASS" && cert.salesProResult === "PASS", `Master/CTO/Sales Pro all individually PASS (got ${cert.masterResult}/${cert.ctoResult}/${cert.salesProResult})`);
     assert(cert.confirmedLeakCount === 0, `real certificate reports 0 confirmed leaks (got ${cert.confirmedLeakCount})`);
-    assert(cert.releasedLeadCount === 175, `real certificate covers the corrected 175-lead usable population (got ${cert.releasedLeadCount})`);
+    assert(cert.releasedLeadCount === 170, `real certificate covers the corrected 170-lead usable population (175 usable minus 5 probable-matched leads now correctly held, got ${cert.releasedLeadCount})`);
     assert(cert.authoritativeCustomerFilename === "CustomersProjects81_raw_snapshot_2026-08-03.csv", `certificate names the authoritative snapshot file (got "${cert.authoritativeCustomerFilename}")`);
     assert(cert.customerMasterChecksum === "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1", `certificate checksum matches the real authoritative CustomersProjects81.csv (got "${cert.customerMasterChecksum}")`);
     assert(cert.customerMasterRowCount === 8050 && cert.activeCount === 4558 && cert.inactiveCount === 3492, `certificate reports the exact authoritative row/active/inactive counts (got ${cert.customerMasterRowCount}/${cert.activeCount}/${cert.inactiveCount})`);

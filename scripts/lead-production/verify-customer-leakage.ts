@@ -21,7 +21,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import * as XLSX from "xlsx";
 import { parseCsv } from "./csv";
-import { normaliseName, normalisePhone, normalisePostcode, normaliseAddress, normaliseDomain, nameSimilarity } from "./normalize";
+import { normaliseName, normalisePhone, extractAllUkPhoneComparisons, normalisePostcode, normaliseAddress, normaliseDomain, nameSimilarity } from "./normalize";
 
 // T/A ("trading as") alias extraction — the real customer master routinely embeds the actual
 // trading name inside the legal/account name (e.g. "Al Shukraan Ltd T/A Al Qasr Restaurant").
@@ -96,7 +96,11 @@ export function buildCustomerIndex(csvText: string): CustomerIndexEntry[] {
       name, legalName,
       aliases: [...new Set(aliasSources.map((a) => normaliseName(a)).filter(Boolean))],
       isActive: (row[iInactive] ?? "").trim().toLowerCase() !== "yes",
-      phones: [...new Set(rawPhones.map((p) => normalisePhone(p).comparison).filter((p): p is string => !!p))],
+      // extractAllUkPhoneComparisons (not a single normalisePhone() call) — a phone-ish column
+      // can carry more than one genuine number plus free-text annotation in the same cell (real,
+      // confirmed on 17 rows of "Office Phone" alone); every genuine number embedded in the cell
+      // must still be a matchable candidate, not just the first/only one.
+      phones: [...new Set(rawPhones.flatMap((p) => extractAllUkPhoneComparisons(p)))],
       emails: [...new Set(rawEmails.map((e) => e.trim().toLowerCase()).filter(Boolean))],
       domains: [...new Set(rawEmails.map((e) => (e.includes("@") ? normaliseDomain(e.split("@")[1]) : null)).filter((d): d is string => !!d))],
       postcode: np.canonical,
@@ -128,7 +132,17 @@ export interface LeakageFinding {
   tier: VerdictTier;
 }
 
-export function verifyLeadAgainstIndex(lead: LeadForVerification, index: CustomerIndexEntry[]): LeakageFinding[] {
+// Extracted so the release-decision path (verifyLeadAgainstIndex, below — unchanged behaviour)
+// and the audit-trail candidate trace (traceLeadCandidates, for the leakage-audit workbook's
+// Phone/Postcode/Address/Fuzzy-Name Trigger Candidate sheets) share exactly one evaluation, never
+// two independently-maintained copies that could silently drift apart. Returns null only when NO
+// candidate signal exists at all between this lead and this customer (nothing to log); otherwise
+// returns the same signals/tier the release path would compute, PLUS "clear" as a real possible
+// tier (a genuine candidate — e.g. an exact postcode match with only weak name correspondence —
+// that was considered and explicitly resolved as not material, not one that silently never
+// existed). verifyLeadAgainstIndex filters "clear" out to preserve its exact prior contract.
+export interface PairEvaluation { signals: string[]; tier: VerdictTier | "clear"; triggerSignals: string[] }
+export function evaluateLeadCustomerPair(lead: LeadForVerification, cust: CustomerIndexEntry): PairEvaluation | null {
   const candPhone = lead.phone ? normalisePhone(lead.phone).comparison : null;
   const candEmail = lead.email ? lead.email.trim().toLowerCase() : null;
   const candDomain = lead.website ? normaliseDomain(lead.website) : null;
@@ -136,11 +150,9 @@ export function verifyLeadAgainstIndex(lead: LeadForVerification, index: Custome
   const candNameNorm = normaliseName(lead.tradingName);
   const candAddressNorm = lead.address ? normaliseAddress(lead.address) : null;
 
-  const findings: LeakageFinding[] = [];
-  for (const cust of index) {
+  {
     if (lead.netsuiteAccountCode && cust.id && lead.netsuiteAccountCode.trim().toUpperCase() === cust.id.trim().toUpperCase()) {
-      findings.push({ lead, customer: cust, signals: ["exact_netsuite_account_code"], tier: "confirmed" });
-      continue;
+      return { signals: ["exact_netsuite_account_code"], tier: "confirmed", triggerSignals: ["netsuite_account_code"] };
     }
     const hasPhone = !!candPhone && cust.phones.includes(candPhone);
     const hasEmail = !!candEmail && cust.emails.includes(candEmail);
@@ -181,7 +193,19 @@ export function verifyLeadAgainstIndex(lead: LeadForVerification, index: Custome
     const addressConfirmed = sameAddress && !nameConflicts && (samePostcode || sim >= MODERATE_NAME_SIM);
     const addressProbable = sameAddress && !addressConfirmed;
 
-    if (!hasPhone && !hasEmail && !hasDomain && !hasExactAlias && !samePostcode && !sameDistrict && !sameAddress) continue;
+    // Every raw candidate signal is recorded as a trigger even when it ultimately resolves
+    // "clear" below — the owner's rule is that phone/postcode must be mandatory triggers that are
+    // always explicitly resolved (confirmed/probable/cleared), never silently invisible.
+    const triggerSignals: string[] = [];
+    if (hasPhone) triggerSignals.push("phone");
+    if (samePostcode) triggerSignals.push("postcode");
+    if (sameAddress) triggerSignals.push("address");
+    if (hasDomain) triggerSignals.push("domain");
+    if (hasEmail) triggerSignals.push("email");
+    if (hasExactAlias) triggerSignals.push("alias");
+    if (!triggerSignals.length && sim >= MODERATE_NAME_SIM) triggerSignals.push("fuzzy_name");
+
+    if (!hasPhone && !hasEmail && !hasDomain && !hasExactAlias && !samePostcode && !sameDistrict && !sameAddress) return null;
 
     const strongSignalCount = [hasPhone, hasEmail, hasDomain, aliasConfirmed, samePostcode].filter(Boolean).length;
     const signals: string[] = [];
@@ -190,7 +214,7 @@ export function verifyLeadAgainstIndex(lead: LeadForVerification, index: Custome
     if (hasDomain) signals.push("exact_domain");
     if (hasExactAlias) signals.push("exact_trading_name_alias");
 
-    let tier: VerdictTier;
+    let tier: VerdictTier | "clear";
     if (strongSignalCount >= 2) {
       // Two independent strong signals — confirmed regardless of name, per the explicit rule.
       tier = "confirmed";
@@ -236,12 +260,49 @@ export function verifyLeadAgainstIndex(lead: LeadForVerification, index: Custome
     } else if (sameDistrict && sim >= STRONG_NAME_SIM) {
       tier = "probable"; signals.push("same_district_strong_name");
     } else {
-      continue; // postcode/district alone with weak/no name correspondence — not material, never reported as a hit
+      // A genuine candidate WAS considered (exact postcode/district/address/alias overlap, or a
+      // fuzzy-name hit) but resolved as not material — explicitly "clear", not silently dropped.
+      // Never release-blocking (unchanged from the prior behaviour); logged here purely for the
+      // audit trail so every mandatory-trigger candidate has a recorded, explicit resolution.
+      tier = "clear";
+      signals.push(samePostcode ? "exact_postcode_weak_name" : sameAddress ? "exact_address_weak_name" : sameDistrict ? "same_district_weak_name" : "fuzzy_name_only");
     }
 
-    findings.push({ lead, customer: cust, signals, tier });
+    return { signals, tier, triggerSignals };
+  }
+}
+
+export function verifyLeadAgainstIndex(lead: LeadForVerification, index: CustomerIndexEntry[]): LeakageFinding[] {
+  const findings: LeakageFinding[] = [];
+  for (const cust of index) {
+    const evaluation = evaluateLeadCustomerPair(lead, cust);
+    if (!evaluation || evaluation.tier === "clear") continue; // preserves the exact prior contract: only confirmed/probable are ever returned here
+    findings.push({ lead, customer: cust, signals: evaluation.signals, tier: evaluation.tier });
   }
   return findings;
+}
+
+export interface CandidateTraceRow {
+  lead: LeadForVerification;
+  customer: CustomerIndexEntry;
+  triggerSignals: string[];
+  signals: string[];
+  tier: VerdictTier | "clear";
+}
+
+// Audit-trail candidate trace — EVERY candidate pair considered (including ones that resolve
+// "clear"), for the leakage-audit workbook's Phone/Postcode/Address/Fuzzy-Name Trigger Candidate
+// sheets. Never used to gate a release decision (verifyLeadAgainstIndex above is the only
+// release-blocking path) — this exists purely so a human reviewer can see that a mandatory
+// trigger (phone, postcode) was genuinely evaluated and explicitly resolved, not silently missed.
+export function traceLeadCandidates(lead: LeadForVerification, index: CustomerIndexEntry[]): CandidateTraceRow[] {
+  const rows: CandidateTraceRow[] = [];
+  for (const cust of index) {
+    const evaluation = evaluateLeadCustomerPair(lead, cust);
+    if (!evaluation) continue;
+    rows.push({ lead, customer: cust, triggerSignals: evaluation.triggerSignals, signals: evaluation.signals, tier: evaluation.tier });
+  }
+  return rows;
 }
 
 export interface LeakageCertificate {
