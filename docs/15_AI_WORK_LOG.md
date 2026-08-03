@@ -1114,3 +1114,42 @@ no new district run, matching the explicit instruction this pass operated under.
   workbooks and local campaign data were written to `/Users/homemac/Downloads/` and never
   committed; code/tests/config/docs commits were made but NOT pushed to
   `origin/feature/mvp-vertical-slice-001` — awaiting owner review of the Downloads deliverables.
+
+## 2026-08-03 (same day) — board escalation: customer-suppression leak investigation and fix (ISS-0034)
+
+A board review found existing Magna customers in the released pilot output. All other work
+stopped per explicit instruction. Full detail: `docs/10_BUGS_AND_FIXES.md`,
+`docs/11_ISSUES_LOG.md` (ISS-0034), `docs/09_DECISIONS.md`, `VERIFY_BEFORE_CLAIMING.md` (all
+2026-08-03 entries). Summary:
+
+1. Forensic audit first disproved the investigation brief's assumed customer-master file path —
+   the pilot actually used `magna-customers.csv`, not `magna-customers-master.csv`, proved via MD5
+   checksum match against every district's own recorded `configHashes.customers`.
+2. Independently re-verified all 177 previously-released usable leads against the real file (own
+   comparison logic, not the pipeline's own recorded match result), finding exactly 2 real
+   confirmed leaks and 2 correctly-ambiguous held cases.
+3. Traced both leaks to concrete, fixable root causes: a postcode-normalisation bug affecting
+   ~7% of real customer postcodes (a trailing-comma NetSuite export artifact), unmapped alternate
+   phone/email columns, and a hardcoded `domain: null` that made an already-built domain-matching
+   route permanently dead code.
+4. Fixed all 3, then found and fixed 2 more defects (a location-word false-positive in the phone-
+   conflict floor, and an unconditional domain-alone confirmation) while proving the fix against
+   real data — both over-exclusion risks, caught only because the audit brief explicitly required
+   testing for them as regression cases.
+5. Built a genuinely independent pre-release leakage verifier
+   (`scripts/lead-production/verify-customer-leakage.ts`) that does not share logic with the main
+   matching pipeline, specifically so a future bug in that pipeline cannot also hide itself from
+   this check.
+6. Reprocessed all 5 pilot districts from already-stored checkpoints (zero live provider calls at
+   any point in this entire investigation) and ran the new verifier: **PASS, 0 confirmed leaks**,
+   usable count 177 → 175.
+7. Added 2 new regression-test suites (40 assertions) with both real leaked cases as permanent
+   fixtures. `npm run typecheck`/`build` clean; 27 `test:lead-production-*` suites individually
+   re-run, all ALL PASSED.
+8. Regenerated the combined Master workbook, CTO final-review file, and the customer-leakage audit
+   workbook/certificate to `/Users/homemac/Downloads/` for owner review — explicitly NOT released/
+   distributed to representatives, per the explicit instruction this pass operated under.
+9. The 15-sheet owner-review workbook was NOT regenerated in this pass — flagged as outstanding
+   in ISS-0034 rather than silently left stale.
+10. Committed the fix (commit `fa97306`, code/tests/config only) but did NOT push — the explicit
+    instruction required owner review of the leakage audit before any push.

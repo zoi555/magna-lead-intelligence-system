@@ -1022,3 +1022,77 @@ review-v1/`, `scripts/test-lead-production-commercial-review.ts`,
 `scripts/test-lead-production-cto-business-type-mapping.ts`, `scripts/test-lead-production-master-
 export.ts`, `scripts/test-lead-production-salespro-export.ts`, `docs/09_DECISIONS.md`,
 `VERIFY_BEFORE_CLAIMING.md` (2026-08-03 entry).
+
+## 2026-08-03 (board escalation) — existing Magna customers leaked into the released pilot output: 5 bugs found and fixed
+
+Severity: **Critical — real existing customers were released as "new leads" to representatives.**
+See `docs/11_ISSUES_LOG.md` ISS-0034 for the full incident record; this entry is the technical
+bug-by-bug detail.
+
+Forensic audit first established the pilot's ACTUAL customer-master file did not match the
+"expected path" it was assumed to be reading — see ISS-0034. Independently re-verifying all 177
+previously-released usable leads against the real, actually-used customer master
+(`magna-customers.csv`, own comparison logic, not trusting the pipeline's own match result) found
+exactly 2 real, confirmed leaks: IG1-21A3E429 "Al Qasr Restaurant" (= inactive customer A632 "Al
+Shukraan Ltd T/A Al Qasr Restaurant") and BR1-0FA2C0D7 "Munchies Peri Peri- Bromley" (= inactive
+customer M289 "IH Trading Kent Ltd T/A Munchies Peri Peri").
+
+**BUG 1 (root cause of leak #1 — Al Qasr Restaurant):** `normalize.ts`'s `normalisePostcode()`
+passed the raw postcode string straight to `classifyPostcode()` with no punctuation stripping. A
+trailing comma left over from NetSuite address-field concatenation — real, confirmed on 538/7762
+(6.9%) of non-blank customer postcodes in the actual customer master, e.g. `"IG1 4BS,"` — made
+`classifyPostcode()` return `level: "invalid"`, so BOTH the canonical postcode AND the coarser
+district-level "outward" code came back `null`. This silently disabled postcode-based customer
+matching entirely for those rows (not merely degraded it) across every stage that uses it,
+including the district-level geographic gate in `customer-match-materiality.ts`. **FIX:** strip
+leading/trailing non-alphanumeric junk before classification (only leading/trailing — never
+internal characters, which could mask a genuinely different postcode).
+
+**BUG 2 (the other half of leak #1):** `load-customers.ts`'s `CUSTOMER_FIELD_SPECS` only ever
+mapped a single "Phone" column. The real customer master carries genuine alternate phone/email
+columns ("Office Phone", "Invoice WhatsApp Number", "Invoice Email Address") that were never
+loaded or compared at all — customer A632's matching phone was only present in "Office Phone".
+**FIX:** `CustomerRecord` now carries `alternatePhones`/`alternateEmails`; compared alongside
+(never instead of) the primary phone/email at every matching stage (`match-customers.ts`,
+`customer-resolution-after-google.ts`, `customer-match-materiality.ts`).
+
+**BUG 3 (root cause of leak #2 — Munchies Peri Peri):** `run-final-scoring-stage-v2.ts` hardcoded
+`domain: null` in its `assessCustomerMatchMateriality()` call, making the module's own
+`exact_domain` confirmation route permanently dead code in production — the code to catch this
+exact case already existed and was simply never wired up. **FIX:** domain is now derived from the
+matched customer's email + alternate emails (same pattern already used in
+`customer-resolution-after-google.ts`).
+
+**BUG 4 (found while proving the fix, real over-exclusion risk — the opposite direction from the
+leak, but explicitly required by the audit's regression-case list):** `match-customers.ts`'s
+`PHONE_CONFLICT_FLOOR` (0.15) could be cleared by nothing more than a shared TOWN/AREA word — real
+case: "Franzos - Ilford" (a genuine new prospect) vs an unrelated inactive customer "Peri Peri
+Chicken Bites (Ilford)" (a reused/reassigned phone number), sharing only the word "ilford", scored
+0.2 similarity and would have been wrongly auto-confirmed as the same business, incorrectly
+excluding a real prospect. **FIX:** a small, explicit, pilot-district-scoped location-word strip
+applied only to this specific conflict check (never to the shared `nameSimilarity()` used
+elsewhere, to avoid unintended blast radius).
+
+**BUG 5 (same category as BUG 4):** `customer-match-materiality.ts` confirmed a domain match
+unconditionally — contrary to the owner's explicit rule ("exact verified website/email domain
+PLUS corroborating name/postcode"). **FIX:** domain alone, without corroboration, is now
+`"probable"` (held for review), never `"confirmed"`.
+
+**Verification:** Independent pre-release leakage verifier built
+(`scripts/lead-production/verify-customer-leakage.ts` — deliberately does not reuse the main
+matcher's tier logic) and run against the corrected, fully reprocessed 5-district pilot (zero live
+provider calls — every stage read from already-stored, phone-fix-reprocessed checkpoints):
+**RESULT: PASS, 0 confirmed leaks**, released usable count 177 → 175 (exactly the 2 real leaks
+removed), 2 correctly-demoted probable/held cases surfaced for human review (Franzos - Ilford,
+Chocoberry - Ilford — neither silently excluded nor silently released). `npm run typecheck`/
+`build` clean; 27 `test:lead-production-*` suites individually re-run, all ALL PASSED, including 2
+new suites (40 assertions total) with the real leaked cases as permanent regression fixtures.
+
+**See also:** `scripts/lead-production/normalize.ts`, `scripts/lead-production/load-customers.ts`,
+`scripts/lead-production/match-customers.ts`, `scripts/lead-production/customer-resolution-after-
+google.ts`, `scripts/lead-production/customer-match-materiality.ts`,
+`scripts/lead-production/run-final-scoring-stage-v2.ts`,
+`scripts/lead-production/verify-customer-leakage.ts`,
+`scripts/test-lead-production-customer-suppression-fix.ts`,
+`scripts/test-lead-production-customer-leakage-verifier.ts`, `docs/11_ISSUES_LOG.md` (ISS-0034),
+`docs/09_DECISIONS.md`, `VERIFY_BEFORE_CLAIMING.md` (2026-08-03 entry).

@@ -1254,3 +1254,43 @@ individually re-run, all ALL PASSED. Full detail: `VERIFY_BEFORE_CLAIMING.md` (2
 `scripts/test-lead-production-master-field-resolver.ts`,
 `scripts/test-lead-production-campaign-master-combined.ts`,
 `scripts/test-lead-production-cto-final-review.ts`, `config/lead-production/salespro-schema-v1.json`.
+
+## 2026-08-03 (board escalation, ISS-0034) — independent pre-release customer-leakage verifier is a new, permanent, mandatory gate
+
+**Decision:** added `scripts/lead-production/verify-customer-leakage.ts` as a standing, reusable
+tool — not a one-off audit script — that independently re-derives every customer-identifier
+comparison from the raw customer master, deliberately never reusing `match-customers.ts`/
+`customer-match-materiality.ts`'s own tier logic. Rationale: the whole incident (ISS-0034) was
+caused by bugs INSIDE the main matching pipeline; a verifier that shares that pipeline's logic
+cannot catch a bug in that same logic. Produces a PASS/FAIL zero-leakage certificate
+(campaign ID, customer-master checksum, active/inactive counts, released count, confirmed/probable
+counts) and a 7-sheet findings workbook (Confirmed Customer Leaks / Probable Customer Matches /
+Active Customer Matches / Inactive Customer Matches / Customer Master Quality / Match Evidence /
+Cleared Pilot Leads).
+
+**Decision:** confirmed (via forensic audit, not assumption) that the five-district-pilot's
+ACTUAL customer-master file is `/Users/homemac/Data/aspectlead-lead-production/input/magna-
+customers.csv` — a real, more complete NetSuite export with a genuine binary "Inactive" lifecycle
+column (4833 active / 3092 inactive / 69 quarantined for no usable identifier) — not `magna-
+customers-master.csv`, an older, incomplete file with no genuine Inactive column that some
+investigation instructions had assumed was in use. Verified via MD5 match between the real file
+and `configHashes.customers` already recorded in every district's `.orchestrator-run-manifest.json`.
+Both files remain on disk; `magna-customers-master.csv` is NOT deleted (may be a legitimate older
+snapshot kept for another purpose) but must never be assumed to be the pilot's customer master
+without checking the hash first.
+
+**Decision:** a "conflicting name evidence" carve-out is now applied to phone/domain-based
+customer matching specifically to strip a small, explicit, pilot-district-scoped set of town/area
+words (Ilford, Chelmsford, Bromley, Dartford, Romford, London) before judging whether two trading
+names genuinely conflict — a bare shared locality word (e.g. both names merely containing
+"Ilford") is never treated as identity corroboration. Deliberately narrow and explicit, matching
+the project's established style (`normalize.ts`'s `SUFFIX_WORDS`) — never a general gazetteer.
+
+**Verification:** see `docs/10_BUGS_AND_FIXES.md` and `docs/11_ISSUES_LOG.md` (ISS-0034,
+2026-08-03 entries) for full technical detail and evidence.
+
+**See also:** `scripts/lead-production/verify-customer-leakage.ts`,
+`scripts/lead-production/normalize.ts`, `scripts/lead-production/load-customers.ts`,
+`scripts/lead-production/match-customers.ts`, `scripts/lead-production/customer-match-
+materiality.ts`, `scripts/test-lead-production-customer-suppression-fix.ts`,
+`scripts/test-lead-production-customer-leakage-verifier.ts`.

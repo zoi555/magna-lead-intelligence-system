@@ -434,3 +434,50 @@ cap, Notes rewrite, Lead Urgency recalibration, cross-representative combined Ma
   historical duplicates correctly excluded). No live discovery run was made against any district
   this session — every export used only already-stored, already-phone-fix-reprocessed
   checkpoints.
+
+### 2026-08-03 (same day, board escalation, ISS-0034) — customer-suppression leak: root cause, fix, independent proof
+
+- Change tested: 5 real defects found and fixed in the customer-suppression system after 2
+  existing Magna customers were found in the released five-district-pilot output (board review):
+  (1) `normalisePostcode()` silently broke on a trailing comma present in 538/7762 (6.9%) of real
+  customer postcodes; (2) "Office Phone"/"Invoice WhatsApp Number"/"Invoice Email Address" columns
+  were never loaded/compared; (3) `run-final-scoring-stage-v2.ts` hardcoded `domain: null`,
+  disabling an already-built domain-matching route; (4) the core matcher's phone-conflict floor
+  could be cleared by a bare shared town/area word alone (a real over-exclusion risk found while
+  proving the fix); (5) domain-alone matches were confirmed unconditionally, contrary to the
+  explicit "domain plus corroborating name/postcode" rule.
+- Evidence: first established the pilot's ACTUAL customer-master file
+  (`/Users/homemac/Data/aspectlead-lead-production/input/magna-customers.csv`) via MD5 match
+  against `configHashes.customers` in every district's `.orchestrator-run-manifest.json` — proving
+  it, not assuming the "expected path" given in the investigation brief was correct (it was not;
+  that path names a different, older, incomplete file the pilot never read). Independently
+  re-verified all 177 previously-released usable leads against the real customer master using a
+  from-scratch comparison (own logic, not the pipeline's own match result), finding exactly 2 real
+  confirmed leaks (IG1-21A3E429 "Al Qasr Restaurant", BR1-0FA2C0D7 "Munchies Peri Peri- Bromley")
+  and 2 correctly-ambiguous probable/held cases. Fixed all 5 code defects; `npm run typecheck`/
+  `build` clean; 27 `test:lead-production-*` suites individually re-run, all ALL PASSED, including
+  2 new suites (40 assertions, both real leaked cases as permanent regression fixtures). Built a
+  new, independent, non-code-sharing pre-release leakage verifier
+  (`scripts/lead-production/verify-customer-leakage.ts`) and ran it against the fully reprocessed
+  5-district pilot (zero live provider calls throughout — every stage read from already-stored,
+  phone-fix-reprocessed checkpoints): **RESULT: PASS, 0 confirmed leaks**, released usable count
+  177 → 175 (exactly the 2 real leaks removed). Certificate:
+  `/Users/homemac/Downloads/campaign-002-zero-leakage-certificate.json`. Findings workbook (all 7
+  required sheets): `/Users/homemac/Downloads/campaign-002-existing-customer-leakage-audit.xlsx`.
+- Files: `scripts/lead-production/normalize.ts`, `scripts/lead-production/load-customers.ts`,
+  `scripts/lead-production/match-customers.ts`, `scripts/lead-production/customer-resolution-
+  after-google.ts`, `scripts/lead-production/customer-match-materiality.ts`,
+  `scripts/lead-production/run-final-scoring-stage-v2.ts`,
+  `scripts/lead-production/verify-customer-leakage.ts` (new), matching test files; commit
+  `fa97306`. Not pushed.
+- Remaining risk: the 15-sheet owner-review workbook was NOT regenerated in this correction pass
+  (out of scope for the time available, flagged explicitly rather than silently left stale — see
+  ISS-0034's "Outstanding" section). 2 real candidates remain correctly held at "probable" rather
+  than confirmed or cleared (Franzos - Ilford, Chocoberry - Ilford) and need a human decision. The
+  customer master's "Office Phone"/"Invoice WhatsApp Number" fix widens matching coverage but the
+  file still has NO company-number column and NO explicit website/domain column at all (domain is
+  derived from email only) — company-number-based matching against this specific customer master
+  remains structurally impossible regardless of code correctness, a genuine data-coverage gap, not
+  a code defect. Per the explicit instruction this pass operated under: the CTO lead file was
+  regenerated for audit-completeness only (matching the corrected 175-lead population) and is
+  explicitly NOT cleared for release/import/team use pending owner review of the leakage audit.

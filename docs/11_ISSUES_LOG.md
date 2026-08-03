@@ -979,3 +979,68 @@ already-released "Operationally Usable Leads" (read-only reference data, never i
 using the same tiered identity-evidence hierarchy already used for cross-district dedup. 10/10
 of the owner's required regression tests pass, including against real historical RM1 data (41 real
 Nauman RM1 leads). Full detail: `docs/09_DECISIONS.md` (2026-08-03 entry).
+
+## ISS-0034 — Existing Magna customers found in the released five-district-pilot output (board escalation)
+
+Date: 2026-08-03
+Severity: **Critical — real existing customers were released as "new leads" to representatives.**
+Owner: Zoeb (escalated from a board review)
+Status: **Resolved 2026-08-03.** 2 real confirmed leaks found and fixed; independent verifier
+proves 0 confirmed leaks in the corrected 175-lead released population. Full technical detail:
+`docs/10_BUGS_AND_FIXES.md` (2026-08-03 entry).
+
+### Problem
+
+The customer-suppression system exists specifically to guarantee this can never happen (`hard-
+gates.ts`'s `not_an_active_magna_customer` gate, and the more comprehensive `customer_master_
+exclusion` terminal-bucket rule added 2026-07-24 — `docs/09_DECISIONS.md`), yet 2 real, currently-
+active-or-inactive Magna customers were released as ordinary new leads in the five-district-pilot
+output that had already been reviewed by the board:
+- IG1-21A3E429 "Al Qasr Restaurant" = customer A632 "Al Shukraan Ltd T/A Al Qasr Restaurant"
+  (inactive lifecycle).
+- BR1-0FA2C0D7 "Munchies Peri Peri- Bromley" = customer M289 "IH Trading Kent Ltd T/A Munchies
+  Peri Peri" (inactive lifecycle).
+
+### Investigation
+
+First established the pilot's ACTUAL customer-master file (`magna-customers.csv`, verified via MD5
+match to `configHashes.customers` in every district's `.orchestrator-run-manifest.json`) did not
+match the file at the "expected path" the investigation brief named (`magna-customers-master.csv`
+— a different, older file with no genuine Inactive lifecycle flag that the pilot never actually
+read). The real file was then independently re-verified against all 177 previously-released usable
+leads using a from-scratch comparison (not trusting the pipeline's own match result), surfacing
+the 2 real leaks above plus 2 correctly-ambiguous cases (see below).
+
+### Root cause (5 defects, all fixed — see `docs/10_BUGS_AND_FIXES.md` for full technical detail)
+
+1. A trailing comma in ~7% of real customer postcodes (a NetSuite export artifact) silently broke
+   postcode normalisation entirely.
+2. The customer master's "Office Phone"/"Invoice WhatsApp Number"/"Invoice Email Address" columns
+   were never loaded or compared — only the single primary "Phone"/"Email" columns were.
+3. `run-final-scoring-stage-v2.ts` hardcoded `domain: null` in its materiality-check call, making
+   an already-built domain-matching capability permanently dead code in production.
+4. (found while proving the fix) The core matcher's phone-conflict floor could be cleared by a
+   bare shared town/area word alone — an over-exclusion risk in the opposite direction, but
+   explicitly required as a regression case by the audit brief.
+5. (same category) Domain-alone matches were confirmed unconditionally, contrary to the explicit
+   "domain plus corroborating name/postcode" rule.
+
+### Resolution
+
+All 5 defects fixed; 2 new regression-test suites added (40 assertions total, including both real
+leaked cases as permanent fixtures — they can never be released again without a test failure). A
+new independent pre-release leakage verifier (`scripts/lead-production/verify-customer-leakage.ts`)
+was built specifically so a future bug in the main matching pipeline cannot also hide itself from
+detection — it does not reuse the main matcher's logic. Run against the corrected, fully
+reprocessed 5-district pilot (zero live provider calls throughout): **PASS, 0 confirmed leaks**,
+2 correctly-flagged probable/held cases for human review (never silently excluded, never silently
+released). Released usable count 177 → 175. Full audit workbook:
+`/Users/homemac/Downloads/campaign-002-existing-customer-leakage-audit.xlsx`; certificate:
+`/Users/homemac/Downloads/campaign-002-zero-leakage-certificate.json`.
+
+### Outstanding
+
+The owner-review workbook (15-sheet audit pack) and CTO-review file were regenerated to reflect
+the corrected 175-lead population where already covered by existing generator scripts; the owner-
+review pack's OWN regeneration for this specific correction pass was not re-run in this turn (out
+of scope for the time available) — flagged so it isn't silently assumed current.

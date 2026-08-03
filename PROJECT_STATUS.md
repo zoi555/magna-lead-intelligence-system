@@ -1419,3 +1419,37 @@ entries).
 
 **Next action:** owner reviews the regenerated Downloads deliverables; push the code/test/config
 commits once approved.
+
+## Current state — 2026-08-03 (board escalation: customer-suppression leak — resolved, verified)
+
+A board review found existing Magna customers in the released pilot output. All other work
+stopped. Full detail: `docs/11_ISSUES_LOG.md` ISS-0034, `docs/10_BUGS_AND_FIXES.md`,
+`docs/09_DECISIONS.md`, `VERIFY_BEFORE_CLAIMING.md` (all 2026-08-03 entries).
+
+- Root cause: the investigation's assumed customer-master file path was wrong (proved via MD5
+  checksum, not assumed) — the pilot actually used `magna-customers.csv`. Independently
+  re-verified all 177 previously-released usable leads and found exactly 2 real confirmed leaks
+  (Al Qasr Restaurant IG1, Munchies Peri Peri BR1), traced to 3 concrete bugs (a postcode-
+  normalisation defect affecting ~7% of real customer postcodes, unmapped alternate phone/email
+  columns, and a hardcoded `domain: null`) plus 2 further over-exclusion-risk defects found while
+  proving the fix.
+- All 5 fixed. Built a genuinely independent pre-release leakage verifier
+  (`verify-customer-leakage.ts`) that does not share logic with the main matcher. Reprocessed all
+  5 districts from already-stored checkpoints (zero live calls) — **verifier result: PASS, 0
+  confirmed leaks**, usable count 177 → 175.
+- `npm run typecheck`/`build` clean; 27 `test:lead-production-*` suites individually re-run, all
+  ALL PASSED, including 2 new suites (40 assertions) with both real leaked cases as permanent
+  regression fixtures.
+- Regenerated to `/Users/homemac/Downloads/` for owner review (not distributed to
+  representatives): combined Master workbook, CTO final-review file, customer-leakage audit
+  workbook (7 required sheets), zero-leakage certificate. The 15-sheet owner-review workbook was
+  NOT regenerated this pass — flagged as outstanding in ISS-0034.
+
+**Commit:** `fa97306` (code/tests/config only). Not pushed — awaiting owner review of the
+leakage audit per the explicit instruction this pass operated under.
+
+**Next action:** owner reviews the customer-leakage audit and zero-leakage certificate; confirm
+which customer-master file (`magna-customers.csv` vs `magna-customers-master.csv`) is the
+genuinely approved snapshot going forward; decide Franzos - Ilford and Chocoberry - Ilford
+(currently held, not released); approve before any push or before the CTO file is used by the
+team.
