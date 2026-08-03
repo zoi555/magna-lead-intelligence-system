@@ -148,10 +148,13 @@ async function main() {
     // 2026-08-04 owner-review correction: "insufficient_category_evidence"/"review_required_
     // business_category" candidates now hold instead of releasing — real UB1 data: 3 usable
     // candidates moved from Operationally Usable Leads into Held-Review as a result (39 -> 36).
-    assert(usableRows.length === 36, `Operationally Usable Leads has exactly 36 rows (got ${usableRows.length}) — down from 39 (3 candidates with review_required/insufficient business-category evidence moved to held, per the 2026-08-04 4-way policy correction)`);
+    // 2026-08-04 trademark-symbol brand-matching fix: "Chaiiwala® - Southall" was leaking through
+    // as usable because the raw-string separator regexes didn't consume the "®" symbol after the
+    // brand word — now correctly caught as a Commercial Review Exclusion (36 -> 35).
+    assert(usableRows.length === 35, `Operationally Usable Leads has exactly 35 rows (got ${usableRows.length}) — down from 36 ("Chaiiwala® - Southall" now correctly caught by the trademark-symbol brand-matching fix)`);
     assert(usableRows.length > 0 && Object.keys(usableRows[0]).length === 129, `every usable row has exactly 129 fields (v2 schema: 107 v1 + 22 new) (got ${Object.keys(usableRows[0] ?? {}).length})`);
     const premiumRows = XLSX.utils.sheet_to_json(wb.Sheets["Premium Level 0"]) as any[];
-    assert(premiumRows.length === 25, `Premium Level 0 has exactly 25 rows (got ${premiumRows.length})`);
+    assert(premiumRows.length === 24, `Premium Level 0 has exactly 24 rows (got ${premiumRows.length}) — down from 25 ("Chaiiwala® - Southall" moved to Commercial Review Exclusions)`);
     const releasableRows = XLSX.utils.sheet_to_json(wb.Sheets["Releasable Level 1"]) as any[];
     assert(releasableRows.length === 11, `Releasable Level 1 has exactly 11 rows (got ${releasableRows.length})`);
     const heldRows = XLSX.utils.sheet_to_json(wb.Sheets["Held-Review"]) as any[];
@@ -160,7 +163,7 @@ async function main() {
     assert(exclusionRows.length === 20, `Customer Master Exclusions has exactly 20 rows (got ${exclusionRows.length})`);
     const excludedRows = XLSX.utils.sheet_to_json(wb.Sheets["Excluded Groups"]) as any[];
     const commercialReviewRows = XLSX.utils.sheet_to_json(wb.Sheets["Commercial Review Exclusions"]) as any[];
-    assert(commercialReviewRows.length === 12, `Commercial Review Exclusions has exactly 12 rows (got ${commercialReviewRows.length}) — 10 brand (incl. "Londis - Southall" via the dash-separated single-word-brand fix) + 2 pharmacy/chemist name-evidence exclusions ("Sherrys Chemist", "Queens Pharmacy") found after the 2026-07-26 rule fix`);
+    assert(commercialReviewRows.length === 13, `Commercial Review Exclusions has exactly 13 rows (got ${commercialReviewRows.length}) — 11 brand (incl. "Londis - Southall" via the dash-separated single-word-brand fix, and "Chaiiwala® - Southall" via the 2026-08-04 trademark-symbol fix) + 2 pharmacy/chemist name-evidence exclusions ("Sherrys Chemist", "Queens Pharmacy") found after the 2026-07-26 rule fix`);
     const hardRejectRows = XLSX.utils.sheet_to_json(wb.Sheets["Hard Rejects"]) as any[];
     // 2026-08-04: businessCategoryExclusionRows was missing from this sum entirely (a pre-
     // existing gap, never surfaced because real UB1 data had 0 café/bubble-tea exclusions until
