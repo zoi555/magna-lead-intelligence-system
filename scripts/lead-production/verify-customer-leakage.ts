@@ -21,7 +21,16 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import * as XLSX from "xlsx";
 import { parseCsv } from "./csv";
-import { normaliseName, normalisePhone, normalisePostcode, normaliseDomain, nameSimilarity } from "./normalize";
+import { normaliseName, normalisePhone, normalisePostcode, normaliseAddress, normaliseDomain, nameSimilarity } from "./normalize";
+
+// T/A ("trading as") alias extraction — the real customer master routinely embeds the actual
+// trading name inside the legal/account name (e.g. "Al Shukraan Ltd T/A Al Qasr Restaurant").
+// Extracted as an explicit, separately-matchable alias, not just left folded into the combined
+// name string nameSimilarity() already tolerates.
+function extractTradingAsAlias(raw: string): string | null {
+  const m = /t\/a\s+(.+?)(?:\s*\(closed\))?$/i.exec(raw);
+  return m ? m[1].trim() : null;
+}
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
 
@@ -44,24 +53,29 @@ function stripLocationWords(normalisedName: string): string {
 }
 
 export interface CustomerIndexEntry {
-  id: string;
+  id: string; // NetSuite entity/customer ID (e.g. "A632") — the column literally named "ID"
+  internalId: string; // NetSuite "Internal ID" — a separate, numeric identifier
   name: string;
+  legalName: string;
+  aliases: string[]; // normalised T/A-parsed trading-name aliases
   isActive: boolean;
   phones: string[]; // normalised
   emails: string[];
   domains: string[]; // normalised, derived from emails
   postcode: string | null; // normalised canonical
   outward: string | null;
+  address: string | null; // normalised (normaliseAddress), for full-address corroboration
 }
 
 export function buildCustomerIndex(csvText: string): CustomerIndexEntry[] {
   const rows = parseCsv(csvText);
   const header = rows[0];
   const idx = (name: string) => header.indexOf(name);
-  const iInactive = idx("Inactive"), iId = idx("ID"), iName = idx("Name"), iCompanyName = idx("Company Name");
+  const iInactive = idx("Inactive"), iId = idx("ID"), iInternalId = idx("Internal ID"), iName = idx("Name"), iCompanyName = idx("Company Name");
   const iPhone = idx("Phone"), iOfficePhone = idx("Office Phone"), iWhatsApp = idx("Invoice WhatsApp Number");
   const iEmail = idx("Email"), iInvoiceEmail = idx("Invoice Email Address");
   const iZip = idx("Billing Zip"), iShipZip = idx("Shipping Zip");
+  const iAddr1 = idx("Billing Address 1"), iAddr2 = idx("Billing Address 2"), iCity = idx("Billing City");
   const missing = [["Inactive", iInactive], ["ID", iId], ["Name", iName]].filter(([, i]) => i === -1).map(([n]) => n);
   if (missing.length) throw new Error(`verify-customer-leakage: customer file is missing required column(s): ${missing.join(", ")}. Refusing to build an incomplete identity index.`);
 
@@ -72,15 +86,22 @@ export function buildCustomerIndex(csvText: string): CustomerIndexEntry[] {
     const rawEmails = [row[iEmail], iInvoiceEmail >= 0 ? row[iInvoiceEmail] : null].filter((v): v is string => !!v);
     const postcodeRaw = row[iZip] || (iShipZip >= 0 ? row[iShipZip] : "");
     const np = normalisePostcode(postcodeRaw);
+    const name = row[iName] || row[iCompanyName] || "";
+    const legalName = iCompanyName >= 0 ? (row[iCompanyName] ?? "") : "";
+    const aliasSources = [name, legalName].map(extractTradingAsAlias).filter((a): a is string => !!a);
+    const addrParts = [iAddr1 >= 0 ? row[iAddr1] : "", iAddr2 >= 0 ? row[iAddr2] : "", iCity >= 0 ? row[iCity] : ""].filter(Boolean);
     entries.push({
       id: row[iId] ?? "",
-      name: row[iName] || row[iCompanyName] || "",
+      internalId: iInternalId >= 0 ? (row[iInternalId] ?? "") : "",
+      name, legalName,
+      aliases: [...new Set(aliasSources.map((a) => normaliseName(a)).filter(Boolean))],
       isActive: (row[iInactive] ?? "").trim().toLowerCase() !== "yes",
       phones: [...new Set(rawPhones.map((p) => normalisePhone(p).comparison).filter((p): p is string => !!p))],
       emails: [...new Set(rawEmails.map((e) => e.trim().toLowerCase()).filter(Boolean))],
       domains: [...new Set(rawEmails.map((e) => (e.includes("@") ? normaliseDomain(e.split("@")[1]) : null)).filter((d): d is string => !!d))],
       postcode: np.canonical,
       outward: np.outward,
+      address: addrParts.length ? normaliseAddress(addrParts.join(", ")) : null,
     });
   }
   return entries;
@@ -95,6 +116,7 @@ export interface LeadForVerification {
   email: string | null;
   website: string | null;
   postcode: string | null;
+  address?: string | null;
   netsuiteAccountCode?: string | null;
 }
 
@@ -112,6 +134,7 @@ export function verifyLeadAgainstIndex(lead: LeadForVerification, index: Custome
   const candDomain = lead.website ? normaliseDomain(lead.website) : null;
   const candPostcode = normalisePostcode(lead.postcode);
   const candNameNorm = normaliseName(lead.tradingName);
+  const candAddressNorm = lead.address ? normaliseAddress(lead.address) : null;
 
   const findings: LeakageFinding[] = [];
   for (const cust of index) {
@@ -122,21 +145,50 @@ export function verifyLeadAgainstIndex(lead: LeadForVerification, index: Custome
     const hasPhone = !!candPhone && cust.phones.includes(candPhone);
     const hasEmail = !!candEmail && cust.emails.includes(candEmail);
     const hasDomain = !!candDomain && cust.domains.includes(candDomain);
+    // Exact trading-name alias match (the T/A-parsed name, e.g. candidate "Al Qasr Restaurant"
+    // against customer "Al Shukraan Ltd T/A Al Qasr Restaurant"'s parsed alias "al qasr
+    // restaurant") — a direct identity match, not merely a similarity score.
+    const hasExactAlias = !!candNameNorm && cust.aliases.includes(candNameNorm);
+    // Compared against BOTH the trading name and the separate legal/company name column — a
+    // candidate can genuinely match either (the user explicitly requires "company/legal names"
+    // as its own tested identifier, not folded silently into the trading-name comparison).
     const custNameNorm = normaliseName(cust.name);
-    const sim = candNameNorm && custNameNorm ? nameSimilarity(candNameNorm, custNameNorm) : 0;
+    const custLegalNameNorm = cust.legalName ? normaliseName(cust.legalName) : "";
+    const sim = Math.max(
+      candNameNorm && custNameNorm ? nameSimilarity(candNameNorm, custNameNorm) : 0,
+      candNameNorm && custLegalNameNorm ? nameSimilarity(candNameNorm, custLegalNameNorm) : 0,
+    );
     const conflictSim = nameSimilarity(stripLocationWords(candNameNorm), stripLocationWords(custNameNorm));
     const nameConflicts = conflictSim < CONFLICTING_NAME_FLOOR; // essentially unrelated names (ignoring a merely-shared town/area word) — a reassigned number/address, not the same business
     const samePostcode = !!candPostcode.canonical && candPostcode.canonical === cust.postcode;
     const sameDistrict = !!candPostcode.outward && candPostcode.outward === cust.outward;
     const nameCorroborates = sim >= MODERATE_NAME_SIM;
+    // Full-address corroboration — genuinely useful when a full postcode isn't available but a
+    // free-text address is (a common gap pre-enrichment); never a substitute for postcode when
+    // the postcode itself disagrees.
+    const addressSim = candAddressNorm && cust.address ? nameSimilarity(candAddressNorm, cust.address) : 0;
+    const sameAddress = addressSim >= STRONG_NAME_SIM && (!candPostcode.outward || !cust.outward || candPostcode.outward === cust.outward);
+    // Model-defect fix (2026-08-03, authoritative-source rerun): an exact trading-name alias
+    // (T/A-parsed) is just as reusable/generic as a bare trading name — real case: "Spice Hut" is
+    // an exact T/A alias shared by 5 completely unrelated customers in different towns. The
+    // owner's own rule requires "exact trading-name alias + postcode" for CONFIRMED — alias alone
+    // is never enough. Likewise "same address with uncertain operator" is explicitly listed as
+    // PROBABLE, not confirmed — a different, unrelated business can genuinely occupy a former
+    // customer's old premises (real case: "Kings Diner" at the same address as "Madoona's Ltd
+    // T/A Morley's - Downham", a flatly different name).
+    const aliasConfirmed = hasExactAlias && samePostcode;
+    const aliasProbable = hasExactAlias && !samePostcode;
+    const addressConfirmed = sameAddress && !nameConflicts && (samePostcode || sim >= MODERATE_NAME_SIM);
+    const addressProbable = sameAddress && !addressConfirmed;
 
-    if (!hasPhone && !hasEmail && !hasDomain && !samePostcode && !sameDistrict) continue;
+    if (!hasPhone && !hasEmail && !hasDomain && !hasExactAlias && !samePostcode && !sameDistrict && !sameAddress) continue;
 
-    const strongSignalCount = [hasPhone, hasEmail, hasDomain, samePostcode].filter(Boolean).length;
+    const strongSignalCount = [hasPhone, hasEmail, hasDomain, aliasConfirmed, samePostcode].filter(Boolean).length;
     const signals: string[] = [];
     if (hasPhone) signals.push("exact_phone");
     if (hasEmail) signals.push("exact_email");
     if (hasDomain) signals.push("exact_domain");
+    if (hasExactAlias) signals.push("exact_trading_name_alias");
 
     let tier: VerdictTier;
     if (strongSignalCount >= 2) {
@@ -149,16 +201,36 @@ export function verifyLeadAgainstIndex(lead: LeadForVerification, index: Custome
     } else if ((hasPhone || hasEmail) && nameConflicts) {
       tier = "probable";
       signals.push("conflicting_name_evidence");
-    } else if (hasDomain && (nameCorroborates || samePostcode)) {
+    } else if (aliasConfirmed) {
+      tier = "confirmed"; signals.push("alias_plus_postcode");
+    } else if (aliasProbable) {
+      tier = "probable"; signals.push("alias_without_postcode_corroboration");
+    } else if (hasDomain && samePostcode) {
       // Domain alone requires corroborating name OR postcode to confirm, per the explicit rule
       // ("exact verified website/email domain plus corroborating name/postcode").
       tier = "confirmed";
-      signals.push(nameCorroborates ? "corroborating_name" : "corroborating_postcode");
+      signals.push("corroborating_postcode");
+    } else if (hasDomain && nameCorroborates && sameDistrict) {
+      // Model-defect fix (2026-08-03, authoritative-source rerun): name corroboration alone,
+      // with NO geographic agreement at all, is not enough for a shared domain — a brand-wide
+      // domain used across multiple independent franchise locations (real case: "phatbuns.co.uk",
+      // shared by "PHAT Buns - Romford" (legal entity "Phat Buns London Ltd") and an unrelated
+      // franchisee "Cha Sha Hounslow Ltd T/A Phat buns hounslow" in a different town/company
+      // entirely) is exactly the "possible branch/successor relationship" case the owner's rules
+      // put in the PROBABLE tier, never confirmed on domain+name alone. Requiring at least the
+      // same postal DISTRICT here matches the same geographic-gate principle already used
+      // throughout this codebase (customer-match-materiality.ts's "foundational geographic gate").
+      tier = "confirmed";
+      signals.push("corroborating_name_same_district");
     } else if (hasDomain) {
       tier = "probable";
-      signals.push("differing_trading_name");
+      signals.push(nameCorroborates ? "corroborating_name_different_district_possible_franchise" : "differing_trading_name");
     } else if (samePostcode && sim >= STRONG_NAME_SIM) {
       tier = "confirmed"; signals.push("exact_postcode_strong_name");
+    } else if (addressConfirmed) {
+      tier = "confirmed"; signals.push("exact_full_address_plus_corroboration");
+    } else if (addressProbable) {
+      tier = "probable"; signals.push("exact_address_uncertain_operator");
     } else if (samePostcode && sim >= MODERATE_NAME_SIM) {
       tier = "probable"; signals.push("exact_postcode_moderate_name");
     } else if (sameDistrict && sim >= STRONG_NAME_SIM) {
@@ -174,16 +246,42 @@ export function verifyLeadAgainstIndex(lead: LeadForVerification, index: Custome
 
 export interface LeakageCertificate {
   campaignId: string;
+  authoritativeCustomerFilename: string;
   customerMasterChecksum: string;
   customerMasterPath: string;
+  customerMasterRowCount: number;
   activeCount: number;
   inactiveCount: number;
   releasedLeadCount: number;
   matchTestsPerformed: string[];
   confirmedLeakCount: number;
+  confirmedMatchesRemovedDuringReprocessing: number | null;
   probableMatchCount: number;
+  masterResult: "PASS" | "FAIL";
+  ctoResult: "PASS" | "FAIL" | "NOT_CHECKED";
+  salesProResult: "PASS" | "FAIL" | "NOT_CHECKED";
   result: "PASS" | "FAIL";
+  verificationTimestamp: string;
   generatedAt: string;
+  verifierCommitHash: string;
+}
+
+async function verifySheet(wbPath: string, sheetName: string, index: CustomerIndexEntry[]): Promise<{ leads: LeadForVerification[]; findings: LeakageFinding[] }> {
+  const wb = XLSX.readFile(wbPath);
+  const ws = wb.Sheets[sheetName];
+  if (!ws) throw new Error(`${wbPath}: no "${sheetName}" sheet found.`);
+  const rows = XLSX.utils.sheet_to_json(ws, { defval: null }) as Record<string, unknown>[];
+  const leads: LeadForVerification[] = rows.map((r) => ({
+    leadId: String(r["Permanent Lead ID"] ?? r["Lead ID"] ?? ""), district: String(r["Postcode District"] ?? r["District"] ?? ""),
+    representative: (r["Assigned Representative"] as string) || (r["Sales Rep"] as string) || null,
+    tradingName: String(r["Trading Name"] ?? r["Shop Name"] ?? ""), phone: (r["Main Phone"] as string) || (r["Phone"] as string) || null,
+    email: (r["Verified Email"] as string) || (r["Email"] as string) || null, website: (r["Website"] as string) || null,
+    postcode: (r["Full Postcode"] as string) || (r["Postcode"] as string) || null, address: (r["Full Operating Address"] as string) || (r["Address Line 1"] as string) || null,
+    netsuiteAccountCode: (r["NetSuite Customer Account Code"] as string) || null,
+  }));
+  const findings: LeakageFinding[] = [];
+  for (const lead of leads) findings.push(...verifyLeadAgainstIndex(lead, index));
+  return { leads, findings };
 }
 
 async function main() {
@@ -192,55 +290,88 @@ async function main() {
   const campaignId = arg("campaign-id");
   const outJson = arg("out-json");
   const outXlsx = arg("out-xlsx");
+  const ctoReviewPath = arg("cto-review");
+  const salesProNewLeadsPaths = (arg("salespro-new-leads") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const removedCountArg = arg("removed-count");
   if (!combinedMasterPath || !customersPath || !campaignId || !outJson) {
-    console.error("Missing required argument(s): --combined-master=<path> --customers=<path> --campaign-id=<id> --out-json=<path> [--out-xlsx=<path>]");
+    console.error("Missing required argument(s): --combined-master=<path> --customers=<path> --campaign-id=<id> --out-json=<path> [--out-xlsx=<path>] [--cto-review=<path>] [--salespro-new-leads=<path,path,...>] [--removed-count=<n>]");
     process.exit(1);
   }
 
   const { createHash } = await import("node:crypto");
+  const { execSync } = await import("node:child_process");
+  let verifierCommitHash = "unknown";
+  try { verifierCommitHash = execSync("git rev-parse HEAD", { cwd: process.cwd() }).toString().trim(); } catch { /* not fatal — reported as "unknown" */ }
+
   const customersCsv = await fs.readFile(customersPath, "utf8");
   const checksum = createHash("sha256").update(customersCsv).digest("hex");
   const index = buildCustomerIndex(customersCsv);
   console.log(`Customer identity index: ${index.length} records (${index.filter((c) => c.isActive).length} active, ${index.filter((c) => !c.isActive).length} inactive), checksum ${checksum}.`);
 
-  const wb = XLSX.readFile(combinedMasterPath);
-  const ws = wb.Sheets["Operationally Usable Leads"];
-  if (!ws) throw new Error(`${combinedMasterPath}: no "Operationally Usable Leads" sheet found.`);
-  const rows = XLSX.utils.sheet_to_json(ws, { defval: null }) as Record<string, unknown>[];
-
-  const leads: LeadForVerification[] = rows.map((r) => ({
-    leadId: String(r["Permanent Lead ID"] ?? ""), district: String(r["Postcode District"] ?? ""),
-    representative: (r["Assigned Representative"] as string) || null,
-    tradingName: String(r["Trading Name"] ?? ""), phone: (r["Main Phone"] as string) || null,
-    email: (r["Verified Email"] as string) || null, website: (r["Website"] as string) || null,
-    postcode: (r["Full Postcode"] as string) || null, netsuiteAccountCode: (r["NetSuite Customer Account Code"] as string) || null,
-  }));
-
-  const allFindings: LeakageFinding[] = [];
-  for (const lead of leads) allFindings.push(...verifyLeadAgainstIndex(lead, index));
+  const { leads, findings: allFindings } = await verifySheet(combinedMasterPath, "Operationally Usable Leads", index);
   const confirmed = allFindings.filter((f) => f.tier === "confirmed");
   const probable = allFindings.filter((f) => f.tier === "probable");
+  const masterResult: "PASS" | "FAIL" = confirmed.length === 0 ? "PASS" : "FAIL";
 
-  console.log(`\nReleased lead population: ${leads.length}`);
+  console.log(`\nReleased lead population (Master): ${leads.length}`);
   console.log(`Confirmed leaks: ${confirmed.length}`);
   for (const f of confirmed) console.log(`  BLOCK: ${f.lead.leadId} "${f.lead.tradingName}" -> customer ${f.customer.id} "${f.customer.name}" (${f.customer.isActive ? "active" : "inactive"}) [${f.signals.join(", ")}]`);
   console.log(`Probable matches (held, not release-blocking on their own, reported for review): ${probable.length}`);
   for (const f of probable) console.log(`  REVIEW: ${f.lead.leadId} "${f.lead.tradingName}" -> customer ${f.customer.id} "${f.customer.name}" (${f.customer.isActive ? "active" : "inactive"}) [${f.signals.join(", ")}]`);
 
-  const result: LeakageCertificate["result"] = confirmed.length === 0 ? "PASS" : "FAIL";
+  let ctoResult: LeakageCertificate["ctoResult"] = "NOT_CHECKED";
+  let ctoConfirmed: LeakageFinding[] = [];
+  if (ctoReviewPath) {
+    const ctoCheck = await verifySheet(ctoReviewPath, "CTO Final Review", index);
+    ctoConfirmed = ctoCheck.findings.filter((f) => f.tier === "confirmed");
+    ctoResult = ctoConfirmed.length === 0 ? "PASS" : "FAIL";
+    console.log(`\nCTO final-review population: ${ctoCheck.leads.length}, confirmed leaks: ${ctoConfirmed.length} -> ${ctoResult}`);
+  }
+
+  let salesProResult: LeakageCertificate["salesProResult"] = "NOT_CHECKED";
+  const salesProConfirmedAll: LeakageFinding[] = [];
+  if (salesProNewLeadsPaths.length) {
+    for (const p of salesProNewLeadsPaths) {
+      const { parseCsvObjects } = await import("./csv");
+      const parsed = parseCsvObjects(await fs.readFile(p, "utf8"));
+      const spLeads: LeadForVerification[] = parsed.rows.map((r) => ({
+        leadId: r["Permanent Lead ID"] ?? "", district: r["Inward Code"] ?? "", tradingName: r["Shop Name"] ?? "",
+        phone: r["Phone"] || null, email: r["Email"] || null, website: null, postcode: r["Postcode"] || null,
+        address: null, netsuiteAccountCode: r["Customer NetSuite Account Code"] || null,
+      }));
+      for (const lead of spLeads) salesProConfirmedAll.push(...verifyLeadAgainstIndex(lead, index).filter((f) => f.tier === "confirmed"));
+    }
+    salesProResult = salesProConfirmedAll.length === 0 ? "PASS" : "FAIL";
+    console.log(`\nSales Pro new-leads files checked: ${salesProNewLeadsPaths.length}, confirmed leaks: ${salesProConfirmedAll.length} -> ${salesProResult}`);
+  }
+
+  const overallResult: LeakageCertificate["result"] = [masterResult, ctoResult === "NOT_CHECKED" ? "PASS" : ctoResult, salesProResult === "NOT_CHECKED" ? "PASS" : salesProResult].every((r) => r === "PASS") ? "PASS" : "FAIL";
+  const nowIso = new Date().toISOString();
   const certificate: LeakageCertificate = {
-    campaignId, customerMasterChecksum: checksum, customerMasterPath: customersPath,
+    campaignId,
+    authoritativeCustomerFilename: path.basename(customersPath),
+    customerMasterChecksum: checksum, customerMasterPath: customersPath, customerMasterRowCount: index.length,
     activeCount: index.filter((c) => c.isActive).length, inactiveCount: index.filter((c) => !c.isActive).length,
     releasedLeadCount: leads.length,
-    matchTestsPerformed: ["netsuite_account_code", "exact_phone (incl. alternate phone columns)", "exact_email", "exact_domain", "exact_postcode+name", "same_district+strong_name"],
-    confirmedLeakCount: confirmed.length, probableMatchCount: probable.length, result,
-    generatedAt: new Date().toISOString(),
+    matchTestsPerformed: [
+      "netsuite_account_code", "exact_phone (Phone + Office Phone + Invoice WhatsApp Number)",
+      "exact_email (Email + Invoice Email Address)", "exact_domain_with_corroboration",
+      "exact_postcode_with_punctuation_stripped", "exact_full_address", "trading_name_alias (T/A-parsed)",
+      "company_legal_name", "exact_postcode+name", "same_district+strong_name",
+      "parent_branch_relationship (no usable data in this customer master — Account column is 99.98% blank)",
+      "active_customers", "inactive_customers",
+    ],
+    confirmedLeakCount: confirmed.length,
+    confirmedMatchesRemovedDuringReprocessing: removedCountArg ? Number(removedCountArg) : null,
+    probableMatchCount: probable.length,
+    masterResult, ctoResult, salesProResult, result: overallResult,
+    verificationTimestamp: nowIso, generatedAt: nowIso, verifierCommitHash,
   };
 
   await fs.mkdir(path.dirname(outJson), { recursive: true });
   await fs.writeFile(outJson, JSON.stringify(certificate, null, 2));
   console.log(`\nZero-leakage certificate: ${outJson}`);
-  console.log(`RESULT: ${result}`);
+  console.log(`RESULT: ${overallResult} (Master: ${masterResult}, CTO: ${ctoResult}, Sales Pro: ${salesProResult})`);
 
   if (outXlsx) {
     const clearedLeadIds = new Set(leads.map((l) => l.leadId));
@@ -301,6 +432,6 @@ async function main() {
     console.log(`Findings workbook: ${outXlsx}`);
   }
 
-  if (result === "FAIL") process.exit(1);
+  if (overallResult === "FAIL") process.exit(1);
 }
 if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
