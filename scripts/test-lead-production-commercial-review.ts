@@ -118,7 +118,7 @@ async function main() {
   console.log("\n7. Registry loader validates the real commercial-review-v1 files on disk:");
   const realRegistry = await loadCommercialReviewRegistry("config/lead-production/commercial-review-v1");
   assert(realRegistry.keepBrands.length === 28, `real registry has 28 keep brands (got ${realRegistry.keepBrands.length})`);
-  assert(realRegistry.excludeBrands.length === 116, `real registry has 116 exclude brands after the 2026-08-02 union addition (Boots, Burger King, Greene King) (got ${realRegistry.excludeBrands.length})`);
+  assert(realRegistry.excludeBrands.length === 117, `real registry has 117 exclude brands after the 2026-08-02 union addition (Boots, Burger King, Greene King) + 2026-08-04 owner correction (Haute Dolci) (got ${realRegistry.excludeBrands.length})`);
   assert(realRegistry.excludeBrands.includes("Boots"), "\"Boots\" is on the real exclude list");
   assert(realRegistry.excludeBrands.includes("Burger King"), "\"Burger King\" is on the real exclude list");
   assert(realRegistry.excludeBrands.includes("Greene King"), "\"Greene King\" is on the real exclude list");
