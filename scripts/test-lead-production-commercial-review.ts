@@ -110,6 +110,17 @@ async function main() {
   const r6b2 = evaluateBrandDecision(pearlChemistExact, registry);
   assert(r6b2.excluded === true, "case-insensitive: 'PEARL CHEMIST BYFLEET' also matches");
 
+  console.log("\n6c. Trademark symbol between brand word and separator (2026-08-04 fix — real gap: 'Chaiiwala® - Ilford Lane' never matched brand 'Chaiiwala'):");
+  const chaiiwalaTrademark = mkDossier({ tradingName: "Chaiiwala® - Ilford Lane" });
+  const r6c = evaluateBrandDecision(chaiiwalaTrademark, registry);
+  assert(r6c.excluded === true, "'Chaiiwala® - Ilford Lane' (® directly after the brand word) matches single-word EXCLUDE brand 'Chaiiwala'");
+  const chaiiwalaPlain = mkDossier({ tradingName: "Chaiiwala - Southall" });
+  const r6c2 = evaluateBrandDecision(chaiiwalaPlain, registry);
+  assert(r6c2.excluded === true, "'Chaiiwala - Southall' (no trademark symbol) still matches — the fix is additive, never a regression");
+  const chaiiwalaTM = mkDossier({ tradingName: "Chaiiwala™ - Wembley" });
+  const r6c3 = evaluateBrandDecision(chaiiwalaTM, registry);
+  assert(r6c3.excluded === true, "'Chaiiwala™ - Wembley' (™ symbol) also matches");
+
   console.log("\n6. Unaffected independent business retention — combined evaluator returns not-excluded and no matched rule:");
   const genuineIndependent = mkDossier({ tradingName: "Southall Tandoori Grill House", businessType: "Restaurant/Cafe/Canteen" });
   const r6 = evaluateCommercialReviewExclusion(genuineIndependent, registry);
@@ -117,11 +128,19 @@ async function main() {
 
   console.log("\n7. Registry loader validates the real commercial-review-v1 files on disk:");
   const realRegistry = await loadCommercialReviewRegistry("config/lead-production/commercial-review-v1");
-  assert(realRegistry.keepBrands.length === 28, `real registry has 28 keep brands (got ${realRegistry.keepBrands.length})`);
-  assert(realRegistry.excludeBrands.length === 117, `real registry has 117 exclude brands after the 2026-08-02 union addition (Boots, Burger King, Greene King) + 2026-08-04 owner correction (Haute Dolci) (got ${realRegistry.excludeBrands.length})`);
+  assert(realRegistry.keepBrands.length === 27, `real registry has 27 keep brands after the 2026-08-04 Black Sheep Coffee reclassification (got ${realRegistry.keepBrands.length})`);
+  assert(realRegistry.excludeBrands.length === 118, `real registry has 118 exclude brands after the 2026-08-02 union addition (Boots, Burger King, Greene King) + 2026-08-04 owner corrections (Haute Dolci, Black Sheep Coffee) (got ${realRegistry.excludeBrands.length})`);
   assert(realRegistry.excludeBrands.includes("Boots"), "\"Boots\" is on the real exclude list");
   assert(realRegistry.excludeBrands.includes("Burger King"), "\"Burger King\" is on the real exclude list");
   assert(realRegistry.excludeBrands.includes("Greene King"), "\"Greene King\" is on the real exclude list");
+  assert(realRegistry.excludeBrands.includes("Haute Dolci"), "\"Haute Dolci\" is on the real exclude list");
+  assert(realRegistry.excludeBrands.includes("Black Sheep Coffee"), "\"Black Sheep Coffee\" is on the real exclude list");
+  const blackSheepReal = mkDossier({ tradingName: "Black Sheep Coffee - Bromley" });
+  const rBlackSheep = evaluateBrandDecision(blackSheepReal, realRegistry);
+  assert(rBlackSheep.excluded === true, "'Black Sheep Coffee - Bromley' (real registry) matches EXCLUDE brand 'Black Sheep Coffee'");
+  const chaiiwalaReal = mkDossier({ tradingName: "Chaiiwala® - Ilford Lane" });
+  const rChaiiwalaReal = evaluateBrandDecision(chaiiwalaReal, realRegistry);
+  assert(rChaiiwalaReal.excluded === true, "'Chaiiwala® - Ilford Lane' (real registry, real candidate IG1-34DC85F9) matches EXCLUDE brand 'Chaiiwala'");
   const overlap = realRegistry.keepBrands.filter((b) => realRegistry.excludeNormalised.has(normaliseName(b)));
   assert(overlap.length === 0, "zero overlap between keep and exclude in the real registry");
   assert(realRegistry.aliasEntries.length === 2, `real registry loads the alias/identifier layer (expected 2 entries, got ${realRegistry.aliasEntries.length})`);

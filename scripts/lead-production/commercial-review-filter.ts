@@ -87,29 +87,36 @@ function escapeRegExp(s: string): string {
 // dash — the original design only checked brand-BEFORE) and "Bubblewala @Nisa Local" (an "@"
 // separator, not a dash at all).
 const SEPARATOR_CLASS = "[-–—:]"; // hyphen, en-dash, em-dash, colon
+// Trademark/registered/copyright symbols, optionally present directly after a brand word in the
+// RAW (pre-normalisation) name — real gap found 2026-08-04: "Chaiiwala® - Ilford Lane" never
+// matched brand "Chaiiwala" because the "®" sits between the brand word and the separator, and
+// `\s*` (whitespace only) does not consume it. normaliseName() already strips these symbols (they
+// fall under its `[^a-z0-9\s]` scrub), so the exact/prefix-match branches are unaffected — only
+// the RAW-string separator patterns needed this.
+const TRADEMARK_SYMBOL_CLASS = "[®™©]?";
 
 // "Brand - Branch", "Brand: Branch" — brand first, at the very start of the raw name.
 function matchesBrandBeforeSeparator(candidateRaw: string, brandOriginal: string): boolean {
-  const re = new RegExp(`^\\s*${escapeRegExp(brandOriginal)}\\s*${SEPARATOR_CLASS}\\s+`, "i");
+  const re = new RegExp(`^\\s*${escapeRegExp(brandOriginal)}${TRADEMARK_SYMBOL_CLASS}\\s*${SEPARATOR_CLASS}\\s+`, "i");
   return re.test(candidateRaw);
 }
 
 // "Branch - Brand", "Branch: Brand" — brand last, at the very end of the raw name. This is the
 // pattern the original design was missing (Sizzling Pubs, Nisa Local leaks above).
 function matchesBrandAfterSeparator(candidateRaw: string, brandOriginal: string): boolean {
-  const re = new RegExp(`${SEPARATOR_CLASS}\\s*${escapeRegExp(brandOriginal)}\\s*$`, "i");
+  const re = new RegExp(`${SEPARATOR_CLASS}\\s*${escapeRegExp(brandOriginal)}${TRADEMARK_SYMBOL_CLASS}\\s*$`, "i");
   return re.test(candidateRaw);
 }
 
 // "Branch @Brand" — an explicit "@" immediately preceding the brand word, anywhere in the name.
 function matchesAtBrand(candidateRaw: string, brandOriginal: string): boolean {
-  const re = new RegExp(`@\\s*${escapeRegExp(brandOriginal)}\\b`, "i");
+  const re = new RegExp(`@\\s*${escapeRegExp(brandOriginal)}${TRADEMARK_SYMBOL_CLASS}\\b`, "i");
   return re.test(candidateRaw);
 }
 
 // "Branch (Brand)" — brand appears exactly within a bracketed segment, anywhere in the name.
 function matchesBracketedBrand(candidateRaw: string, brandOriginal: string): boolean {
-  const re = new RegExp(`\\(\\s*${escapeRegExp(brandOriginal)}\\s*\\)`, "i");
+  const re = new RegExp(`\\(\\s*${escapeRegExp(brandOriginal)}${TRADEMARK_SYMBOL_CLASS}\\s*\\)`, "i");
   return re.test(candidateRaw);
 }
 
