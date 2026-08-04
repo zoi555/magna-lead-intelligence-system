@@ -632,3 +632,31 @@ cap, Notes rewrite, Lead Urgency recalibration, cross-representative combined Ma
   sheets. The owner-review pack from the FIRST 2026-08-04 pass (170-row population) was
   regenerated again this pass at the corrected 167-row population — current. The permanent live
   customer-master pointer remains `pending_owner_review`, not switched by this session.
+
+## 2026-08-04 (third pass) — pre-push acceptance verification
+
+- Claim: customer matching is proven to read only legitimate source fields (never a derived/audit
+  field), the 3 explicit owner overrides are formally recorded with full structured detail, the
+  customer-master pin fail-closes on any drift, and the full 524-candidate population reconciles
+  exactly with zero unaccounted leaks anywhere.
+- Evidence: `test-lead-production-source-vs-derived-fields.ts` — poisoned every derived/audit
+  column on a genuinely clear lead with values that would be decisive evidence if read as input,
+  reran the matcher, the full hold/exclude script chain, and an export-to-CSV-and-reimport round
+  trip; the decision never changed. `validate-customer-master-pin.ts` — re-derives checksum/row-
+  count/lifecycle totals from the pinned file and fails closed on any mismatch or missing
+  referenced file; the real pointer validates clean. Population reconciliation: 524 = 167 released
+  + 20 confirmed exclusions + 68 Held-Review (11 customer-match-related + 57 unrelated) + 98 hard
+  rejections + 67 group exclusions + 77 commercial/brand exclusions + 27 business-category
+  exclusions. Release-membership verified by Lead ID (CTO by trading name + postcode, since CTO
+  carries no internal Lead ID column): 0 leaks of any confirmed/held lead into CTO or Sales Pro
+  across all 5 export files.
+- `npm run typecheck`/`build` clean; all 39 `test:lead-production-*` suites (4 new this pass)
+  individually re-run, ALL PASSED.
+- Files: `scripts/lead-production/record-owner-overrides.ts`,
+  `scripts/lead-production/validate-customer-master-pin.ts`,
+  `scripts/test-lead-production-source-vs-derived-fields.ts`,
+  `scripts/test-lead-production-record-owner-overrides.ts`,
+  `scripts/test-lead-production-validate-customer-master-pin.ts`. Commit `d5a454b`. Not pushed.
+- Remaining risk: none newly found this pass — this was a verification pass, not a fix pass. All
+  previously-recorded outstanding items (12 held/probable cases needing a human decision on the
+  underlying business question, the pending customer-master pointer approval) are unchanged.

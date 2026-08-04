@@ -1563,3 +1563,25 @@ The permanent live customer-master pointer remains `pending_owner_review`.
 **Next action:** owner reviews the final reconciliation, the entity-resolution documentation, the
 override-released Spice Hut/PHAT Buns decisions, and the 12 held/probable cases; approves (or
 rejects) `CustomersProjects81.csv` as the permanent live customer-master snapshot before any push.
+
+## Current state — 2026-08-04 (third pass: pre-push acceptance verification)
+
+Pure verification pass, no new defects — confirms the system is ready for owner push approval.
+Proved customer matching reads only legitimate source fields, never a derived/audit field, via a
+dedicated poison-and-rerun regression test covering the full matcher, the hold/exclude script
+chain, and an export/reimport round trip. Formally recorded the 3 explicit owner-override
+decisions (Spice Hut, PHAT Buns - Romford released; Kings Diner held) as dedicated structured
+columns and certificate entries, distinct from ordinary algorithmic outcomes. Built a fail-closed
+validator for the versioned customer-master pointer. Fully reconciled all 524 canonical pilot
+candidates across the 7 disjoint sheets and verified, by Lead ID, that 0 confirmed/held leads leak
+into CTO or any Sales Pro export.
+
+`npm run typecheck`/`build` clean; all 39 `test:lead-production-*` suites (4 new this pass)
+individually re-run, ALL PASSED.
+
+**Commit:** `d5a454b` (code/tests/config only), on top of `05d4138`/`bc9aebd`/`a21e3de`. 20 commits
+total ahead of `origin/feature/mvp-vertical-slice-001`. Not pushed.
+
+**Next action:** unchanged — owner reviews and approves the final reconciliation, the 3 explicit
+overrides, and the remaining held/probable cases; approves (or rejects) the customer-master
+pointer; only then should the branch be pushed.

@@ -1186,3 +1186,44 @@ typecheck`/`build` clean. Full technical detail: `docs/10_BUGS_AND_FIXES.md`, `d
 `VERIFY_BEFORE_CLAIMING.md` (2026-08-04 second entries). Certificate:
 `/Users/homemac/Downloads/campaign-002-zero-customer-leakage-certificate.json` — PASS across
 Master/CTO/Sales Pro.
+
+### Update (2026-08-04, third pass) — pre-push acceptance verification: derived-field isolation proven, owner overrides formally recorded, customer-master pin fail-closed validator built, full 524-candidate reconciliation
+
+Pure verification pass (no new defects found) plus one new capability. Proved, with a dedicated
+regression test (`test-lead-production-source-vs-derived-fields.ts`), that customer matching reads
+only legitimate source identity fields — poisoned every derived/audit field (Matched Customer
+Name, Matched Customer Account Code(s), Customer Match Evidence, Magna Customer Match Status,
+Final Outcome, Customer Match Audit Warning, Customer Master Checksum) on a genuinely clear lead
+with values that would be decisive evidence if read as input, reran the full matcher and hold/
+exclude script chain plus an export-to-CSV-and-reimport round trip, and confirmed the decision
+never changes; also statically confirmed none of the 5 production lead-mapping functions read any
+derived field as a matching input.
+
+Recorded the 3 explicit owner-override decisions as dedicated, structured, non-algorithmic-looking
+columns (`record-owner-overrides.ts`): Spice Hut and PHAT Buns - Romford —
+`released_with_owner_override`; Kings Diner — `held_with_owner_override` (its own current
+algorithmic evidence is "clear (no material finding)" — the component-address fix already
+established the two premises are different buildings; it remains held purely by explicit owner
+instruction, honestly recorded as such, never dressed up as an algorithmic hold). Every override
+now appears individually in the certificate JSON and a dedicated "Owner Override Decisions"
+workbook sheet — Lead ID, independently re-derived original algorithm decision, owner decision,
+reason, timestamp, checksum, reviewer, evidence retained.
+
+Built a fail-closed validator (`validate-customer-master-pin.ts`) for the existing versioned
+customer-master pointer (`campaign-002-customer-master-pointer.json`) — re-derives checksum, row
+count, and active/inactive lifecycle totals from the file the pointer actually references and
+refuses to certify it on any mismatch, or on any missing referenced identity-index/alias/manifest/
+quality-report file. Real pointer validated clean: checksum, 8050 rows, 4558 active / 3492
+inactive, all referenced files present.
+
+Full population reconciliation: all 524 canonical pilot candidates across the 7 disjoint sheets
+(167 released + 20 confirmed exclusions + 68 Held-Review [11 customer-match-related: 10
+algorithmic + Kings Diner's owner-held override, 57 unrelated hold reasons] + 98 hard rejections +
+67 group exclusions + 77 commercial/brand exclusions [including the 1 phone exception] + 27
+business-category exclusions = 524). Verified by Lead ID (matched by trading name + postcode for
+CTO, which carries no internal Lead ID field): all 20 confirmed exclusions and all 11 held/owner-
+held cases are absent from CTO and every Sales Pro export; the 2 owner-released overrides are
+present in both, individually listed in the certificate, retaining their original evidence.
+
+All 39 `test:lead-production-*` suites (4 new this pass) individually re-run, ALL PASSED; `npm run
+typecheck`/`build` clean. Commit `d5a454b`. Not pushed.
