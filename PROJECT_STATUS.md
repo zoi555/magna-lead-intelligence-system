@@ -1653,3 +1653,30 @@ items and the Hot/Warm distribution — 62 Hot / 59 Warm / 0 Cold, notably Hot-h
 uncommitted code changes, then decides on committing/pushing and on starting Meer or another
 representative. Per the stop condition: no other representative started, CTO file not imported,
 no merge to main.
+
+## 2026-08-04 (same day) — Kunz full-allocation RELEASED AND PUSHED; Meer preflight flagged a territory-assignment conflict requiring confirmation
+
+Owner approved the corrected Kunz classification and a terminology guardrail (Google review
+counts must be labelled "Google Review Activity", never "volume"). Applied at the source
+(`master-field-resolver.ts`), regenerated all 7 Kunz files from stored checkpoints, all 41 suites
++ typecheck + build clean. Committed and pushed in 2 commits: `a4a3159` (code/tests/docs) and
+`187c3ad` (release manifest) — both verified local=remote on `origin/feature/mvp-vertical-slice-001`.
+
+**Final Kunz release**: 121 leads (108 ordinary + 13 key accounts), 40 Hot / 81 Warm / 0 Standard,
+0 confirmed customer leaks, 1 algorithmically-cleared probable match (3 underlying candidate
+records — Kaspa's Desserts), 0 unresolved probable matches remaining released. Zero-leakage
+certificate: PASS. Full detail: `docs/11_ISSUES_LOG.md` ISS-0035, `docs/release-manifests/
+campaign-003-kunz-full-allocation-2026-08-04.json`.
+
+**Meer preflight**: checked `config/lead-production/sales-territories-v2.json` — Meer's recorded
+allocation is **TW11–TW20**, not CM11–CM24 as referenced when preflight was requested. CM11–CM24
+are real, valid postcode districts (confirmed against `postcode_reference`) — this is not a
+geography error, but a genuine discrepancy against the stored record, the same shape of conflict
+resolved for Kunz (CM0–CM9 vs the stored TW1–TW10) earlier this session. **Not resolved** — no
+Meer config built, no Meer scoring started. Needs the same kind of explicit owner clarification
+Kunz's conflict received before any Meer work proceeds.
+
+**Next action**: owner confirms Meer's correct current territory (CM11–CM24, superseding
+TW11–TW20 for new campaigns — or otherwise) before Meer preflight/config work begins. Just Eat
+`rating_count` capture (separate evidence field, never summed with Google reviews) remains an
+explicitly deferred, non-blocking follow-up.
