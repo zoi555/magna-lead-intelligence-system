@@ -1227,3 +1227,124 @@ present in both, individually listed in the certificate, retaining their origina
 
 All 39 `test:lead-production-*` suites (4 new this pass) individually re-run, ALL PASSED; `npm run
 typecheck`/`build` clean. Commit `d5a454b`. Not pushed.
+
+## ISS-0035 — Just Eat public discovery endpoint (`uk.api.just-eat.io/restaurants/bypostcode/{code}`) now returns 404 for every postcode — blocks all new live discovery (2026-08-04)
+
+### Status
+**UNRESOLVED / BLOCKING.** Discovered during the first live production call for campaign-003
+(Kunz full allocation), district CM0. Confirmed provider-side, not local.
+
+### Problem
+`npm run je:run -- "CM0"` completed with `completed_with_warnings`: 1/1 outcode query failed, 0
+outlets, 0 observations. The pipeline's own internal retry-on-failure (2 attempts, 750ms apart, on
+403/429/5xx/network error — `fetchJustEatSearchRaw` in `src/lib/sources/just-eat.ts`) already ran
+and still failed both times. A full second `je:run -- "CM0"` (a fresh execution — not blocked by
+the 24h duplicate-run guard, since `completed_with_warnings` is not in its blocker-status list)
+produced the identical result.
+
+### Investigation
+Direct `curl` against the live endpoint confirmed the true HTTP response: `404 {"message":"uri not
+found"}` for **every** postcode tested — `CM0`, `CM1`, `UB1`, `TW1`, `RM1`, a full postcode
+(`SW1A1AA`), and a percent-encoded full postcode. This is not district-specific: the exact endpoint
+call that produced 94 real consolidated candidates for CM1 as recently as 2026-08-02 (discovery
+run `ff0ad42a-65d5-49cb-9bb9-bf67826d93bd`, 170 raw observations, status `completed`) now 404s for
+that same district. General internet connectivity confirmed working (`google.com` → 200); the
+`uk.api.just-eat.io` domain itself is alive and Cloudflare-fronted (root → 302, real
+`x-je-conversation` header present on the 404 responses) — only the specific
+`/restaurants/bypostcode/{code}` path is gone. Regression window: worked 2026-08-02, broken by
+2026-08-04.
+
+### Separate defect noted, not fixed (out of scope for this pass — no pipeline redesign authorised)
+`src/lib/discovery-engine/worker/execute.ts`'s failed-query branch (~line 108) increments the
+`failed` counter but never persists `result.error` (the actual HTTP status/error string returned by
+the adapter) anywhere — not to `je_executions.error`, not to `metrics`, not to console. The
+`je_executions.error` column read back for CM0's execution was `null` despite a real, diagnosable
+failure having occurred; the only trace was the generic `"N outcode query/queries failed"` warning
+string. This made root-causing the CM0 failure from the database alone impossible — the actual
+reason had to be independently re-derived via a direct `curl` against the live endpoint. Worth
+fixing in a future pass (capture `result.error` into the execution record) — not attempted here per
+the explicit "do not redesign the pipeline" constraint on this run.
+
+### Impact
+Just Eat is the only approved lead-discovery source for campaign-003 (Kunz full allocation) and
+for the wider pipeline generally. With this endpoint down, **no new district can be discovered
+live** — this blocks CM0 and, by the same mechanism, would identically block CM2–CM9. Established
+safe-retry rules (internal adapter retry + a full fresh run) were exhausted before this was
+recorded as a hard failure, per instruction not to fabricate an empty successful result. CM0's two
+discovery runs (`cbc25500-9c15-4955-9a33-a8c0d88606c2`, `d64f1663-3716-41f7-838e-119577c7fe1d`)
+remain in Supabase, `status=completed_with_warnings`, as an honest record — not deleted, not
+resubmitted as if they succeeded.
+
+### Update (2026-08-04, same day, recovery pass) — replacement endpoint independently verified, versioned adapter built, ISS-0035 error-persistence gap fixed, CM0 recovery pilot succeeded live
+
+Owner explicitly authorised a narrowly-scoped recovery investigation (not a pipeline redesign).
+Findings:
+
+**Legacy endpoint reconfirmed dead.** `curl` matrix against `/restaurants/bypostcode/{code}` —
+CM0, CM1, TW1, RM1, each as full postcode (with/without space) and bare outcode — 404 `"uri not
+found"` in every case, timestamped 2026-08-04.
+
+**Live site inspected via a real browser session** (no CAPTCHA/anti-bot bypass, no private
+session tokens reused). The consumer site (`www.just-eat.co.uk`) geocodes a full address via
+Google Places, then server-side-renders an `/area/{postcode}-{town}` results page — no client-
+visible XHR for restaurant data (SSR), and the HTML site itself is Cloudflare-bot-protected
+(confirmed via a deliberately-unauthenticated `curl`, which was correctly blocked — not
+circumvented). This confirms the lawful, scriptable surface remains the separate
+`uk.api.just-eat.io` API host, not the protected consumer HTML site — consistent with the
+existing code's own documented acquisition method.
+
+**Candidate endpoint verified live and materially equivalent.**
+`https://uk.api.just-eat.io/discovery/uk/restaurants/enriched/bypostcode/{postcode-or-outcode}` —
+HTTP 200, no auth, on the same lawful `uk.api.just-eat.io` host. Response headers show
+`api-supported-versions: 3`, `api-deprecated-versions: 2` — direct provider-side confirmation
+that this is a genuine, intentional API version migration, not an unrelated outage. Accepts a
+bare outcode/district (e.g. `"CM1"`) and returns the FULL district set in one call
+(`metaData.resultCount === restaurants.length`, verified up to 677 records for RM1, no
+pagination observed) — the existing one-query-per-district planning strategy required no
+change. **CM1 comparison against the stored campaign-002 pilot: 170/170 restaurant IDs match
+exactly — 0 only-in-old, 0 only-in-new.** All required field equivalents present at 100%
+completeness across the 170-record sample (id, name, address, postcode, coordinates, cuisines,
+rating, rating count, delivery/collection, availability) except brand/is-brand, which has no
+equivalent in the new schema at all (0/170) — recorded honestly as a permanent gap, never
+inferred from the trading name. An unrecognised postcode returns HTTP 200 with
+`canonicalName`/`location` both `null` — a distinguishable "not found" signal the new adapter
+checks explicitly, never conflated with a genuine empty district.
+
+**Versioned adapter built** (`JustEatEnrichedAdapter`,
+`src/lib/discovery-engine/just-eat/adapter-v2.ts` + `parse-v2.ts`,
+`src/lib/sources/just-eat.ts`'s new `fetchJustEatEnrichedRaw`) — a separate, additive class and
+parser, not an in-place edit. The legacy `JustEatAdapter`/`fetchJustEatSearchRaw`/`parse.ts`
+remain byte-for-byte unchanged and re-verified passing (`npm run test:je-stage1`) as the
+historical record of what campaign-002's CM1 pilot actually called. `execute.ts`'s default
+adapter now points at the new class (the only "swap" made — every other file additive).
+14 fixture-driven regression tests added (`scripts/test-je-enriched-adapter.ts`, `npm run
+test:je-enriched-adapter`) covering valid/empty/unrecognised-postcode responses, 400/401/403/
+404/429/500/malformed-JSON/network-error, unrecognised-schema fail-closed, one-query-per-
+district planning, cross-query-point deduplication, and postcode-outside-district
+classification — all passing.
+
+**ISS-0035's own error-persistence gap fixed.** `execute.ts` now builds a sanitised
+`last_failure` object (endpoint version, request type, HTTP status, provider error code,
+message, retry count, query point, timestamp — never headers/cookies/auth tokens) on every
+failed query, surfaces it in `metrics.last_failure`, and persists it into the execution's own
+`error` column at finish (previously always `null`). Proven by a dedicated regression test
+that a 429 failure is retained in full, not discarded.
+
+**CM0 recovery pilot run live, discovery + geography validation only** (`npm run je:run --
+"CM0"`, new run `331414d5-5be2-41bb-9317-73089718e0d5`): `status=completed`, 1/1 outcode, 0
+failed queries, 4 outlets discovered, 4 observations, 0 duplicates. Geography validation: 2
+`valid_geography` (physically in CM0 — "Domino's - Burnham on Crouch", "Curry Cottage"), 2
+`out_of_scope_geography` (serve CM0 but sit elsewhere) — the existing, unchanged geography gate
+correctly separated them; only the 2 valid ones reached `consolidated_candidates`. Stopped here
+as instructed — no Google/website/FSA/Companies House calls made, no enrichment run, CM1 not
+combined, no Kunz files created.
+
+`npm run typecheck`/`build` clean. All 41 suites individually re-run (39 `test:lead-production-*`
++ `test:je-stage1` + the new `test:je-enriched-adapter`), ALL PASSED.
+
+### Not yet done
+CM2–CM9 not yet run with the new adapter (owner review of this recovery pass requested first,
+per the authorising instruction's step 8/10). Root cause of Just Eat's OWN reason for retiring
+version 2 of this API was not investigated beyond the header evidence above (out of scope — no
+access to Just Eat's internal systems). No new commits pushed (3 campaign-003 config commits
+remain local as before; this pass's code/doc changes are also uncommitted, awaiting instruction).

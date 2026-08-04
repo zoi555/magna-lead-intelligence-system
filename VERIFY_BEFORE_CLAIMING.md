@@ -660,3 +660,48 @@ cap, Notes rewrite, Lead Urgency recalibration, cross-representative combined Ma
 - Remaining risk: none newly found this pass — this was a verification pass, not a fix pass. All
   previously-recorded outstanding items (12 held/probable cases needing a human decision on the
   underlying business question, the pending customer-master pointer approval) are unchanged.
+
+## 2026-08-04 (same day) — campaign-003 (Kunz) CM0 live discovery: claim, command, result, remaining risk
+
+- Claim: "Just Eat live discovery is currently unusable for new districts" (NOT "CM0 has 0 real
+  listings").
+- Command run: `npm run je:run -- "CM0"` (x2, fresh executions each time — the second not blocked
+  by the 24h duplicate-run guard since `completed_with_warnings` isn't a blocking status). Result
+  both times: `completed_with_warnings`, 1/1 outcode query failed, 0 outlets, 0 observations.
+- Independent verification command: direct `curl` against
+  `https://uk.api.just-eat.io/restaurants/bypostcode/{CM0,CM1,UB1,TW1,RM1,SW1A1AA}` — every one
+  returned `404 {"message":"uri not found"}`. Cross-checked against Supabase: CM1's original
+  discovery run (`ff0ad42a-...`, 2026-08-02) returned 170 raw observations / 94 consolidated
+  candidates via this exact same endpoint — confirms regression, not a CM0-specific or
+  always-broken condition.
+- `npm run typecheck`/`build` clean; all 39 `test:lead-production-*` suites individually re-run,
+  ALL PASSED (unrelated to this finding — confirms the pipeline code itself, as opposed to the
+  external provider, is unaffected).
+- Remaining risk: Just Eat's public discovery endpoint may still be down for CM2–CM9 and for any
+  other future district — not verified fixed, only confirmed broken as of 2026-08-04 10:41 UTC.
+  Full detail: `docs/11_ISSUES_LOG.md` ISS-0035.
+
+## 2026-08-04 (same day) — Just Eat endpoint recovery: claim, command, result, remaining risk
+
+- Claim: "The replacement Just Eat endpoint is materially equivalent to the retired one for
+  district-level discovery, and the CM0 recovery pilot succeeded live using it."
+- Verification commands run: curl matrix against both the retired and candidate endpoints
+  (CM0/CM1/TW1/RM1 × full-postcode/outcode); a real Chrome browser session against
+  www.just-eat.co.uk; a direct Supabase comparison of the new endpoint's CM1 output (170 IDs)
+  against the stored campaign-002 CM1 pilot's raw observations (170 IDs) — exact match, 0 drift;
+  `npm run je:run -- "CM0"` (live, new adapter) — `status=completed`, 4 outlets, 2 valid_geography
+  consolidated candidates.
+- `npm run typecheck`/`build` clean; all 41 suites individually re-run (39
+  `test:lead-production-*` + `test:je-stage1` + new `test:je-enriched-adapter`), ALL PASSED.
+- Files: `src/lib/sources/just-eat.ts` (new fetcher, legacy untouched),
+  `src/lib/discovery-engine/just-eat/adapter-v2.ts`, `parse-v2.ts` (new, additive),
+  `src/lib/discovery-engine/worker/execute.ts` (default adapter swap + ISS-0035 fix),
+  `src/lib/discovery-engine/version.ts` (new version constants),
+  `src/lib/discovery-engine/adapter.ts` (optional interface fields),
+  `scripts/test-je-enriched-adapter.ts`, `tests/fixtures/just-eat/enriched-cm1.json`. Not
+  committed yet — awaiting instruction.
+- Remaining risk: CM2–CM9 not yet run with the new adapter (owner review requested first, per
+  the authorising instruction). A handful of fields have no equivalent in the new schema
+  (brand/is-brand, offer_percent, is_sponsored, opening_times array, offline_reason,
+  delivery_zipcode) — recorded honestly as permanent gaps in the field catalogue's unavailable
+  list, never fabricated. Full detail: `docs/11_ISSUES_LOG.md` ISS-0035.

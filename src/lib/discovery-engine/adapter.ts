@@ -20,6 +20,13 @@ export interface QueryExecutionResult {
   restaurantCount: number;      // records seen before filtering test rows
   parsed: ParsedRecord[];       // normalised records
   error?: string;
+  // Optional — populated by versioned adapters (e.g. JustEatEnrichedAdapter, ISS-0035) so the
+  // worker can persist real failure diagnostics instead of only a generic failure count.
+  endpointVersion?: string;
+  requestType?: "outcode" | "full_postcode" | "coordinate";
+  attempts?: number;
+  providerErrorCode?: string;
+  responseSchemaVersion?: string;
 }
 
 export interface AdapterCapabilities {

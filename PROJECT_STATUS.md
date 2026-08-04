@@ -1585,3 +1585,33 @@ total ahead of `origin/feature/mvp-vertical-slice-001`. Not pushed.
 **Next action:** unchanged — owner reviews and approves the final reconciliation, the 3 explicit
 overrides, and the remaining held/probable cases; approves (or rejects) the customer-master
 pointer; only then should the branch be pushed.
+
+## 2026-08-04 — pushed to origin; campaign-003 (Kunz full allocation) started, then BLOCKED on a live Just Eat outage
+
+Owner approved and pushed the campaign-002 customer-suppression work: `origin/feature/mvp-vertical-slice-001`
+now at `8cc518f`, local/remote hashes verified matching post-push. Release manifest recorded at
+`docs/release-manifests/campaign-002-five-district-pilot-2026-08-04.json`.
+
+Started campaign-003-kunz-full-allocation (Kunz's current CM0–CM9 territory; TW1–TW10 preserved as
+his separate, immutable, completed prior allocation — resolution recorded in
+`config/lead-production/campaigns/campaign-003-kunz-full-allocation/territories.json`). Built and
+validated all campaign-003 config artifacts (`territories.json`, `sales-territories-v2.json`,
+`assignments.csv`) plus a campaign-003 customer-master pointer — commits `ae5580d`, `c12cf16`,
+`8e098d8` (3 ahead of remote, not yet pushed).
+
+First live call (`je:run -- "CM0"`) failed, retried once cleanly (established safe-retry path — a
+fresh `completed_with_warnings` execution is not blocked by the 24h duplicate-run guard), failed
+again identically. Root-caused via direct `curl`: Just Eat's public discovery endpoint
+(`uk.api.just-eat.io/restaurants/bypostcode/{code}`) now returns 404 for every postcode tested,
+including CM1 — which worked and returned 94 real candidates as recently as 2026-08-02. This is a
+provider-side outage/endpoint change, not local (general connectivity confirmed, domain itself
+alive). Full detail: `docs/11_ISSUES_LOG.md` ISS-0035.
+
+Since Just Eat is the sole approved discovery source for this campaign, **no new district can be
+run live** until this is resolved. CM0 is the only district attempted; CM2–CM9 not started.
+`npm run typecheck`/`build` clean; all 39 `test:lead-production-*` suites re-run, ALL PASSED.
+
+**Next action:** owner decision on how to proceed on the Just Eat outage (wait and retry later /
+investigate the endpoint change / other). No new commits pushed this pass beyond the 3 campaign-003
+config commits already on the branch (code/config only, no customer data). Campaign-003 paused,
+awaiting owner review — Kunz's run has not produced any output files yet.

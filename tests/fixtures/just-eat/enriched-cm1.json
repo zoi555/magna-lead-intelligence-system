@@ -1,0 +1,2265 @@
+{
+  "metaData": {
+    "canonicalName": "cm1-chelmsford",
+    "district": "CM1",
+    "postalCode": "CM1",
+    "area": "Chelmsford",
+    "location": {
+      "type": "Point",
+      "coordinates": [
+        0.412034,
+        51.76104
+      ]
+    },
+    "resultCount": 4,
+    "cuisineDetails": [],
+    "searchedTerms": null,
+    "tagDetails": [],
+    "deliveryArea": "CM1"
+  },
+  "restaurants": [
+    {
+      "id": "245775",
+      "name": "Favourite chicken Ms",
+      "uniqueName": "favourite-chicken-ms-chelmsford-cm1",
+      "address": {
+        "city": "Chelmsford",
+        "firstLine": "60 Trent Road",
+        "postalCode": "CM1 2LQ",
+        "location": {
+          "type": "Point",
+          "coordinates": [
+            0.439966,
+            51.747183
+          ]
+        }
+      },
+      "rating": {
+        "count": 178,
+        "starRating": 5,
+        "userRating": null
+      },
+      "isNew": false,
+      "driveDistanceMeters": 2469,
+      "openingTimeLocal": "2026-08-05T11:00:00",
+      "deliveryOpeningTimeLocal": "2026-08-04T11:00:00",
+      "deliveryEtaMinutes": {
+        "rangeLower": 30,
+        "rangeUpper": 45
+      },
+      "isCollection": true,
+      "isDelivery": true,
+      "isOpenNowForCollection": true,
+      "isOpenNowForDelivery": true,
+      "isOpenNowForPreorder": false,
+      "isTemporarilyOffline": false,
+      "deliveryCost": 0,
+      "minimumDeliveryValue": 9.99,
+      "defaultDisplayRank": 0,
+      "isTemporaryBoost": false,
+      "isPremier": false,
+      "logoUrl": "https://d30v2pzvrfyzpo.cloudfront.net/uk/images/restaurants/245775.gif",
+      "isTestRestaurant": false,
+      "deals": [
+        {
+          "description": "Save £10 * Spend £15",
+          "offerType": "Notification"
+        },
+        {
+          "description": "Cheeky Tuesday · 20% off",
+          "offerType": "Percent"
+        }
+      ],
+      "tags": [],
+      "cuisines": [
+        {
+          "name": "Chicken",
+          "uniqueName": "chicken"
+        },
+        {
+          "name": "Burgers",
+          "uniqueName": "burgers"
+        },
+        {
+          "name": "Deals",
+          "uniqueName": "deals"
+        },
+        {
+          "name": "Cheeky Tuesday",
+          "uniqueName": "cheekyTuesday"
+        }
+      ],
+      "availability": {
+        "delivery": {
+          "isOpen": true,
+          "canPreOrder": false,
+          "isTemporarilyOffline": false,
+          "nextAvailability": {
+            "from": "2026-08-05T11:00:00"
+          },
+          "etaMinutes": {
+            "rangeLower": 30,
+            "rangeUpper": 45
+          }
+        },
+        "collection": {
+          "isOpen": true,
+          "canPreOrder": false,
+          "isTemporarilyOffline": false,
+          "nextAvailability": {
+            "from": "2026-08-05T11:00:00"
+          },
+          "etaMinutes": {
+            "approximate": 20
+          }
+        }
+      }
+    },
+    {
+      "id": "293550",
+      "name": "Angel - Chelmsford",
+      "uniqueName": "angel---chelmsford-chelmsford",
+      "address": {
+        "city": "CHELMSFORD",
+        "firstLine": "160 Main Road",
+        "postalCode": "CM1 7AH",
+        "location": {
+          "type": "Point",
+          "coordinates": [
+            0.473522,
+            51.762336
+          ]
+        }
+      },
+      "rating": {
+        "count": 0,
+        "starRating": 0,
+        "userRating": null
+      },
+      "isNew": false,
+      "driveDistanceMeters": 4247,
+      "openingTimeLocal": "2026-08-05T12:00:00",
+      "deliveryOpeningTimeLocal": "2026-08-04T12:00:00",
+      "deliveryEtaMinutes": {
+        "approximate": 50,
+        "rangeLower": 35,
+        "rangeUpper": 50
+      },
+      "isCollection": true,
+      "isDelivery": true,
+      "isOpenNowForCollection": true,
+      "isOpenNowForDelivery": true,
+      "isOpenNowForPreorder": false,
+      "isTemporarilyOffline": false,
+      "deliveryCost": 4.29,
+      "minimumDeliveryValue": 0,
+      "defaultDisplayRank": 53,
+      "isTemporaryBoost": false,
+      "isPremier": false,
+      "logoUrl": "https://d30v2pzvrfyzpo.cloudfront.net/uk/images/restaurants/293550.gif",
+      "isTestRestaurant": false,
+      "deals": [
+        {
+          "description": "Free item offer",
+          "offerType": "FreeItem"
+        }
+      ],
+      "tags": [],
+      "cuisines": [
+        {
+          "name": "Fish & Chips",
+          "uniqueName": "fish-and-chips"
+        },
+        {
+          "name": "Pub Food",
+          "uniqueName": "pubfood"
+        },
+        {
+          "name": "Deals",
+          "uniqueName": "deals"
+        },
+        {
+          "name": "Freebies",
+          "uniqueName": "freebies"
+        }
+      ],
+      "availability": {
+        "delivery": {
+          "isOpen": true,
+          "canPreOrder": false,
+          "isTemporarilyOffline": false,
+          "nextAvailability": {
+            "from": "2026-08-05T12:00:00"
+          },
+          "etaMinutes": {
+            "approximate": 50,
+            "rangeLower": 35,
+            "rangeUpper": 50
+          }
+        },
+        "collection": {
+          "isOpen": true,
+          "canPreOrder": false,
+          "isTemporarilyOffline": false,
+          "nextAvailability": {
+            "from": "2026-08-05T12:00:00"
+          },
+          "etaMinutes": {
+            "approximate": 15
+          }
+        }
+      }
+    },
+    {
+      "id": "218229",
+      "name": "Treat Stop Cafe & Desserts",
+      "uniqueName": "treat-stop-chelmsford-cm1",
+      "address": {
+        "city": "Chelmsford",
+        "firstLine": "243 Broomfield Road",
+        "postalCode": "CM1 4DP",
+        "location": {
+          "type": "Point",
+          "coordinates": [
+            0.468488,
+            51.750922
+          ]
+        }
+      },
+      "rating": {
+        "count": 39,
+        "starRating": 5,
+        "userRating": null
+      },
+      "isNew": false,
+      "driveDistanceMeters": 4057,
+      "openingTimeLocal": "2026-08-05T09:00:00",
+      "deliveryOpeningTimeLocal": "2026-08-04T09:00:00",
+      "deliveryEtaMinutes": {
+        "rangeLower": 25,
+        "rangeUpper": 40
+      },
+      "isCollection": true,
+      "isDelivery": true,
+      "isOpenNowForCollection": true,
+      "isOpenNowForDelivery": true,
+      "isOpenNowForPreorder": false,
+      "isTemporarilyOffline": false,
+      "deliveryCost": 2.99,
+      "minimumDeliveryValue": 6.99,
+      "defaultDisplayRank": 19,
+      "isTemporaryBoost": false,
+      "isPremier": false,
+      "logoUrl": "https://d30v2pzvrfyzpo.cloudfront.net/uk/images/restaurants/218229.gif",
+      "isTestRestaurant": false,
+      "deals": [
+        {
+          "description": "Cheeky Tuesday · 20% off",
+          "offerType": "Percent"
+        },
+        {
+          "description": "",
+          "offerType": "StampCard"
+        }
+      ],
+      "tags": [],
+      "cuisines": [
+        {
+          "name": "Breakfast",
+          "uniqueName": "breakfast"
+        },
+        {
+          "name": "Desserts",
+          "uniqueName": "desserts"
+        },
+        {
+          "name": "Halal",
+          "uniqueName": "halal"
+        },
+        {
+          "name": "Collect stamps",
+          "uniqueName": "stampcard-restaurants"
+        },
+        {
+          "name": "Lunch",
+          "uniqueName": "lunch"
+        },
+        {
+          "name": "Deals",
+          "uniqueName": "deals"
+        },
+        {
+          "name": "Cheeky Tuesday",
+          "uniqueName": "cheekyTuesday"
+        }
+      ],
+      "availability": {
+        "delivery": {
+          "isOpen": true,
+          "canPreOrder": false,
+          "isTemporarilyOffline": false,
+          "nextAvailability": {
+            "from": "2026-08-05T09:00:00"
+          },
+          "etaMinutes": {
+            "rangeLower": 25,
+            "rangeUpper": 40
+          }
+        },
+        "collection": {
+          "isOpen": true,
+          "canPreOrder": false,
+          "isTemporarilyOffline": false,
+          "nextAvailability": {
+            "from": "2026-08-05T09:00:00"
+          },
+          "etaMinutes": {
+            "approximate": 20
+          }
+        }
+      }
+    },
+    {
+      "id": "254370",
+      "name": "Black Sheep Coffee - Chelmsford",
+      "uniqueName": "black-sheep-coffee---chelmsford-chelmsford",
+      "address": {
+        "city": "Chelmsford",
+        "firstLine": "61 High Street",
+        "postalCode": "CM1 1DH",
+        "location": {
+          "type": "Point",
+          "coordinates": [
+            0.474504,
+            51.732276
+          ]
+        }
+      },
+      "rating": {
+        "count": 21,
+        "starRating": 3,
+        "userRating": null
+      },
+      "isNew": false,
+      "driveDistanceMeters": 5371,
+      "openingTimeLocal": "2026-08-05T07:00:00",
+      "deliveryOpeningTimeLocal": "2026-08-04T07:00:00",
+      "deliveryEtaMinutes": {
+        "rangeLower": 25,
+        "rangeUpper": 40
+      },
+      "isCollection": false,
+      "isDelivery": false,
+      "isOpenNowForCollection": false,
+      "isOpenNowForDelivery": false,
+      "isOpenNowForPreorder": false,
+      "isTemporarilyOffline": true,
+      "deliveryCost": 0,
+      "minimumDeliveryValue": 0,
+      "defaultDisplayRank": 102,
+      "isTemporaryBoost": false,
+      "isPremier": false,
+      "logoUrl": "https://d30v2pzvrfyzpo.cloudfront.net/uk/images/restaurants/254370.gif",
+      "isTestRestaurant": false,
+      "deals": [
+        {
+          "description": "Cheeky Tuesday · 20% off",
+          "offerType": "Percent"
+        }
+      ],
+      "tags": [],
+      "cuisines": [
+        {
+          "name": "Coffee",
+          "uniqueName": "coffee"
+        },
+        {
+          "name": "Breakfast",
+          "uniqueName": "breakfast"
+        },
+        {
+          "name": "Lunch",
+          "uniqueName": "lunch"
+        },
+        {
+          "name": "Sandwiches",
+          "uniqueName": "sandwiches"
+        },
+        {
+          "name": "Deals",
+          "uniqueName": "deals"
+        },
+        {
+          "name": "Cheeky Tuesday",
+          "uniqueName": "cheekyTuesday"
+        }
+      ],
+      "availability": {
+        "delivery": {
+          "isOpen": false,
+          "canPreOrder": false,
+          "isTemporarilyOffline": true,
+          "nextAvailability": {
+            "from": "2026-08-05T07:00:00"
+          },
+          "etaMinutes": {
+            "rangeLower": 25,
+            "rangeUpper": 40
+          }
+        },
+        "collection": {
+          "isOpen": true,
+          "canPreOrder": false,
+          "isTemporarilyOffline": false,
+          "nextAvailability": {
+            "from": "2026-08-05T07:00:00"
+          },
+          "etaMinutes": {
+            "approximate": 5
+          }
+        }
+      }
+    }
+  ],
+  "deliveryFees": {
+    "restaurants": {
+      "7535": {
+        "restaurantId": "7535",
+        "minimumOrderValue": 1200,
+        "bands": [
+          {
+            "minimumAmount": 1200,
+            "fee": 250
+          }
+        ]
+      },
+      "9819": {
+        "restaurantId": "9819",
+        "minimumOrderValue": 3000,
+        "bands": [
+          {
+            "minimumAmount": 3000,
+            "fee": 300
+          }
+        ]
+      },
+      "19645": {
+        "restaurantId": "19645",
+        "minimumOrderValue": 2000,
+        "bands": [
+          {
+            "minimumAmount": 2000,
+            "fee": 300
+          }
+        ]
+      },
+      "31551": {
+        "restaurantId": "31551",
+        "minimumOrderValue": 1200,
+        "bands": [
+          {
+            "minimumAmount": 1200,
+            "fee": 200
+          }
+        ]
+      },
+      "34853": {
+        "restaurantId": "34853",
+        "minimumOrderValue": 2000,
+        "bands": [
+          {
+            "minimumAmount": 2000,
+            "fee": 300
+          }
+        ]
+      },
+      "35642": {
+        "restaurantId": "35642",
+        "minimumOrderValue": 1299,
+        "bands": [
+          {
+            "minimumAmount": 1299,
+            "fee": 199
+          }
+        ]
+      },
+      "40893": {
+        "restaurantId": "40893",
+        "minimumOrderValue": 1200,
+        "bands": [
+          {
+            "minimumAmount": 1200,
+            "fee": 200
+          }
+        ]
+      },
+      "69293": {
+        "restaurantId": "69293",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 250
+          },
+          {
+            "minimumAmount": 1500,
+            "fee": 100
+          }
+        ]
+      },
+      "78393": {
+        "restaurantId": "78393",
+        "minimumOrderValue": 1000,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 400
+          }
+        ]
+      },
+      "90748": {
+        "restaurantId": "90748",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 279
+          }
+        ]
+      },
+      "98160": {
+        "restaurantId": "98160",
+        "minimumOrderValue": 1500,
+        "bands": [
+          {
+            "minimumAmount": 1500,
+            "fee": 200
+          }
+        ]
+      },
+      "107107": {
+        "restaurantId": "107107",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "108349": {
+        "restaurantId": "108349",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 329
+          }
+        ]
+      },
+      "109091": {
+        "restaurantId": "109091",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 329
+          }
+        ]
+      },
+      "112274": {
+        "restaurantId": "112274",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "113822": {
+        "restaurantId": "113822",
+        "minimumOrderValue": 1000,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 300
+          }
+        ]
+      },
+      "114773": {
+        "restaurantId": "114773",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 400
+          },
+          {
+            "minimumAmount": 1700,
+            "fee": 200
+          }
+        ]
+      },
+      "116584": {
+        "restaurantId": "116584",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 379
+          }
+        ]
+      },
+      "118297": {
+        "restaurantId": "118297",
+        "minimumOrderValue": 2500,
+        "bands": [
+          {
+            "minimumAmount": 2500,
+            "fee": 250
+          }
+        ]
+      },
+      "119221": {
+        "restaurantId": "119221",
+        "minimumOrderValue": 1000,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 199
+          },
+          {
+            "minimumAmount": 6000,
+            "fee": 0
+          }
+        ]
+      },
+      "119465": {
+        "restaurantId": "119465",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "120673": {
+        "restaurantId": "120673",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "126501": {
+        "restaurantId": "126501",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "127141": {
+        "restaurantId": "127141",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "130734": {
+        "restaurantId": "130734",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "135240": {
+        "restaurantId": "135240",
+        "minimumOrderValue": 1200,
+        "bands": [
+          {
+            "minimumAmount": 1200,
+            "fee": 200
+          }
+        ]
+      },
+      "135405": {
+        "restaurantId": "135405",
+        "minimumOrderValue": 1500,
+        "bands": [
+          {
+            "minimumAmount": 1500,
+            "fee": 250
+          },
+          {
+            "minimumAmount": 5000,
+            "fee": 0
+          }
+        ]
+      },
+      "136314": {
+        "restaurantId": "136314",
+        "minimumOrderValue": 1500,
+        "bands": [
+          {
+            "minimumAmount": 1500,
+            "fee": 350
+          }
+        ]
+      },
+      "136558": {
+        "restaurantId": "136558",
+        "minimumOrderValue": 1500,
+        "bands": [
+          {
+            "minimumAmount": 1500,
+            "fee": 200
+          }
+        ]
+      },
+      "137075": {
+        "restaurantId": "137075",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "143113": {
+        "restaurantId": "143113",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "143399": {
+        "restaurantId": "143399",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "146516": {
+        "restaurantId": "146516",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "149794": {
+        "restaurantId": "149794",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "150974": {
+        "restaurantId": "150974",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "159524": {
+        "restaurantId": "159524",
+        "minimumOrderValue": 1200,
+        "bands": [
+          {
+            "minimumAmount": 1200,
+            "fee": 300
+          },
+          {
+            "minimumAmount": 6000,
+            "fee": 0
+          }
+        ]
+      },
+      "162601": {
+        "restaurantId": "162601",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "165369": {
+        "restaurantId": "165369",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "165575": {
+        "restaurantId": "165575",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "167279": {
+        "restaurantId": "167279",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "169988": {
+        "restaurantId": "169988",
+        "minimumOrderValue": 990,
+        "bands": [
+          {
+            "minimumAmount": 990,
+            "fee": 149
+          }
+        ]
+      },
+      "170833": {
+        "restaurantId": "170833",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "173733": {
+        "restaurantId": "173733",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "174386": {
+        "restaurantId": "174386",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "175930": {
+        "restaurantId": "175930",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "178201": {
+        "restaurantId": "178201",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 399
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 599
+          }
+        ]
+      },
+      "178232": {
+        "restaurantId": "178232",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          },
+          {
+            "minimumAmount": 1000,
+            "fee": 229
+          }
+        ]
+      },
+      "178333": {
+        "restaurantId": "178333",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "179247": {
+        "restaurantId": "179247",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "180700": {
+        "restaurantId": "180700",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 399
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 599
+          }
+        ]
+      },
+      "182511": {
+        "restaurantId": "182511",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 409
+          },
+          {
+            "minimumAmount": 1000,
+            "fee": 209
+          }
+        ]
+      },
+      "187403": {
+        "restaurantId": "187403",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 329
+          }
+        ]
+      },
+      "188313": {
+        "restaurantId": "188313",
+        "minimumOrderValue": 1200,
+        "bands": [
+          {
+            "minimumAmount": 1200,
+            "fee": 300
+          }
+        ]
+      },
+      "189877": {
+        "restaurantId": "189877",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "195412": {
+        "restaurantId": "195412",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 500
+          },
+          {
+            "minimumAmount": 1500,
+            "fee": 250
+          }
+        ]
+      },
+      "199785": {
+        "restaurantId": "199785",
+        "minimumOrderValue": 3500,
+        "bands": [
+          {
+            "minimumAmount": 3500,
+            "fee": 200
+          }
+        ]
+      },
+      "200821": {
+        "restaurantId": "200821",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 249
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 449
+          }
+        ]
+      },
+      "203540": {
+        "restaurantId": "203540",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 349
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 549
+          }
+        ]
+      },
+      "204006": {
+        "restaurantId": "204006",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "205359": {
+        "restaurantId": "205359",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 329
+          }
+        ]
+      },
+      "205698": {
+        "restaurantId": "205698",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 249
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 449
+          }
+        ]
+      },
+      "209759": {
+        "restaurantId": "209759",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "210585": {
+        "restaurantId": "210585",
+        "minimumOrderValue": 2000,
+        "bands": [
+          {
+            "minimumAmount": 2000,
+            "fee": 299
+          },
+          {
+            "minimumAmount": 8000,
+            "fee": 0
+          }
+        ]
+      },
+      "212100": {
+        "restaurantId": "212100",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 349
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 549
+          }
+        ]
+      },
+      "212107": {
+        "restaurantId": "212107",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 499
+          }
+        ]
+      },
+      "213133": {
+        "restaurantId": "213133",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 499
+          }
+        ]
+      },
+      "214123": {
+        "restaurantId": "214123",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "214528": {
+        "restaurantId": "214528",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "216162": {
+        "restaurantId": "216162",
+        "minimumOrderValue": 1500,
+        "bands": [
+          {
+            "minimumAmount": 1500,
+            "fee": 299
+          },
+          {
+            "minimumAmount": 8000,
+            "fee": 0
+          }
+        ]
+      },
+      "216552": {
+        "restaurantId": "216552",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "216720": {
+        "restaurantId": "216720",
+        "minimumOrderValue": 1200,
+        "bands": [
+          {
+            "minimumAmount": 1200,
+            "fee": 200
+          }
+        ]
+      },
+      "218229": {
+        "restaurantId": "218229",
+        "minimumOrderValue": 699,
+        "bands": [
+          {
+            "minimumAmount": 699,
+            "fee": 299
+          }
+        ]
+      },
+      "221843": {
+        "restaurantId": "221843",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "222277": {
+        "restaurantId": "222277",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "226938": {
+        "restaurantId": "226938",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 299
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 499
+          }
+        ]
+      },
+      "229794": {
+        "restaurantId": "229794",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 249
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 449
+          }
+        ]
+      },
+      "229855": {
+        "restaurantId": "229855",
+        "minimumOrderValue": 2000,
+        "bands": [
+          {
+            "minimumAmount": 2000,
+            "fee": 299
+          },
+          {
+            "minimumAmount": 8000,
+            "fee": 0
+          }
+        ]
+      },
+      "232164": {
+        "restaurantId": "232164",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 329
+          }
+        ]
+      },
+      "235963": {
+        "restaurantId": "235963",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 499
+          }
+        ]
+      },
+      "237528": {
+        "restaurantId": "237528",
+        "minimumOrderValue": 1299,
+        "bands": [
+          {
+            "minimumAmount": 1299,
+            "fee": 100
+          }
+        ]
+      },
+      "243121": {
+        "restaurantId": "243121",
+        "minimumOrderValue": 2000,
+        "bands": [
+          {
+            "minimumAmount": 2000,
+            "fee": 300
+          }
+        ]
+      },
+      "245320": {
+        "restaurantId": "245320",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "245655": {
+        "restaurantId": "245655",
+        "minimumOrderValue": 2000,
+        "bands": [
+          {
+            "minimumAmount": 2000,
+            "fee": 299
+          }
+        ]
+      },
+      "245775": {
+        "restaurantId": "245775",
+        "minimumOrderValue": 999,
+        "bands": [
+          {
+            "minimumAmount": 999,
+            "fee": 199
+          },
+          {
+            "minimumAmount": 5000,
+            "fee": 0
+          }
+        ]
+      },
+      "246620": {
+        "restaurantId": "246620",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 399
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 599
+          }
+        ]
+      },
+      "249094": {
+        "restaurantId": "249094",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 399
+          },
+          {
+            "minimumAmount": 1000,
+            "fee": 199
+          }
+        ]
+      },
+      "249095": {
+        "restaurantId": "249095",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 399
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 599
+          }
+        ]
+      },
+      "250175": {
+        "restaurantId": "250175",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 499
+          }
+        ]
+      },
+      "250478": {
+        "restaurantId": "250478",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          },
+          {
+            "minimumAmount": 1000,
+            "fee": 229
+          }
+        ]
+      },
+      "250483": {
+        "restaurantId": "250483",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "250714": {
+        "restaurantId": "250714",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 349
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 549
+          }
+        ]
+      },
+      "251088": {
+        "restaurantId": "251088",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "252781": {
+        "restaurantId": "252781",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 349
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 549
+          }
+        ]
+      },
+      "253210": {
+        "restaurantId": "253210",
+        "minimumOrderValue": 1950,
+        "bands": [
+          {
+            "minimumAmount": 1950,
+            "fee": 250
+          }
+        ]
+      },
+      "253297": {
+        "restaurantId": "253297",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "253299": {
+        "restaurantId": "253299",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "254370": {
+        "restaurantId": "254370",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 0
+          }
+        ]
+      },
+      "254846": {
+        "restaurantId": "254846",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "255454": {
+        "restaurantId": "255454",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "256297": {
+        "restaurantId": "256297",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "257159": {
+        "restaurantId": "257159",
+        "minimumOrderValue": 1500,
+        "bands": [
+          {
+            "minimumAmount": 1500,
+            "fee": 200
+          }
+        ]
+      },
+      "260880": {
+        "restaurantId": "260880",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "261751": {
+        "restaurantId": "261751",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "262912": {
+        "restaurantId": "262912",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "264072": {
+        "restaurantId": "264072",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 249
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 449
+          }
+        ]
+      },
+      "266501": {
+        "restaurantId": "266501",
+        "minimumOrderValue": 1500,
+        "bands": [
+          {
+            "minimumAmount": 1500,
+            "fee": 299
+          }
+        ]
+      },
+      "270173": {
+        "restaurantId": "270173",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "270195": {
+        "restaurantId": "270195",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "273042": {
+        "restaurantId": "273042",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 249
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 449
+          }
+        ]
+      },
+      "273181": {
+        "restaurantId": "273181",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 409
+          },
+          {
+            "minimumAmount": 1000,
+            "fee": 209
+          }
+        ]
+      },
+      "273187": {
+        "restaurantId": "273187",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 329
+          },
+          {
+            "minimumAmount": 1000,
+            "fee": 129
+          }
+        ]
+      },
+      "273190": {
+        "restaurantId": "273190",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 349
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 549
+          }
+        ]
+      },
+      "273192": {
+        "restaurantId": "273192",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 299
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 499
+          }
+        ]
+      },
+      "273194": {
+        "restaurantId": "273194",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 399
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 599
+          }
+        ]
+      },
+      "273389": {
+        "restaurantId": "273389",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 399
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 599
+          }
+        ]
+      },
+      "273420": {
+        "restaurantId": "273420",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 249
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 449
+          }
+        ]
+      },
+      "273428": {
+        "restaurantId": "273428",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          },
+          {
+            "minimumAmount": 1000,
+            "fee": 229
+          }
+        ]
+      },
+      "273484": {
+        "restaurantId": "273484",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 399
+          },
+          {
+            "minimumAmount": 1000,
+            "fee": 199
+          }
+        ]
+      },
+      "275640": {
+        "restaurantId": "275640",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "280617": {
+        "restaurantId": "280617",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "280940": {
+        "restaurantId": "280940",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "283189": {
+        "restaurantId": "283189",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "286616": {
+        "restaurantId": "286616",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 399
+          },
+          {
+            "minimumAmount": 1500,
+            "fee": 299
+          }
+        ]
+      },
+      "291385": {
+        "restaurantId": "291385",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "293550": {
+        "restaurantId": "293550",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "294562": {
+        "restaurantId": "294562",
+        "minimumOrderValue": 1200,
+        "bands": [
+          {
+            "minimumAmount": 1200,
+            "fee": 175
+          }
+        ]
+      },
+      "294566": {
+        "restaurantId": "294566",
+        "minimumOrderValue": 1200,
+        "bands": [
+          {
+            "minimumAmount": 1200,
+            "fee": 175
+          }
+        ]
+      },
+      "294779": {
+        "restaurantId": "294779",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 300
+          },
+          {
+            "minimumAmount": 1500,
+            "fee": 100
+          }
+        ]
+      },
+      "297988": {
+        "restaurantId": "297988",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "298422": {
+        "restaurantId": "298422",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "300439": {
+        "restaurantId": "300439",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "303632": {
+        "restaurantId": "303632",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "303662": {
+        "restaurantId": "303662",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "303668": {
+        "restaurantId": "303668",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "304854": {
+        "restaurantId": "304854",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "304855": {
+        "restaurantId": "304855",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "304856": {
+        "restaurantId": "304856",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "304857": {
+        "restaurantId": "304857",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "305851": {
+        "restaurantId": "305851",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 229
+          }
+        ]
+      },
+      "305877": {
+        "restaurantId": "305877",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 229
+          }
+        ]
+      },
+      "306564": {
+        "restaurantId": "306564",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "306655": {
+        "restaurantId": "306655",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "308139": {
+        "restaurantId": "308139",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "308715": {
+        "restaurantId": "308715",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 229
+          }
+        ]
+      },
+      "309062": {
+        "restaurantId": "309062",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 499
+          }
+        ]
+      },
+      "309083": {
+        "restaurantId": "309083",
+        "minimumOrderValue": 1200,
+        "bands": [
+          {
+            "minimumAmount": 1200,
+            "fee": 199
+          },
+          {
+            "minimumAmount": 8000,
+            "fee": 0
+          }
+        ]
+      },
+      "309153": {
+        "restaurantId": "309153",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 329
+          },
+          {
+            "minimumAmount": 1000,
+            "fee": 129
+          }
+        ]
+      },
+      "310677": {
+        "restaurantId": "310677",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 249
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 449
+          }
+        ]
+      },
+      "313664": {
+        "restaurantId": "313664",
+        "minimumOrderValue": 1299,
+        "bands": [
+          {
+            "minimumAmount": 1299,
+            "fee": 199
+          }
+        ]
+      },
+      "313667": {
+        "restaurantId": "313667",
+        "minimumOrderValue": 1299,
+        "bands": [
+          {
+            "minimumAmount": 1299,
+            "fee": 199
+          }
+        ]
+      },
+      "313668": {
+        "restaurantId": "313668",
+        "minimumOrderValue": 1299,
+        "bands": [
+          {
+            "minimumAmount": 1299,
+            "fee": 199
+          }
+        ]
+      },
+      "315390": {
+        "restaurantId": "315390",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 329
+          }
+        ]
+      },
+      "316081": {
+        "restaurantId": "316081",
+        "minimumOrderValue": 1500,
+        "bands": [
+          {
+            "minimumAmount": 1500,
+            "fee": 99
+          }
+        ]
+      },
+      "317772": {
+        "restaurantId": "317772",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "317773": {
+        "restaurantId": "317773",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "320154": {
+        "restaurantId": "320154",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 479
+          }
+        ]
+      },
+      "321097": {
+        "restaurantId": "321097",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 429
+          }
+        ]
+      },
+      "321287": {
+        "restaurantId": "321287",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 0,
+            "fee": 499
+          }
+        ]
+      },
+      "423772": {
+        "restaurantId": "423772",
+        "minimumOrderValue": 0,
+        "bands": [
+          {
+            "minimumAmount": 1000,
+            "fee": 349
+          },
+          {
+            "minimumAmount": 0,
+            "fee": 549
+          }
+        ]
+      },
+      "425613": {
+        "restaurantId": "425613",
+        "minimumOrderValue": 1,
+        "bands": [
+          {
+            "minimumAmount": 1,
+            "fee": 200
+          }
+        ]
+      },
+      "426978": {
+        "restaurantId": "426978",
+        "minimumOrderValue": 2000,
+        "bands": [
+          {
+            "minimumAmount": 2000,
+            "fee": 200
+          }
+        ]
+      },
+      "436338": {
+        "restaurantId": "436338",
+        "minimumOrderValue": 1500,
+        "bands": [
+          {
+            "minimumAmount": 1500,
+            "fee": 200
+          }
+        ]
+      },
+      "437406": {
+        "restaurantId": "437406",
+        "minimumOrderValue": 1500,
+        "bands": [
+          {
+            "minimumAmount": 1500,
+            "fee": 250
+          }
+        ]
+      }
+    }
+  },
+  "promotedPlacement": {
+    "filteredSearchPromotedLimit": 0,
+    "rankedIds": [
+      "245775",
+      "315390",
+      "232164",
+      "150974",
+      "252781"
+    ],
+    "restaurants": {
+      "150974": {
+        "restaurantId": "150974",
+        "defaultPromoted": true
+      },
+      "232164": {
+        "restaurantId": "232164",
+        "defaultPromoted": true
+      },
+      "245775": {
+        "restaurantId": "245775",
+        "defaultPromoted": true
+      },
+      "252781": {
+        "restaurantId": "252781",
+        "defaultPromoted": true
+      },
+      "315390": {
+        "restaurantId": "315390",
+        "defaultPromoted": true
+      }
+    }
+  },
+  "filters": {},
+  "layout": {},
+  "enrichedLists": {}
+}

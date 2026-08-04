@@ -13,7 +13,7 @@ import type { DiscoveryRepository } from "../repository/repository";
 import type { ExecutionRecord, RunRecord, ParsedOutlet } from "../types";
 import type { SourceAdapter, AdapterConfig } from "../adapter";
 import type { SourceOutlet } from "../consolidation/types";
-import { JustEatAdapter } from "../just-eat/adapter";
+import { JustEatEnrichedAdapter } from "../just-eat/adapter-v2";
 import { extractResponseMeta } from "../just-eat/parse";
 import { contentHash } from "../hash";
 import { PARSER_VERSION, ADAPTER_VERSION, SCHEMA_VERSION, NORMALISATION_VERSION } from "../version";
@@ -63,7 +63,10 @@ export interface ExecuteResult {
 export async function executeJustEatRun(
   repo: DiscoveryRepository, run: RunRecord, execution: ExecutionRecord, opts: ExecuteOptions
 ): Promise<ExecuteResult> {
-  const adapter = opts.adapter ?? new JustEatAdapter();
+  // ISS-0035 (2026-08-04): the legacy JustEatAdapter's endpoint is retired (confirmed 404 for
+  // every postcode). Default now points at the independently-verified replacement adapter.
+  // The legacy class remains importable/instantiable (opts.adapter override) — never deleted.
+  const adapter = opts.adapter ?? new JustEatEnrichedAdapter();
   const lease = opts.leaseSeconds ?? 60;
   const cfg = opts.config;
 
@@ -80,6 +83,16 @@ export async function executeJustEatRun(
   let cancelled = false;
   let lostOwnership = false;
   let responseMeta: Record<string, unknown> = {};   // response-level metadata (RestaurantSets/CuisineSets/Dishes/…)
+  // ISS-0035 (2026-08-04): the real reason the LAST failed query failed — previously counted
+  // but discarded, making root-causing a failure from the database alone impossible. Never
+  // includes secrets/cookies/auth headers — only status/error-code/message/query context.
+  let lastFailure: Record<string, unknown> | null =
+    (execution.metrics as Record<string, unknown> | undefined)?.last_failure as Record<string, unknown> | undefined ?? null;
+  // Run-manifest fields (owner-required, 2026-08-04 recovery approval): provider/adapter/
+  // endpoint/schema versions + per-query provenance (query type, query point, retrieval
+  // timestamp), recorded on every run regardless of outcome — not only on failure.
+  const queryLog: Array<Record<string, unknown>> = Array.isArray((execution.metrics as Record<string, unknown> | undefined)?.query_log)
+    ? [...((execution.metrics as Record<string, unknown>).query_log as Array<Record<string, unknown>>)] : [];
 
   const metricsSnapshot = () => ({
     unique_outlets: outletsByJeId.size, total_observations: totalObservations,
@@ -88,6 +101,13 @@ export async function executeJustEatRun(
     canonical_observations: totalObservations - duplicateObservations,   // operational count excludes duplicates
     response_meta: responseMeta,
     normalisation_version: NORMALISATION_VERSION,
+    last_failure: lastFailure,
+    run_manifest: {
+      provider: adapter.source, adapter_version: adapter.adapterVersion,
+      endpoint_version: queryLog.length ? queryLog[queryLog.length - 1].endpoint_version : null,
+      response_schema_version: queryLog.length ? queryLog[queryLog.length - 1].response_schema_version : null,
+    },
+    query_log: queryLog,
   });
   // heartbeat helper: returns false if the worker should stop (lost lease or cancelled)
   const beat = async (): Promise<boolean> => {
@@ -107,11 +127,31 @@ export async function executeJustEatRun(
     const result = await adapter.executeQuery(q, cfg);
     if (!result.ok) {
       failed++;                                      // fail-safe: not fatal, not "completed"
+      // ISS-0035: persist the REAL reason, not just the count. Sanitised — status/error-code/
+      // message/query context/endpoint version only, never headers, cookies or auth tokens.
+      lastFailure = {
+        endpoint_version: result.endpointVersion ?? null,
+        request_type: result.requestType ?? null,
+        http_status: result.httpStatus,
+        provider_error_code: result.providerErrorCode ?? null,
+        message: result.error ?? null,
+        retry_count: result.attempts ?? null,
+        query_point: q.outcode,
+        failed_at: new Date().toISOString(),
+      };
+      queryLog.push({
+        query_point: q.outcode, request_type: result.requestType ?? null, endpoint_version: result.endpointVersion ?? null,
+        response_schema_version: result.responseSchemaVersion ?? null, outcome: "failed", retrieved_at: new Date().toISOString(),
+      });
       await repo.heartbeat(execution.id, opts.workerId, succeeded, metricsSnapshot(), lease);
       await pace(cfg, i, queries.length);
       continue;
     }
 
+    queryLog.push({
+      query_point: q.outcode, request_type: result.requestType ?? null, endpoint_version: result.endpointVersion ?? null,
+      response_schema_version: result.responseSchemaVersion ?? null, outcome: "ok", retrieved_at: new Date().toISOString(),
+    });
     responseMeta = { ...responseMeta, ...extractResponseMeta(result.raw) };   // capture response-level fields
     let n = 0;
     for (const rec of result.parsed) {
@@ -203,7 +243,10 @@ export async function executeJustEatRun(
     completedQueries, plannedQueries: planned, claimedBy: opts.workerId,   // authoritative + ownership-guarded
     metrics: metricsSnapshot(),
     warnings: failed ? [`${failed} outcode query/queries failed (fail-safe, kept going)`] : [],
-    error: null,
+    // ISS-0035: the execution's own `error` column now carries the real, sanitised reason for
+    // the LAST failed query (status/error-code/message/query-point/endpoint-version/retry-
+    // count) instead of always being null — never secrets/headers/cookies.
+    error: lastFailure,
   });
   await repo.setRunStatus(run.id, status === "completed" ? "completed" : status === "cancelled" ? "cancelled" : "completed_with_warnings");
 

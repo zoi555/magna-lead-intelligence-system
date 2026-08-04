@@ -1245,3 +1245,96 @@ stopped per explicit instruction. Full detail: `docs/10_BUGS_AND_FIXES.md`,
 11. Committed the fix (commit `05d4138`, code/tests/config only) but did NOT push — did not
     approve/switch the permanent live customer-master pointer — did not run new districts or make
     any live provider calls, per the explicit instructions this pass operated under.
+
+## 2026-08-04 (same day) — push executed and verified; campaign-003 (Kunz full allocation) started, first live discovery call BLOCKED by a Just Eat provider-side outage (ISS-0035)
+
+1. Executed owner-approved push of 21 pending commits to `origin/feature/mvp-vertical-slice-001`.
+   Verified pre- and post-push: branch, `git status`, commit range, local hash `8cc518f` = remote
+   hash `8cc518f`. The two pre-existing untracked scripts confirmed untouched throughout.
+2. Created `docs/release-manifests/campaign-002-five-district-pilot-2026-08-04.json` — a
+   metadata-only release record (no customer/lead contents), every SHA-256 computed
+   programmatically after catching a hand-transcription error in an earlier draft. Committed
+   `8cc518f`, pushed.
+3. Started campaign-003-kunz-full-allocation. Surfaced and resolved (via `AskUserQuestion`, then a
+   plain-text follow-up) a genuine conflict between the owner's stated Kunz allocation (CM0–CM9)
+   and the repo's authoritative historical record (Kunz's completed prior allocation, TW1–TW10).
+   Owner confirmed: CM0–CM9 is Kunz's current allocation for new campaigns; TW1–TW10 remains a
+   separate, immutable, historical record — never rerun, reassigned, or included in campaign-003's
+   output. Encoded this explicitly in `territories.json`'s `resolutionNote`.
+4. Reverse-engineered the real orchestration chain for a brand-new district run (`je-run.ts` →
+   `run-full-territory.ts` → `run-sales-territory.ts`) and discovered it needs TWO incompatible
+   assignment-file schemas. Built and validated all three campaign-003 config artifacts plus a
+   campaign-003 customer-master pointer (commits `ae5580d`, `c12cf16`, `8e098d8` — not yet pushed,
+   code/config only, no customer data).
+5. Ran all 8 explicit pre-run gates; a zero-live-call dry-run sanity check on CM0; then the first
+   genuine live provider call of the session: `je:run -- "CM0"`. Result: `completed_with_warnings`,
+   1/1 outcode query failed, 0 outlets.
+6. Per the explicit "do not fabricate an empty successful result" / "retry only within established
+   safe retry rules" instructions: confirmed the adapter's own internal retry (2 attempts,
+   403/429/5xx/network-error only) had already run; performed one further established-safe retry
+   (a fresh `je:run -- "CM0"` execution — not blocked by the 24h duplicate-run guard, since
+   `completed_with_warnings` isn't a blocking status) — identical failure.
+7. Root-caused directly via `curl` against the live endpoint (bypassing the app entirely): Just
+   Eat's `uk.api.just-eat.io/restaurants/bypostcode/{code}` now returns `404 {"message":"uri not
+   found"}` for every postcode tested (CM0, CM1, UB1, TW1, RM1, a full postcode) — including CM1,
+   which returned 94 real candidates as recently as 2026-08-02 (run `ff0ad42a-...`, confirmed via
+   Supabase). Confirmed not a local/network issue (general internet fine, JE's own domain alive).
+8. Noted, but explicitly did NOT fix (no pipeline redesign authorised this pass), a separate real
+   defect: `execute.ts` never persists the adapter's actual error string into the execution record
+   — only a generic failure count. Logged as part of ISS-0035 for a future pass.
+9. Logged `docs/11_ISSUES_LOG.md` ISS-0035 (full technical detail) and updated `PROJECT_STATUS.md`.
+   `npm run typecheck`/`build` clean; all 39 `test:lead-production-*` suites individually re-run,
+   ALL PASSED.
+10. Did not proceed to CM2–CM9 (same failure would recur identically) — did not fabricate any
+    empty-but-successful district result. Did not attempt to fix, replace, or guess an alternate
+    Just Eat endpoint. Did not merge, did not push the 3 pending campaign-003 config commits
+    without reporting them first, did not touch the two pre-existing untracked scripts. Kunz's run
+    is paused; no Kunz output files exist yet.
+
+## 2026-08-04 (same day) — authorised Just Eat endpoint recovery investigation: replacement endpoint verified, versioned adapter built, ISS-0035 error-persistence gap fixed, CM0 recovery pilot succeeded live
+
+1. Owner explicitly authorised a narrowly-scoped recovery task (not a pipeline redesign) after
+   the Kunz run was blocked by the dead Just Eat endpoint. Reconfirmed the legacy failure with a
+   small controlled curl matrix (CM0/CM1/TW1/RM1 × full-postcode/outcode) — 404 on every case.
+2. Inspected the live Just Eat website via a real, authenticated browser session (Chrome
+   automation) — no CAPTCHA bypass, no anti-bot circumvention, no private session tokens reused.
+   Found the consumer site is now SSR + Google-Places-geocoded with no client-visible restaurant
+   API call, and confirmed its HTML is Cloudflare-bot-protected (a plain curl was correctly
+   blocked, not defeated).
+3. Verified the owner-suggested candidate endpoint
+   (`/discovery/uk/restaurants/enriched/bypostcode/{postcode}`) live via curl: 200 OK, no auth,
+   same lawful `uk.api.just-eat.io` host. Response headers (`api-supported-versions: 3`,
+   `api-deprecated-versions: 2`) directly confirm a genuine provider-side API version migration.
+4. Compared the new endpoint's CM1 output against the stored campaign-002 CM1 pilot: 170/170
+   restaurant IDs matched exactly (0 drift either direction). Confirmed bare-outcode queries
+   return the full district set in one call (no pagination up to 677 records for RM1) — so no
+   multi-full-postcode coverage scheme was needed; the existing one-query-per-district plan
+   still applies. Documented every genuine schema gap (no brand field, single rating figure,
+   no explicit "is open" flag, etc.) rather than guessing equivalents.
+5. Built a separate, versioned adapter/parser (`JustEatEnrichedAdapter`, `adapter-v2.ts`,
+   `parse-v2.ts`, `fetchJustEatEnrichedRaw` in `src/lib/sources/just-eat.ts`) — additive, not an
+   in-place edit. The legacy `JustEatAdapter`/`parse.ts`/`fetchJustEatSearchRaw` remain
+   byte-for-byte unchanged, documented as retired, and re-verified passing
+   (`npm run test:je-stage1`, all 18 assertions). `execute.ts`'s default adapter now points at
+   the new class — the only production "swap" made.
+6. Added 14 fixture-driven regression tests (`scripts/test-je-enriched-adapter.ts`, `npm run
+   test:je-enriched-adapter`) covering valid/empty/unrecognised-postcode responses, all required
+   HTTP error shapes (400/401/403/404/429/500/malformed-JSON/network-error), unrecognised-schema
+   fail-closed behaviour, one-query-per-district planning, cross-query-point deduplication, and
+   postcode-outside-district classification. All passing.
+7. Fixed ISS-0035's own error-persistence gap: `execute.ts` now builds and persists a sanitised
+   `last_failure` object (endpoint version, request type, HTTP status, provider error code,
+   message, retry count, query point, timestamp — never headers/cookies/auth tokens) into both
+   `metrics` and the execution's own `error` column, proven by a dedicated regression test.
+8. Ran the authorised CM0 recovery pilot live (`npm run je:run -- "CM0"`, run
+   `331414d5-5be2-41bb-9317-73089718e0d5`): `status=completed`, 1/1 outcode, 0 failed queries, 4
+   outlets, 4 observations, 0 duplicates. Geography validation split 2 `valid_geography` / 2
+   `out_of_scope_geography` correctly via the existing, unchanged geography gate — 2
+   consolidated candidates. Stopped there as instructed: no Google/website/FSA/Companies House
+   calls, no enrichment, CM1 not combined, no Kunz output files created, CM2–CM9 not run.
+9. `npm run typecheck`/`build` clean; all 41 suites individually re-run (39
+   `test:lead-production-*` + `test:je-stage1` + the new `test:je-enriched-adapter`), ALL
+   PASSED. Updated `docs/11_ISSUES_LOG.md` ISS-0035 with the full verification evidence.
+10. Did not push any commits (the 3 pre-existing campaign-003 config commits remain local, as
+    do this pass's code/doc changes — all reported, none pushed without instruction). Did not
+    merge. Did not run CM2–CM9. Did not touch the two pre-existing untracked scripts.

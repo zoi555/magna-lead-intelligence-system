@@ -38,6 +38,13 @@ function clampInt(raw: string | undefined, dflt: number, min: number, max: numbe
   return Math.min(Math.max(Math.trunc(n), min), max);
 }
 
+// RETIRED (confirmed 2026-08-04, ISS-0035): this endpoint now returns 404 "uri not found"
+// for every postcode/outcode tested (CM0, CM1, UB1, TW1, RM1, full postcodes) — including
+// CM1, which returned 94 real candidates via this exact endpoint as recently as 2026-08-02.
+// The response's own `api-deprecated-versions: 2` header on the replacement endpoint below
+// corroborates a genuine platform-side API version retirement, not a transient outage.
+// Kept here, UNCHANGED and undeleted, as the historical record of what campaign-002's CM1
+// pilot actually called — never reused for a live call again. See JUST_EAT_ENRICHED_BASE.
 export const JUST_EAT_BASE = "https://uk.api.just-eat.io/restaurants/bypostcode";
 // A descriptive UA is polite and honest about who is calling; not evasion.
 export const JUST_EAT_HEADERS = {
@@ -46,7 +53,90 @@ export const JUST_EAT_HEADERS = {
 } as const;
 
 // Response headers that are safe to retain for audit (never auth/cookies).
-const SAFE_HEADER_KEYS = ["date", "content-type", "cache-control", "x-ratelimit-remaining", "x-ratelimit-limit", "retry-after"];
+const SAFE_HEADER_KEYS = ["date", "content-type", "cache-control", "x-ratelimit-remaining", "x-ratelimit-limit", "retry-after", "api-supported-versions", "api-deprecated-versions"];
+
+// ---------- replacement endpoint (ISS-0035 recovery, 2026-08-04) ----------
+// Independently verified live (curl + browser network inspection) as the successor to the
+// retired endpoint above: same lawful public host (uk.api.just-eat.io), no auth/cookies/
+// CAPTCHA required, honest structured JSON. Verification evidence (docs/11_ISSUES_LOG.md
+// ISS-0035): CM1 queried by bare outcode returned the identical 170/170 restaurant-ID set as
+// the historical campaign-002 CM1 pilot (0 only-in-old, 0 only-in-new). Accepts a bare
+// outcode/district (e.g. "CM1") and returns the FULL district set in one call (metaData.
+// resultCount === restaurants.length, verified up to 677 records for RM1, no pagination
+// observed) — so the existing one-query-per-district planning strategy still applies
+// unchanged; no multi-full-postcode coverage scheme is needed.
+export const JUST_EAT_ENRICHED_BASE = "https://uk.api.just-eat.io/discovery/uk/restaurants/enriched/bypostcode";
+// Recorded on every run manifest (ISS-0035 requirement) — mirrors the live `api-supported-
+// versions` response header confirmed on 2026-08-04. Bump if Just Eat's own header advances.
+export const JUST_EAT_ENDPOINT_VERSION = "je-enriched-bypostcode-v3-2026-08-04";
+
+export type JustEatRequestType = "outcode" | "full_postcode" | "coordinate";
+
+export interface JustEatEnrichedFetchResult {
+  ok: boolean;
+  httpStatus: number | null;
+  headers: Record<string, string>;
+  raw: unknown;
+  error?: string;
+  attempts: number;
+  endpointVersion: string;
+  requestType: JustEatRequestType;
+  queryPoint: string;
+}
+
+function classifyRequestType(input: string): JustEatRequestType {
+  const compact = input.toUpperCase().replace(/\s+/g, "");
+  // A full UK postcode has an inward code (digit + 2 letters) after the outward code;
+  // a bare outcode/district does not. Conservative — coordinates are never inferred here.
+  return /^[A-Z]{1,2}[0-9][A-Z0-9]?[0-9][A-Z]{2}$/.test(compact) ? "full_postcode" : "outcode";
+}
+
+/**
+ * Fetch ONE query point's raw enriched search payload from the live replacement endpoint.
+ * Same lawful method as fetchJustEatSearchRaw (server-side, descriptive UA, retry-once,
+ * fail-safe) — never throws, returns { ok:false } with the real HTTP status/error string on
+ * failure so the caller can persist it (ISS-0035: never silently discarded).
+ *
+ * The provider returns HTTP 200 even for an unrecognised postcode (canonicalName/location
+ * null, resultCount 0) — that is a legitimate empty result, not a failure, and is NOT
+ * translated into ok:false here. A genuinely malformed/unexpected top-level shape (missing
+ * both `metaData` and `restaurants`) is instead the caller's fail-closed responsibility
+ * (see JustEatEnrichedAdapter.executeQuery), since detecting that requires parsing the body.
+ */
+export async function fetchJustEatEnrichedRaw(queryPoint: string): Promise<JustEatEnrichedFetchResult> {
+  const requestType = classifyRequestType(queryPoint);
+  const qp = queryPoint.toUpperCase().replace(/\s+/g, "");
+  const url = `${JUST_EAT_ENRICHED_BASE}/${encodeURIComponent(qp)}`;
+  let lastStatus: number | null = null;
+  let lastErr = "";
+  let attempts = 0;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    attempts++;
+    try {
+      const res = await fetch(url, { headers: JUST_EAT_HEADERS });
+      lastStatus = res.status;
+      const headers: Record<string, string> = {};
+      for (const k of SAFE_HEADER_KEYS) { const v = res.headers.get(k); if (v) headers[k] = v; }
+      if (res.status === 403 || res.status === 429 || res.status >= 500) {
+        lastErr = `HTTP ${res.status} ${res.statusText}`;
+        if (attempt === 0) { await sleep(750); continue; }
+        return { ok: false, httpStatus: res.status, headers, raw: null, error: lastErr, attempts, endpointVersion: JUST_EAT_ENDPOINT_VERSION, requestType, queryPoint: qp };
+      }
+      if (!res.ok) return { ok: false, httpStatus: res.status, headers, raw: null, error: `HTTP ${res.status}`, attempts, endpointVersion: JUST_EAT_ENDPOINT_VERSION, requestType, queryPoint: qp };
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch (parseErr) {
+        return { ok: false, httpStatus: res.status, headers, raw: null, error: `malformed JSON: ${parseErr instanceof Error ? parseErr.message : String(parseErr)}`, attempts, endpointVersion: JUST_EAT_ENDPOINT_VERSION, requestType, queryPoint: qp };
+      }
+      return { ok: true, httpStatus: res.status, headers, raw: body, attempts, endpointVersion: JUST_EAT_ENDPOINT_VERSION, requestType, queryPoint: qp };
+    } catch (e) {
+      lastErr = e instanceof Error ? e.message : String(e);
+      if (attempt === 0) { await sleep(750); continue; }
+    }
+  }
+  return { ok: false, httpStatus: lastStatus, headers: {}, raw: null, error: lastErr || "network error", attempts, endpointVersion: JUST_EAT_ENDPOINT_VERSION, requestType, queryPoint: qp };
+}
 
 /**
  * Fetch ONE outcode's raw search payload and retain it for immutable observation
