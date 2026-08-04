@@ -172,6 +172,25 @@ async function main() {
   const confirmedRemainingInReleasable = confirmedLeads.filter(([leadId]) => stillReleasedIds.has(leadId) && !explicitlyOverriddenIds.has(leadId));
   const probableRemainingInReleasable = probableLeads.filter(([leadId]) => stillReleasedIds.has(leadId) && !explicitlyOverriddenIds.has(leadId));
   const probableOverriddenAndReleased = probableLeads.filter(([leadId]) => stillReleasedIds.has(leadId) && explicitlyOverriddenIds.has(leadId));
+  // Explicit owner-override records (record-owner-overrides.ts) — pulled directly from the row's
+  // own "Override: ..." columns, never re-typed by hand, so the certificate can never drift from
+  // what is actually recorded on the Master row. Includes held_with_owner_override cases too
+  // (e.g. Kings Diner), not just released ones — every override must be individually listed.
+  const allRowsForOverrideScan = [...usableRows, ...heldRows, ...excludedRows];
+  const ownerOverrides = allRowsForOverrideScan
+    .filter((r) => r["Override: Owner Decision"])
+    .map((r) => ({
+      leadId: String(r["Permanent Lead ID"]),
+      tradingName: String(r["Trading Name"] ?? ""),
+      originalAlgorithmDecision: String(r["Override: Original Algorithm Decision"] ?? ""),
+      ownerDecision: String(r["Override: Owner Decision"] ?? ""),
+      reason: String(r["Override: Reason"] ?? ""),
+      timestamp: String(r["Override: Timestamp"] ?? ""),
+      customerMasterChecksum: String(r["Override: Customer Master Checksum"] ?? ""),
+      reviewer: String(r["Override: Reviewer"] ?? ""),
+      evidenceRetained: String(r["Override: Evidence Retained"] ?? ""),
+      sheetAtTimeOfRecording: String(r["Override: Sheet At Time Of Recording"] ?? ""),
+    }));
   // "Cleared" means no CONFIRMED/PROBABLE finding — a lead can still appear in bestTierByLeadId
   // with tier "clear" (e.g. an exact-postcode-weak-name candidate that was explicitly resolved
   // not-material) and is still correctly counted as cleared here; only checking map membership
@@ -191,6 +210,16 @@ async function main() {
     { Measure: "7. Final released leads (Operationally Usable Leads sheet row count)", Count: usableRows.length },
     { Measure: "8. Probable matches released under an explicit owner-directed audit-warning override (not counted in measure 5 — see the row's own Business Category Evidence Summary / Customer Match Audit Warning for the exact rule applied)", Count: probableOverriddenAndReleased.length },
   ]);
+
+  // Every explicit owner-override decision, individually listed — never represented as an
+  // ordinary algorithmic outcome. Pulled verbatim from the row's own "Override: ..." columns.
+  addSheet("Owner Override Decisions", ownerOverrides.map((o) => ({
+    "Lead ID": o.leadId, "Trading Name": o.tradingName,
+    "Original Algorithm Decision": o.originalAlgorithmDecision, "Owner Decision": o.ownerDecision,
+    Reason: o.reason, Timestamp: o.timestamp, "Customer Master Checksum": o.customerMasterChecksum,
+    Reviewer: o.reviewer, "Evidence Retained": o.evidenceRetained,
+    "Sheet At Time Of Recording": o.sheetAtTimeOfRecording,
+  })));
 
   // Per-lead detail for every confirmed AND probable lead — the exact fields Part 1 required.
   const ctoReviewPath = arg("cto-review");
@@ -274,6 +303,7 @@ async function main() {
         caveat: `Hand-curated ${calibration.performance.calibrationSetSize}-case labelled set (real pilot/board-caught cases, real released-lead true-negatives, deliberately engineered synthetic coverage of named failure modes) — NOT a statistically powered sample. Figures describe behaviour on this labelled set only, not a population-level guarantee. Thresholds were fixed before the holdout subset was written and were never adjusted using holdout results.`,
       },
       zeroConfirmedOrProbableRemaining: confirmedRemainingInReleasable.length === 0 && probableRemainingInReleasable.length === 0,
+      ownerOverrides,
     },
   };
 
