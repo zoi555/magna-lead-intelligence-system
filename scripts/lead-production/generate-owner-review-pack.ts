@@ -340,8 +340,8 @@ export async function generateOwnerReviewPack(opts: {
   const manualSample = buildManualSample(allQualifiedLeads);
   // Owner-decision review (2026-08-04): one row per released lead, the full urgency-decision
   // trail — never just the current Hot Leads sheet in isolation. "Urgency Reclassification Note"
-  // is an optional column this workbook's own generator (generate-kunz-full-allocation-master.ts
-  // patches, when applied) may add; a workbook without it simply reports every lead as "Original"
+  // is an optional column a one-off correction patch (or apply-leakage-certificate-decisions.ts)
+  // may add; a workbook without it simply reports every lead as "Original"
   // — this never fabricates a reclassification that didn't happen.
   const urgencyDecisions = usableRows.map((m) => ({
     "Lead ID": m["Permanent Lead ID"], District: m["Postcode District"], "Trading Name": m["Trading Name"],

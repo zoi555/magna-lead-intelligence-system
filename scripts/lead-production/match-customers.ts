@@ -1,4 +1,4 @@
-// Customer-matching hierarchy. Classifies by EVIDENCE (named rules from the fixed 6-label
+// Customer-matching hierarchy. Classifies by EVIDENCE (named rules from the fixed 7-label
 // vocabulary in types.ts's EvidenceRule), never a single opaque blended score, and never
 // describes postcode+name evidence as an "address match" — consolidated_candidates has no
 // free-text address field pre-enrichment (postcode + coordinates only).
@@ -9,6 +9,18 @@
 //                                       conflicting (a shared/reused number with a completely
 //                                       unrelated name doesn't get blindly confirmed)
 //   exact_postcode_exact_name        — canonical postcode matches AND normalised name is exactly equal
+//   exact_trading_name_alias         — customer's T/A-parsed alias (e.g. "Samsco Global Limited
+//                                       T/A Chicken House" -> "Chicken House") exactly equals the
+//                                       candidate's normalised name/brand, AND canonical postcode
+//                                       also matches (alias alone is never enough — a T/A alias is
+//                                       as reusable/generic as a bare trading name; real case:
+//                                       "Spice Hut" is an exact alias shared by 5 unrelated
+//                                       customers in different towns). Added 2026-08-05 (ISS-0038)
+//                                       — previously only the LAST-stage independent verifier
+//                                       parsed this pattern at all; phase1 compared only the
+//                                       un-parsed whole legal/trading-name string, so an exact
+//                                       alias+postcode match scored merely "probable" (~0.5
+//                                       similarity) here while being a genuine identity match.
 //   verified_parent_branch_relationship — customer's parent/group account field, normalised,
 //                                       exactly equals the candidate's normalised name/brand
 //
@@ -20,7 +32,7 @@
 //   weak_name_similarity             — name similarity alone, no postcode/phone/company/parent
 //                                       corroboration. NEVER creates an automatic exclusion.
 
-import { normaliseName, normaliseCompanyNumber, normalisePhone, normalisePostcode, nameSimilarity } from "./normalize";
+import { normaliseName, normaliseCompanyNumber, normalisePhone, normalisePostcode, nameSimilarity, extractTradingAsAlias } from "./normalize";
 import type { CustomerRecord, OperationalCandidate, MatchResult, MatchTier, MatchOutcome, EvidenceRule, NormalisedPair } from "./types";
 
 const PROBABLE_NAME_SIM = 0.3;  // probable-tier floor: postcode match + at least this much name overlap
@@ -75,6 +87,23 @@ function evaluatePair(candidate: OperationalCandidate, customer: CustomerRecord)
   const custPostcode = normalisePostcode(customer.postcode).canonical;
   const postcodesEqual = !!candPostcode && !!custPostcode && candPostcode === custPostcode;
 
+  // Exact T/A-parsed alias match (ISS-0038) — parsed from the RAW trading/legal name (before
+  // normaliseName() strips the "T/A" marker itself), so "Samsco Global Limited T/A Chicken
+  // House" yields alias "Chicken House", normalised and compared exactly against the
+  // candidate — never merely folded into the whole-string Jaccard similarity above. Requires
+  // postcode agreement too, matching verify-customer-leakage.ts's own owner-approved rule
+  // exactly ("exact trading-name alias + postcode" for confirmed — alias alone is never
+  // enough; real case: "Spice Hut" is an exact T/A alias shared by 5 unrelated customers in
+  // different towns, model-defect fix 2026-08-03) — an alias match without postcode agreement
+  // deliberately falls through to the existing probable/weak tiers below instead, never a new
+  // confirmed route on its own.
+  const custAliases = [customer.tradingName, customer.legalName]
+    .map((raw) => (raw ? extractTradingAsAlias(raw) : null))
+    .filter((a): a is string => !!a)
+    .map((a) => normaliseName(a));
+  const aliasExactMatch = custAliases.some((alias) => !!alias && (alias === candName || (!!candBrand && alias === candBrand)));
+  if (aliasExactMatch && postcodesEqual) rules.push("exact_trading_name_alias");
+
   if (postcodesEqual && namesExactlyEqual) rules.push("exact_postcode_exact_name");
 
   const parentGroupNorm = customer.parentGroupAccount ? normaliseName(customer.parentGroupAccount) : "";
@@ -88,7 +117,7 @@ function evaluatePair(candidate: OperationalCandidate, customer: CustomerRecord)
   if (phonesEqual && phoneConflictSim >= PHONE_CONFLICT_FLOOR) rules.push("exact_normalised_telephone");
 
   if (rules.length) {
-    const directIdentity = rules.some((r) => r === "exact_company_number" || r === "exact_postcode_exact_name" || r === "exact_normalised_telephone");
+    const directIdentity = rules.some((r) => r === "exact_company_number" || r === "exact_postcode_exact_name" || r === "exact_normalised_telephone" || r === "exact_trading_name_alias");
     return { tier: "confirmed", rules, nameSim: bestNameSim || null, directIdentity };
   }
 

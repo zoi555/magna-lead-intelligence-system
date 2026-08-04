@@ -78,22 +78,39 @@ async function main() {
   assert(threw, "throws when the caller explicitly tags the write as kind: 'release', regardless of the literal path text");
 
   console.log("\n10. generate-release-manifest.ts's buildReleaseManifest computes REAL SHA-256/byte counts from disk, never hand-typed:");
-  const releaseDir = path.join(tmpDir, "campaigns", "test-campaign-2", "release");
+  const campaignDir = path.join(tmpDir, "campaigns", "test-campaign-2");
+  const releaseDir = path.join(campaignDir, "release");
+  const reviewDir = path.join(campaignDir, "review");
+  const auditDir = path.join(campaignDir, "audit");
   await fs.mkdir(releaseDir, { recursive: true });
+  await fs.mkdir(reviewDir, { recursive: true });
+  await fs.mkdir(auditDir, { recursive: true });
   const fileA = path.join(releaseDir, "a.csv");
   const fileB = path.join(releaseDir, "b.json");
   await fs.writeFile(fileA, "trading_name,postcode\nExample,AB1 2CD\n");
   await fs.writeFile(fileB, JSON.stringify({ hello: "world" }));
   await fs.writeFile(path.join(releaseDir, ".DS_Store"), "ignored"); // hidden files must be skipped
   await fs.mkdir(path.join(releaseDir, "a-subdirectory-should-be-skipped"), { recursive: true });
+  const reviewFile = path.join(reviewDir, "owner-review.xlsx");
+  await fs.writeFile(reviewFile, "fake-xlsx-bytes-review");
+  const auditFile1 = path.join(auditDir, "customer-leakage-audit.xlsx");
+  const auditFile2 = path.join(auditDir, "zero-leakage-certificate.json");
+  await fs.writeFile(auditFile1, "fake-xlsx-bytes-audit");
+  await fs.writeFile(auditFile2, JSON.stringify({ result: "PASS" }));
 
-  const manifest = await buildReleaseManifest({ campaignId: "test-campaign-2", releaseDir });
+  const manifest = await buildReleaseManifest({ campaignId: "test-campaign-2", scannedDirectories: { release: releaseDir, review: reviewDir, audit: auditDir } });
   assert(manifest.campaignId === "test-campaign-2", "manifest records the supplied campaign id verbatim");
-  assert(manifest.artifactCount === 2, `exactly the 2 real files are hashed, hidden file and subdirectory skipped (got ${manifest.artifactCount})`);
+  assert(manifest.artifactCount === 5, `all 5 real files across release/review/audit are hashed — hidden file and subdirectory skipped (got ${manifest.artifactCount})`);
   const expectedShaA = createHash("sha256").update(await fs.readFile(fileA)).digest("hex");
   const foundA = manifest.artifacts.find((a) => a.filename === "a.csv");
   assert(foundA?.sha256 === expectedShaA, "a.csv's SHA-256 matches an independently-computed hash of the same bytes");
   assert(foundA?.bytes === (await fs.stat(fileA)).size, "a.csv's byte count matches the real file size");
+  assert(foundA?.kind === "release", "a.csv is correctly tagged with its own kind (release)");
+  const foundReview = manifest.artifacts.find((a) => a.filename === "owner-review.xlsx");
+  assert(foundReview?.kind === "review", `the review/ directory's file is scanned and correctly tagged (got kind "${foundReview?.kind}")`);
+  const foundAuditFiles = manifest.artifacts.filter((a) => a.kind === "audit");
+  assert(foundAuditFiles.length === 2, `both audit/ files (leakage audit + certificate) are scanned (got ${foundAuditFiles.length})`);
+  assert(!manifest.artifacts.some((a) => a.filename.includes("release-manifest")), "the manifest never hashes or includes itself as one of its own artifacts");
   assert(manifest.certificate === null, "no certificate path supplied -> certificate field is null, never fabricated");
   assert(manifest.authoritativeCustomerMaster === null, "no customers path supplied -> field is null, never fabricated");
   assert(!/naseh|kunz|meer/i.test(JSON.stringify(manifest)), "no representative name appears anywhere in a generic manifest");
@@ -103,7 +120,7 @@ async function main() {
   await fs.writeFile(certPath, JSON.stringify({ result: "PASS", masterResult: "PASS", ctoResult: "PASS", salesProResult: "NOT_CHECKED", confirmedLeakCount: 0, unresolvedProbableLeadCount: 0, releasedLeadCount: 42 }));
   const custPath = path.join(tmpDir, "customers.csv");
   await fs.writeFile(custPath, "id,name\n1,Test\n");
-  const manifest2 = await buildReleaseManifest({ campaignId: "test-campaign-2", releaseDir, certificatePath: certPath, customersPath: custPath });
+  const manifest2 = await buildReleaseManifest({ campaignId: "test-campaign-2", scannedDirectories: { release: releaseDir }, certificatePath: certPath, customersPath: custPath });
   assert(manifest2.certificate?.result === "PASS", "certificate result carried through");
   assert(manifest2.certificate?.releasedLeadCount === 42, "certificate released-lead-count carried through");
   assert(manifest2.authoritativeCustomerMaster?.sha256 === createHash("sha256").update(await fs.readFile(custPath)).digest("hex"), "customer-master checksum is independently recomputed, matches a direct hash of the same file");

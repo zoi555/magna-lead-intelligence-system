@@ -180,6 +180,20 @@ export function normaliseDomain(raw: string | null | undefined): string | null {
   return host || null;
 }
 
+// T/A ("trading as") alias extraction — moved here 2026-08-05 (ISS-0038: three confirmed
+// customer matches missed by match-customers.ts, the upstream phase1 matcher, because it never
+// parsed this pattern — only verify-customer-leakage.ts, the LAST-stage independent verifier,
+// did). The real customer master routinely embeds the actual trading name inside the legal/
+// account name (e.g. "Al Shukraan Ltd T/A Al Qasr Restaurant"; real case: "Samsco Global Limited
+// T/A Chicken House" vs candidate "Chicken House" — nameSimilarity() alone scores this only
+// ~0.5, "probable", never "confirmed", because the un-parsed legal name shares only one of five
+// tokens with the candidate). Single source of truth for both the phase1 matcher and the final
+// verifier, so neither can drift out of sync with the other again.
+export function extractTradingAsAlias(raw: string): string | null {
+  const m = /t\/a\s+(.+?)(?:\s*\(closed\))?$/i.exec(raw);
+  return m ? m[1].trim() : null;
+}
+
 /** Jaccard similarity over whitespace tokens of two already-normalised names. */
 export function nameSimilarity(a: string, b: string): number {
   const ta = new Set(a.split(" ").filter(Boolean));

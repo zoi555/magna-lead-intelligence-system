@@ -153,14 +153,20 @@ export const MATCH_OUTCOMES: MatchOutcome[] = [
   "branch_of_inactive_customer", "probable_match", "weak_possible_match", "new_prospect",
 ];
 
-// The exact 6-label evidence vocabulary this bridge is allowed to cite. Deliberately does NOT
+// The exact 7-label evidence vocabulary this bridge is allowed to cite. Deliberately does NOT
 // include any "address match" language — consolidated_candidates has no free-text address
 // field pre-enrichment (postcode + coordinates only), so postcode is never described as an
-// address match, only as postcode/name evidence.
+// address match, only as postcode/name evidence. "exact_trading_name_alias" added 2026-08-05
+// (ISS-0038) — phase1 previously had no T/A-alias-parsing route at all, only the LAST-stage
+// independent verifier did, so a candidate whose only match signal was an exact T/A-parsed
+// alias (e.g. "Chicken House" vs customer "Samsco Global Limited T/A Chicken House") was scored
+// merely "probable" here (~0.5 whole-string similarity) while the verifier alone knew it was
+// actually an exact identity match.
 export type EvidenceRule =
   | "exact_company_number"
   | "exact_normalised_telephone"
   | "exact_postcode_exact_name"
+  | "exact_trading_name_alias"
   | "probable_postcode_name_similarity"
   | "verified_parent_branch_relationship"
   | "weak_name_similarity";

@@ -1,0 +1,45 @@
+{
+  "campaignId": "campaign-005-naseh-full-allocation",
+  "campaignVersion": "v1",
+  "effectiveDate": "2026-08-04",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-04 (explicit territory-conflict check performed before live discovery, mirroring the same conflict/resolution pattern already resolved for Kunz's campaign-003 and Meer's campaign-004)",
+  "description": "Naseh's first full-territory production run under the current allocation. Covers IG1-IG6 (6 districts). IG1 was already discovered and enriched live under campaign-002-five-district-pilot (including a documented, zero-live-call phone-validation reprocess on 2026-08-04) and is reused verbatim, never rerun. IG2-IG6 are newly discovered and processed under this campaign.",
+  "resolutionNote": "Two genuine conflicts were found during offline preflight and resolved before live discovery, both the same shape already resolved for Kunz/Meer. (1) config/lead-production/sales-territories-v2.json records Naseh's OTHER, separate historical allocation as UB1-UB5 (see handover/naseh-ub1-ub5/). The owner's 2026-08-04 instruction confirmed IG1-IG6 is Naseh's CURRENT approved allocation, superseding UB1-UB5 for all NEW campaigns going forward. UB1-UB5's historical configuration, outputs, and provenance are explicitly NOT modified, superseded, reassigned, deleted, or reprocessed by this file or this campaign — they remain the immutable historical record of Naseh's completed prior work. UB1-UB5 must never be rerun and must never be treated as part of this campaign's final Naseh output. (2) IG1 itself was already run live under campaign-002-five-district-pilot (output/territories/campaign-002/naseh/ig1/) with a later, documented, zero-new-live-call phone-validation correction (postprocess-revision-manifest.json, 2026-08-04, docs/10_BUGS_AND_FIXES.md) — the SAME shape of reuse already applied to Kunz's CM1. IG1's existing checkpoint (using the revised final_scoring output, not the stale pre-fix one) is reused verbatim, never rerun, for this campaign; only IG2-IG6 are newly discovered.",
+  "representative": {
+    "internalName": "Naseh",
+    "role": "telesales",
+    "salesProRepresentativeValue": "Muhammad  <Nasehnaseh@magnafoodservice.co.uk>",
+    "regionRoute": "East London",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "description": "Naseh's complete current postcode allocation — one district (IG1) reused verbatim from campaign-002, five newly run under this campaign.",
+    "postcodeDistricts": ["IG1", "IG2", "IG3", "IG4", "IG5", "IG6"],
+    "districtCount": 6
+  },
+  "alreadyCompletedElsewhere": {
+    "description": "IG1 — discovered and fully enriched live under campaign-002-five-district-pilot. Reused verbatim (including its 2026-08-04 phone-fix reprocess correction), never rerun.",
+    "postcodeDistricts": ["IG1"],
+    "sourceCampaignId": "campaign-002-five-district-pilot",
+    "sourceOutputDir": "/Users/homemac/Data/aspectlead-lead-production/output/territories/campaign-002/naseh/ig1",
+    "revisedFinalScoringDir": "/Users/homemac/Data/aspectlead-lead-production/output/territories/campaign-002/naseh/ig1/ig1-final-scoring-stage-2026-08-04T-phone-fix-reprocess",
+    "revisionProvenance": "/Users/homemac/Data/aspectlead-lead-production/output/territories/campaign-002/naseh/ig1/postprocess-revision-manifest.json"
+  },
+  "newDistrictsForThisCampaign": {
+    "description": "The ONLY districts campaign-005 itself runs live discovery/enrichment against. Processed sequentially, one checkpointed before the next begins.",
+    "postcodeDistricts": ["IG2", "IG3", "IG4", "IG5", "IG6"],
+    "districtCount": 5,
+    "processingOrder": ["IG2", "IG3", "IG4", "IG5", "IG6"]
+  },
+  "explicitlyExcluded": {
+    "description": "Fail-closed exclusion list — this campaign must refuse to process any district not in currentFullAllocation above, and must never touch these.",
+    "ig7AndAbove": "Not listed in currentFullAllocation — excluded by construction.",
+    "ub1ThroughUb5": "Naseh's OTHER, separate, historical territory (sales-territories-v2.json / handover/naseh-ub1-ub5/). Immutable. Never rerun, reassigned, or included in this campaign's output.",
+    "anyOtherRepresentativesDistricts": "Out of scope for this campaign entirely."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04 — see docs/11_ISSUES_LOG.md ISS-0035), for IG2-IG6 only. IG1 has no new discovery call — reused verbatim.",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"],
+    "explicitlyNotUsedForDiscovery": ["Uber Eats", "Deliveroo", "any other unapproved discovery source"]
+  }
+}

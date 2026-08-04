@@ -21,20 +21,15 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import * as XLSX from "xlsx";
 import { parseCsv } from "./csv";
-import { normaliseName, normalisePhone, extractAllUkPhoneComparisons, normalisePostcode, normaliseAddress, normaliseDomain, nameSimilarity } from "./normalize";
+import { normaliseName, normalisePhone, extractAllUkPhoneComparisons, normalisePostcode, normaliseAddress, normaliseDomain, nameSimilarity, extractTradingAsAlias } from "./normalize";
 import { parseAddressComponents, compareAddressComponents, type AddressComponents } from "./address-components";
 import { fuzzyNameCandidate } from "./fuzzy-name-match";
 import { isOnlyGenericAliasOrUncorroboratedDomain } from "./reevaluate-and-clear-probable-matches";
 import { defaultCampaignOutputPath, assertSafeToWrite } from "./campaign-output";
 
-// T/A ("trading as") alias extraction — the real customer master routinely embeds the actual
-// trading name inside the legal/account name (e.g. "Al Shukraan Ltd T/A Al Qasr Restaurant").
-// Extracted as an explicit, separately-matchable alias, not just left folded into the combined
-// name string nameSimilarity() already tolerates.
-function extractTradingAsAlias(raw: string): string | null {
-  const m = /t\/a\s+(.+?)(?:\s*\(closed\))?$/i.exec(raw);
-  return m ? m[1].trim() : null;
-}
+// extractTradingAsAlias moved to normalize.ts (2026-08-05, ISS-0038) — now also used by
+// match-customers.ts (the upstream phase1 matcher), so both stages share one definition instead
+// of silently drifting apart.
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
 function flag(name: string): boolean { return process.argv.includes(`--${name}`); }
@@ -365,6 +360,11 @@ export interface LeakageCertificate {
   matchTestsPerformed: string[];
   confirmedLeakCount: number;
   confirmedMatchesRemovedDuringReprocessing: number | null;
+  // Lead-level (never inflating one lead's multiple confirmed candidate-record matches into
+  // multiple entries) — added 2026-08-04 so a downstream tool can act on exactly these leads
+  // without re-deriving matches or parsing console text. confirmedLeakCount above remains the
+  // raw underlying candidate-record count for backward compatibility with existing consumers.
+  confirmedLeaks: { leadId: string; tradingName: string; candidateRecordsReviewed: number; customerIds: string[] }[];
   // Owner-decision review (2026-08-04): reported at LEAD level, never inflating one lead's
   // multiple candidate-record matches into multiple "probable leads". probableMatchCount is the
   // raw underlying candidate-customer-record count (informational); probableLeadCount is the
@@ -475,6 +475,14 @@ async function main() {
   const { leads, findings: allFindings } = await verifySheet(combinedMasterPath, "Operationally Usable Leads", index);
   const confirmed = allFindings.filter((f) => f.tier === "confirmed");
   const probable = allFindings.filter((f) => f.tier === "probable");
+  // Grouped at LEAD level (never inflating one lead's multiple confirmed candidate-record
+  // matches into multiple entries) so the certificate itself is machine-actionable — a downstream
+  // tool can exclude exactly these leads without re-deriving matches or re-parsing console text.
+  const confirmedByLead = groupFindingsByLead(confirmed);
+  const confirmedLeaksList = [...confirmedByLead.entries()].map(([leadId, findings]) => ({
+    leadId, tradingName: findings[0].lead.tradingName, candidateRecordsReviewed: findings.length,
+    customerIds: findings.map((f) => f.customer.id),
+  }));
 
   // Owner-decision review (2026-08-04): a probable match is reported and reasoned about at LEAD
   // level, never as N independent "leads" merely because one lead has N candidate customer-
@@ -545,6 +553,7 @@ async function main() {
       "active_customers", "inactive_customers",
     ],
     confirmedLeakCount: confirmed.length,
+    confirmedLeaks: confirmedLeaksList,
     confirmedMatchesRemovedDuringReprocessing: removedCountArg ? Number(removedCountArg) : null,
     probableMatchCount: probable.length,
     probableLeadCount: probableByLead.size,

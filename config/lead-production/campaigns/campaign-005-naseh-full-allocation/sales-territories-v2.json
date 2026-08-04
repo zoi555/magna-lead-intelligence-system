@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 5,
+  "note": "Only IG2-IG6 (the 5 newly-run districts) are listed here — IG1 is reused verbatim from campaign-002 and never goes through this campaign's live orchestrator. See territories.json's alreadyCompletedElsewhere for IG1's provenance.",
+  "representatives": [
+    {
+      "representative": "Naseh",
+      "role": "telesales",
+      "salesTerritory": "IG2-IG6",
+      "postcodeDistricts": ["IG2", "IG3", "IG4", "IG5", "IG6"],
+      "districtCount": 5,
+      "mapsRequired": false
+    }
+  ]
+}

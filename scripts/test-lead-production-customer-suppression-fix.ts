@@ -128,6 +128,33 @@ async function main() {
   assert(findConfirmedCustomerMasterMatch({ phase1PreliminaryStatus: null, fsaResolutionOutcome: "confirmed_active_customer_after_fsa", googleResolutionOutcome: null, companiesHouseResolutionOutcome: "unresolved_customer_match_after_companies_house" }) === "FSA", "an FSA-stage confirmation is honoured even when the LATER Companies House stage's own independent evidence was merely 'unresolved', never silently cleared");
   assert(findConfirmedCustomerMasterMatch({ phase1PreliminaryStatus: null, fsaResolutionOutcome: null, googleResolutionOutcome: "confirmed_inactive_customer_after_google", companiesHouseResolutionOutcome: "released_from_customer_hold_after_companies_house" }) === "Google Places", "a Google-stage confirmation is honoured even when the Companies House stage later 'released' a DIFFERENT/unrelated original suspicion — the two are independent checks");
 
+  console.log("\n14. REAL CASE — ISS-0038 (2026-08-05): Samsco Global Limited T/A Chicken House (customer C194, real leaked lead IG3-9D634F88, Naseh campaign-005). Root cause: phase1 had NO T/A-alias-parsing route at all — only the LAST-stage independent verifier did — so this scored merely 0.5 whole-string similarity (\"probable\") here despite being an exact identity match once the alias is parsed out:");
+  const chickenHouseCustomer = mkCustomer({ customerId: "C194", tradingName: "Samsco Global Limited T/A Chicken House", isActive: true, postcode: "IG3 8RA" });
+  const chickenHouseCandidate = mkCandidate({ name: "Chicken House", postcode: "IG3 8RA" });
+  const chickenHouseMatch = matchCandidateToCustomers(chickenHouseCandidate, [chickenHouseCustomer]);
+  assert(chickenHouseMatch.matchTier === "confirmed", `"Chicken House" now confirms against its real Magna customer via the parsed T/A alias, not merely "probable" (got tier "${chickenHouseMatch.matchTier}")`);
+  assert(!!chickenHouseMatch.rulesTriggered.includes("exact_trading_name_alias"), `the new "exact_trading_name_alias" rule specifically fires (got rules ${JSON.stringify(chickenHouseMatch.rulesTriggered)})`);
+  assert(chickenHouseMatch.outcome === "confirmed_active_customer", `overall outcome is now a genuine confirm, not a hold (got "${chickenHouseMatch.outcome}")`);
+
+  console.log("\n15. Trading-name alias match REQUIRES postcode agreement too — alias alone is never enough (real case: \"Spice Hut\" is an exact T/A alias shared by 5 completely unrelated customers in different towns, per the owner's own explicit rule already enforced in verify-customer-leakage.ts — this phase1 fix must not be MORE permissive than that rule, or it becomes a new false-positive source):");
+  const spiceHutCustomer = mkCustomer({ customerId: "S633", tradingName: "Spice Hut Indian Ltd T/A Spice Hut", isActive: false, postcode: "AA1 1AA" });
+  const spiceHutFarAwayCandidate = mkCandidate({ name: "Spice Hut", postcode: "ZZ9 9ZZ" }); // same exact alias, different postcode, no other corroboration
+  const spiceHutFarAwayMatch = matchCandidateToCustomers(spiceHutFarAwayCandidate, [spiceHutCustomer]);
+  assert(!spiceHutFarAwayMatch.rulesTriggered.includes("exact_trading_name_alias"), `an exact alias match WITHOUT postcode agreement must NOT fire the new confirmed-tier rule (got rules ${JSON.stringify(spiceHutFarAwayMatch.rulesTriggered)}, tier "${spiceHutFarAwayMatch.matchTier}")`);
+  assert(spiceHutFarAwayMatch.matchTier !== "confirmed", `must not be auto-confirmed on alias alone (got tier "${spiceHutFarAwayMatch.matchTier}")`);
+  const spiceHutSamePostcodeCandidate = mkCandidate({ name: "Spice Hut", postcode: "AA1 1AA" }); // same exact alias, SAME postcode
+  const spiceHutSamePostcodeMatch = matchCandidateToCustomers(spiceHutSamePostcodeCandidate, [spiceHutCustomer]);
+  assert(spiceHutSamePostcodeMatch.matchTier === "confirmed" && spiceHutSamePostcodeMatch.rulesTriggered.includes("exact_trading_name_alias"), `alias + matching postcode together DOES confirm, matching the real Chicken House case's own evidence shape exactly (got tier "${spiceHutSamePostcodeMatch.matchTier}")`);
+  const partialAliasCandidate = mkCandidate({ name: "Spice Hut Express Kitchen", postcode: "AA1 1AA" }); // NOT an exact alias match, even with matching postcode
+  const partialAliasMatch = matchCandidateToCustomers(partialAliasCandidate, [spiceHutCustomer]);
+  assert(!partialAliasMatch.rulesTriggered.includes("exact_trading_name_alias"), `a candidate name that only PARTIALLY overlaps the alias (extra words) does not fire the exact-alias rule even with matching postcode (got rules ${JSON.stringify(partialAliasMatch.rulesTriggered)})`);
+
+  console.log("\n16. REAL CASE — GOODMAYES FISH AND CHIPS (customer G210, real leaked lead IG3-5C1156E1 \"MT doughnuts (donuts) - Goodmayes\", Naseh campaign-005). Deliberately NOT auto-confirmed at phase1 or its post-enrichment re-check stages — the match signal here is full-address-plus-corroboration on a completely different trading name (doughnut shop vs fish & chips), discoverable only via Google-enriched address data that becomes available AFTER phase1 runs. customer-resolution-after-google.ts's own header comment documents this as a deliberate risk tradeoff (\"never opens a fresh search across the whole customer file... risks pulling an already-cleared candidate back onto weak evidence\") — not a bug to silently patch. The independent verifier (which runs against the fully-enriched final Master, with no such restriction) is the correct, intentional safety net for exactly this category of miss:");
+  const goodmayesCustomer = mkCustomer({ customerId: "G210", tradingName: "GOODMAYES FISH AND CHIPS", isActive: false, postcode: "IG3 9UF" });
+  const mtDoughnutsCandidatePreEnrichment = mkCandidate({ name: "MT doughnuts (donuts) - Goodmayes", postcode: "IG3 9UF" }); // no phone/address pre-enrichment, per real Just Eat discovery data
+  const mtDoughnutsMatch = matchCandidateToCustomers(mtDoughnutsCandidatePreEnrichment, [goodmayesCustomer]);
+  assert(mtDoughnutsMatch.matchTier === "none", `phase1 correctly finds no name/postcode-based signal at all for two completely differently-named businesses — confirming this is genuinely NOT phase1's job to catch (got tier "${mtDoughnutsMatch.matchTier}")`);
+
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);
   process.exit(fails === 0 ? 0 : 1);
 }

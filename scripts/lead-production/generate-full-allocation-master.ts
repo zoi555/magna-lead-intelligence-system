@@ -1,18 +1,26 @@
-// Kunz full-allocation (campaign-003) final Master combine — a thin, additive glue script.
+// Generic multi-source-campaign final Master combine — a thin, additive glue script. Renamed
+// 2026-08-05 from generate-kunz-full-allocation-master.ts (owner instruction: "a Kunz-named
+// script must not become the generic production consolidator") — its logic was already fully
+// generic (only its filename, comments, and console log text were Kunz-specific; verified no
+// representative name was ever hardcoded in the actual merge logic). Used for Kunz (campaign-
+// 003), and now Naseh (campaign-005); Meer (campaign-004) never needed it, since Meer's full
+// population came from a single source campaign.
 //
-// WHY THIS EXISTS: generate-campaign-master-combined.ts applies exactly ONE --campaign-id to
-// every row of a single invocation. Kunz's final population spans TWO source campaigns — CM1
-// (campaign-002-five-district-pilot, reused verbatim, never rerun) and CM0/CM2-CM9
-// (campaign-003-kunz-full-allocation, run live this session). Correct per-row Campaign ID
-// provenance therefore requires running the existing, unmodified combiner ONCE PER SOURCE
-// CAMPAIGN (already done — see docs/11_ISSUES_LOG.md ISS-0035 recovery pass), each producing
-// its own correctly-tagged combined workbook. This script does the ONLY remaining step: a
-// dumb, read-only, row-preserving CONCATENATION of those two already-correct workbooks into
-// one final Kunz workbook. It re-derives, re-scores, and re-classifies NOTHING — every value,
-// bucket placement, and Campaign ID tag is carried through byte-for-byte from its source.
+// WHY THIS EXISTS: generate-master-export.ts (and the older generate-campaign-master-
+// combined.ts) each apply exactly ONE --campaign-id to every row of a single invocation. A
+// representative whose final population spans TWO source campaigns — one or more districts
+// reused verbatim from an earlier campaign, plus one or more districts newly run under the
+// current campaign — needs correct per-row Campaign ID provenance, which requires running the
+// existing, unmodified per-campaign exporter ONCE PER SOURCE CAMPAIGN, each producing its own
+// correctly-tagged combined workbook. This script does the ONLY remaining step: a dumb,
+// read-only, row-preserving CONCATENATION of those already-correct workbooks into one final
+// workbook. It re-derives, re-scores, and re-classifies NOTHING — every value, bucket
+// placement, and Campaign ID tag is carried through byte-for-byte from its source (each input
+// workbook's own Representative Summary sheet, read once per input — see ISS-0038's sibling
+// fix, "candidate rows never carry Campaign ID directly" — never hardcoded here).
 //
 // Usage:
-//   npx tsx scripts/lead-production/generate-kunz-full-allocation-master.ts \
+//   npx tsx scripts/lead-production/generate-full-allocation-master.ts \
 //     --input=<path-to-campaign-tagged-combined-workbook.xlsx> [--input=<path> ...] \
 //     --out-xlsx=<path> --out-csv=<path>
 
@@ -44,7 +52,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log(`=== Kunz full-allocation Master combine — merging ${inputs.length} already-tagged workbook(s) ===`);
+  console.log(`=== Multi-source-campaign full-allocation Master combine — merging ${inputs.length} already-tagged workbook(s) ===`);
 
   const workbooks = inputs.map((p) => ({ path: p, wb: XLSX.readFile(p) }));
 
@@ -55,8 +63,17 @@ async function main() {
 
   for (const { path: p, wb } of workbooks) {
     let inputTotal = 0;
+    // A candidate row never carries its own "Campaign ID" column — only this SOURCE file's own
+    // Representative Summary sheet does (one shared value, since a single generate-master-
+    // export.ts invocation always tags every row of ONE input with exactly one campaign id).
+    // Stamp it onto every row's in-memory copy here so downstream reconciliation-by-campaign
+    // and the rebuilt Representative Summary both have a real value instead of silently reading
+    // an always-absent field (previously surfaced as "By source campaign: unknown" and a blank
+    // "Campaign ID" cell for every district row — a real defect, not a hand-typed patch fix).
+    const sourceRepSummary = sheetRows(wb, "Representative Summary")[0] as Record<string, unknown> | undefined;
+    const sourceCampaignId = String(sourceRepSummary?.["Campaign ID"] ?? "unknown");
     for (const sheet of DISJOINT_SHEETS) {
-      const rows = sheetRows(wb, sheet);
+      const rows = sheetRows(wb, sheet).map((r) => ({ ...r, "Campaign ID": sourceCampaignId }));
       for (const row of rows) {
         const header = Object.keys(row);
         if (!referenceHeader) referenceHeader = header;
@@ -65,11 +82,10 @@ async function main() {
         }
         combined[sheet].push(row);
         inputTotal++;
-        const campaignId = String(row["Campaign ID"] ?? "unknown");
-        totalsByCampaign[campaignId] = (totalsByCampaign[campaignId] ?? 0) + 1;
+        totalsByCampaign[sourceCampaignId] = (totalsByCampaign[sourceCampaignId] ?? 0) + 1;
       }
     }
-    for (const sheet of OVERLAY_SHEETS) for (const row of sheetRows(wb, sheet)) combined[sheet].push(row);
+    for (const sheet of OVERLAY_SHEETS) for (const row of sheetRows(wb, sheet)) combined[sheet].push({ ...row, "Campaign ID": sourceCampaignId });
     console.log(`  ${p}: ${inputTotal} candidates`);
   }
 
