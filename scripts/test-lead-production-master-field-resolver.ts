@@ -2,7 +2,7 @@
 // recalibration (owner correction, 2026-08-04).
 // npm run test:lead-production-master-field-resolver
 
-import { resolveMasterFields } from "./lead-production/master-field-resolver";
+import { resolveMasterFields, classifyReviewVolumeBand, isHighVolumeOperation } from "./lead-production/master-field-resolver";
 import type { Dossier } from "./lead-production/candidate-dossier";
 
 let fails = 0;
@@ -91,11 +91,21 @@ async function main() {
   assert(note2b.includes("dine-in") && note2b.includes("delivery") && !note2b.includes("takeaway/collection"), `Note 2 lists only the service formats with genuine positive evidence (got: ${note2b})`);
   assert(note2b.includes("Halal evidence") && note2b.includes("100% halal certified"), `Note 2 includes halal evidence (got: ${note2b})`);
 
-  console.log("\n8. Note 2 — high-volume indicator only above a genuine threshold, never for an ordinary review count:");
+  console.log("\n8. Note 2 — Google Review Activity is BANDED (2026-08-04 owner-decision review + terminology guardrail, same day), never a flat 'high-volume indicator' claim applied identically regardless of scale, and NEVER labelled business/purchasing/wholesale volume:");
   const r8a = resolveMasterFields(mkDossier({ google_review_count: 20 }), CTX);
-  assert(!(r8a.fields.note_2 as string | null)?.includes("High-volume indicator"), "an ordinary review count (20) is NOT reported as a high-volume indicator");
+  assert(!(r8a.fields.note_2 as string | null)?.includes("Google Review Activity"), "a Low-band review count (20) is NOT called out at all (uninformative — most candidates start there)");
   const r8b = resolveMasterFields(mkDossier({ google_review_count: 350 }), CTX);
-  assert((r8b.fields.note_2 as string).includes("High-volume indicator: 350 Google reviews"), `a genuinely high review count IS reported (got: ${r8b.fields.note_2})`);
+  assert((r8b.fields.note_2 as string).includes("Google Review Activity: Strong (350 Google reviews)"), `a Strong-band review count is reported with its real band label, not a flat claim (got: ${r8b.fields.note_2})`);
+  const r8c = resolveMasterFields(mkDossier({ google_review_count: 126 }), CTX);
+  const r8d = resolveMasterFields(mkDossier({ google_review_count: 2275 }), CTX);
+  assert((r8c.fields.note_2 as string).includes("Google Review Activity: Moderate (126 Google reviews)"), `a 126-review lead is banded "Moderate" (got: ${r8c.fields.note_2})`);
+  assert((r8d.fields.note_2 as string).includes("Google Review Activity: Exceptional (2275 Google reviews)"), `a 2275-review lead is banded "Exceptional" — no longer the SAME wording as the 126-review lead (got: ${r8d.fields.note_2})`);
+  assert(r8c.fields.note_2 !== r8d.fields.note_2, "the 126-review and 2275-review leads no longer receive identical Note 2 review-activity wording");
+  assert((r8b.fields.note_2 as string).includes("does not by itself establish high-volume operation"), "the review-activity bullet explicitly disclaims that a review count alone establishes high-volume operation");
+  for (const forbidden of ["business volume", "purchasing volume", "wholesale volume", "volume-based pricing"]) {
+    assert(!(r8b.fields.note_2 as string).toLowerCase().includes(forbidden), `Note 2 never uses the forbidden phrase "${forbidden}" (terminology guardrail, 2026-08-04)`);
+    assert(!(r8d.fields.note_2 as string).toLowerCase().includes(forbidden), `Note 2 never uses the forbidden phrase "${forbidden}" for the Exceptional-band lead either (got: ${r8d.fields.note_2})`);
+  }
 
   console.log("\n9. Note 2 — a specific, evidence-driven call approach, never generic boilerplate:");
   const r9a = resolveMasterFields(mkDossier({ cuisine_service_model: { cuisineTags: [], serviceModel: { catering: { value: true, evidenceText: null, confidence: "medium" } } } }), CTX);
@@ -135,11 +145,23 @@ async function main() {
   const r11e = resolveMasterFields(mkDossier({ cuisine_service_model: { cuisineTags: [], serviceModel: { catering: { value: true, evidenceText: null, confidence: "medium" } } } }, { qualificationStatus: "qualified" }), CTX);
   assert(r11e.fields.lead_urgency === "Hot Lead", `major catering evidence makes a lead Hot (got "${r11e.fields.lead_urgency}")`);
 
-  const r11f = resolveMasterFields(mkDossier({ google_review_count: 400 }, { qualificationStatus: "qualified" }), CTX);
-  assert(r11f.fields.lead_urgency === "Hot Lead", `an unusually high review count (>=300) makes a lead Hot (got "${r11f.fields.lead_urgency}")`);
+  // Owner-decision review (2026-08-04): a review count ALONE — however large — no longer
+  // single-handedly makes a lead Hot. Replaces the old flat ">=300 reviews = Hot" rule that gave
+  // a 126-review lead and a 2275-review lead materially different urgency outcomes purely off one
+  // raw number, with no requirement for any corroborating operational-scale evidence.
+  const r11f = resolveMasterFields(mkDossier({ google_review_count: 400 }, { qualificationStatus: "qualified", finalLevel: "level_0" }), CTX);
+  assert(r11f.fields.lead_urgency === "Warm Lead", `a review count alone (400 — "Very Strong" band), with no other supporting signal, no longer makes a lead Hot on its own (got "${r11f.fields.lead_urgency}")`);
+  const r11f2 = resolveMasterFields(mkDossier({ google_review_count: 2275 }, { qualificationStatus: "qualified", finalLevel: "level_0" }), CTX);
+  assert(r11f2.fields.lead_urgency === "Warm Lead", `even an Exceptional-band review count (2275) alone, with no other supporting signal, no longer makes a lead Hot on its own (got "${r11f2.fields.lead_urgency}")`);
 
   const r11g = resolveMasterFields(mkDossier({ financial_strength_band: "strong_financial_strength" }, { qualificationStatus: "qualified" }), CTX);
   assert(r11g.fields.lead_urgency === "Hot Lead", `exceptional financial strength makes a lead Hot (got "${r11g.fields.lead_urgency}")`);
+
+  console.log("\n11b. Lead Urgency — a Very Strong/Exceptional review band DOES contribute to Hot status when combined with at least one other independent supporting signal (never review count in isolation):");
+  const r11h = resolveMasterFields(mkDossier({ google_review_count: 500, financial_strength_band: "strong_financial_strength" }, { qualificationStatus: "qualified", finalLevel: "level_0" }), CTX);
+  assert(r11h.fields.lead_urgency === "Hot Lead", `a Very Strong review band (500) PLUS exceptional financials together make a lead Hot (got "${r11h.fields.lead_urgency}")`);
+  const r11i = resolveMasterFields(mkDossier({ cuisine_service_model: { cuisineTags: [], serviceModel: { catering: { value: true, evidenceText: null, confidence: "medium" } } }, google_review_count: 5 }, { qualificationStatus: "qualified" }), CTX);
+  assert(r11i.fields.lead_urgency === "Hot Lead", `direct catering evidence alone makes a lead Hot regardless of review count (got "${r11i.fields.lead_urgency}")`);
 
   console.log("\n12. Lead Urgency — Standard Lead for qualified/contactable leads of lower expected value (the 'Cold' concept mapped to the nearest approved value):");
   const r12a = resolveMasterFields(mkDossier({ commercial_score: 40 }, { qualificationStatus: "qualified", finalLevel: "level_3" }), CTX);
@@ -147,6 +169,23 @@ async function main() {
 
   const r12b = resolveMasterFields(mkDossier({}, { qualificationStatus: "hard_rejected", finalLevel: "level_4" }), CTX);
   assert(r12b.fields.lead_urgency === "Standard Lead", `a hard-rejected candidate never reaching a rep-facing export still resolves to a valid approved value if ever computed (got "${r12b.fields.lead_urgency}")`);
+
+  console.log("\n13. classifyReviewVolumeBand — 5 evidence bands grounded in the real Kunz distribution (2026-08-04 owner-decision review):");
+  assert(classifyReviewVolumeBand(null) === null, "no review count -> null band, never guessed");
+  assert(classifyReviewVolumeBand(0) === "Low" && classifyReviewVolumeBand(49) === "Low", "0-49 -> Low");
+  assert(classifyReviewVolumeBand(50) === "Moderate" && classifyReviewVolumeBand(126) === "Moderate" && classifyReviewVolumeBand(149) === "Moderate", "50-149 -> Moderate (includes the real 126-review Kunz lead)");
+  assert(classifyReviewVolumeBand(150) === "Strong" && classifyReviewVolumeBand(399) === "Strong", "150-399 -> Strong");
+  assert(classifyReviewVolumeBand(400) === "Very Strong" && classifyReviewVolumeBand(999) === "Very Strong", "400-999 -> Very Strong");
+  assert(classifyReviewVolumeBand(1000) === "Exceptional" && classifyReviewVolumeBand(2275) === "Exceptional", "1000+ -> Exceptional (includes the real 2275-review Kunz lead)");
+
+  console.log("\n14. isHighVolumeOperation — a review band ALONE, however strong, is never sufficient (owner's explicit rule):");
+  assert(isHighVolumeOperation({ hasMajorCateringEvidence: false, hasMultiSiteEvidence: false, hasExceptionalFinancials: false, reviewVolumeBand: "Exceptional" }) === false, "Exceptional review band alone, with nothing else, is NOT a high-volume operation");
+  assert(isHighVolumeOperation({ hasMajorCateringEvidence: false, hasMultiSiteEvidence: false, hasExceptionalFinancials: false, reviewVolumeBand: classifyReviewVolumeBand(2275) }) === false, "literally 2,275 Google reviews (classified Exceptional) alone, with no other evidence, does NOT establish high-volume operation (terminology guardrail, 2026-08-04)");
+  assert(isHighVolumeOperation({ hasMajorCateringEvidence: false, hasMultiSiteEvidence: false, hasExceptionalFinancials: false, reviewVolumeBand: "Strong" }) === false, "Strong review band alone is NOT a high-volume operation");
+  assert(isHighVolumeOperation({ hasMajorCateringEvidence: true, hasMultiSiteEvidence: false, hasExceptionalFinancials: false, reviewVolumeBand: null }) === true, "direct catering evidence alone IS sufficient, even with zero review evidence");
+  assert(isHighVolumeOperation({ hasMajorCateringEvidence: false, hasMultiSiteEvidence: true, hasExceptionalFinancials: false, reviewVolumeBand: null }) === true, "direct multi-site evidence alone IS sufficient, even with zero review evidence");
+  assert(isHighVolumeOperation({ hasMajorCateringEvidence: false, hasMultiSiteEvidence: false, hasExceptionalFinancials: true, reviewVolumeBand: "Very Strong" }) === true, "Very Strong review band PLUS exceptional financials (2 independent signals) together ARE sufficient");
+  assert(isHighVolumeOperation({ hasMajorCateringEvidence: false, hasMultiSiteEvidence: false, hasExceptionalFinancials: true, reviewVolumeBand: "Moderate" }) === false, "exceptional financials alone (Moderate review band does not count as a supporting signal) is NOT sufficient — only 1 real signal");
 
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);
   process.exit(fails === 0 ? 0 : 1);

@@ -1348,3 +1348,205 @@ per the authorising instruction's step 8/10). Root cause of Just Eat's OWN reaso
 version 2 of this API was not investigated beyond the header evidence above (out of scope — no
 access to Just Eat's internal systems). No new commits pushed (3 campaign-003 config commits
 remain local as before; this pass's code/doc changes are also uncommitted, awaiting instruction).
+
+### RESOLVED (2026-08-04, same day, owner approval) — endpoint recovery pushed; CM0–CM9 run live end-to-end using the new adapter
+
+Owner reviewed and approved the recovery. Pushed to `origin/feature/mvp-vertical-slice-001`
+(commit `50c59ea`, local=remote verified). Then ran the full campaign-003-kunz-full-allocation
+population live using the new `JustEatEnrichedAdapter`: CM0 continued from its existing
+discovery-only checkpoint (integrity re-verified, not rerun); CM2–CM9 discovered fresh and run
+through the complete 8-stage `run-full-territory.ts` pipeline (Phase 1 comparison, FSA, Google
+Places, Companies House, website, public-profile, group-rescreen, final scoring v2), all live,
+all clean (no adapter errors, no fail-closed schema rejections). Full per-district results
+recorded in the final report this pass produced (see `PROJECT_STATUS.md` for the summary).
+
+Two further genuinely new findings from this run, both fixed before release:
+
+1. **Discovered a real defect in my own campaign-003 export invocation, not the adapter**: passed
+   the postcode-district list ("CM0, CM1, ...") as `--sales-territory=`, which flows straight
+   into the CTO's "Region/Route" column — should have been "East London" (Kunz's actual named
+   route, per `sales-territories-v2.json`/`territories.json`). Caught via a spot-check before
+   release, not by any test (no test covers this specific field mapping) — worth a regression
+   test in a future pass. Root cause: `generate-master-export.ts`'s `--territory-manifest=` mode
+   silently overrides the CLI `--sales-territory=` with the manifest JSON's own `salesTerritory`
+   field — the CLI flag is not a fallback, it is simply ignored whenever a manifest is supplied.
+   Not fixed in the script itself (a genuine documentation/UX gap, not incorrect behaviour) — the
+   manifest file itself was corrected instead, and both affected exports (CM1, CM0+CM2-CM9) were
+   regenerated and re-verified.
+
+2. **`generate-owner-review-pack.ts` was hardcoded to campaign-002-five-district-pilot's fixed
+   5-representative/5-district shape** (`DISTRICT_REP`/`DISTRICT_TO_REP_DIR` constants, and an
+   unconditional read of RM1's phase1 checkpoint for its own cross-campaign-dedup history) — it
+   could not run at all for a representative owning 10 districts. Fixed with two small, additive,
+   backward-compatible changes: (a) a repeatable `--district-rep=DIST:Name` CLI flag that extends
+   `DISTRICT_REP`/`DISTRICT_TO_REP_DIR` at runtime (omitting it leaves campaign-002's own
+   regeneration byte-for-byte unchanged — reverified via `npm run test:lead-production-owner-review-pack`,
+   all assertions still pass, including the real 42-row RM1 Historical Duplicates recovery);
+   (b) `buildHistoricalDuplicates()` now checks for the "RM1 Historical Duplicates" sheet's
+   existence before reading it, rather than throwing when a later campaign's combined workbook
+   (correctly) has no such sheet at all. `--rm1-phase1-dir=` is now optional or the same reason.
+
+Also built one new, additive, campaign-003-specific glue script,
+`generate-kunz-full-allocation-master.ts`: `generate-campaign-master-combined.ts` applies exactly
+ONE `--campaign-id=` per invocation, but Kunz's final population genuinely spans two source
+campaigns (CM1 = campaign-002, reused verbatim; CM0/CM2–CM9 = campaign-003). The new script does
+the one remaining step — a read-only, row-preserving concatenation of two already campaign-tagged
+combined workbooks (each produced by the existing, unmodified `generate-campaign-master-combined.ts`,
+run once per source campaign) — re-deriving and re-scoring nothing. It also reconstructs a genuine
+one-row-per-real-district "Representative Summary" sheet from the merged candidate rows' own
+"Postcode District" values, since `generate-master-export.ts`'s own multi-district territory-
+manifest mode collapses that into one joined-string row (not usable by the owner-review pack's
+per-district Pilot Summary). Two sub-splits that the upstream disjoint sheets no longer retain
+separately post-merge (Held-Review's Phone-Resolution-Exception/Business-Category-Review-Required
+components; Commercial-Review-Exclusions' Brand vs Pharmacy/Chemist split) are reported as 0 in
+that reconstructed sheet, honestly, per this codebase's established "leave blank rather than
+guess" convention — the combined totals they roll up into are unaffected and fully accurate.
+
+Final reconciliation (all 10 districts, CM0–CM9, 280 total candidates after within-campaign
+cross-district dedup — 4 duplicates removed, all exact-phone matches within a single district's
+own Just Eat listing, not genuine cross-boundary premises): 121 final released leads (83 Premium
+Level 0 + 38 Releasable Level 1, 13 of which are also Key Accounts), 31 Held-Review, 46 Hard
+Rejects, 5 Customer Master Exclusions, 44 Excluded Groups, 29 Commercial Review Exclusions, 4
+Business Category Exclusions — sums to exactly 280. Independent customer-leakage verification:
+0 confirmed leaks in Master or CTO (PASS), 3 probable/non-blocking matches reported for owner
+review (all involving one CM2 candidate, "Kaspa's Desserts - Chelmsford", sharing only a website
+domain — not a trading name, postcode, phone, or company number — with 3 unrelated customer
+records; consistent with a shared ordering-platform domain, not common ownership, but not
+independently confirmed either way by this pass).
+
+All 41 suites (39 `test:lead-production-*` + `test:je-stage1` + `test:je-enriched-adapter`)
+individually re-run, ALL PASSED; `npm run typecheck`/`build` clean. Full 24-item final report:
+see this session's conversation record / `PROJECT_STATUS.md`.
+
+### Owner-decision review completions (2026-08-04, same day) — Kaspa's customer-match resolved algorithmically, certificate corrected to lead-level, Hot-Lead audit found and fixed a genuine 7-lead urgency-classification defect
+
+**Kaspa's Desserts - Chelmsford (CM2-36E572FF) resolved.** All 3 "probable" leakage findings trace
+to one lead, three candidate customer records (D298/F458/S612), every signal limited to shared
+`kaspas.co.uk` domain + differing trading name — no phone/postcode/address/legal-identity
+corroboration; the 3 customer records are in three different UK regions (Norbury, Reading x2)
+from the Chelmsford lead. Classified `cleared_non_customer_with_audit_warning` per the owner's
+existing item-5 rule (never a confirmed exclusion, hold, or override). Master row annotated
+(`Magna Customer Match Status`, `Customer Match Confidence`, `Existing Customer Warning`, new
+`Customer Match Audit Warning` column) via the two campaign-tagged source workbooks, then
+re-merged/re-exported. Commercial-chain check (stored evidence only, no live calls): no entry for
+"Kaspa's"/"kaspas.co.uk" in the commercial-review-v1 brand registry or group-registry.json; the
+pipeline's own stored Google/Companies House classification for this candidate is `Independent`/
+`ownership_unresolved` — not confirmed as an excluded chain. Retained as released, no registry
+entry added (would require owner confirmation beyond stored evidence).
+
+**`verify-customer-leakage.ts` corrected to report at LEAD level, never candidate-record level.**
+Exported `isOnlyGenericAliasOrUncorroboratedDomain` from `reevaluate-and-clear-probable-matches.ts`
+(single source of truth, not duplicated) and added `groupFindingsByLead`/`classifyProbableLeads`
+(both exported, both independently re-derive from the raw customer master every run — never trusts
+a stored Master-row status field). Certificate now reports `probableMatchCount` (raw candidate-
+record count), `probableLeadCount`, `clearedLeadCount`, `unresolvedProbableLeadCount`, and
+individually-recorded `clearedMatches`/`unresolvedProbableLeads` arrays. `masterResult` now FAILs
+on any unresolved probable lead remaining released, not only on a confirmed leak. 2 new regression
+tests added (`test:lead-production-customer-leakage-verifier`, cases 12-13) reproducing the real
+Kaspa's case and a mixed-evidence refusal case. All existing tests (including the real 5-district
+campaign-002 certificate proof) re-verified unchanged.
+
+**Hot Lead audit found a genuine classification defect.** Verified all 62 original Hot Leads
+against the 5 owner-approved criteria (key account, major catering, multi-site/franchise, ≥300
+Google reviews, exceptional financials) using the raw stored checkpoints (website-stage
+`franchise_group_clues`/`branch_count`, Companies House group-rescreen `classification`), not
+just the exported Master columns (which under-reported branch/franchise evidence for some leads).
+55 of 62 confirmed genuinely evidenced. **7 had zero evidence for any criterion** (Suraya Tandoori
+CM1-686B4496, El Chigre CM2-02B69364, Cucina Italiana CM5-4F19B4C2, The Ruby CM7-04851C50, Tamim's
+Indian Takeaway CM7-9A34B84E, Moonlight Balti Express CM9-96D53B5E, Ruby's Indian Cuisine
+CM9-881E1995) — all confirmed via raw checkpoints: Companies House `ownership_unresolved`, no
+website franchise clues, branch_count <3, reviews <300, financial band "Insufficient Data", not a
+key account. **Root cause not yet identified** — `master-field-resolver.ts`'s own urgency logic
+(read in full, matches its documented intent exactly) should not have produced Hot for these 7
+given this evidence; a field-mapping discrepancy between the dossier's internal scoring inputs and
+what reaches the exported Master columns is suspected but not confirmed. Reclassified to Warm Lead
+via the same source-workbook-patch mechanism as the Kaspa's fix (new `Urgency Reclassification
+Note` column, audit trail preserved, nothing silently changed). Revised totals: 55 Hot / 66 Warm /
+0 Standard (was 62/59/0). New "Urgency Decisions" sheet added to `generate-owner-review-pack.ts`
+(16th sheet; existing 15-sheet regression test updated + extended, re-verified passing).
+
+**Not yet done:** the root cause of the 7-lead Hot-classification discrepancy needs a follow-up
+investigation (comparing the dossier's raw internal fields against what `generate-master-export.ts`
+writes to the Master for `google_review_count`/`financial_strength_band`/`branch_list` specifically)
+before this defect can be considered closed — currently patched at the output layer only, not fixed
+at the source. Logged here for a future session.
+
+All 41 suites (39 `test:lead-production-*` + `test:je-stage1` + `test:je-enriched-adapter`),
+typecheck, build clean. No commits made this pass — `generate-owner-review-pack.ts`,
+`reevaluate-and-clear-probable-matches.ts` (one function made exportable, no behaviour change),
+`verify-customer-leakage.ts`, and the 2 updated test files remain uncommitted, awaiting report.
+
+### Volume-classification audit and fix (2026-08-04, same day) — replaced a binary "high volume" threshold with evidence bands; fixed a genuine defect (2275-review lead labelled identically to a 126-review lead)
+
+**Audit found two independent binary thresholds, both in `master-field-resolver.ts`, giving
+inconsistent "high volume" language:** `hasHighVolumeEvidence` (feeds Hot-Lead urgency) used
+`google_review_count >= 300`; Note 2's "High-volume indicator" bullet and its "position volume-
+based pricing" call-approach line both independently used `>= 100`. Neither was banded — a lead
+with 126 reviews and a lead with 2275 reviews received the byte-identical Note 2 wording
+`"High-volume indicator: N Google reviews."`, and a lead with exactly 400 reviews and NOTHING
+else became Hot purely off that one number (confirmed: "Angel - Chelmsford", 2275 Google
+reviews, 0 other signal, was genuinely Hot before this fix). Just Eat's own `rating_count` (a
+real, larger-magnitude, independent signal — confirmed via Supabase: some Kunz candidates have
+2,700-3,700+ Just Eat ratings against under 150 Google reviews) was never captured into any
+dossier field this resolver can read, so it was never mixed with Google's count — but also never
+used at all.
+
+**Fix (`master-field-resolver.ts`):** added `classifyReviewVolumeBand()` — 5 bands grounded in
+the real observed distribution across Kunz's 121 released leads (min 1, median 132, p90 425, p95
+541, max 2275): Low 0-49 (26 leads), Moderate 50-149 (39), Strong 150-399 (43), Very Strong
+400-999 (9), Exceptional 1000+ (4). Added `isHighVolumeOperation()` — a genuinely stronger claim
+than a review band alone: requires EITHER direct operational-scale evidence (catering/bulk-order,
+or multi-site/franchise/group structure) OR at least 2 independent supporting signals together
+(e.g. Very Strong/Exceptional review band + exceptional filed-accounts financials) — a review
+count alone, however large, is never sufficient by itself, per the owner's explicit rule.
+`hasUnusuallyStrongOpportunity` (Hot-Lead urgency) now uses `isHighVolumeOperation()` instead of
+the flat `>=300` check. Note 2's bullet is now `"Review volume: <Band> (<N> Google reviews) —
+supporting evidence only, not itself proof of bulk/wholesale purchasing volume."` (Low band not
+called out at all — uninformative, most candidates start there); the call-approach line is gated
+on the same band (Strong+) instead of a separate raw `>=100` threshold.
+
+**Result on the real Kunz population (regenerated from source, not just patched at output):**
+released membership, bucket placement, qualification, and Premium/Releasable/Key-Account tiering
+are ALL unaffected (governed by separate scoring/qualification logic never touched) — 121 released
+leads, same 280-candidate reconciliation, unchanged. Urgency: 62 Hot / 59 Warm (pre-fix) → 47 Hot /
+74 Warm (code fix alone, before reapplying the still-open 7-lead patch from the earlier audit) →
+**40 Hot / 81 Warm** (final, both fixes applied). 14 leads lost the "volume-based pricing" call-
+approach line (100-149 review range, previously above the old flat `>=100` bar, now below the new
+`Strong` (150+) bar) — listed in the session's final report. "Happy Gourmet" (126 reviews) and
+"Mozza Pizza & Kebab" (126 reviews) remain Hot on independent, legitimate grounds (Key Account;
+Companies House Group classification, respectively) — their Hot status was never actually caused
+by review count, confirming the original "same label" complaint was specifically a Note 2 wording
+defect for these two, not a urgency-classification defect.
+
+9 new/updated regression tests (`test:lead-production-master-field-resolver`, direct unit tests
+for both new functions plus updated Note 2/urgency scenarios proving a review count alone —
+including a synthetic 2275-review, no-other-evidence case — no longer triggers Hot on its own, and
+that Very-Strong/Exceptional-band + one more signal together do). All 41 suites, typecheck, build
+clean. No commits made — `master-field-resolver.ts` and its test file added to the same
+uncommitted set as the rest of this pass's changes.
+
+### Terminology guardrail applied, Kunz release finalised (2026-08-04, same day)
+
+Owner approved the corrected classification (121 released / 108 ordinary / 13 key accounts / 40
+Hot / 81 Warm / 0 Standard) subject to one wording correction: review-count bands must never be
+labelled "volume" (business/purchasing/wholesale) — a Google review count is consumer-review
+evidence, not direct proof of wholesale purchasing capacity. Relabelled in
+`master-field-resolver.ts`: Note 2's band bullet is now `"Google Review Activity: <Band> (<N>
+Google reviews) — consumer review evidence only, does not by itself establish high-volume
+operation."`; the call-approach line no longer says "volume-based pricing", now "reference strong
+online consumer engagement... as a talking point — not itself evidence of high-volume operation."
+The band type/threshold logic itself is unchanged (5 bands, same thresholds) — this was purely a
+wording fix. "High-volume operation" is retained as approved terminology (per the owner's own
+spec) for the SEPARATE, correctly-gated concept requiring direct evidence or 2+ signals — never
+the review band alone. Verified: 0 occurrences of "business volume"/"purchasing volume"/
+"wholesale volume"/"volume-based pricing" across all 121 released leads' Note 2 text. 2 new test
+assertions added (forbidden-phrase check on both a Strong-band and an Exceptional-band lead) plus
+an explicit literal-2275-reviews `isHighVolumeOperation` test. Regenerated from source (not
+output-patched) — released membership, reconciliation, and certificate all unchanged (121
+released, 280 total, PASS). All 41 suites, typecheck, build clean.
+
+**Follow-up requirement recorded for before Meer**: capture Just Eat `rating_count` as its own
+separate evidence field (source + retrieval date retained, displayed separately from Google
+reviews, used only as supporting consumer-activity evidence, never alone as proof of wholesale
+purchasing volume, never summed with Google's count). Not implemented this pass — explicitly
+deferred with owner approval; does not block the Kunz release.

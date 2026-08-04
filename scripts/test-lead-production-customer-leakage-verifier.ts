@@ -5,7 +5,7 @@
 // matching pipeline.
 // npm run test:lead-production-customer-leakage-verifier
 
-import { buildCustomerIndex, verifyLeadAgainstIndex, traceLeadCandidates, type LeadForVerification } from "./lead-production/verify-customer-leakage";
+import { buildCustomerIndex, verifyLeadAgainstIndex, traceLeadCandidates, groupFindingsByLead, classifyProbableLeads, type LeadForVerification, type LeakageFinding } from "./lead-production/verify-customer-leakage";
 
 let fails = 0;
 const assert = (c: boolean, m: string) => { if (!c) { console.error("  ✗", m); fails++; } else console.log("  ✓", m); };
@@ -164,6 +164,38 @@ async function main() {
   } else {
     console.log("  (skipped — no certificate present at", certPath, ")");
   }
+
+  console.log("\n12. Lead-level probable-match classification (2026-08-04, owner-decision review — REAL CASE, Kaspa's Desserts - Chelmsford):");
+  const kaspasLead = mkLead({ leadId: "CM2-36E572FF", district: "CM2", tradingName: "Kaspa's Desserts - Chelmsford", phone: "01245 256528", website: "kaspas.co.uk", postcode: "CM2 6FA" });
+  const kaspasIndex = buildCustomerIndex([
+    "Inactive,ID,Name,Company Name,Phone,Office Phone,Email,Invoice Email Address,Invoice WhatsApp Number,Billing Zip",
+    'Yes,D298,Doner & Gyros UK Limited,,07951898999,,azhar@kaspas.co.uk,,,"SW16 4AQ"',
+    'No,F458,The Granby Tavern Trading Ltd T/A Fat Twins Reading,,07932384336,,readingft@kaspas.co.uk,readingft@kaspas.co.uk,,"RG1 5AY"',
+    'Yes,S612,Swiss Bubble Ltd T/A Fat Twin - Reading (Closed),,01189663354,,reading@kaspas.co.uk,reading@kaspas.co.uk,,"RG1 5AY"',
+  ].join("\n"));
+  const kaspasFindings = verifyLeadAgainstIndex(kaspasLead, kaspasIndex);
+  assert(kaspasFindings.length === 3 && kaspasFindings.every((f) => f.tier === "probable"), `all 3 candidate customer records found, all probable, none confirmed (got ${JSON.stringify(kaspasFindings.map((f) => ({ id: f.customer.id, tier: f.tier })))})`);
+  const kaspasByLead = groupFindingsByLead(kaspasFindings);
+  assert(kaspasByLead.size === 1, `3 candidate matches group into exactly 1 lead, never 3 separate "probable leads" (got ${kaspasByLead.size})`);
+  const { clearedProbableLeads: kaspasCleared, unresolvedProbableLeadsList: kaspasUnresolved } = classifyProbableLeads(kaspasByLead);
+  assert(kaspasCleared.length === 1 && kaspasUnresolved.length === 0, `the lead is algorithmically CLEARED (domain-only evidence, no phone/postcode/address/name corroboration against any of the 3) — never left unresolved (got cleared=${kaspasCleared.length}, unresolved=${kaspasUnresolved.length})`);
+  assert(kaspasCleared[0]?.candidateRecordsReviewed === 3 && kaspasCleared[0]?.customerIds.sort().join(",") === "D298,F458,S612", `the cleared record retains all 3 underlying candidate customer IDs individually, not silently dropped (got ${JSON.stringify(kaspasCleared[0]?.customerIds)})`);
+  assert(kaspasCleared[0]?.reason.includes("D298") && kaspasCleared[0]?.reason.includes("F458") && kaspasCleared[0]?.reason.includes("S612"), "the recorded reason names every underlying candidate individually — never a blanket unexplained clearance");
+
+  console.log("\n13. Lead-level classification refuses to clear when even ONE candidate carries stronger evidence:");
+  const mkFinding = (leadId: string, tradingName: string, customerId: string, signals: string[]): LeakageFinding => ({
+    lead: mkLead({ leadId, tradingName }),
+    customer: { id: customerId, internalId: "", name: `Customer ${customerId}`, legalName: "", aliases: [], isActive: true, phones: [], emails: [], domains: [], postcode: null, outward: null, address: null, addressComponents: null },
+    signals, tier: "probable",
+  });
+  const mixedFindings: LeakageFinding[] = [
+    mkFinding("CM2-99999999", "Mixed Evidence Diner", "W1", ["exact_domain", "differing_trading_name"]),
+    mkFinding("CM2-99999999", "Mixed Evidence Diner", "S1", ["exact_phone", "conflicting_name_evidence"]),
+  ];
+  const mixedByLead = groupFindingsByLead(mixedFindings);
+  assert(mixedByLead.size === 1 && mixedByLead.get("CM2-99999999")?.length === 2, "both candidates group under the same one lead");
+  const { clearedProbableLeads: mixedCleared, unresolvedProbableLeadsList: mixedUnresolved } = classifyProbableLeads(mixedByLead);
+  assert(mixedCleared.length === 0 && mixedUnresolved.length === 1, `a lead with one weak-domain candidate AND one exact-phone candidate stays UNRESOLVED, never cleared just because one candidate was weak (got cleared=${mixedCleared.length}, unresolved=${mixedUnresolved.length})`);
 
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);
   process.exit(fails === 0 ? 0 : 1);

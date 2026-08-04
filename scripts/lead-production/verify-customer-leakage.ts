@@ -24,6 +24,7 @@ import { parseCsv } from "./csv";
 import { normaliseName, normalisePhone, extractAllUkPhoneComparisons, normalisePostcode, normaliseAddress, normaliseDomain, nameSimilarity } from "./normalize";
 import { parseAddressComponents, compareAddressComponents, type AddressComponents } from "./address-components";
 import { fuzzyNameCandidate } from "./fuzzy-name-match";
+import { isOnlyGenericAliasOrUncorroboratedDomain } from "./reevaluate-and-clear-probable-matches";
 
 // T/A ("trading as") alias extraction — the real customer master routinely embeds the actual
 // trading name inside the legal/account name (e.g. "Al Shukraan Ltd T/A Al Qasr Restaurant").
@@ -362,7 +363,19 @@ export interface LeakageCertificate {
   matchTestsPerformed: string[];
   confirmedLeakCount: number;
   confirmedMatchesRemovedDuringReprocessing: number | null;
+  // Owner-decision review (2026-08-04): reported at LEAD level, never inflating one lead's
+  // multiple candidate-record matches into multiple "probable leads". probableMatchCount is the
+  // raw underlying candidate-customer-record count (informational); probableLeadCount is the
+  // distinct-lead count those records belong to; clearedLeadCount/unresolvedProbableLeadCount
+  // partition probableLeadCount exactly. Every clearance is independently re-derived from the
+  // raw customer master on every run (never trusts a stored Master-row status field) and is
+  // individually recorded in clearedMatches — never a silent blanket pass.
   probableMatchCount: number;
+  probableLeadCount: number;
+  clearedLeadCount: number;
+  unresolvedProbableLeadCount: number;
+  clearedMatches: { leadId: string; tradingName: string; candidateRecordsReviewed: number; customerIds: string[]; reason: string }[];
+  unresolvedProbableLeads: { leadId: string; tradingName: string; candidateRecordsReviewed: number; customerIds: string[] }[];
   masterResult: "PASS" | "FAIL";
   ctoResult: "PASS" | "FAIL" | "NOT_CHECKED";
   salesProResult: "PASS" | "FAIL" | "NOT_CHECKED";
@@ -370,6 +383,44 @@ export interface LeakageCertificate {
   verificationTimestamp: string;
   generatedAt: string;
   verifierCommitHash: string;
+}
+
+export interface ClearedProbableLead { leadId: string; tradingName: string; candidateRecordsReviewed: number; customerIds: string[]; reason: string }
+export interface UnresolvedProbableLead { leadId: string; tradingName: string; candidateRecordsReviewed: number; customerIds: string[] }
+
+/** Groups probable-tier findings by lead — one lead can carry N candidate-customer-record
+ *  matches; this must never be reported/counted as N separate "probable leads". */
+export function groupFindingsByLead(probable: LeakageFinding[]): Map<string, LeakageFinding[]> {
+  const byLead = new Map<string, LeakageFinding[]>();
+  for (const f of probable) {
+    const key = f.lead.leadId;
+    if (!byLead.has(key)) byLead.set(key, []);
+    byLead.get(key)!.push(f);
+  }
+  return byLead;
+}
+
+/** Owner-decision review (2026-08-04): independently re-derives, per lead, whether EVERY
+ *  candidate-customer-record match is limited to the SAME safe evidence shape already
+ *  owner-approved elsewhere (isOnlyGenericAliasOrUncorroboratedDomain) — never trusts any status
+ *  field already written onto a Master row. A lead cleared here is individually recorded with
+ *  its full evidence, never silently passed. A lead with even one finding carrying stronger
+ *  evidence (exact phone/email/postcode+name/address/legal-identity, or a domain match WITH
+ *  postcode/same-district corroboration) remains genuinely unresolved. */
+export function classifyProbableLeads(probableByLead: Map<string, LeakageFinding[]>): { clearedProbableLeads: ClearedProbableLead[]; unresolvedProbableLeadsList: UnresolvedProbableLead[] } {
+  const clearedProbableLeads: ClearedProbableLead[] = [];
+  const unresolvedProbableLeadsList: UnresolvedProbableLead[] = [];
+  for (const [leadId, findings] of probableByLead) {
+    const tradingName = findings[0].lead.tradingName;
+    const customerIds = findings.map((f) => f.customer.id);
+    if (findings.every((f) => isOnlyGenericAliasOrUncorroboratedDomain(f.signals))) {
+      const evidenceSummary = findings.map((f) => `${f.customer.id} "${f.customer.name}" (${f.customer.isActive ? "active" : "inactive"}) [${f.signals.join(", ")}]`).join(" | ");
+      clearedProbableLeads.push({ leadId, tradingName, candidateRecordsReviewed: findings.length, customerIds, reason: `Algorithmically cleared — every candidate match limited to shared-domain/generic-alias evidence only, no phone/postcode/address/legal-identity corroboration against any candidate. Candidates: ${evidenceSummary}` });
+    } else {
+      unresolvedProbableLeadsList.push({ leadId, tradingName, candidateRecordsReviewed: findings.length, customerIds });
+    }
+  }
+  return { clearedProbableLeads, unresolvedProbableLeadsList };
 }
 
 async function verifySheet(wbPath: string, sheetName: string, index: CustomerIndexEntry[]): Promise<{ leads: LeadForVerification[]; findings: LeakageFinding[] }> {
@@ -417,13 +468,32 @@ async function main() {
   const { leads, findings: allFindings } = await verifySheet(combinedMasterPath, "Operationally Usable Leads", index);
   const confirmed = allFindings.filter((f) => f.tier === "confirmed");
   const probable = allFindings.filter((f) => f.tier === "probable");
-  const masterResult: "PASS" | "FAIL" = confirmed.length === 0 ? "PASS" : "FAIL";
+
+  // Owner-decision review (2026-08-04): a probable match is reported and reasoned about at LEAD
+  // level, never as N independent "leads" merely because one lead has N candidate customer-
+  // record matches. This is a pure re-derivation from the SAME evidentiary rule already owner-
+  // approved and tested elsewhere (isOnlyGenericAliasOrUncorroboratedDomain, imported from
+  // reevaluate-and-clear-probable-matches.ts, not duplicated) — it never trusts any status field
+  // already written onto the Master workbook's own rows. A lead whose EVERY probable finding is
+  // limited to that safe evidence shape (shared domain/generic alias, no phone/postcode/address/
+  // legal-identity corroboration) is algorithmically cleared; ANY lead with even one finding
+  // carrying stronger evidence remains genuinely unresolved and now fails the certificate.
+  const probableByLead = groupFindingsByLead(probable);
+  const { clearedProbableLeads, unresolvedProbableLeadsList } = classifyProbableLeads(probableByLead);
+  const unresolvedProbableLeadCount = unresolvedProbableLeadsList.length;
+  const masterResult: "PASS" | "FAIL" = confirmed.length === 0 && unresolvedProbableLeadCount === 0 ? "PASS" : "FAIL";
 
   console.log(`\nReleased lead population (Master): ${leads.length}`);
   console.log(`Confirmed leaks: ${confirmed.length}`);
   for (const f of confirmed) console.log(`  BLOCK: ${f.lead.leadId} "${f.lead.tradingName}" -> customer ${f.customer.id} "${f.customer.name}" (${f.customer.isActive ? "active" : "inactive"}) [${f.signals.join(", ")}]`);
-  console.log(`Probable matches (held, not release-blocking on their own, reported for review): ${probable.length}`);
-  for (const f of probable) console.log(`  REVIEW: ${f.lead.leadId} "${f.lead.tradingName}" -> customer ${f.customer.id} "${f.customer.name}" (${f.customer.isActive ? "active" : "inactive"}) [${f.signals.join(", ")}]`);
+  console.log(`Probable-match leads: ${probableByLead.size} (${probable.length} underlying candidate customer record(s) reviewed)`);
+  for (const [leadId, findings] of probableByLead) {
+    const status = unresolvedProbableLeadsList.some((u) => u.leadId === leadId) ? "UNRESOLVED — remains held/reviewable" : "CLEARED — generic evidence only";
+    console.log(`  ${leadId} "${findings[0].lead.tradingName}" [${status}]:`);
+    for (const f of findings) console.log(`    -> customer ${f.customer.id} "${f.customer.name}" (${f.customer.isActive ? "active" : "inactive"}) [${f.signals.join(", ")}]`);
+  }
+  console.log(`Cleared (algorithmic, generic-evidence-only) leads: ${clearedProbableLeads.length}`);
+  console.log(`Unresolved probable leads (still released, stronger evidence present): ${unresolvedProbableLeadCount}`);
 
   let ctoResult: LeakageCertificate["ctoResult"] = "NOT_CHECKED";
   let ctoConfirmed: LeakageFinding[] = [];
@@ -470,6 +540,11 @@ async function main() {
     confirmedLeakCount: confirmed.length,
     confirmedMatchesRemovedDuringReprocessing: removedCountArg ? Number(removedCountArg) : null,
     probableMatchCount: probable.length,
+    probableLeadCount: probableByLead.size,
+    clearedLeadCount: clearedProbableLeads.length,
+    unresolvedProbableLeadCount,
+    clearedMatches: clearedProbableLeads,
+    unresolvedProbableLeads: unresolvedProbableLeadsList,
     masterResult, ctoResult, salesProResult, result: overallResult,
     verificationTimestamp: nowIso, generatedAt: nowIso, verifierCommitHash,
   };
@@ -492,17 +567,26 @@ async function main() {
       if (f.signals.includes("differing_trading_name")) parts.push("shared domain but a differing trading name and no postcode agreement — correctly held for human review, not a pipeline miss");
       return parts.length ? parts.join("; ") : "matched on an identifier the automated pipeline's stage-by-stage matchers do not independently cross-check";
     };
-    const revisedOutcome = (f: LeakageFinding): string => f.tier === "confirmed" ? "Move to Customer Master Exclusions — permanent hard exclusion" : "Move to Held/Review — requires human confirmation before release or exclusion";
+    const unresolvedLeadIdSet = new Set(unresolvedProbableLeadsList.map((u) => u.leadId));
+    const revisedOutcome = (f: LeakageFinding): string =>
+      f.tier === "confirmed" ? "Move to Customer Master Exclusions — permanent hard exclusion"
+        : f.tier === "probable" && !unresolvedLeadIdSet.has(f.lead.leadId) ? "Cleared with audit warning (algorithmic — generic evidence only, see Cleared Probable Matches sheet) — retained in Operationally Usable Leads"
+        : "Move to Held/Review — requires human confirmation before release or exclusion";
 
     const outWb = XLSX.utils.book_new();
     const findingRows = (fs2: LeakageFinding[]) => fs2.map((f) => ({
       "Lead ID": f.lead.leadId, District: f.lead.district, Representative: f.lead.representative ?? "", "Lead Trading Name": f.lead.tradingName, "Lead Phone": f.lead.phone,
       "Lead Address/Postcode": f.lead.postcode, "Matched NetSuite Account Code": f.customer.id, "Matched Customer Name": f.customer.name,
       "Customer Lifecycle Status": f.customer.isActive ? "Active" : "Inactive", "Match Signals": f.signals.join(", "), "Match Confidence": f.tier,
+      "Lead-Level Status": f.tier !== "probable" ? "n/a" : unresolvedLeadIdSet.has(f.lead.leadId) ? "UNRESOLVED" : "CLEARED (algorithmic)",
       "Why the Original Pipeline Missed It": whyMissed(f), "Revised Final Outcome": revisedOutcome(f),
     }));
     XLSX.utils.book_append_sheet(outWb, XLSX.utils.json_to_sheet(findingRows(confirmed)), "Confirmed Customer Leaks");
     XLSX.utils.book_append_sheet(outWb, XLSX.utils.json_to_sheet(findingRows(probable)), "Probable Customer Matches");
+    XLSX.utils.book_append_sheet(outWb, XLSX.utils.json_to_sheet(clearedProbableLeads.map((l) => ({
+      "Lead ID": l.leadId, "Trading Name": l.tradingName, "Candidate Customer Records Reviewed": l.candidateRecordsReviewed,
+      "Matched NetSuite Account Codes": l.customerIds.join(", "), Reason: l.reason,
+    }))), "Cleared Probable Matches");
     XLSX.utils.book_append_sheet(outWb, XLSX.utils.json_to_sheet(findingRows(allFindings.filter((f) => f.customer.isActive))), "Active Customer Matches");
     XLSX.utils.book_append_sheet(outWb, XLSX.utils.json_to_sheet(findingRows(allFindings.filter((f) => !f.customer.isActive))), "Inactive Customer Matches");
 

@@ -36,7 +36,7 @@ const toLead = (r: Record<string, unknown>): LeadForVerification => ({
 // with no postcode corroboration, or a shared domain with no postcode/same-district corroboration.
 // Anything else (exact phone/email, exact postcode+name, exact address, same-district+strong-name,
 // a CONFIRMING domain match) means real, independent evidence exists and the lead must stay held.
-function isOnlyGenericAliasOrUncorroboratedDomain(signals: string[]): boolean {
+export function isOnlyGenericAliasOrUncorroboratedDomain(signals: string[]): boolean {
   const safe = new Set(["exact_trading_name_alias", "alias_without_postcode_corroboration", "exact_domain", "differing_trading_name", "corroborating_name_different_district_possible_franchise"]);
   return signals.every((s) => safe.has(s));
 }

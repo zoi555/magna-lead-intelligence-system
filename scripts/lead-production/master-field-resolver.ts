@@ -13,6 +13,43 @@ import type { Dossier } from "./candidate-dossier";
 import { evaluateBusinessCategoryEligibility } from "./business-category-eligibility";
 import { mapCtoBusinessType, type CtoBusinessTypeVocabulary } from "./cto-business-type-mapping";
 
+// Review-volume evidence bands (owner-decision review, 2026-08-04 — Kunz volume-classification
+// audit). Replaces a flat binary threshold ("high volume" at >=100 or >=300 Google reviews,
+// depending which of two independent call sites you looked at) that gave a 126-review lead and a
+// 2275-review lead the IDENTICAL "high-volume indicator" wording. Thresholds are grounded in the
+// real observed distribution across Kunz's 121 released leads (min 1, median 132, p90 425, p95
+// 541, max 2275; natural clustering at ~50, ~150, ~400, ~1000) — not an arbitrary round number.
+// Google review count only — Just Eat's own rating_count is a real, distinct, larger-magnitude
+// signal for some candidates (confirmed during the audit: some outlets have 10-30x more Just Eat
+// ratings than Google reviews) but is not captured into any dossier field this resolver can read;
+// documented as a known gap, never silently mixed with the Google count.
+export type ReviewVolumeBand = "Low" | "Moderate" | "Strong" | "Very Strong" | "Exceptional";
+export function classifyReviewVolumeBand(googleReviewCount: number | null): ReviewVolumeBand | null {
+  if (googleReviewCount == null) return null;
+  if (googleReviewCount < 50) return "Low";
+  if (googleReviewCount < 150) return "Moderate";
+  if (googleReviewCount < 400) return "Strong";
+  if (googleReviewCount < 1000) return "Very Strong";
+  return "Exceptional";
+}
+
+// "High-volume OPERATION" (owner-decision review, 2026-08-04): a genuinely stronger claim than a
+// review-volume band alone — it asserts real bulk/wholesale purchasing capacity, not just a busy
+// consumer-facing footfall. A review count, however large, is corroborating evidence at most,
+// never sufficient alone (explicit owner rule: "a high review count may support high-volume
+// status but must not confirm it alone"). Requires EITHER direct operational-scale evidence
+// (catering/bulk-order capability, or multi-site/franchise/group structure), OR at least two
+// independent supporting signals together (e.g. a Very Strong/Exceptional review band PLUS
+// exceptional filed-accounts financial strength) — never a single review-count signal by itself,
+// regardless of how large.
+export function isHighVolumeOperation(opts: { hasMajorCateringEvidence: boolean; hasMultiSiteEvidence: boolean; hasExceptionalFinancials: boolean; reviewVolumeBand: ReviewVolumeBand | null }): boolean {
+  const hasDirectEvidence = opts.hasMajorCateringEvidence || opts.hasMultiSiteEvidence;
+  if (hasDirectEvidence) return true;
+  const reviewVolumeIsStrongSignal = opts.reviewVolumeBand === "Very Strong" || opts.reviewVolumeBand === "Exceptional";
+  const supportingSignalCount = [reviewVolumeIsStrongSignal, opts.hasExceptionalFinancials].filter(Boolean).length;
+  return supportingSignalCount >= 2;
+}
+
 export interface MasterFieldContext {
   territory: string; // Postcode District this candidate was discovered in, e.g. "RM1"
   representative: string;
@@ -122,7 +159,15 @@ function buildNote2SalesIntelligence(f: Record<string, unknown>): string | null 
   }
   if (centralPurchasingClues.length) bullets.push(`Expansion/central-purchasing indicators: ${centralPurchasingClues.join(", ")}.`);
 
-  if (googleReviewCount != null && googleReviewCount >= 100) bullets.push(`High-volume indicator: ${googleReviewCount} Google reviews.`);
+  // Owner-decision review (2026-08-04, terminology guardrail 2026-08-04 same day): banded, not a
+  // flat "high-volume indicator" claim applied identically to a 126-review lead and a 2275-review
+  // lead. Labelled "Google Review Activity" — NEVER "volume"/"purchasing volume"/"business
+  // volume"/"high-volume operation" — a Google review count is consumer-popularity evidence, not
+  // direct proof of wholesale purchasing capacity. "Low" is not called out (uninformative — most
+  // candidates start there); Moderate and above are reported with their real band label, so the
+  // reader sees the actual scale, never a single undifferentiated claim.
+  const reviewBandForNote = classifyReviewVolumeBand(googleReviewCount);
+  if (reviewBandForNote && reviewBandForNote !== "Low") bullets.push(`Google Review Activity: ${reviewBandForNote} (${googleReviewCount} Google reviews) — consumer review evidence only, does not by itself establish high-volume operation.`);
 
   const formatParts: string[] = [];
   if (serviceModel?.dineIn?.value === true) formatParts.push("dine-in");
@@ -138,7 +183,11 @@ function buildNote2SalesIntelligence(f: Record<string, unknown>): string | null 
     hasCatering ? "Call approach: lead with Magna's bulk/catering supply capability — website shows catering evidence." :
     halalEvidence ? "Call approach: lead with halal-certified product range — halal evidence found on official website." :
     (branchList.length || franchiseClues.length || centralPurchasingClues.length) ? "Call approach: position as a multi-site/growing account — expansion evidence found." :
-    (googleReviewCount != null && googleReviewCount >= 100) ? "Call approach: position volume-based pricing — strong customer footfall signal." :
+    // Owner-decision review (2026-08-04, terminology guardrail 2026-08-04 same day): gated on the
+    // same band used above, not a separate raw >=100 threshold. Never says "volume-based
+    // pricing"/"purchasing volume" — this is a consumer-engagement talking point, not a claim of
+    // wholesale purchasing capacity.
+    (reviewBandForNote === "Strong" || reviewBandForNote === "Very Strong" || reviewBandForNote === "Exceptional") ? `Call approach: reference strong online consumer engagement (${reviewBandForNote} Google review activity, ${googleReviewCount} reviews) as a talking point — not itself evidence of high-volume operation.` :
     likelyMagnaProducts.length ? `Call approach: lead with the ${likelyMagnaProducts[0]} product range.` :
     menuSpecialities.length ? `Call approach: tailor pitch to the ${menuSpecialities[0]} menu range.` :
     null;
@@ -290,8 +339,12 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext, v
   const cuisineServiceModelForUrgency = f.cuisine_service_model as { serviceModel?: Record<"catering", { value: unknown }> | null } | null;
   const hasMajorCateringEvidence = cuisineServiceModelForUrgency?.serviceModel?.catering?.value === true;
   const hasMultiSiteEvidence = (groupClass !== "Independent Single Site" && groupClass !== "Unresolved") || ((f.branch_list as string[])?.length ?? 0) >= 3 || ((f.franchise_group_clues as string[])?.length ?? 0) > 0;
-  const hasHighVolumeEvidence = ((f.google_review_count as number) ?? 0) >= 300;
   const hasExceptionalFinancials = ((f.financial_strength_band as string | null)?.toLowerCase().includes("strong") ?? false);
+  // Review-volume band + high-volume-OPERATION determination (owner-decision review,
+  // 2026-08-04) — see classifyReviewVolumeBand/isHighVolumeOperation above. A review count alone,
+  // however large, no longer single-handedly triggers Hot status.
+  const reviewVolumeBand = classifyReviewVolumeBand((f.google_review_count as number) ?? null);
+  const hasHighVolumeEvidence = isHighVolumeOperation({ hasMajorCateringEvidence, hasMultiSiteEvidence, hasExceptionalFinancials, reviewVolumeBand });
   const hasUnusuallyStrongOpportunity = hasMultiSiteEvidence || hasMajorCateringEvidence || hasHighVolumeEvidence || hasExceptionalFinancials;
   const isQualifiedAndContactable = dossier.qualificationStatus === "qualified" || dossier.qualificationStatus === "qualified_with_channel_limit";
   const leadUrgency =

@@ -24,7 +24,13 @@ import * as XLSX from "xlsx";
 import { parseCsvObjects } from "./csv";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
+function argAll(name: string): string[] { return process.argv.filter((x) => x.startsWith(`--${name}=`)).map((x) => x.slice(name.length + 3)); }
 
+// Base map from campaign-002-five-district-pilot (one representative per district). A later
+// campaign whose representative owns MULTIPLE districts (e.g. campaign-003-kunz-full-
+// allocation, CM0-CM9) extends this at runtime via repeatable --district-rep=DIST:Name args
+// (see main()) — never by hardcoding a second campaign's districts here, so campaign-002's own
+// behaviour is unchanged when that flag is omitted.
 const DISTRICT_REP: Record<string, string> = { CM1: "Kunz", IG1: "Naseh", RM1: "Saif", DA1: "Tahira", BR1: "Hassan" };
 const CAFE_RE = /\bcaf[ée]\b|\bcoffee\b/i;
 const BUBBLE_RE = /\bbubble\b|\bboba\b|\bbobo\b|\bcha\b/i;
@@ -212,6 +218,10 @@ const HIST_COLUMNS = ["New Campaign Lead ID", "Dropped Candidate ID (internal)",
 const TIER_LABEL: Record<string, string> = { exact_phone: "Phone match", exact_company_number: "Company number match" };
 
 async function buildHistoricalDuplicates(combined: XLSX.WorkBook, rm1Phase1Dir: string): Promise<Record<string, unknown>[]> {
+  // A combined workbook with no RM1-specific cross-campaign-dedup history (e.g. any campaign
+  // other than campaign-002-five-district-pilot) simply has no such sheet at all — that is a
+  // genuine, honest "not applicable here", not a malformed workbook, so this does not throw.
+  if (!combined.Sheets["RM1 Historical Duplicates"]) return [];
   const raw = sheetRows(combined, "RM1 Historical Duplicates");
   if (!raw.length) return [];
   const matchResults = JSON.parse(await fs.readFile(path.join(rm1Phase1Dir, "customer-match-results.json"), "utf8")) as any[];
@@ -326,6 +336,16 @@ export async function generateOwnerReviewPack(opts: {
   const salesProValidation = await buildSalesProValidation(opts.districtAuditPaths.map((d) => ({ district: d.district, path: d.requiredFieldGaps })));
   const noteQualityReview = buildNoteQualityReview(combined);
   const manualSample = buildManualSample(allQualifiedLeads);
+  // Owner-decision review (2026-08-04): one row per released lead, the full urgency-decision
+  // trail — never just the current Hot Leads sheet in isolation. "Urgency Reclassification Note"
+  // is an optional column this workbook's own generator (generate-kunz-full-allocation-master.ts
+  // patches, when applied) may add; a workbook without it simply reports every lead as "Original"
+  // — this never fabricates a reclassification that didn't happen.
+  const urgencyDecisions = usableRows.map((m) => ({
+    "Lead ID": m["Permanent Lead ID"], District: m["Postcode District"], "Trading Name": m["Trading Name"],
+    "Lead Urgency": m["Lead Urgency"], "Decision Type": m["Urgency Reclassification Note"] ? "Reclassified" : "Original",
+    "Reclassification Reason": m["Urgency Reclassification Note"] ?? "",
+  }));
 
   const wb = XLSX.utils.book_new();
   const add = (name: string, columns: string[], rows: Record<string, unknown>[]) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows, { header: columns }), name.slice(0, 31));
@@ -344,6 +364,7 @@ export async function generateOwnerReviewPack(opts: {
   add("Sales Pro Validation", SPV_COLUMNS, salesProValidation);
   add("Note Quality Review", NQ_COLUMNS, noteQualityReview);
   add("Manual Sample", [...AQ_COLUMNS, "Sample Rationale"], manualSample);
+  add("Urgency Decisions", ["Lead ID", "District", "Trading Name", "Lead Urgency", "Decision Type", "Reclassification Reason"], urgencyDecisions);
 
   await fs.mkdir(path.dirname(opts.outPath), { recursive: true });
   XLSX.writeFile(wb, opts.outPath);
@@ -355,6 +376,7 @@ export async function generateOwnerReviewPack(opts: {
     "Phone Exceptions": phoneExceptionRows.length, "Trading Status": tradingStatusRows.length,
     "RM1 Historical Duplicates": historicalDuplicates.length, "Sales Pro Validation": salesProValidation.length,
     "Note Quality Review": noteQualityReview.length, "Manual Sample": manualSample.length,
+    "Urgency Decisions": urgencyDecisions.length,
   };
   const notRederived = [
     'Pilot Summary: "Raw Discovered (JE outlets)" (pre-consolidation raw discovery count) — not tracked in any stage checkpoint read by this script; would require the discovery-stage raw scrape output, out of scope for this correction pass.',
@@ -367,13 +389,30 @@ export async function generateOwnerReviewPack(opts: {
 async function main() {
   const combinedMasterPath = arg("combined-master");
   const outPath = arg("out");
-  const rm1Phase1Dir = arg("rm1-phase1-dir");
+  // Optional (2026-08-04, campaign-003-kunz-full-allocation recovery pass): the campaign-002
+  // 5-district-5-representative pilot supplied RM1's own dropped-cross-campaign-dedup evidence
+  // via --rm1-phase1-dir=. A later campaign that never touches RM1 has nothing to recover here
+  // — buildHistoricalDuplicates() already no-ops when the combined workbook carries no "RM1
+  // Historical Duplicates" sheet, so this is optional, not required, for that case.
+  const rm1Phase1Dir = arg("rm1-phase1-dir") ?? "";
   const exportsBase = arg("exports-base"); // e.g. /Users/.../campaign-002 ; expects {rep}/exports/{rep}-{dist}-*.csv
-  if (!combinedMasterPath || !outPath || !rm1Phase1Dir || !exportsBase) {
-    console.error("Missing required argument(s): --combined-master=<path> --out=<path> --rm1-phase1-dir=<path> --exports-base=<dir>");
+  if (!combinedMasterPath || !outPath || !exportsBase) {
+    console.error("Missing required argument(s): --combined-master=<path> --out=<path> --exports-base=<dir> (--rm1-phase1-dir=<path> optional — only needed for campaign-002-five-district-pilot's RM1 cross-campaign-dedup history)");
     process.exit(1);
   }
+  // Repeatable --district-rep=DIST:Name overrides/extends BOTH the Representative-column lookup
+  // and the audit-file directory lookup below, for representatives (like Kunz in campaign-003)
+  // who own more districts than campaign-002's fixed one-rep-per-district assumption. Omitting
+  // this flag entirely leaves campaign-002's own regeneration behaviour byte-for-byte unchanged.
+  const districtRepArgs = argAll("district-rep");
   const DISTRICT_TO_REP_DIR: Record<string, string> = { CM1: "kunz", IG1: "naseh", RM1: "saif", DA1: "tahira", BR1: "hassan" };
+  for (const kv of districtRepArgs) {
+    const idx = kv.indexOf(":");
+    if (idx < 0) { console.error(`--district-rep value "${kv}" must be DISTRICT:RepName`); process.exit(1); }
+    const district = kv.slice(0, idx), repName = kv.slice(idx + 1);
+    DISTRICT_REP[district] = repName;
+    DISTRICT_TO_REP_DIR[district] = repName.toLowerCase().replace(/\s+/g, "-");
+  }
   const districtAuditPaths = Object.entries(DISTRICT_TO_REP_DIR).map(([district, repDir]) => {
     const d = district.toLowerCase();
     const dir = path.join(exportsBase, repDir, "exports");

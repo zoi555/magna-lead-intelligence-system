@@ -14,7 +14,7 @@ const REAL_OUT = "/Users/homemac/Downloads/campaign-002-five-district-pilot-owne
 const REAL_EXPORTS_BASE = "/Users/homemac/Data/aspectlead-lead-production/output/territories/campaign-002";
 const REAL_RM1_PHASE1 = "/Users/homemac/Data/aspectlead-lead-production/output/territories/campaign-002/saif/rm1/rm1-phase1-comparison-2026-08-02T23-44-25-538Z";
 
-const EXPECTED_SHEETS = ["Pilot Summary", "Reconciliation", "All Qualified Leads", "Key Accounts", "Hot Leads", "Exclusions", "Cafe Coffee Review", "Bubble Tea Review", "Review Required", "Phone Exceptions", "Trading Status", "RM1 Historical Duplicates", "Sales Pro Validation", "Note Quality Review", "Manual Sample"];
+const EXPECTED_SHEETS = ["Pilot Summary", "Reconciliation", "All Qualified Leads", "Key Accounts", "Hot Leads", "Exclusions", "Cafe Coffee Review", "Bubble Tea Review", "Review Required", "Phone Exceptions", "Trading Status", "RM1 Historical Duplicates", "Sales Pro Validation", "Note Quality Review", "Manual Sample", "Urgency Decisions"];
 
 async function main() {
   console.log("generate-owner-review-pack.ts — regression proofs:\n");
@@ -39,12 +39,17 @@ async function main() {
     };
   });
 
-  console.log("1. Regeneration runs end-to-end and writes the exact 15 expected sheets:");
+  console.log("1. Regeneration runs end-to-end and writes the exact 16 expected sheets (15 + Urgency Decisions, added 2026-08-04 owner-decision review):");
   const result = await generateOwnerReviewPack({ combinedMasterPath: REAL_COMBINED, districtAuditPaths, rm1Phase1Dir: REAL_RM1_PHASE1, outPath: REAL_OUT });
-  assert(Object.keys(result.sheetCounts).length === 15, `exactly 15 sheets reported (got ${Object.keys(result.sheetCounts).length})`);
+  assert(Object.keys(result.sheetCounts).length === 16, `exactly 16 sheets reported (got ${Object.keys(result.sheetCounts).length})`);
   const wb = XLSX.readFile(REAL_OUT);
-  assert(wb.SheetNames.length === 15, `output workbook has exactly 15 sheets (got ${wb.SheetNames.length})`);
+  assert(wb.SheetNames.length === 16, `output workbook has exactly 16 sheets (got ${wb.SheetNames.length})`);
   for (const sheet of EXPECTED_SHEETS) assert(wb.SheetNames.includes(sheet), `sheet "${sheet}" is present (unchanged from the prior file's structure)`);
+
+  console.log("\n1b. Urgency Decisions: campaign-002's own combined workbook has no Urgency Reclassification Note column at all — every row must report \"Original\", never a fabricated reclassification:");
+  const urgencyRows = XLSX.utils.sheet_to_json(wb.Sheets["Urgency Decisions"], { defval: null }) as Record<string, unknown>[];
+  assert(urgencyRows.length === result.sheetCounts["All Qualified Leads"], `Urgency Decisions has one row per usable lead (got ${urgencyRows.length}, expected ${result.sheetCounts["All Qualified Leads"]})`);
+  assert(urgencyRows.every((r) => r["Decision Type"] === "Original" && r["Reclassification Reason"] === ""), "every row reports Decision Type=Original with a blank reason — no reclassification exists on this workbook, none fabricated");
 
   console.log("\n2. Bobo & Cha (DA1-015ED52A) appears in Review Required with the correct review_required evidence:");
   const review = XLSX.utils.sheet_to_json(wb.Sheets["Review Required"], { defval: null }) as Record<string, unknown>[];

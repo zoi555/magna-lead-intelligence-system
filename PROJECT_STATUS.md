@@ -1615,3 +1615,41 @@ run live** until this is resolved. CM0 is the only district attempted; CM2–CM9
 investigate the endpoint change / other). No new commits pushed this pass beyond the 3 campaign-003
 config commits already on the branch (code/config only, no customer data). Campaign-003 paused,
 awaiting owner review — Kunz's run has not produced any output files yet.
+
+## 2026-08-04 (same day) — owner approved the endpoint recovery; pushed; full Kunz allocation (CM0–CM9) run live and consolidated — AWAITING OWNER REVIEW
+
+Owner reviewed ISS-0035's recovery evidence and approved the replacement Just Eat endpoint.
+Pushed to `origin/feature/mvp-vertical-slice-001` — commit `50c59ea`, local=remote verified.
+
+Resumed campaign-003-kunz-full-allocation: CM0 continued from its existing discovery-only
+checkpoint (re-verified, not rerun); CM2–CM9 discovered live via the new adapter and run through
+the complete 8-stage enrichment pipeline (FSA, Google Places, Companies House, website, and the
+zero-live-call consolidation stages), all clean. Combined with the stored, reused (never rerun)
+campaign-002 CM1 pilot output. Full detail and per-district numbers: `docs/11_ISSUES_LOG.md`
+ISS-0035's final update.
+
+**Final population (CM0–CM9, 280 candidates after 4 within-campaign duplicate removals):** 121
+final released leads (108 ordinary + 13 key accounts), 31 held-review, 46 hard rejects, 5
+confirmed customer exclusions, 44 group exclusions, 29 commercial-review exclusions, 4
+business-category exclusions. Independent leakage verification: 0 confirmed leaks (PASS), 3
+non-blocking probable matches flagged for owner review (all one CM2 candidate, domain-only
+evidence, no name/postcode/phone/company-number match).
+
+7 files produced at `/Users/homemac/Downloads/kunz-full-allocation-*` (master-combined.xlsx/csv,
+owner-review.xlsx, CTO-final-review.xlsx/csv, customer-leakage-audit.xlsx,
+zero-leakage-certificate.json). A genuine defect (wrong Region/Route value from a territory-
+manifest field-override gotcha) was caught via spot-check and corrected before release — full
+detail in ISS-0035.
+
+Two small, additive, backward-compatible code changes made to generalise `generate-owner-review-
+pack.ts` beyond campaign-002's fixed 5-district assumption (campaign-002's own regeneration
+reverified unchanged), plus one new glue script (`generate-kunz-full-allocation-master.ts`) to
+merge two campaign-tagged Master workbooks into one with correct per-row provenance. All 41
+suites, typecheck, build clean. **Not committed or pushed** — reporting first, per the stop
+condition on this task.
+
+**Next action:** owner reviews the 7 Kunz files (especially the 3 flagged probable-match review
+items and the Hot/Warm distribution — 62 Hot / 59 Warm / 0 Cold, notably Hot-heavy) and the 2
+uncommitted code changes, then decides on committing/pushing and on starting Meer or another
+representative. Per the stop condition: no other representative started, CTO file not imported,
+no merge to main.

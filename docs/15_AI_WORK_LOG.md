@@ -1338,3 +1338,38 @@ stopped per explicit instruction. Full detail: `docs/10_BUGS_AND_FIXES.md`,
 10. Did not push any commits (the 3 pre-existing campaign-003 config commits remain local, as
     do this pass's code/doc changes — all reported, none pushed without instruction). Did not
     merge. Did not run CM2–CM9. Did not touch the two pre-existing untracked scripts.
+
+## 2026-08-04 (same day) — owner approved Just Eat recovery pushed; full Kunz campaign-003 allocation (CM0–CM9) run live and consolidated into 7 final files
+
+1. Verified pre-push state, committed nothing new (reused the already-committed recovery), pushed
+   the 4 pending commits (3 campaign-003 config + the ISS-0035 recovery fix) to
+   `origin/feature/mvp-vertical-slice-001` (`50c59ea`), verified local=remote post-push, confirmed
+   the 2 pre-existing untracked scripts untouched throughout.
+2. Re-validated the CM0 discovery checkpoint's integrity (exact match on raw-observation/
+   geography-validation/candidate counts) before reuse — did not rerun discovery.
+3. Ran CM0's remaining 7 pipeline stages live from that checkpoint, then CM2–CM9 fresh
+   (discovery + full 8-stage enrichment), all live, all clean, no adapter failures.
+4. Built the final Master export per source campaign (CM1 alone tagged campaign-002; CM0+CM2–CM9
+   together tagged campaign-003, with cross-campaign dedup against CM1 and within-campaign
+   cross-district dedup — 4 duplicates found and removed, all genuine within-district exact-phone
+   matches). Wrote a new, additive glue script to merge the two campaign-tagged workbooks into
+   one final Kunz Master with correct per-row Campaign ID provenance and a genuine one-row-per-
+   district Representative Summary (generate-master-export.ts's own multi-district mode collapses
+   this into one joined string, not usable downstream).
+5. Caught and fixed a real defect before release: passed the postcode-district list as
+   `--sales-territory=`, which silently became the CTO's wrong "Region/Route" value — root cause
+   was `--territory-manifest=` mode overriding, not falling back from, the CLI flag. Corrected the
+   manifest file itself and regenerated both affected exports.
+6. Generalised `generate-owner-review-pack.ts` beyond campaign-002's hardcoded 5-district
+   assumption via two small, additive, backward-compatible changes (a repeatable
+   `--district-rep=` override; a graceful skip when a later campaign's workbook has no "RM1
+   Historical Duplicates" sheet) — campaign-002's own regeneration reverified byte-for-byte
+   unchanged via its existing test.
+7. Produced all 7 required Kunz files at `/Users/homemac/Downloads/kunz-full-allocation-*`.
+   Final population: 280 candidates, 121 released (108 ordinary + 13 key accounts), 0 confirmed
+   customer leaks (independent verifier PASS), 3 non-blocking probable matches flagged for
+   review.
+8. All 41 suites, typecheck, build clean. Updated `docs/11_ISSUES_LOG.md` ISS-0035 and
+   `PROJECT_STATUS.md`. Did NOT commit or push this pass's 2 code changes — reporting them first,
+   per the stop condition. Did not start Meer or any other representative, did not merge, did not
+   import the CTO file.
