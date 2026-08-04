@@ -237,7 +237,7 @@ async function main() {
   }
 
   if (!representative || !role || !salesTerritory) { console.error("Could not resolve representative/role/sales-territory."); process.exit(1); }
-  console.log(`=== Master exporter (129 fields, v2 schema) — ${representative} (${role}), ${salesTerritory}, ${districts.length} district(s) ===`);
+  console.log(`=== Master exporter (134 fields, v2 schema) — ${representative} (${role}), ${salesTerritory}, ${districts.length} district(s) ===`);
 
   const commercialReviewDir = arg("commercial-review-dir") ?? "config/lead-production/commercial-review-v1";
   const commercialReviewRegistry = await loadCommercialReviewRegistry(commercialReviewDir);
