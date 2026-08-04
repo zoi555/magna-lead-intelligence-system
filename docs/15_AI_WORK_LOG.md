@@ -1200,3 +1200,48 @@ stopped per explicit instruction. Full detail: `docs/10_BUGS_AND_FIXES.md`,
 11. Committed the fix (commit `a21e3de`, code/tests/config only) but did NOT push — did not
     approve/switch the permanent live customer-master pointer — did not run new districts or make
     any live provider calls, per the explicit instructions this pass operated under.
+
+## 2026-08-04 — component-address/fuzzy-name matching, canonical-Master annotation, expanded calibration; a critical self-inflicted account-code feedback-loop bug found and fixed before any release
+
+1. Built component-level UK address parsing/comparison (`address-components.ts`) — unit/shop
+   number, building number, building name, street, locality, town, postcode compared separately.
+   Proved on real data that the prior whole-string comparison was over-matching: "Kings Diner" and
+   its previously-assumed same-address customer match are at genuinely different building numbers
+   (439 vs 453 Downham Way) on the same street/postcode.
+2. Built Damerau-Levenshtein fuzzy name matching (`fuzzy-name-match.ts`) — whole-string (joined/
+   split-word tolerant) and per-token-best-match (misspelling tolerant), never confirms alone.
+   Found and fixed a real false positive via the expanded calibration set: a single-token
+   candidate name trivially scored a perfect match against any customer containing that one word
+   ("Chelmsford Takeaway" wrongly confirmed against 3 unrelated customers) — fixed by requiring
+   both sides to have 2+ tokens for the per-token comparison.
+3. Built `annotate-canonical-master.ts` to add structured customer-match evidence (matched
+   customer name/account code, evidence, checksum) to every held/excluded row in the canonical
+   combined-Master workbook, and to correct a stale "Final Outcome" companion column.
+4. **Critical bug found and fixed before any release**: the first version of that script wrote
+   matched account codes into the EXISTING "NetSuite Customer Account Code" column — the same
+   column the matcher reads as an independent, decisive matching input — creating a self-
+   confirming feedback loop. The artifact reached a real SalesPro export CSV (PHAT Buns - Romford,
+   already cleared under this session's own re-evaluation) and was caught by the independent
+   verifier (`salesProResult: FAIL`) before any release. Fixed by using a dedicated non-input
+   report column and cleaning the 32 corrupted Master rows + 2 corrupted SalesPro cells.
+5. Re-evaluated and cleared Spice Hut and PHAT Buns - Romford per the owner's explicit rule
+   (generic alias / shared-domain-only evidence, no other corroborating signal), recording a
+   permanent, human-readable audit warning on each row (`reevaluate-and-clear-probable-
+   matches.ts`, which defensively refuses to clear if any stronger evidence is found).
+6. Re-ran the probable-hold enforcement with the improved matcher and found 5 genuinely new
+   probable matches the earlier (weaker) matcher never caught — held and removed from their
+   SalesPro exports.
+7. Made the release-gate reconciliation override-aware: an explicitly audit-warned release is
+   reported as its own distinct, always-visible measure, never silently counted as an unresolved
+   leak and never silently hidden either.
+8. Expanded the calibration set from 20 to 103 labelled cases (80 calibration / 23 holdout);
+   100% precision/recall on both subsets; thresholds fixed before the holdout subset was written
+   and never adjusted afterward.
+9. Final reconciliation: 20 confirmed found/removed (0 remaining anywhere releasable), 12
+   probable held total (2 released under explicit owner override, 0 remaining unaccounted for),
+   165 cleared, 167 final released leads.
+10. `npm run typecheck`/`build` clean; all 35 `test:lead-production-*` suites (6 new this pass)
+    individually re-run, ALL PASSED.
+11. Committed the fix (commit `05d4138`, code/tests/config only) but did NOT push — did not
+    approve/switch the permanent live customer-master pointer — did not run new districts or make
+    any live provider calls, per the explicit instructions this pass operated under.

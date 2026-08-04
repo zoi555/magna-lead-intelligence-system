@@ -577,3 +577,58 @@ cap, Notes rewrite, Lead Urgency recalibration, cross-representative combined Ma
   and unchanged at 170. 7 probable/held cases still require a human decision (unchanged from the
   2026-08-03 entry, minus the one now-confirmed "Monster Burger" case). The permanent live
   customer-master pointer remains `pending_owner_review`, not switched by this session.
+
+## 2026-08-04 (same day, second follow-up) — component-address/fuzzy-name matching, canonical-Master annotation, expanded calibration; critical self-inflicted feedback-loop bug found and fixed before release
+
+- Claim: 4 owner-directed capability gaps closed (component-level address matching, fuzzy name
+  matching, canonical-Master structured annotation, 103-case calibration with a genuine holdout
+  split), a critical self-inflicted bug found and fixed BEFORE any output was released, and the
+  final 167-lead population is independently re-verified PASS across Master/CTO/Sales Pro.
+- Evidence: `address-components.ts` proven against real data — the previously-assumed "Kings
+  Diner same address as an existing customer" case is, on component-level inspection, genuinely
+  DIFFERENT building numbers (439 vs 453 Downham Way) on the same street/postcode; the prior
+  whole-string comparison had over-matched purely on shared street/town/postcode tokens.
+  `fuzzy-name-match.ts` proven against the 4 owner-specified examples plus a real false-positive
+  catch-and-fix (single-token candidate names, e.g. "Chelmsford Takeaway"→"chelmsford" after
+  suffix-stripping, trivially matched any customer containing that one word — fixed by requiring
+  2+ tokens on both sides for the per-token comparison). `annotate-canonical-master.ts` initially
+  introduced a CRITICAL self-confirming feedback loop (writing matched account codes into the same
+  "NetSuite Customer Account Code" column the matcher reads as an independent decisive input) that
+  silently upgraded genuinely probable (and even already owner-cleared) leads to CONFIRMED — the
+  artifact reached a real SalesPro export CSV and was caught by `verify-customer-leakage.ts`'s own
+  independent check (`salesProResult: FAIL`) BEFORE any release, then fixed at the root (dedicated
+  non-input report column) and at the data layer (32 corrupted Master rows + 2 corrupted SalesPro
+  cells cleaned, full hold/exclude/clear/annotate chain re-run from the corrected state, re-
+  verified `salesProResult: PASS`). Re-running the improved matcher surfaced 5 genuinely new
+  probable matches never caught by the earlier matcher run — held and removed from SalesPro.
+  Spice Hut and PHAT Buns re-evaluated and cleared per the owner's explicit rule with a permanent
+  audit warning; the reconciliation gate made override-aware (an explicit release reported as its
+  own distinct measure, never silently blocked, never silently hidden). Calibration set expanded
+  to 103 labelled cases (80 calibration / 23 holdout) — 100% precision/recall on BOTH subsets,
+  thresholds fixed before the holdout subset was written and never adjusted afterward.
+- Final reconciliation: 20 confirmed found/removed (0 remaining releasable), 12 probable held (2
+  released under explicit owner override, 0 remaining unaccounted for), 165 cleared, 167 final
+  released leads. Certificate PASS across Master/CTO/Sales Pro, tied to commit `05d4138`.
+- `npm run typecheck`/`build` clean; all 35 `test:lead-production-*` suites (6 new this pass)
+  individually re-run, ALL PASSED.
+- Files: `scripts/lead-production/address-components.ts`,
+  `scripts/lead-production/fuzzy-name-match.ts`,
+  `scripts/lead-production/annotate-canonical-master.ts`,
+  `scripts/lead-production/flatten-combined-master-to-csv.ts`,
+  `scripts/lead-production/reevaluate-and-clear-probable-matches.ts`,
+  `scripts/lead-production/append-leads-to-salespro-export.ts`,
+  `scripts/lead-production/generate-expanded-calibration-set.ts`,
+  `scripts/lead-production/verify-customer-leakage.ts`,
+  `scripts/lead-production/generate-entity-resolution-audit.ts`,
+  `scripts/test-lead-production-address-components.ts`,
+  `scripts/test-lead-production-fuzzy-name-match.ts`,
+  `scripts/test-lead-production-annotate-canonical-master.ts`,
+  `scripts/test-lead-production-reevaluate-clear-matches.ts`,
+  `scripts/test-lead-production-append-salespro-export.ts`. Commit `05d4138`. Not pushed.
+- Remaining risk: 12 probable/held cases require a human decision; the 2 explicit clearances
+  (Spice Hut, PHAT Buns) await owner sign-off on the underlying policy call, not further
+  algorithmic review — their audit warnings are permanent and visible in both the Master workbook
+  and the leakage-audit workbook's "Confirmed & Probable Detail"/"Customer Match Reconciliation"
+  sheets. The owner-review pack from the FIRST 2026-08-04 pass (170-row population) was
+  regenerated again this pass at the corrected 167-row population — current. The permanent live
+  customer-master pointer remains `pending_owner_review`, not switched by this session.

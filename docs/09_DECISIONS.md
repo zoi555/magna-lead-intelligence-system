@@ -1344,3 +1344,49 @@ newly-discovered defect (a confirmed match sitting in Held-Review) this pass fou
 `scripts/test-lead-production-hold-probable-matches.ts`,
 `scripts/test-lead-production-exclude-confirmed-matches.ts`,
 `scripts/test-lead-production-entity-resolution-calibration.ts`.
+
+## 2026-08-04 (same day, second follow-up) — the "structured evidence" columns added to the canonical Master must never be the same columns the matcher reads as input
+
+**Decision:** any script that writes report-only customer-match evidence onto a Master row must
+use dedicated, NEW columns (e.g. "Matched Customer Account Code(s)") — never an EXISTING column
+that `evaluateLeadCustomerPair()` also reads as an independent matching INPUT (specifically
+"NetSuite Customer Account Code", whose exact match is an automatic CONFIRM by design). Rationale:
+`annotate-canonical-master.ts` originally reused that exact input column for reporting, which
+created a self-confirming feedback loop — the next trace run read its own annotation back as
+genuine external evidence, silently upgrading probable (and even already-cleared) leads to
+confirmed, and the artifact reached a real SalesPro export CSV before being caught by the
+independent verifier. This is now a standing rule for any future "write evidence back onto the
+Master row" feature: audit every column it touches against every column the matcher itself reads.
+
+**Decision:** component-level address matching (unit/building-number/street/postcode compared
+separately, not a flat whole-string score) supersedes whole-string Jaccard as the PREFERRED
+address-comparison path, with the whole-string comparison retained ONLY as a fallback when either
+side's address doesn't parse into enough structure to compare component-by-component. Rationale:
+a flat bag-of-tokens comparison cannot express "same postcode but a different building number is
+NOT the same premises" — proven on real data (Kings Diner vs. its previously-assumed same-address
+customer match are genuinely different building numbers on the same street).
+
+**Decision:** fuzzy name-variation matching (Damerau-Levenshtein) is a candidate-generation and
+corroboration-support mechanism only — it may create a same-district-gated PROBABLE candidate on
+its own, or boost the existing `sim` score enough to support an independent postcode/phone/domain
+signal, but it can never confirm alone, mirroring the existing exact-similarity thresholds exactly
+so no new confirmation pathway is introduced. A single-token comparison side is refused for the
+per-token-best-match method specifically (a generic single word like a stripped town name would
+otherwise trivially "match" anything containing it) — the whole-string method still covers
+genuine single-token spelling variants.
+
+**Decision:** a probable customer match released into "Operationally Usable Leads" under an
+explicit, human-reviewed, permanently-recorded audit warning (`reevaluate-and-clear-probable-
+matches.ts`) is a distinct category from an unresolved algorithmic leak, and the release-gate
+scripts must never conflate the two. `generate-entity-resolution-audit.ts`'s blocking "probable
+remaining in releasable output" count now excludes explicitly-overridden leads, while still
+reporting them as their own separate, always-visible reconciliation measure.
+
+**Verification:** see `docs/10_BUGS_AND_FIXES.md` and `docs/11_ISSUES_LOG.md` (ISS-0034,
+2026-08-04 second entry) for full technical detail and the final reconciliation table.
+
+**See also:** `scripts/lead-production/address-components.ts`,
+`scripts/lead-production/fuzzy-name-match.ts`,
+`scripts/lead-production/annotate-canonical-master.ts`,
+`scripts/lead-production/reevaluate-and-clear-probable-matches.ts`,
+`scripts/lead-production/generate-expanded-calibration-set.ts`.

@@ -985,11 +985,13 @@ Nauman RM1 leads). Full detail: `docs/09_DECISIONS.md` (2026-08-03 entry).
 Date: 2026-08-03
 Severity: **Critical — real existing customers were released as "new leads" to representatives.**
 Owner: Zoeb (escalated from a board review)
-Status: **Resolved 2026-08-04 (entity-resolution configuration audit).** Full reconciliation as of
-2026-08-04: 20 confirmed customer matches found and removed, 0 remaining anywhere releasable; 7
-probable matches held, 0 remaining anywhere releasable; 170 leads cleared and released. See the
-2026-08-04 update below for the full reconciliation and 2 further defects found/fixed. Full
-technical detail: `docs/10_BUGS_AND_FIXES.md` (2026-08-03 and 2026-08-04 entries).
+Status: **Resolved 2026-08-04 (entity-resolution configuration audit, second follow-up).** Full
+reconciliation as of 2026-08-04: 20 confirmed customer matches found and removed, 0 remaining
+anywhere releasable; 12 probable matches held total, 2 released under an explicit owner-directed
+audit-warning override (Spice Hut, PHAT Buns), 0 remaining unaccounted for; 165 leads cleared;
+**167 final released leads**. A critical self-inflicted account-code feedback-loop bug was found
+and fixed before it ever reached a released output — see the second 2026-08-04 update below. Full
+technical detail: `docs/10_BUGS_AND_FIXES.md` (2026-08-03 and both 2026-08-04 entries).
 
 ### Problem
 
@@ -1138,3 +1140,49 @@ regeneration for this specific correction pass was NOT re-run in this turn (Held
 Master Exclusions row counts in that workbook are one pass stale — 66/19 vs the corrected 65/20;
 the Usable/CTO/Sales Pro population itself is unaffected, unchanged at 170) — flagged so it isn't
 silently assumed current.
+
+### Update (2026-08-04, same day, second follow-up) — component-level address/fuzzy-name matching added; a self-inflicted account-code feedback-loop bug found and fixed before reaching any released output; canonical Master clarified; calibration expanded to 103 cases
+
+Four owner-directed gaps closed this pass: (1) component-level address matching, replacing whole-
+string comparison, which real data proved was over-matching two genuinely different building
+numbers on the same street ("Kings Diner" vs. its old assumed match, 439 vs 453 Downham Way — now
+correctly not a material candidate on address alone); (2) Damerau-Levenshtein fuzzy name matching
+(candidate-generation/corroboration-support only, never confirms alone); (3) the canonical Master
+now carries structured customer-match evidence (Matched Customer Name, Matched Customer Account
+Code(s), Customer Match Evidence, Customer Master Checksum) on every held/excluded row, and a
+stale "Final Outcome" companion column is corrected; (4) the calibration set grew from 20 to 103
+labelled cases (80 calibration / 23 holdout), 100% precision/recall on both subsets, thresholds
+never adjusted after seeing holdout results.
+
+**Critical self-inflicted bug found and fixed before any release:** the first version of the
+canonical-Master annotation script wrote matched account codes into the EXISTING "NetSuite
+Customer Account Code" column — which the matcher also reads as an independent, decisive
+identity-matching INPUT. This created a feedback loop: the next trace run read its own annotation
+back as genuine evidence, silently upgrading probable (and even already owner-cleared) leads to
+CONFIRMED. The artifact reached a real SalesPro export CSV (PHAT Buns - Romford, already cleared
+under this pass's own item-5 re-evaluation) and was caught by the independent verifier
+(`salesProResult: FAIL`) before ever being handed to a representative. Fixed at the root (report
+evidence now written to a NEW, non-input column only) and at the data layer (32 corrupted Master
+rows and 2 corrupted SalesPro cells blanked, the full hold/exclude/clear/annotate chain re-run
+from the corrected state).
+
+**Re-running the improved matcher surfaced 5 genuinely new probable matches** never caught by the
+earlier (weaker) matcher: "JK FRIED CHICKEN", "The Grill Bros" (component-address evidence —
+same premises, different operator), "Grilled Peri Peri Ilford", "Chicken Hut Ilford", "Ben's
+Fried Chicken" (fuzzy-name evidence) — all correctly held and removed from their SalesPro exports.
+
+**Spice Hut and PHAT Buns re-evaluated and cleared** per the owner's explicit item-5 rule (generic
+alias/shared-domain-only evidence, no postcode/phone/address/legal-identity match) — released back
+to Operationally Usable Leads with a permanent, human-readable audit warning on the row. The
+release-gate reconciliation is now override-aware: an explicitly audit-warned release is reported
+as its own distinct measure, never counted as an unresolved leak, never silently hidden either.
+
+**Final reconciliation (255-lead full population):** 20 confirmed found and removed (0 remaining
+anywhere releasable), 12 probable held total — 2 released under explicit owner override, 0
+remaining unaccounted for — 165 cleared, **167 final released leads**.
+
+All 35 `test:lead-production-*` suites (6 new this pass) individually re-run, ALL PASSED; `npm run
+typecheck`/`build` clean. Full technical detail: `docs/10_BUGS_AND_FIXES.md`, `docs/09_DECISIONS.md`,
+`VERIFY_BEFORE_CLAIMING.md` (2026-08-04 second entries). Certificate:
+`/Users/homemac/Downloads/campaign-002-zero-customer-leakage-certificate.json` — PASS across
+Master/CTO/Sales Pro.

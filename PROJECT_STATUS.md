@@ -1518,3 +1518,48 @@ a human decision. The permanent live customer-master pointer remains `pending_ow
 **Next action:** owner reviews the reconciliation table, the entity-resolution configuration audit,
 and the 7 remaining probable/held cases; approves (or rejects) `CustomersProjects81.csv` as the
 permanent live customer-master snapshot before any push.
+
+## Current state — 2026-08-04 (same day, second follow-up: component-address/fuzzy-name matching, canonical-Master annotation, expanded calibration, critical self-inflicted bug found and fixed)
+
+Four owner-directed gaps closed: (1) component-level UK address matching
+(`address-components.ts`) — unit/building-number/street/postcode compared separately, replacing
+whole-string comparison that real data proved was over-matching different building numbers on the
+same street (Kings Diner vs. its old assumed match, 439 vs 453 Downham Way); (2) Damerau-
+Levenshtein fuzzy name matching (`fuzzy-name-match.ts`) — candidate-generation/corroboration-
+support only, never confirms alone; (3) the canonical combined-Master workbook now carries
+structured customer-match evidence on every held/excluded row (`annotate-canonical-master.ts`);
+(4) the calibration set grew from 20 to 103 labelled cases (80 calibration / 23 holdout), 100%
+precision/recall on both subsets.
+
+**Critical self-inflicted bug found and fixed before any release:** the first version of the
+canonical-Master annotation script wrote matched account codes into the "NetSuite Customer Account
+Code" column, which the matcher also reads as an independent decisive matching input — creating a
+feedback loop that silently upgraded probable (and already owner-cleared) leads to CONFIRMED, and
+reached a real SalesPro export CSV before the independent verifier caught it
+(`salesProResult: FAIL`). Fixed at the root (report evidence now uses a dedicated non-input
+column) and at the data layer (32 corrupted Master rows + 2 corrupted SalesPro cells cleaned, the
+full hold/exclude/clear/annotate chain re-run from the corrected state).
+
+Re-running the improved matcher surfaced 5 genuinely new probable matches never caught by the
+earlier matcher run; Spice Hut and PHAT Buns re-evaluated and cleared per the owner's explicit
+rule with a permanent audit warning; the reconciliation gate is now override-aware (an explicit
+release is reported, never silently blocked or silently hidden).
+
+**Final reconciliation (255-lead full population):** 20 confirmed found/removed (0 remaining
+releasable), 12 probable held (2 released under explicit owner override, 0 remaining
+unaccounted for), 165 cleared, **167 final released leads**.
+
+`npm run typecheck`/`build` clean; all 35 `test:lead-production-*` suites (6 new this pass)
+individually re-run, ALL PASSED.
+
+**Commit:** `05d4138` (code/tests/config only), on top of `a21e3de`/`bc9aebd`/`42d8eb7`. Not
+pushed.
+
+**Outstanding:** 12 probable/held cases require a human decision (7 unchanged + 5 newly
+surfaced); the 2 explicit clearances (Spice Hut, PHAT Buns) are recorded with a permanent audit
+warning and await owner sign-off on the underlying policy call, not further algorithmic review.
+The permanent live customer-master pointer remains `pending_owner_review`.
+
+**Next action:** owner reviews the final reconciliation, the entity-resolution documentation, the
+override-released Spice Hut/PHAT Buns decisions, and the 12 held/probable cases; approves (or
+rejects) `CustomersProjects81.csv` as the permanent live customer-master snapshot before any push.

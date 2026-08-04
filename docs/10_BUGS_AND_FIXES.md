@@ -1212,3 +1212,123 @@ ALL PASSED; `npm run typecheck`/`build` clean.
 `scripts/test-lead-production-entity-resolution-calibration.ts`,
 `docs/11_ISSUES_LOG.md` (ISS-0034 follow-up), `docs/09_DECISIONS.md`,
 `VERIFY_BEFORE_CLAIMING.md` (2026-08-04 entry).
+
+## 2026-08-04 (same day, second follow-up) — component-level address matching, fuzzy-name matching, canonical-Master annotation, expanded calibration, and a self-inflicted account-code feedback-loop bug found and fixed before it ever reached a released output
+
+**Four capability gaps closed**, all owner-directed (ISS-0034 follow-up item 2-4, 1):
+
+1. **Component-level address matching** (`scripts/lead-production/address-components.ts`, new):
+   parses unit/shop number, building number, building name, street, locality, town, postcode
+   separately, instead of the prior flat whole-string Jaccard comparison. Real bug fixed while
+   proving it against real data: the real Kings Diner lead (439 Downham Way) and its previously-
+   assumed "same address" customer match (C1409, 453 Downham Way) are at DIFFERENT building
+   numbers on the same street/postcode — the old whole-string comparison over-matched them purely
+   because every other token overlapped. `compareAddressComponents()` now explicitly flags
+   `premisesIdentifierConflict` (same postcode+street, different unit/building number = never a
+   match) vs `compatiblePremises` (still requires name/phone corroboration to confirm, per the
+   owner's "address similarity alone must not confirm" rule). A second real parser bug found via
+   testing: customer address fields (Billing Address 1/2) never included the postcode, so
+   `addressComponents.postcode` was silently always null for every real customer — fixed by
+   appending the already-parsed canonical postcode before parsing.
+
+2. **Fuzzy spelling/name-variation matching** (`scripts/lead-production/fuzzy-name-match.ts`,
+   new): Damerau-Levenshtein edit distance, applied whole-string (joined/split-word tolerant, e.g.
+   "Grill House"/"Grillhouse") and per-token best-match (misspelling tolerant, e.g. "Mohammed
+   Grill"/"Mohamad Grill"), with singular/plural normalisation and a reported-only phonetic key.
+   Never confirms alone — only supports an independent corroborating signal (≥0.85 similarity) or
+   generates its own same-district-gated PROBABLE candidate (≥0.75). Real false positive found and
+   fixed via the expanded calibration set: a single-token candidate name (e.g. "Chelmsford
+   Takeaway" collapses to just "chelmsford" once the generic "takeaway" suffix is stripped)
+   trivially scored a PERFECT token-best-match similarity against ANY customer containing that one
+   word — wrongly confirmed against 3 unrelated Chelmsford-area customers. Fixed by requiring both
+   sides to have ≥2 tokens before trusting the per-token comparison; the whole-string comparison
+   (unaffected) still correctly catches genuine single-token spelling variants like
+   "Rafiques"/"Rafique".
+
+3. **Canonical-Master annotation** (`scripts/lead-production/annotate-canonical-master.ts`, new):
+   corrects a stale "Final Outcome" companion column (rows moved between sheets by the hold/
+   exclude scripts never had this column updated) and adds structured customer-match reporting
+   columns (Matched Customer Name, Matched Customer Account Code(s), Customer Match Evidence,
+   Customer Master Checksum) to every confirmed/probable row in the canonical combined-Master
+   workbook — resolving the owner's flagged ambiguity between "the releasable Usable sheet" and
+   "the canonical audit Master" (the full 7-sheet combined workbook, which already legitimately
+   contains held/excluded rows).
+   **CRITICAL BUG (self-inflicted, found and fixed before reaching any released output):** the
+   first version of this script wrote the matched customer's account code into the EXISTING
+   "NetSuite Customer Account Code" column — the same column `evaluateLeadCustomerPair()` reads as
+   an independent, decisive MATCHING INPUT (an exact match there is an automatic CONFIRM, by
+   design, for leads with a genuinely pre-supplied external account linkage). Writing report
+   evidence into that exact input column created a self-confirming feedback loop: the very next
+   trace run read its own annotation back as if it were independently-supplied evidence, silently
+   upgrading genuinely PROBABLE (and even already explicitly CLEARED) leads to CONFIRMED. Real
+   leads affected: "JK FRIED CHICKEN" and "The Grill Bros" (newly-discovered genuine probable
+   matches, spuriously shown as confirmed), and — more seriously — the already owner-cleared
+   "PHAT Buns - Romford" and "Spice Hut", whose stale annotated account codes survived a status-
+   field patch and (for PHAT Buns specifically, since its match was to a single customer) were
+   subsequently carried into a REAL SalesPro export CSV via `append-leads-to-salespro-export.ts`,
+   where `verify-customer-leakage.ts`'s own independent re-check caught it as a genuine confirmed
+   leak in a real distributable file (`salesProResult: FAIL`) before any release. Fixed by (a)
+   never writing to "NetSuite Customer Account Code" — using a new report-only "Matched Customer
+   Account Code(s)" column instead; (b) blanking the 32 already-corrupted rows in the real
+   workbook and the 2 corrupted SalesPro CSV cells; (c) re-running the full hold/exclude/clear/
+   annotate chain end-to-end from the corrected state, re-verifying `salesProResult: PASS`.
+
+4. **Expanded entity-resolution calibration set** (`scripts/lead-production/generate-expanded-
+   calibration-set.ts`, new): grew the labelled set from 20 to 103 cases (all 20 real confirmed
+   exclusions, all 7 real probable/held cases, 24 real released true-negatives, and 52 synthetic
+   engineered cases covering active/inactive controls, moderate-vs-strong name similarity, joined/
+   split words, legal-name-vs-T/A, same-address-new-operator, reused phone numbers, shared
+   franchise domains, generic-name controls, duplicate NetSuite accounts), split 80 calibration /
+   23 holdout at authoring time. Final result: 100% precision/recall on BOTH subsets, 0 false
+   positives/negatives, thresholds never adjusted after seeing holdout results. 6 real generator-
+   authoring bugs were caught and fixed by the calibration run itself before ever reaching a
+   report (mislabelled expected-difficulty name pairs, a real customer-master alias collision with
+   a synthetic "The Kitchen" test case, an over-optimistic joined-word-confirms expectation,
+   plus the single-token fuzzy false positive described in item 2 above).
+
+**Reconciliation gate made override-aware:** a probable match released under an explicit, owner-
+directed re-evaluation (item 5 below) is not an accidental leak — `generate-entity-resolution-
+audit.ts`'s "remaining in releasable output" gate now excludes leads carrying a "Customer Match
+Audit Warning" from the blocking count, while still reporting them transparently as a distinct,
+separately-counted measure (never silently hidden).
+
+**Two named probable cases re-evaluated and cleared** (owner item 5): Spice Hut (IG1-FA671913—
+only a generic T/A alias shared by 5 unrelated customers, no postcode/phone/address/legal-identity
+match) and PHAT Buns - Romford (RM1-015EC5DD — only a shared franchise domain at a different
+district, no postcode/phone/address/legal-entity match) both meet the owner's explicit clearance
+rule exactly — cleared back to Operationally Usable Leads with an explicit, permanent audit
+warning recorded on the row (`scripts/lead-production/reevaluate-and-clear-probable-matches.ts`,
+new — defensively re-derives full evidence and REFUSES to clear if any stronger signal is found,
+never trusts a hardcoded "safe" list).
+
+**Comprehensive re-hold with the improved matcher:** re-running `hold-probable-customer-matches.ts`
+with the new component-address + fuzzy-name logic surfaced 5 genuinely new probable matches never
+caught by the earlier (weaker) matcher run — "JK FRIED CHICKEN", "The Grill Bros" (both via
+`exact_address_uncertain_operator` — the new component-address logic), "Grilled Peri Peri Ilford",
+"Chicken Hut Ilford", "Ben's Fried Chicken" (all via `fuzzy_name_variation_same_district`) — held
+and removed from their SalesPro exports.
+
+**Final reconciliation (255-lead full population, independently re-checked):** 20 confirmed found
+and removed (0 remaining anywhere releasable), 12 probable held total — 2 released under an
+explicit owner-directed audit-warning override (Spice Hut, PHAT Buns), 0 remaining unaccounted for
+— 165 cleared, 167 final released.
+
+**Verification:** all 35 `test:lead-production-*` suites (6 new this pass) individually re-run,
+ALL PASSED; `npm run typecheck`/`build` clean.
+
+**See also:** `scripts/lead-production/address-components.ts`,
+`scripts/lead-production/fuzzy-name-match.ts`,
+`scripts/lead-production/annotate-canonical-master.ts`,
+`scripts/lead-production/flatten-combined-master-to-csv.ts`,
+`scripts/lead-production/reevaluate-and-clear-probable-matches.ts`,
+`scripts/lead-production/append-leads-to-salespro-export.ts`,
+`scripts/lead-production/generate-expanded-calibration-set.ts`,
+`scripts/lead-production/verify-customer-leakage.ts`,
+`scripts/lead-production/generate-entity-resolution-audit.ts`,
+`scripts/test-lead-production-address-components.ts`,
+`scripts/test-lead-production-fuzzy-name-match.ts`,
+`scripts/test-lead-production-annotate-canonical-master.ts`,
+`scripts/test-lead-production-reevaluate-clear-matches.ts`,
+`scripts/test-lead-production-append-salespro-export.ts`,
+`docs/11_ISSUES_LOG.md` (ISS-0034 follow-up), `docs/09_DECISIONS.md`,
+`VERIFY_BEFORE_CLAIMING.md` (2026-08-04 second entry).
