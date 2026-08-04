@@ -1,0 +1,89 @@
+{
+  "campaignId": "campaign-002-five-district-pilot",
+  "releaseDate": "2026-08-04",
+  "pushedCommitHash": "552e154650aa1afae3e0da21f77660c52e154094",
+  "pushedBranch": "feature/mvp-vertical-slice-001",
+  "pushedRemote": "origin",
+  "commitRangePushed": {
+    "from": "f40e68c407397047ded32aa5dd93670a7c4e63bf",
+    "to": "552e154650aa1afae3e0da21f77660c52e154094",
+    "commitCount": 21
+  },
+  "authoritativeCustomerMaster": {
+    "filename": "CustomersProjects81_raw_snapshot_2026-08-03.csv",
+    "path": "/Users/homemac/Data/aspectlead-lead-production/input/customer-masters/2026-08-03/CustomersProjects81_raw_snapshot_2026-08-03.csv",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1",
+    "customerRows": 8050,
+    "activeCustomers": 4558,
+    "inactiveCustomers": 3492,
+    "pointerFile": "/Users/homemac/Data/aspectlead-lead-production/input/customer-masters/2026-08-03/campaign-002-customer-master-pointer.json",
+    "pointerApprovalStatus": "pending_owner_review"
+  },
+  "customerSuppressionResult": {
+    "confirmedCustomersRemoved": 20,
+    "algorithmicProbableHolds": 10,
+    "ownerHeldOverrides": 1,
+    "ownerReleaseOverrides": 2,
+    "finalReleasedLeads": 167,
+    "ctoColumns": 28,
+    "zeroLeakageCertificateResult": "PASS",
+    "zeroLeakageCertificatePath": "/Users/homemac/Downloads/campaign-002-zero-customer-leakage-certificate.json"
+  },
+  "verification": {
+    "testSuitesPassed": 39,
+    "testSuiteFramework": "npm run test:lead-production-*",
+    "typecheck": "PASS",
+    "build": "PASS"
+  },
+  "generatedArtifacts": [
+    {
+      "path": "/Users/homemac/Downloads/campaign-002-existing-customer-leakage-audit.xlsx",
+      "sha256": "a9aa0b6ea95f0e87adf930d86f1f101b4c0234cc16c07d0621d2b38e6408eb4a"
+    },
+    {
+      "path": "/Users/homemac/Downloads/campaign-002-five-district-pilot-master-combined.xlsx",
+      "sha256": "9e6b8da8938a0187f5b8abcb971ea37c85bdc9f9e59968d6c6c6066ad5ae3f86"
+    },
+    {
+      "path": "/Users/homemac/Downloads/campaign-002-five-district-pilot-master-combined.csv",
+      "sha256": "2501ace3461900677aa56e72321e5e2d2d307d0f6b4af07530c0ae5ab0997c60"
+    },
+    {
+      "path": "/Users/homemac/Downloads/campaign-002-five-district-pilot-owner-review.xlsx",
+      "sha256": "a3cb0807179e4a9ba17a45ea0ecdcb51935bff99011b297e61d5ad81f2a3c923"
+    },
+    {
+      "path": "/Users/homemac/Downloads/campaign-002-five-district-pilot-CTO-final-review.xlsx",
+      "sha256": "bbbcfcb23a1d2d9c8e2d266d953f40d77210a58f9e61be23e206112c741b1d97"
+    },
+    {
+      "path": "/Users/homemac/Downloads/campaign-002-five-district-pilot-CTO-final-review.csv",
+      "sha256": "581d47f3fa5e3ede2a6752b7f6062754f9d7041a6ee4e58523a45d1fe416d57c"
+    },
+    {
+      "path": "/Users/homemac/Downloads/campaign-002-zero-customer-leakage-certificate.json",
+      "sha256": "4f5852fd1add9e9e65b73f1f31e3ab6cb3a9affdd0cb24287cf05fdbf0280019"
+    },
+    {
+      "path": "/Users/homemac/Data/aspectlead-lead-production/output/territories/campaign-002/kunz/exports/cm1-salespro-new-leads.csv",
+      "sha256": "ca05127733e6de1c06885529ef0dd36547f776d3b141ba14d8464767fa6e2942"
+    },
+    {
+      "path": "/Users/homemac/Data/aspectlead-lead-production/output/territories/campaign-002/naseh/exports/ig1-salespro-new-leads.csv",
+      "sha256": "85a9d5fcdf9a2dd6419a7c13856e6d559e9a5c3f0c872ac143dbd280988833d7"
+    },
+    {
+      "path": "/Users/homemac/Data/aspectlead-lead-production/output/territories/campaign-002/tahira/exports/da1-salespro-new-leads.csv",
+      "sha256": "e14eed766a25a487306ae851a07dc002538c4dda7789462045a7e91bf477dec2"
+    },
+    {
+      "path": "/Users/homemac/Data/aspectlead-lead-production/output/territories/campaign-002/hassan/exports/br1-salespro-new-leads.csv",
+      "sha256": "3182c7f9136a0e1b6b1ac161a8e525d41c42a7b41a1810ce4039328628da7f3f"
+    },
+    {
+      "path": "/Users/homemac/Data/aspectlead-lead-production/output/territories/campaign-002/saif/exports/rm1-salespro-new-leads.csv",
+      "sha256": "d857175ce09c5e3883780a4431ed1b022436ad7a13477b1fd9e81887abdfc48d"
+    }
+  ],
+  "note": "Metadata and hashes only \u2014 this file deliberately contains no customer or lead record contents. Generated artifacts listed above remain outside the Git repository (under ~/Downloads and ~/Data/aspectlead-lead-production) and are not tracked."
+}
