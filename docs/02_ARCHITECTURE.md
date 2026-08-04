@@ -54,3 +54,37 @@ The scoring logic and matching rules must be auditable and derived from Magna ev
 ## Recommended build shape
 
 Start with a CLI/batch pipeline and database tables before building UI polish. The dashboard exists to review outputs, not to cosplay as progress while the data layer is still mud.
+
+## Temporary local production storage boundary (recorded 2026-08-04)
+
+The CLI lead-production pipeline currently used for real campaign runs (Kunz campaign-003, Meer
+campaign-004, and any future campaign) writes ALL lead, customer, provider-payload, and generated
+workbook data to a local filesystem root, never to Git:
+
+```
+/Users/homemac/Data/aspectlead-lead-production/
+  input/                    customer masters, group registry, identity indexes
+  campaigns/<campaign-id>/  raw/, checkpoints/<district>/, working/, review/, audit/,
+                            release/, manifests/ — one tree per campaign
+  representatives/<name>/current-release/  final CTO delivery copies only
+```
+
+This is a deliberate, temporary structure for the current single-operator CLI pipeline — not the
+live application's storage design. It is out of scope to redesign or implement here; this section
+only records the boundary so a future migration knows what it is replacing:
+
+- **Structured operational records** (leads, scoring, qualification state, audit trail) will move
+  to **Supabase PostgreSQL**, not local JSON/XLSX checkpoints.
+- **Files and evidence** (raw provider payloads, generated workbooks, screenshots) will move to
+  **private object storage**, not the local filesystem.
+- **Pipeline execution** will run as **background workers** against that database, not as CLI
+  scripts invoked by hand against local directories.
+- **Review and approval** will happen in **application screens**, not by opening generated XLSX
+  files from a local folder.
+- **Releases** will be **immutable online records**, not a `release/` folder plus a manually
+  copied `~/Downloads` convenience copy.
+
+The Git repository (`/Users/homemac/Projects/magna/lead-intelligence-engine`) holds only code,
+configuration, tests, documentation, and metadata-only release manifests (`docs/release-
+manifests/*.json` — hashes and counts, never record contents). Every campaign's actual lead and
+customer data lives exclusively under the local data root above.

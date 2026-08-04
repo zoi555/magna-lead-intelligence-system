@@ -109,7 +109,14 @@ async function main() {
   const rep = findRepresentative(config, representativeName);
   if (!rep) { console.error(`No representative "${representativeName}" found in ${assignmentsPath}.`); process.exit(1); }
 
-  const outRoot = arg("out") ?? `/Users/homemac/Data/aspectlead-lead-production/output/territories/${rep.representative.toLowerCase()}`;
+  // Optional (2026-08-04, post-Kunz/Meer storage restructure): when --campaign-id is supplied
+  // and --out is not, default to the campaign-scoped checkpoints/ root — never a representative
+  // name in the path, so a future campaign never needs a per-rep hardcoded default. Passing
+  // --out explicitly always wins, unchanged from before.
+  const campaignId = arg("campaign-id");
+  const outRoot = arg("out") ?? (campaignId
+    ? `/Users/homemac/Data/aspectlead-lead-production/campaigns/${campaignId}/checkpoints`
+    : `/Users/homemac/Data/aspectlead-lead-production/output/territories/${rep.representative.toLowerCase()}`);
   await fs.mkdir(outRoot, { recursive: true });
   const manifestPath = path.join(outRoot, ".sales-territory-manifest.json");
 

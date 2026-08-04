@@ -1,0 +1,96 @@
+{
+  "campaignId": "campaign-004-meer-full-allocation",
+  "sourceCampaigns": ["campaign-004-meer-full-allocation"],
+  "representative": "Meer",
+  "salesProRepresentativeValue": "Meer  <Hassanmeer.hassaan@magnafoodservice.co.uk>",
+  "regionRoute": "East London",
+  "releaseDate": "2026-08-04",
+  "pushedCommitHash": "a0229fa6472c5f8f91f975cca7e85dca7af9757e",
+  "pushedBranch": "feature/mvp-vertical-slice-001",
+  "pushedRemote": "origin",
+  "commitRangePushed": {
+    "from": "2166794",
+    "to": "a0229fa6472c5f8f91f975cca7e85dca7af9757e",
+    "commitCount": 1
+  },
+  "note_subsequentLocalOnlyChange": "Commit 276dd80 (local-only, not yet pushed as of this manifest) corrects a stale display-only console-log string in generate-master-export.ts (said '129 fields' after the schema had already moved to 134) — no schema or behavioural change, does not affect this release's data.",
+  "authoritativeCustomerMaster": {
+    "filename": "CustomersProjects81_raw_snapshot_2026-08-03.csv",
+    "path": "/Users/homemac/Data/aspectlead-lead-production/input/customer-masters/2026-08-03/CustomersProjects81_raw_snapshot_2026-08-03.csv",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1",
+    "customerRows": 8050,
+    "activeCustomers": 4558,
+    "inactiveCustomers": 3492
+  },
+  "discoveryEndpoint": {
+    "provider": "just_eat",
+    "endpointVersion": "je-enriched-bypostcode-v3-2026-08-04",
+    "adapterVersion": "je-adapter-2.0.0",
+    "note": "Same recovered v3 endpoint used for Kunz's campaign-003 (ISS-0035) — see docs/11_ISSUES_LOG.md."
+  },
+  "territoryResult": {
+    "districtsIncluded": ["CM11", "CM12", "CM13", "CM14", "CM15", "CM16", "CM17", "CM18", "CM19", "CM20", "CM21", "CM22", "CM23", "CM24"],
+    "priorAllocationNote": "Meer's previous, separate, historical territory (TW11-TW20) is immutable and was not touched, rerun, or combined into this release.",
+    "totalCanonicalCandidates": 392,
+    "withinCampaignDuplicatesRemoved": 20,
+    "crossCampaignDuplicatesRemoved": 0,
+    "crossCampaignDedupSourcesCompared": ["campaign-002-five-district-pilot", "campaign-003-kunz-full-allocation", "meer-tw11-tw20-historical"]
+  },
+  "customerSuppressionResult": {
+    "confirmedCustomerExclusions": 3,
+    "algorithmicallyClearedProbableMatchLeads": 3,
+    "algorithmicallyClearedUnderlyingCandidateRecords": 3,
+    "unresolvedProbableMatchLeadsRemainingReleased": 0,
+    "ownerOverrides": 0
+  },
+  "releaseComposition": {
+    "finalReleasedLeads": 148,
+    "ordinaryLeads": 142,
+    "keyAccounts": 6,
+    "hotLeads": 33,
+    "warmLeads": 115,
+    "standardOrColdLeads": 0,
+    "heldReview": 31,
+    "hardRejects": 64,
+    "excludedGroups": 65,
+    "commercialReviewExclusions": 45,
+    "businessCategoryExclusions": 16,
+    "ctoColumns": 28
+  },
+  "reviewActivityClassification": {
+    "terminology": "Google Review Activity (never business/purchasing/wholesale volume) and Just Eat Rating Activity, always kept separate, never summed",
+    "googleReviewActivityBands": {
+      "Low_0_49": 28,
+      "Moderate_50_149": 51,
+      "Strong_150_399": 46,
+      "VeryStrong_400_999": 13,
+      "Exceptional_1000plus": 10
+    },
+    "justEatRatingActivity": {
+      "note": "Captured as a separate, versioned evidence field for the first time this campaign (source=just_eat, endpoint version je-enriched-bypostcode-v3-2026-08-04) — never overwrites or sums with Google Review Count.",
+      "releasedLeadsWithJustEatRatingCountPresent": 142
+    },
+    "highVolumeOperationRule": "direct catering/multi-site evidence, OR 2+ independent supporting signals — review band alone (Google or Just Eat) never sufficient"
+  },
+  "verification": {
+    "testSuitesPassed": 41,
+    "testFramework": "npm run test:lead-production-* + test:je-stage1 + test:je-enriched-adapter",
+    "typecheck": "PASS",
+    "build": "PASS",
+    "zeroLeakageCertificateResult": "PASS"
+  },
+  "generatedArtifacts": [
+    { "path": "/Users/homemac/Downloads/meer-full-allocation-master-combined.xlsx", "sha256": "08de7dfcab3439080a7696402463b6a476786a0304991a5f43e176faf1e5ba51", "bytes": 4010949 },
+    { "path": "/Users/homemac/Downloads/meer-full-allocation-master-combined.csv", "sha256": "130ee0bcdbe1ab5852c5ef3d3e8b3f7040166086a87accb7c14879fafd54b377", "bytes": 919371 },
+    { "path": "/Users/homemac/Downloads/meer-full-allocation-owner-review.xlsx", "sha256": "fdd1fbd11589bedd1a32d214fdfc97eee5655e70e58e69d7d2c2fbdb190a54be", "bytes": 836038 },
+    { "path": "/Users/homemac/Downloads/meer-full-allocation-CTO-final-review.xlsx", "sha256": "3f62fa639db485ddf6c28346338664a520be11a61982210ba71e002aed08538d", "bytes": 254103 },
+    { "path": "/Users/homemac/Downloads/meer-full-allocation-CTO-final-review.csv", "sha256": "3d835302534fa60a46bdf3eba1299f57d79e02c98afd37c6d355b5842f7e73a6", "bytes": 103713 },
+    { "path": "/Users/homemac/Downloads/meer-full-allocation-customer-leakage-audit.xlsx", "sha256": "e126edc19352e45f288e6a331a950034644d5b092f306c5c6a512c13d7fc21f7", "bytes": 84011 },
+    { "path": "/Users/homemac/Downloads/meer-full-allocation-zero-leakage-certificate.json", "sha256": "932c67077d2fb90b8ca8100e835b931eb3891d658becd18a35394cfa8329b88f", "bytes": 3136 }
+  ],
+  "campaignReleaseDirectoryVerified": {
+    "path": "/Users/homemac/Data/aspectlead-lead-production/campaigns/campaign-004-meer-full-allocation/release/",
+    "note": "All 7 files copied from Downloads and independently re-hashed — byte-identical (see 2026-08-04 storage-restructure pass, docs/15_AI_WORK_LOG.md)."
+  },
+  "note": "Metadata and hashes only — this file deliberately contains no customer or lead record contents. Generated artifacts listed above remain outside the Git repository (under ~/Downloads and the campaign data root) and are not tracked."
+}

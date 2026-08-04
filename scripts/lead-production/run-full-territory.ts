@@ -238,7 +238,16 @@ async function main() {
   const assignmentsPath = arg("assignments");
   const customers = arg("customers");
   const registry = arg("registry");
-  const outArg = arg("out") ?? `/Users/homemac/Data/aspectlead-lead-production/output/${territory.toLowerCase()}`;
+  // Optional (2026-08-04, post-Kunz/Meer storage restructure): when --campaign-id is supplied
+  // and --out is not, default to the campaign-scoped checkpoints/ layout under the temporary
+  // pipeline's data root — never a representative name in the path, so this generalises across
+  // any future campaign without a hardcoded per-rep default. Passing --out explicitly (as every
+  // campaign-003/004 district run this session did) always wins, unchanged from before — this is
+  // additive, not a behaviour change for any existing invocation.
+  const outCampaignId = arg("campaign-id");
+  const outArg = arg("out") ?? (outCampaignId
+    ? `/Users/homemac/Data/aspectlead-lead-production/campaigns/${outCampaignId}/checkpoints/${territory.toLowerCase()}`
+    : `/Users/homemac/Data/aspectlead-lead-production/output/${territory.toLowerCase()}`);
   const live = flag("live");
   const dryRun = flag("dry-run") || (!live);
   const resume = flag("resume");

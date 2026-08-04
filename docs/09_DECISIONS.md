@@ -1390,3 +1390,37 @@ reporting them as their own separate, always-visible reconciliation measure.
 `scripts/lead-production/annotate-canonical-master.ts`,
 `scripts/lead-production/reevaluate-and-clear-probable-matches.ts`,
 `scripts/lead-production/generate-expanded-calibration-set.ts`.
+
+## 2026-08-04 — post-Kunz/Meer storage restructure: campaign-scoped data root, default paths
+
+**Decision:** the temporary local pipeline's authoritative data root
+(`/Users/homemac/Data/aspectlead-lead-production`) now has a standard per-campaign layout —
+`campaigns/<campaign-id>/{configuration,raw,checkpoints/<district>,working,review,audit,release,
+manifests}/` — and a `representatives/<name>/current-release/` folder holding only the final CTO
+delivery copies (`final-review.xlsx`/`.csv`). Kunz's (campaign-003) and Meer's (campaign-004)
+already-approved 7-file releases were copied (not regenerated) from `~/Downloads` into their
+campaign `release/` directories; every copy's SHA-256 was independently re-verified against the
+Downloads source and, for Kunz, against the already-committed release manifest — all matched
+exactly. Meer's own metadata-only release manifest (`docs/release-manifests/campaign-004-meer-
+full-allocation-2026-08-04.json`) was created following the same shape as Kunz's.
+
+`run-full-territory.ts` and `run-sales-territory.ts` gained an optional `--campaign-id=` flag:
+when supplied and `--out` is not, the default output path now uses this campaign-scoped layout —
+never a representative name in the default path, so no future campaign needs its own hardcoded
+default. Passing `--out` explicitly (as every campaign-003/004 district run this session did)
+is unchanged and always wins; existing invocations are unaffected. `docs/02_ARCHITECTURE.md` now
+records the boundary between this temporary local structure and the future live application
+(Supabase Postgres + private object storage + background workers + application review screens +
+immutable online release records) — that live design was explicitly not implemented here.
+
+**Reason:** owner instruction — keep the Git repo free of production data permanently, not just
+per-campaign, and stop hardcoding representative names into default pipeline output paths now
+that more than one campaign/representative exists.
+
+**Verification:** all 41 `test:lead-production-*`/`test:je-*` suites, typecheck, build all pass
+after the two script changes; `test:lead-production-campaign-territory` explicitly re-confirms no
+prior campaign's outputs or ownership records changed.
+
+**See also:** `docs/02_ARCHITECTURE.md` (Temporary local production storage boundary),
+`docs/release-manifests/campaign-004-meer-full-allocation-2026-08-04.json`,
+`scripts/lead-production/run-full-territory.ts`, `scripts/lead-production/run-sales-territory.ts`.

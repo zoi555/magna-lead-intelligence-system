@@ -1550,3 +1550,31 @@ separate evidence field (source + retrieval date retained, displayed separately 
 reviews, used only as supporting consumer-activity evidence, never alone as proof of wholesale
 purchasing volume, never summed with Google's count). Not implemented this pass — explicitly
 deferred with owner approval; does not block the Kunz release.
+
+## ISS-0036 — `Lead_Data_Schema_and_SalesPro_Mapping_v1.xlsx`'s Pipeline Stage allowed-values list is stale against the locked operational value (2026-08-04)
+
+**Non-blocking, documentation-only.** While independently re-verifying Meer's CTO "Lead Type"
+dropdown against the primary source workbook (`~/Downloads/Lead_Data_Schema_and_SalesPro_
+Mapping_v1.xlsx`), also checked its "Pipeline Status/Stage" entry against the actual value written
+into every released row. The workbook's three sheets ("Master Field Schema", "CTO Existing
+Mapping", "Final SalesPro Schema") all still list `Allowed Values: "1. Qualification | 2.
+Contacting | 3. Engaged | 4. Opportunity | 5. Won | 6. Lost"`, with `Example Value: "1.
+Qualification"` — matching `CTO_Lead_Import_Template.xlsx`'s own sample row. The pipeline's
+actual, locked, operational default is `"1. Follow Up"` (`docs/09_DECISIONS.md`, "Sales Pro
+'Business Types' column repointed" entry, 2026-08-04: *"`pipeline_stage`'s default changed from
+`\"1. Qualification\"` to `\"1. Follow Up\"` (locked instruction)"*) — already implemented in
+`generate-cto-final-review.ts` and already used identically and correctly in every row of both
+Kunz's and Meer's delivered CTO exports. Confirmed NOT a defect in either release.
+
+**What's actually wrong**: the mapping workbook itself was never updated after that locked
+instruction, so anyone consulting it directly (rather than `docs/09_DECISIONS.md` or the code)
+would see a stale, contradicted allowed-values list for this one field.
+
+**Action**: none taken against Kunz or Meer — both releases are correct and unchanged. Recording
+this here as a documentation-alignment item: before the next representative's CTO export is
+generated, either (a) obtain an updated `Lead_Data_Schema_and_SalesPro_Mapping_v1.1.xlsx` from the
+owner reflecting `"1. Follow Up"` as the approved default, or (b) get explicit confirmation that
+the workbook is intentionally left stale and `docs/09_DECISIONS.md` is the sole source of truth
+for this field going forward. Either way, do not let a future validation pass treat the workbook's
+literal `Allowed Values` cell as authoritative for `pipeline_stage` without cross-checking
+`docs/09_DECISIONS.md` first.

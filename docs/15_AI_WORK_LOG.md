@@ -1373,3 +1373,57 @@ stopped per explicit instruction. Full detail: `docs/10_BUGS_AND_FIXES.md`,
    `PROJECT_STATUS.md`. Did NOT commit or push this pass's 2 code changes — reporting them first,
    per the stop condition. Did not start Meer or any other representative, did not merge, did not
    import the CTO file.
+
+## 2026-08-04 (same day) — full Meer campaign-004 run (CM11-CM24), CTO Lead Type/dropdown re-verification, post-campaign storage restructure
+
+1. Committed and pushed the verified Just Eat rating-count implementation + campaign-004 config
+   (commit `a0229fa`) after a full backward-compatibility check (campaign-002/003 workbooks still
+   readable, 129 pre-existing schema fields unchanged, Kunz's 121-lead release untouched, all 41
+   suites/typecheck/build clean). Verified local=remote HEAD post-push.
+2. Ran all 14 Meer districts (CM11-CM24) live end to end: Just Eat v3 discovery (1766 outlets
+   total, 0 failed queries across every district) -> full 8-stage enrichment via
+   `run-full-territory.ts --live`, one district checkpointed before the next began. 392 Phase 1
+   candidates, invariant balanced in every district.
+3. Consolidated via `generate-master-export.ts --territory-manifest=` (built fresh, with
+   `salesTerritory: "East London"` set directly this time — the CLI-flag-override gotcha from
+   Kunz's run was avoided by construction) + a merged 413-row cross-campaign historical reference
+   (campaign-002 + campaign-003-Kunz + Meer's own historical TW11-TW20 "usable leads" sheets) for
+   the dedup pass. Cross-district dedup: 20 removed (392->372). Cross-campaign dedup: 0 found —
+   structurally guaranteed, no district overlap with any prior campaign.
+4. Independent leakage verifier found, on the first pass, 1 confirmed leak (exact-phone match)
+   and 5 unresolved probable leads (exact-address/uncertain-operator or uncorroborated-alias
+   evidence) still sitting in the released population — a real instance of the same "probable/
+   unresolved must not remain released" rule from Kunz's Kaspa's case. Applied a targeted
+   correction (exclude the 1 confirmed match; hold the 5 unresolved leads; retain 3 independently
+   algorithmically-cleared leads with an explicit audit-warning annotation, matching the Kaspa's
+   precedent) — released population corrected 154 -> 148. Re-ran the verifier: PASS (Master PASS,
+   CTO PASS, 0 confirmed, 0 unresolved).
+5. Found and fixed one real, minor defect while validating: `generate-master-export.ts`'s startup
+   console message still said "129 fields" though the schema/header comment already said 134 —
+   display-only, no behavioural change (commit `276dd80`, pushed as part of this pass's cleanup).
+6. On explicit request, independently re-verified the CTO's "Lead Type" field against the
+   primary-source workbook (`Lead_Data_Schema_and_SalesPro_Mapping_v1.xlsx`, 3 sheets) and the
+   live `CTO_Lead_Import_Template.xlsx`'s own header row (not the JSON config transcription, not
+   Kunz precedent) — confirmed "Key Account" is a genuine existing, approved CTO dropdown value;
+   no correction needed. While validating "all dropdown values approved" also independently
+   confirmed the "1. Follow Up" Pipeline Status/Stage value (which the schema workbook's own
+   allowedValues list doesn't include) is a deliberate, owner-locked override already recorded in
+   `docs/09_DECISIONS.md` and already used identically in Kunz's delivered CTO file — not a defect.
+7. Produced all 7 Meer files at `/Users/homemac/Downloads/meer-full-allocation-*`. Final
+   population: 372 candidates, 148 released (142 ordinary + 6 key accounts, 33 Hot/115 Warm),
+   3 confirmed customer exclusions, 0 unresolved probable, certificate PASS.
+8. Post-campaign storage restructure: created the standard `campaigns/<id>/{configuration,raw,
+   checkpoints/<district>,working,review,audit,release,manifests}/` layout under the temporary
+   pipeline's data root for both campaign-003 and campaign-004; copied (never regenerated) the 14
+   approved Kunz+Meer release files into their respective `release/` directories and independently
+   re-hashed every copy against its Downloads source (all byte-identical) and, for Kunz, against
+   the already-committed release manifest (all matched). Created Meer's own metadata-only release
+   manifest. Created `representatives/{kunz,meer}/current-release/` holding only
+   `final-review.xlsx`/`.csv` copies of the CTO export. Added an optional `--campaign-id=` default
+   to `run-full-territory.ts`/`run-sales-territory.ts` (never a hardcoded representative name;
+   explicit `--out=` always wins, unchanged) and recorded the temporary-vs-future-live-app storage
+   boundary in `docs/02_ARCHITECTURE.md` — no live storage architecture implemented, by design.
+9. All 41 suites, typecheck, build clean throughout. Did not rerun any district, make any provider
+   call, alter released membership, or touch the two pre-existing untracked scripts. Did not start
+   Naseh or any other representative, did not import the CTO file into any external system, did
+   not merge, did not delete the Downloads copies.
