@@ -152,7 +152,7 @@ async function main() {
     // as usable because the raw-string separator regexes didn't consume the "®" symbol after the
     // brand word — now correctly caught as a Commercial Review Exclusion (36 -> 35).
     assert(usableRows.length === 35, `Operationally Usable Leads has exactly 35 rows (got ${usableRows.length}) — down from 36 ("Chaiiwala® - Southall" now correctly caught by the trademark-symbol brand-matching fix)`);
-    assert(usableRows.length > 0 && Object.keys(usableRows[0]).length === 129, `every usable row has exactly 129 fields (v2 schema: 107 v1 + 22 new) (got ${Object.keys(usableRows[0] ?? {}).length})`);
+    assert(usableRows.length > 0 && Object.keys(usableRows[0]).length === 134, `every usable row has exactly 134 fields (v2 schema: 107 v1 + 22 (2026-08-02) + 5 Just Eat rating-count fields (2026-08-04)) (got ${Object.keys(usableRows[0] ?? {}).length})`);
     const premiumRows = XLSX.utils.sheet_to_json(wb.Sheets["Premium Level 0"]) as any[];
     assert(premiumRows.length === 24, `Premium Level 0 has exactly 24 rows (got ${premiumRows.length}) — down from 25 ("Chaiiwala® - Southall" moved to Commercial Review Exclusions)`);
     const releasableRows = XLSX.utils.sheet_to_json(wb.Sheets["Releasable Level 1"]) as any[];

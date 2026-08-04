@@ -13,6 +13,16 @@ export interface OperationalCandidate {
   companyNumber: string | null; // always null today — JE has no Companies House linkage yet (pre-enrichment)
   website: string | null;       // always null today — no website field captured yet
   sources: { source: string; sourceOutletId: string }[];
+  // Just Eat rating-count evidence (owner-decision review, 2026-08-04) — captured separately from
+  // Google's own review count (resolved much later, at the Google enrichment stage). Never
+  // summed/combined with Google's figure; supporting consumer-activity evidence only, never
+  // itself sufficient for high-volume operation / Key Account / Hot Lead (see
+  // master-field-resolver.ts's isHighVolumeOperation, which intentionally never reads this field).
+  // Optional — every existing construction site across the codebase predates this field; treated
+  // as null when absent (never fabricated as a distinct "explicitly checked, found none" state).
+  justEatRatingCount?: number | null;
+  justEatRatingAverage?: number | null;
+  justEatRatingRetrievedAt?: string | null;
 }
 
 // The ONLY three approved operational outcomes a customer status may map to, plus the sentinel

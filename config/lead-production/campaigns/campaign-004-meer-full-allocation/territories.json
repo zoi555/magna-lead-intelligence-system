@@ -1,0 +1,44 @@
+{
+  "campaignId": "campaign-004-meer-full-allocation",
+  "campaignVersion": "v1",
+  "effectiveDate": "2026-08-04",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-04 (clarified after an explicit territory-conflict check — see resolutionNote below, mirroring the same conflict/resolution pattern found and resolved for Kunz's campaign-003)",
+  "description": "Meer's first full-territory production run. Covers his CURRENT (forward-going, as of 2026-08-04) postcode allocation: CM11-CM24 (14 districts). None of these districts have been previously piloted under any earlier campaign — all 14 are newly discovered and processed under this campaign.",
+  "resolutionNote": "A genuine conflict was found during offline preflight and resolved with the owner on 2026-08-04, the same shape of conflict already resolved for Kunz (CM0-CM9 vs the stored TW1-TW10). config/lead-production/sales-territories-v2.json records Meer's ORIGINAL, already-completed prior campaign as TW11-TW20. The owner confirmed on 2026-08-04 that CM11-CM24 is Meer's CURRENT territory allocation and SUPERSEDES TW11-TW20 for all NEW campaigns going forward. TW11-TW20's historical configuration, outputs, assignments, and provenance in sales-territories-v2.json and any output/territories/meer/ directory are explicitly NOT modified, superseded, reassigned, deleted, or reprocessed by this file or this campaign — they remain the immutable historical record of Meer's completed prior campaign. TW11-TW20 must never be rerun and must never be treated as part of this campaign's final Meer output.",
+  "representative": {
+    "internalName": "Meer",
+    "role": "telesales",
+    "salesProRepresentativeValue": "Meer  <Hassanmeer.hassaan@magnafoodservice.co.uk>",
+    "regionRoute": "East London",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "description": "Meer's complete current postcode allocation — all newly run under this campaign (no prior-campaign district to reuse, unlike Kunz's CM1).",
+    "postcodeDistricts": ["CM11", "CM12", "CM13", "CM14", "CM15", "CM16", "CM17", "CM18", "CM19", "CM20", "CM21", "CM22", "CM23", "CM24"],
+    "districtCount": 14
+  },
+  "alreadyCompletedElsewhere": {
+    "description": "None — every district in this campaign is new. TW11-TW20 (Meer's previous, separate, historical allocation) is NOT part of this campaign's output in any form.",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "description": "The ONLY districts campaign-004 itself runs live discovery/enrichment against. Processed sequentially, one checkpointed before the next begins.",
+    "postcodeDistricts": ["CM11", "CM12", "CM13", "CM14", "CM15", "CM16", "CM17", "CM18", "CM19", "CM20", "CM21", "CM22", "CM23", "CM24"],
+    "districtCount": 14,
+    "processingOrder": ["CM11", "CM12", "CM13", "CM14", "CM15", "CM16", "CM17", "CM18", "CM19", "CM20", "CM21", "CM22", "CM23", "CM24"]
+  },
+  "explicitlyExcluded": {
+    "description": "Fail-closed exclusion list — this campaign must refuse to process any district not in newDistrictsForThisCampaign above, and must never touch these.",
+    "cm10": "Not part of Meer's allocation — belongs to a different representative/campaign scope (CM0-CM9 is Kunz's own campaign-003 allocation).",
+    "cm25AndAbove": "Not listed in currentFullAllocation — excluded by construction.",
+    "tw11ThroughTw20": "Meer's previous, already-completed, historical territory (sales-territories-v2.json). Immutable. Never rerun, reassigned, or included in this campaign's output.",
+    "anyOtherRepresentativesDistricts": "Out of scope for this campaign entirely — including CM0-CM9, which belongs to Kunz's campaign-003, never Meer's."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04 — see docs/11_ISSUES_LOG.md ISS-0035)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"],
+    "explicitlyNotUsedForDiscovery": ["Uber Eats", "Deliveroo", "any other unapproved discovery source"]
+  }
+}

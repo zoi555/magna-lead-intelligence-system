@@ -187,6 +187,51 @@ async function main() {
   assert(isHighVolumeOperation({ hasMajorCateringEvidence: false, hasMultiSiteEvidence: false, hasExceptionalFinancials: true, reviewVolumeBand: "Very Strong" }) === true, "Very Strong review band PLUS exceptional financials (2 independent signals) together ARE sufficient");
   assert(isHighVolumeOperation({ hasMajorCateringEvidence: false, hasMultiSiteEvidence: false, hasExceptionalFinancials: true, reviewVolumeBand: "Moderate" }) === false, "exceptional financials alone (Moderate review band does not count as a supporting signal) is NOT sufficient — only 1 real signal");
 
+  console.log("\n15. Just Eat rating-count evidence — SEPARATE from Google, never overwritten, never summed (owner-decision review, before-Meer requirement, 2026-08-04):");
+  const r15a = resolveMasterFields(mkDossier({
+    google_rating: 4.2, google_review_count: 126,
+    just_eat_rating_average: 4.8, just_eat_rating_count: 2716, just_eat_rating_source: "just_eat",
+    just_eat_rating_retrieved_at: "2026-08-04T10:32:01.131Z", just_eat_endpoint_version: "je-enriched-bypostcode-v3-2026-08-04",
+  }), CTX);
+  assert(r15a.fields.google_review_count === 126, `Google review count is untouched (got ${r15a.fields.google_review_count})`);
+  assert(r15a.fields.just_eat_rating_count === 2716, `Just Eat rating count is retained as its own field (got ${r15a.fields.just_eat_rating_count})`);
+  assert(r15a.fields.google_review_count !== r15a.fields.just_eat_rating_count, "Google and Just Eat counts remain two genuinely separate values, never the same field or overwritten into each other");
+  assert(r15a.fields.just_eat_rating_average === 4.8 && r15a.fields.google_rating === 4.2, "Google rating and Just Eat rating average are two separate, never-overwritten fields");
+  assert(r15a.fields.just_eat_rating_source === "just_eat", "Just Eat rating source is recorded");
+  assert(r15a.fields.just_eat_rating_retrieved_at === "2026-08-04T10:32:01.131Z", "Just Eat rating retrieval timestamp is retained");
+  assert(r15a.fields.just_eat_endpoint_version === "je-enriched-bypostcode-v3-2026-08-04", "Just Eat provider endpoint/schema version is retained for audit traceability");
+  const note2Text15a = r15a.fields.note_2 as string;
+  assert(note2Text15a.includes("Just Eat Rating Activity: Exceptional (2716 Just Eat ratings)"), `Note 2 reports Just Eat rating activity under its own distinct label, banded (got: ${note2Text15a})`);
+  assert(note2Text15a.includes("Google Review Activity: Moderate (126 Google reviews)"), `Note 2 also reports Google review activity separately, under its own label (got: ${note2Text15a})`);
+  for (const forbidden of ["wholesale volume", "business volume", "purchasing volume"]) {
+    assert(!note2Text15a.toLowerCase().includes(forbidden), `Note 2 never labels either field "${forbidden}"`);
+  }
+
+  console.log("\n16. A genuinely nonsensical combined-sum check — proves the code path never adds the two counts together anywhere:");
+  // If Google (126) and Just Eat (2716) were ever summed, the combined figure (2842) would appear
+  // somewhere in the output; it must not.
+  const wholeOutput15 = JSON.stringify(r15a.fields);
+  assert(!wholeOutput15.includes("2842"), "the summed figure (126 + 2716 = 2842) never appears anywhere in the resolved Master fields");
+
+  console.log("\n17. A high Just Eat rating count ALONE — however large — remains insufficient for Hot Lead / Key Account / high-volume operation (mirrors the Google-alone rule exactly):");
+  const r17a = resolveMasterFields(mkDossier({
+    just_eat_rating_count: 3683, just_eat_rating_average: 5, google_review_count: null,
+  }, { qualificationStatus: "qualified", finalLevel: "level_0" }), CTX);
+  assert(r17a.fields.lead_urgency === "Warm Lead", `an Exceptional Just Eat rating count (3683) alone, with no Google evidence and no other signal, does NOT make a lead Hot (got "${r17a.fields.lead_urgency}")`);
+  assert(r17a.fields.key_account_indicator === "No", "a high Just Eat rating count alone does not make a lead a Key Account either (Key Account requires score>=80 + both-channel qualification, never review-count-derived)");
+
+  console.log("\n18. Multiple independent commercial/operational signals may still support Hot even when the Just Eat rating count is high (the count itself just never counts as one of those signals):");
+  const r18a = resolveMasterFields(mkDossier({
+    just_eat_rating_count: 3683, cuisine_service_model: { cuisineTags: [], serviceModel: { catering: { value: true, evidenceText: null, confidence: "medium" } } },
+  }, { qualificationStatus: "qualified" }), CTX);
+  assert(r18a.fields.lead_urgency === "Hot Lead", `direct catering evidence still makes a lead Hot regardless of a high Just Eat rating count sitting alongside it (got "${r18a.fields.lead_urgency}")`);
+
+  console.log("\n19. Missing Just Eat rating count is handled honestly — null, never fabricated, never a 0 that could be misread as 'checked, found zero':");
+  const r19a = resolveMasterFields(mkDossier({ google_review_count: 200 }), CTX);
+  assert(r19a.fields.just_eat_rating_count === null && r19a.fields.just_eat_rating_average === null, `no Just Eat data available -> both fields null, never guessed or defaulted to 0 (got count=${r19a.fields.just_eat_rating_count}, average=${r19a.fields.just_eat_rating_average})`);
+  assert(r19a.fields.just_eat_rating_source === null, "no Just Eat source recorded when there is no Just Eat data");
+  assert(!(r19a.fields.note_2 as string | null)?.includes("Just Eat Rating Activity"), "Note 2 never mentions Just Eat rating activity when there is none to report");
+
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);
   process.exit(fails === 0 ? 0 : 1);
 }

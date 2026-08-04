@@ -1,4 +1,5 @@
-// Milestone 3 — the authoritative Master exporter (129 fields as of the v2 schema, 2026-08-02).
+// Milestone 3 — the authoritative Master exporter (134 fields as of the v2 schema — 107 v1 +
+// 22 (2026-08-02) + 5 Just Eat rating-count evidence fields (2026-08-04)).
 // Read-only; makes no external
 // call; never modifies any checkpoint it reads. Reuses candidate-dossier.ts (the same join
 // already accepted for the UB1 release package) and master-field-resolver.ts for field mapping

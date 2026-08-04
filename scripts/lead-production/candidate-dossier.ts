@@ -9,6 +9,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { parseCsvObjects } from "./csv";
 import { isValidUkPhone, resolveValidUkPhone } from "./normalize";
+import { JUST_EAT_ENDPOINT_VERSION } from "../../src/lib/sources/just-eat";
 
 async function readJson(p: string): Promise<any> { return JSON.parse(await fs.readFile(p, "utf8")); }
 async function readCsvRows(p: string): Promise<Record<string, string>[]> { return (await parseCsvObjects(await fs.readFile(p, "utf8"))).rows; }
@@ -180,6 +181,14 @@ export async function loadCandidateDossiers(dirs: DossierCheckpointDirs): Promis
       website_closure_evidence: website?.closureEvidence?.value ?? null,
       google_place_id: bestGoogle?.placeId ?? null, google_business_status: bestGoogle?.businessStatus ?? null,
       google_rating: bestGoogle?.rating ?? null, google_review_count: bestGoogle?.reviewCount ?? null, google_outcome: googleOutcome,
+      // Just Eat rating-count evidence (owner-decision review, 2026-08-04) — from Phase 1's own
+      // candidate_source_links join (never re-derived here), NEVER overwritten by or summed with
+      // google_review_count above. Supporting consumer-activity evidence only — deliberately never
+      // read by isHighVolumeOperation()/urgency scoring in master-field-resolver.ts.
+      just_eat_rating_count: p1?.justEatRatingCount ?? null, just_eat_rating_average: p1?.justEatRatingAverage ?? null,
+      just_eat_rating_retrieved_at: p1?.justEatRatingRetrievedAt ?? null,
+      just_eat_rating_source: p1?.justEatRatingCount != null ? "just_eat" : null,
+      just_eat_endpoint_version: p1?.justEatRatingCount != null ? JUST_EAT_ENDPOINT_VERSION : null,
       companies_house_number: profile?.company_number ?? (chDecisive ? ch.plausibleCompanies?.[0]?.companyNumber ?? null : null),
       companies_house_status: chDecisive ? (profile?.company_status ?? ch.companiesHouseStatus ?? null) : null,
       incorporation_date: profile?.incorporation_date ?? null,

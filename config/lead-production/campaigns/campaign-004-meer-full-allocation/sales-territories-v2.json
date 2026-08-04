@@ -1,0 +1,15 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 14,
+  "representatives": [
+    {
+      "representative": "Meer",
+      "role": "telesales",
+      "salesTerritory": "CM11-CM24",
+      "postcodeDistricts": ["CM11", "CM12", "CM13", "CM14", "CM15", "CM16", "CM17", "CM18", "CM19", "CM20", "CM21", "CM22", "CM23", "CM24"],
+      "districtCount": 14,
+      "mapsRequired": false
+    }
+  ]
+}

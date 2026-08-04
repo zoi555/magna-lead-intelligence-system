@@ -20,7 +20,7 @@ export interface OperationalCandidate {
   confidence: number | null;
   firstSeen: string | null;
   lastSeen: string | null;
-  sources: { source: string; sourceOutletId: string; rating: number | null; reviewCount: number | null; cuisines: string[] }[];
+  sources: { source: string; sourceOutletId: string; rating: number | null; reviewCount: number | null; cuisines: string[]; observedAt: string | null }[];
 }
 
 /** Every consolidated_candidates row for a run that is currently geography_status='valid_geography'.
@@ -30,21 +30,21 @@ export async function fetchOperationalCandidatesForRun(tenantId: string, runId: 
   const db = createServiceClient();
   const res = await db
     .from("consolidated_candidates")
-    .select("id,name,brand,postcode,phone,latitude,longitude,match_status,confidence,first_seen,last_seen,candidate_source_links(source,source_outlet_id,rating,review_count,cuisines)")
+    .select("id,name,brand,postcode,phone,latitude,longitude,match_status,confidence,first_seen,last_seen,candidate_source_links(source,source_outlet_id,rating,review_count,cuisines,observed_at)")
     .eq("tenant_id", tenantId)
     .eq("run_id", runId)
     .eq("geography_status", "valid_geography")
     .order("last_seen", { ascending: false });
   if (res.error) throw new Error(`fetchOperationalCandidatesForRun: ${JSON.stringify(res.error)}`);
 
-  type Row = { id: string; name: string; brand: string | null; postcode: string | null; phone: string | null; latitude: number | null; longitude: number | null; match_status: string; confidence: number | null; first_seen: string | null; last_seen: string | null; candidate_source_links: { source: string; source_outlet_id: string; rating: number | null; review_count: number | null; cuisines: unknown }[] };
+  type Row = { id: string; name: string; brand: string | null; postcode: string | null; phone: string | null; latitude: number | null; longitude: number | null; match_status: string; confidence: number | null; first_seen: string | null; last_seen: string | null; candidate_source_links: { source: string; source_outlet_id: string; rating: number | null; review_count: number | null; cuisines: unknown; observed_at: string | null }[] };
   return ((res.data ?? []) as unknown as Row[]).map((r) => ({
     id: r.id, name: r.name, brand: r.brand, postcode: r.postcode, phone: r.phone,
     latitude: r.latitude, longitude: r.longitude, matchStatus: r.match_status, confidence: r.confidence,
     firstSeen: r.first_seen, lastSeen: r.last_seen,
     sources: (r.candidate_source_links ?? []).map((l) => ({
       source: l.source, sourceOutletId: l.source_outlet_id, rating: l.rating, reviewCount: l.review_count,
-      cuisines: Array.isArray(l.cuisines) ? (l.cuisines as string[]) : [],
+      cuisines: Array.isArray(l.cuisines) ? (l.cuisines as string[]) : [], observedAt: l.observed_at ?? null,
     })),
   }));
 }

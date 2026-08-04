@@ -102,6 +102,11 @@ export async function writeAuditOutputs(outDir: string, processed: ProcessedCand
     preliminaryStatus: p.preliminaryStatus, group: p.group, assignedTerritory: p.assignedTerritory,
     assignedSalesperson: p.assignedSalesperson, rejection: p.rejection,
     normalisedName: p.match.normalisedName, normalisedPostcode: p.match.normalisedPostcode, normalisedPhone: p.match.normalisedPhone,
+    // Just Eat rating-count evidence (owner-decision review, 2026-08-04) — carried through
+    // unchanged from the candidate's own just_eat source link. Never derived, never combined
+    // with any other source's rating.
+    justEatRatingCount: p.match.candidate.justEatRatingCount, justEatRatingAverage: p.match.candidate.justEatRatingAverage,
+    justEatRatingRetrievedAt: p.match.candidate.justEatRatingRetrievedAt,
   })), null, 2));
 
   const bucket = (pred: (p: ProcessedCandidate) => boolean) => rows.filter((_, i) => pred(processed[i]));

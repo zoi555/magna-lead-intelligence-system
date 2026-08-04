@@ -142,6 +142,7 @@ function buildNote2SalesIntelligence(f: Record<string, unknown>): string | null 
   const franchiseClues = (f.franchise_group_clues as string[]) ?? [];
   const centralPurchasingClues = (f.central_purchasing_clues as string[]) ?? [];
   const googleReviewCount = f.google_review_count as number | null;
+  const justEatRatingCount = f.just_eat_rating_count as number | null;
   const serviceModel = cuisineServiceModel?.serviceModel ?? null;
 
   const menuSpecialities = [...new Set([...cuisineTags, ...productRangeTags])];
@@ -168,6 +169,12 @@ function buildNote2SalesIntelligence(f: Record<string, unknown>): string | null 
   // reader sees the actual scale, never a single undifferentiated claim.
   const reviewBandForNote = classifyReviewVolumeBand(googleReviewCount);
   if (reviewBandForNote && reviewBandForNote !== "Low") bullets.push(`Google Review Activity: ${reviewBandForNote} (${googleReviewCount} Google reviews) — consumer review evidence only, does not by itself establish high-volume operation.`);
+  // Just Eat Rating Activity (owner-decision review, 2026-08-04) — a SEPARATE, distinctly-
+  // labelled bullet from Google Review Activity above, never combined/summed with it, purely
+  // supporting consumer-activity evidence. Reuses the same band thresholds for a like-for-like
+  // reader comparison, but this band is NEVER read by isHighVolumeOperation()/Hot-Lead urgency.
+  const justEatBandForNote = classifyReviewVolumeBand(justEatRatingCount);
+  if (justEatBandForNote && justEatBandForNote !== "Low") bullets.push(`Just Eat Rating Activity: ${justEatBandForNote} (${justEatRatingCount} Just Eat ratings) — consumer review evidence only, does not by itself establish high-volume operation.`);
 
   const formatParts: string[] = [];
   if (serviceModel?.dineIn?.value === true) formatParts.push("dine-in");
@@ -448,6 +455,16 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext, v
     google_review_count: pick(f.google_review_count as number),
     google_categories: (f.google_categories as string[])?.length ? (f.google_categories as string[]) : null,
     google_match_confidence: matchEnum(f.google_outcome as string, [["exact", "Exact"], ["strong_probable", "Strong Probable"], ["conflict", "Conflict"], ["no_match", "No Match"]]),
+
+    // Just Eat rating-count evidence (owner-decision review, 2026-08-04) — a SEPARATE field from
+    // google_rating/google_review_count above, never overwriting or summed with it. Supporting
+    // consumer-activity evidence only — deliberately never read by isHighVolumeOperation()/Hot-
+    // Lead urgency/Key Account scoring, which stay Google-review-based only (see resolveMasterFields).
+    just_eat_rating_average: pick(f.just_eat_rating_average as number),
+    just_eat_rating_count: pick(f.just_eat_rating_count as number),
+    just_eat_rating_source: pick(f.just_eat_rating_source as string),
+    just_eat_rating_retrieved_at: pick(f.just_eat_rating_retrieved_at as string),
+    just_eat_endpoint_version: pick(f.just_eat_endpoint_version as string),
 
     companies_house_number: pick(f.companies_house_number as string),
     company_status: matchEnum(f.companies_house_status as string, [["active", "Active"], ["dissolved", "Dissolved"], ["liquidation", "Liquidation"], ["administration", "Administration"], ["strike-off", "Strike Off Pending"], ["strike off", "Strike Off Pending"], ["dormant", "Dormant"]]),
