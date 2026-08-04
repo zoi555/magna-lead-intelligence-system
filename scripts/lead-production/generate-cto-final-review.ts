@@ -26,8 +26,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import * as XLSX from "xlsx";
 import { writeCsv } from "./csv";
+import { defaultCampaignOutputPath, assertSafeToWrite } from "./campaign-output";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
+function flag(name: string): boolean { return process.argv.includes(`--${name}`); }
 
 const CTO_20_COLUMNS = [
   "Shop Name", "Contact Person", "Email", "Phone", "Whatsapp", "Customer NetSuite Account Code",
@@ -111,12 +113,19 @@ export async function generateCtoFinalReview(combinedMasterWorkbookPath: string,
 
 async function main() {
   const combinedMasterWorkbookPath = arg("combined-master");
-  const outXlsxPath = arg("out-xlsx");
-  const outCsvPath = arg("out-csv");
+  const campaignId = arg("campaign-id");
+  // --campaign-id supplies defaults for --out-xlsx/--out-csv (campaigns/<id>/release/<id>-CTO-
+  // final-review.{xlsx,csv}) when they're omitted — never a hardcoded representative name.
+  // Explicit --out-xlsx/--out-csv always win.
+  const outXlsxPath = arg("out-xlsx") ?? (campaignId ? defaultCampaignOutputPath(campaignId, "release", `${campaignId}-CTO-final-review.xlsx`) : null);
+  const outCsvPath = arg("out-csv") ?? (campaignId ? defaultCampaignOutputPath(campaignId, "release", `${campaignId}-CTO-final-review.csv`) : null);
   if (!combinedMasterWorkbookPath || !outXlsxPath || !outCsvPath) {
-    console.error("Missing required argument(s): --combined-master=<path> --out-xlsx=<path> --out-csv=<path>");
+    console.error("Missing required argument(s): --combined-master=<path> --out-xlsx=<path> --out-csv=<path> (or --campaign-id=<id> to use the campaign-scoped release/ default)");
     process.exit(1);
   }
+  const forceOverwriteRelease = flag("force-overwrite-release");
+  await assertSafeToWrite(outXlsxPath, { force: forceOverwriteRelease });
+  await assertSafeToWrite(outCsvPath, { force: forceOverwriteRelease });
   const result = await generateCtoFinalReview(combinedMasterWorkbookPath, outXlsxPath, outCsvPath);
   console.log(`CTO final review: ${result.rowCount} row(s), ${result.columnCount} columns -> ${result.outXlsxPath} / ${result.outCsvPath}`);
   console.log(`Excluded (not "Trading" status): ${result.excludedNotTrading.length}${result.excludedNotTrading.length ? " -> " + result.excludedNotTrading.join(", ") : ""}`);

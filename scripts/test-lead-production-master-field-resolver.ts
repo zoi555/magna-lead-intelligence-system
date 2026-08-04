@@ -2,7 +2,7 @@
 // recalibration (owner correction, 2026-08-04).
 // npm run test:lead-production-master-field-resolver
 
-import { resolveMasterFields, classifyReviewVolumeBand, isHighVolumeOperation } from "./lead-production/master-field-resolver";
+import { resolveMasterFields, classifyReviewVolumeBand, isHighVolumeOperation, PIPELINE_STAGE_DEFAULT_FOR_NEW_LEADS } from "./lead-production/master-field-resolver";
 import type { Dossier } from "./lead-production/candidate-dossier";
 
 let fails = 0;
@@ -231,6 +231,11 @@ async function main() {
   assert(r19a.fields.just_eat_rating_count === null && r19a.fields.just_eat_rating_average === null, `no Just Eat data available -> both fields null, never guessed or defaulted to 0 (got count=${r19a.fields.just_eat_rating_count}, average=${r19a.fields.just_eat_rating_average})`);
   assert(r19a.fields.just_eat_rating_source === null, "no Just Eat source recorded when there is no Just Eat data");
   assert(!(r19a.fields.note_2 as string | null)?.includes("Just Eat Rating Activity"), "Note 2 never mentions Just Eat rating activity when there is none to report");
+
+  console.log("\n20. Pipeline Stage source of truth (ISS-0036) — explicit named constant, not a bare literal, and it's actually what gets written onto every resolved Master row:");
+  assert(PIPELINE_STAGE_DEFAULT_FOR_NEW_LEADS === "1. Follow Up", `the exported constant is the locked operational default (got "${PIPELINE_STAGE_DEFAULT_FOR_NEW_LEADS}")`);
+  const r20a = resolveMasterFields(mkDossier(), CTX);
+  assert(r20a.fields.pipeline_stage === PIPELINE_STAGE_DEFAULT_FOR_NEW_LEADS, `resolveMasterFields writes the constant's value onto pipeline_stage, never a hand-typed duplicate literal (got "${r20a.fields.pipeline_stage}")`);
 
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);
   process.exit(fails === 0 ? 0 : 1);

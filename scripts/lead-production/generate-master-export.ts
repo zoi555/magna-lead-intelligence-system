@@ -25,8 +25,10 @@ import { writeCsv } from "./csv";
 import { loadCommercialReviewRegistry, type CommercialReviewRegistry } from "./load-commercial-review";
 import { evaluateCommercialReviewExclusion } from "./commercial-review-filter";
 import { loadCtoBusinessTypeVocabulary, type CtoBusinessTypeVocabulary } from "./cto-business-type-mapping";
+import { defaultCampaignOutputDir, assertSafeToWrite } from "./campaign-output";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
+function flag(name: string): boolean { return process.argv.includes(`--${name}`); }
 async function readJson(p: string): Promise<any> { return JSON.parse(await fs.readFile(p, "utf8")); }
 
 interface DistrictInput { district: string; dirs: { phase1Dir: string; fsaDir: string; googleDir: string; chDir: string; websiteDir: string; publicProfileDir: string; groupRescreenDir: string; v2Dir: string } }
@@ -189,8 +191,14 @@ export function classify(rows: RowBundle[], registry: CommercialReviewRegistry, 
 }
 
 async function main() {
-  const outArg = arg("out");
-  if (!outArg) { console.error("Missing required argument: --out=<dir>"); process.exit(1); }
+  // --campaign-id is read here (in addition to its later use for provenance/cross-campaign-dedup
+  // labelling below) so it can supply a default --out when --out itself is omitted — never a
+  // hardcoded representative name in the default, so no future campaign needs its own default
+  // wired in here. Explicit --out always wins, unchanged from before.
+  const earlyCampaignId = arg("campaign-id");
+  const outArg = arg("out") ?? (earlyCampaignId ? defaultCampaignOutputDir(earlyCampaignId, "release") : null);
+  if (!outArg) { console.error("Missing required argument: --out=<dir> (or supply --campaign-id=<id> to use the campaign-scoped release/ default)"); process.exit(1); }
+  const forceOverwriteRelease = flag("force-overwrite-release");
   await fs.mkdir(outArg, { recursive: true });
 
   const territoryManifestPath = arg("territory-manifest");
@@ -336,6 +344,7 @@ async function main() {
   addSheet(combinedWb, "Run Manifest", runManifestRows);
 
   const combinedPath = path.join(outArg, `${representative.toLowerCase()}-master-combined.xlsx`);
+  await assertSafeToWrite(combinedPath, { force: forceOverwriteRelease });
   XLSX.writeFile(combinedWb, combinedPath);
 
   // --- Per-representative workbook (8 contents — Reactivation retired: representatives must
@@ -352,6 +361,7 @@ async function main() {
   const mapRows = buckets.usable.filter((r) => role === "field_sales").map((r) => ({ "Lead ID": r.resolved.leadId, "Trading Name": r.dossier.tradingName, Latitude: r.resolved.fields.latitude, Longitude: r.resolved.fields.longitude, District: r.district, "Final Lead Level": r.resolved.fields.final_lead_level, "Physical Premises Status": r.resolved.fields.physical_premises_status }));
   addSheet(repWb, "Map Data", mapRows);
   const repPath = path.join(outArg, `${representative.toLowerCase()}-master-representative.xlsx`);
+  await assertSafeToWrite(repPath, { force: forceOverwriteRelease });
   XLSX.writeFile(repWb, repPath);
 
   console.log(`\nCombined workbook: ${combinedPath}`);

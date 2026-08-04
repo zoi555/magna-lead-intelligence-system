@@ -1424,3 +1424,32 @@ prior campaign's outputs or ownership records changed.
 **See also:** `docs/02_ARCHITECTURE.md` (Temporary local production storage boundary),
 `docs/release-manifests/campaign-004-meer-full-allocation-2026-08-04.json`,
 `scripts/lead-production/run-full-territory.ts`, `scripts/lead-production/run-sales-territory.ts`.
+
+## 2026-08-04 (same day) — final-output generators made campaign-aware; shared write-safety guard; release-manifest generator built
+
+**Decision:** every final-output generator (`generate-master-export.ts`,
+`flatten-combined-master-to-csv.ts`, `generate-owner-review-pack.ts`,
+`generate-cto-final-review.ts`, `verify-customer-leakage.ts`) now accepts an optional
+`--campaign-id=` that supplies a default output path under the campaign-scoped data root
+(`campaigns/<id>/{release,review,audit}/`) when the caller doesn't pass an explicit `--out`/
+`--out-xlsx`/`--out-csv`/`--out-json` — via a new shared module, `scripts/lead-production/
+campaign-output.ts`, never duplicated per-script and never keyed to a representative name. The
+same module adds a write-safety guard used by all five: refuse to write inside the Git repository
+at all, and refuse to silently overwrite an existing file under a `release/`/`manifests/` path
+without an explicit `--force-overwrite-release`. A new `generate-release-manifest.ts` closes the
+gap that both Kunz's and Meer's manifests exposed (ISS-0037) — it hashes a campaign's `release/`
+directory's real files programmatically rather than requiring a hand-authored JSON.
+
+**Reason:** ISS-0037 audit found none of these generators had any campaign-id-aware default, and
+that both existing release manifests were hand-authored because no generator for them existed —
+recorded as blocking before the next representative, then fixed in the same pass, generically.
+
+**Verification:** 25 new regression assertions (`test:lead-production-campaign-output`) cover the
+generic default-path resolution, the Git-repo write refusal, the release/manifests overwrite
+refusal (and `--force-overwrite-release` lifting it), that audit/review/working stay freely
+overwritable, and that the manifest generator's hashes match an independently-computed SHA-256 of
+the same bytes. All 42 suites, typecheck, build pass. Kunz's and Meer's already-released files
+were not touched, moved, or regenerated.
+
+**See also:** `scripts/lead-production/campaign-output.ts`,
+`scripts/lead-production/generate-release-manifest.ts`, `docs/11_ISSUES_LOG.md` ISS-0037.

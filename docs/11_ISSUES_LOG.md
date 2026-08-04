@@ -1551,7 +1551,7 @@ reviews, used only as supporting consumer-activity evidence, never alone as proo
 purchasing volume, never summed with Google's count). Not implemented this pass — explicitly
 deferred with owner approval; does not block the Kunz release.
 
-## ISS-0036 — `Lead_Data_Schema_and_SalesPro_Mapping_v1.xlsx`'s Pipeline Stage allowed-values list is stale against the locked operational value (2026-08-04)
+## ISS-0036 — RESOLVED (2026-08-04, same day) — `Lead_Data_Schema_and_SalesPro_Mapping_v1.xlsx`'s Pipeline Stage allowed-values list is stale against the locked operational value
 
 **Non-blocking, documentation-only.** While independently re-verifying Meer's CTO "Lead Type"
 dropdown against the primary source workbook (`~/Downloads/Lead_Data_Schema_and_SalesPro_
@@ -1570,16 +1570,20 @@ Kunz's and Meer's delivered CTO exports. Confirmed NOT a defect in either releas
 instruction, so anyone consulting it directly (rather than `docs/09_DECISIONS.md` or the code)
 would see a stale, contradicted allowed-values list for this one field.
 
-**Action**: none taken against Kunz or Meer — both releases are correct and unchanged. Recording
-this here as a documentation-alignment item: before the next representative's CTO export is
-generated, either (a) obtain an updated `Lead_Data_Schema_and_SalesPro_Mapping_v1.1.xlsx` from the
-owner reflecting `"1. Follow Up"` as the approved default, or (b) get explicit confirmation that
-the workbook is intentionally left stale and `docs/09_DECISIONS.md` is the sole source of truth
-for this field going forward. Either way, do not let a future validation pass treat the workbook's
-literal `Allowed Values` cell as authoritative for `pipeline_stage` without cross-checking
-`docs/09_DECISIONS.md` first.
+**Action taken (resolution)**: none against Kunz or Meer — both releases remain correct and
+unchanged. Resolved the "which source of truth" ambiguity in code rather than by chasing an
+updated workbook from the owner: `scripts/lead-production/master-field-resolver.ts` now exports
+a single, explicitly-documented constant, `PIPELINE_STAGE_DEFAULT_FOR_NEW_LEADS = "1. Follow
+Up"`, with a doc comment stating plainly that it — not the primary-source workbook's `Allowed
+Values` cell — is authoritative for `pipeline_stage`, and citing this issue and `docs/
+09_DECISIONS.md` for provenance. The single call site that previously hardcoded the literal
+string now reads the constant instead, so there is exactly one place this value can ever be
+defined or drift. New regression test (`test:lead-production-master-field-resolver`, case 20)
+asserts the constant's value directly and that `resolveMasterFields()` actually writes it. The
+stale workbook itself was intentionally left untouched (out of scope, not owned by this repo) —
+future readers are now pointed at the code constant, not the workbook, by construction.
 
-## ISS-0037 — final-output generators are not campaign-aware; every path is still hand-specified, and no release-manifest generator exists (2026-08-04)
+## ISS-0037 — RESOLVED (2026-08-04, same day) — final-output generators are not campaign-aware; every path is still hand-specified, and no release-manifest generator exists
 
 **Blocking, before the next representative's release.** `run-full-territory.ts` and
 `run-sales-territory.ts` gained an optional `--campaign-id=` default-path flag in the post-Kunz/
@@ -1615,12 +1619,35 @@ copy to the campaign `release/` directory → manually re-verify hashes at each 
 records that explicitly rather than letting the restructure be read as "the pipeline now writes
 straight to the campaign root" — it does not, yet.
 
-**Action**: none taken this pass (explicitly out of scope — no broad redesign). Before the next
-representative's campaign is run, either (a) add `--campaign-id=`-aware default output paths to
-all 4 generators above (mirroring the pattern already used in `run-full-territory.ts`/
-`run-sales-territory.ts`: explicit `--out=`/`--out-xlsx=`/etc. always wins, campaign-id only
-supplies a fallback default), routing to `campaigns/<id>/{review,audit,release}/` as appropriate,
-and build a small release-manifest generator that computes hashes programmatically into
-`campaigns/<id>/manifests/`, or (b) continue the current fully-manual copy-and-reverify workflow
-deliberately, with explicit owner sign-off that manual copying remains acceptable for the
-remaining representatives.
+**Action taken (resolution)**: option (a) implemented, generically, in this same pass — no
+representative name hardcoded anywhere:
+
+- New shared module `scripts/lead-production/campaign-output.ts` — `defaultCampaignOutputPath`/
+  `defaultCampaignOutputDir` (campaign-id + kind + filename -> `campaigns/<id>/<kind>/<filename>`,
+  never a rep name), `assertSafeToWrite` (refuses to write inside the Git repo; refuses to
+  silently overwrite an existing file whose path is under a `release/`/`manifests/` segment —
+  or is explicitly tagged `kind: "release"`/`"manifests"` — unless `--force-overwrite-release`
+  is passed).
+- All 4 generators updated additively: `generate-master-export.ts` (`--out` defaults to
+  `campaigns/<id>/release/` via `--campaign-id`), `flatten-combined-master-to-csv.ts` (`--out-csv`
+  defaults to `campaigns/<id>/release/<id>-master-combined.csv`),
+  `generate-owner-review-pack.ts` (`--out` defaults to `campaigns/<id>/review/<id>-owner-
+  review.xlsx` — this script had NO campaign-id awareness at all before), `generate-cto-final-
+  review.ts` (`--out-xlsx`/`--out-csv` default to `campaigns/<id>/release/`),
+  `verify-customer-leakage.ts` (`--out-json`/`--out-xlsx` default to `campaigns/<id>/audit/` —
+  `--campaign-id` was already required here, just never used for this). Explicit `--out`/
+  `--out-xlsx`/`--out-csv`/`--out-json` continue to always win, unchanged — every invocation this
+  session used explicit paths, so no existing behaviour changed.
+- New `scripts/lead-production/generate-release-manifest.ts` — the missing generator. Hashes every
+  real file in a campaign's `release/` directory programmatically (`sha256`/byte count from the
+  actual bytes on disk, never hand-typed), optionally folds in a certificate JSON and a customer-
+  master checksum, writes to `campaigns/<id>/manifests/` by default. Generic — takes only
+  `--campaign-id`, no representative-specific logic.
+- 25 new regression assertions (`test:lead-production-campaign-output`) prove: the default paths
+  are generic (no rep name in output), explicit `--out` always wins, the Git-repo write refusal,
+  the release/manifests overwrite refusal (and that `--force-overwrite-release` lifts it), that
+  audit/review/working directories stay freely overwritable (routine regeneration must not break),
+  and that `buildReleaseManifest`'s hashes match an independently-computed SHA-256 of the same
+  bytes.
+- Kunz's and Meer's already-released files were NOT touched, moved, or regenerated by this fix —
+  purely additive tooling for future campaigns.

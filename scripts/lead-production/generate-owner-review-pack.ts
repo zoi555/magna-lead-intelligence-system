@@ -22,9 +22,11 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import * as XLSX from "xlsx";
 import { parseCsvObjects } from "./csv";
+import { defaultCampaignOutputPath, assertSafeToWrite } from "./campaign-output";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
 function argAll(name: string): string[] { return process.argv.filter((x) => x.startsWith(`--${name}=`)).map((x) => x.slice(name.length + 3)); }
+function flag(name: string): boolean { return process.argv.includes(`--${name}`); }
 
 // Base map from campaign-002-five-district-pilot (one representative per district). A later
 // campaign whose representative owns MULTIPLE districts (e.g. campaign-003-kunz-full-
@@ -388,7 +390,10 @@ export async function generateOwnerReviewPack(opts: {
 
 async function main() {
   const combinedMasterPath = arg("combined-master");
-  const outPath = arg("out");
+  const campaignId = arg("campaign-id");
+  // --campaign-id supplies a default --out (campaigns/<id>/review/<id>-owner-review.xlsx) when
+  // --out is omitted — never a hardcoded representative name. Explicit --out always wins.
+  const outPath = arg("out") ?? (campaignId ? defaultCampaignOutputPath(campaignId, "review", `${campaignId}-owner-review.xlsx`) : null);
   // Optional (2026-08-04, campaign-003-kunz-full-allocation recovery pass): the campaign-002
   // 5-district-5-representative pilot supplied RM1's own dropped-cross-campaign-dedup evidence
   // via --rm1-phase1-dir=. A later campaign that never touches RM1 has nothing to recover here
@@ -397,7 +402,7 @@ async function main() {
   const rm1Phase1Dir = arg("rm1-phase1-dir") ?? "";
   const exportsBase = arg("exports-base"); // e.g. /Users/.../campaign-002 ; expects {rep}/exports/{rep}-{dist}-*.csv
   if (!combinedMasterPath || !outPath || !exportsBase) {
-    console.error("Missing required argument(s): --combined-master=<path> --out=<path> --exports-base=<dir> (--rm1-phase1-dir=<path> optional — only needed for campaign-002-five-district-pilot's RM1 cross-campaign-dedup history)");
+    console.error("Missing required argument(s): --combined-master=<path> --out=<path> --exports-base=<dir> (--rm1-phase1-dir=<path> optional — only needed for campaign-002-five-district-pilot's RM1 cross-campaign-dedup history; --campaign-id=<id> can supply --out's default instead of passing it explicitly)");
     process.exit(1);
   }
   // Repeatable --district-rep=DIST:Name overrides/extends BOTH the Representative-column lookup
@@ -423,6 +428,7 @@ async function main() {
       requiredFieldGaps: path.join(dir, `${repDir}-${d}-salespro-required-field-gaps.csv`),
     };
   });
+  await assertSafeToWrite(outPath, { force: flag("force-overwrite-release") });
   const result = await generateOwnerReviewPack({ combinedMasterPath, districtAuditPaths, rm1Phase1Dir, outPath });
   console.log(`Owner review pack regenerated: ${result.outPath}`);
   for (const [sheet, count] of Object.entries(result.sheetCounts)) console.log(`  ${sheet}: ${count} rows`);

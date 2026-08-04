@@ -13,6 +13,19 @@ import type { Dossier } from "./candidate-dossier";
 import { evaluateBusinessCategoryEligibility } from "./business-category-eligibility";
 import { mapCtoBusinessType, type CtoBusinessTypeVocabulary } from "./cto-business-type-mapping";
 
+// SOURCE OF TRUTH (ISS-0036, resolved 2026-08-04): the operational default for every freshly
+// exported lead's Pipeline Stage / CTO "Pipeline Status/Stage" field is "1. Follow Up" — a
+// locked, owner-approved override of the original schema's own default ("1. Qualification"),
+// recorded in docs/09_DECISIONS.md ("Sales Pro 'Business Types' column repointed" entry,
+// 2026-08-02/2026-08-04). The primary-source workbook
+// (~/Downloads/Lead_Data_Schema_and_SalesPro_Mapping_v1.xlsx — "Master Field Schema"/"CTO
+// Existing Mapping"/"Final SalesPro Schema" sheets) still lists the OLD allowed-values example
+// ("1. Qualification") and was never updated after this locked instruction — see ISS-0036 in
+// docs/11_ISSUES_LOG.md for full detail. THIS constant, not that workbook, is authoritative for
+// pipeline_stage going forward. Both Kunz's (campaign-003) and Meer's (campaign-004) already-
+// delivered CTO exports already use this value correctly and are unchanged.
+export const PIPELINE_STAGE_DEFAULT_FOR_NEW_LEADS = "1. Follow Up";
+
 // Review-volume evidence bands (owner-decision review, 2026-08-04 — Kunz volume-classification
 // audit). Replaces a flat binary threshold ("high volume" at >=100 or >=300 Google reviews,
 // depending which of two independent call sites you looked at) that gave a 126-review lead and a
@@ -394,7 +407,7 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext, v
     sales_territory: ctx.salesTerritory,
     postcode_district: ctx.territory,
     lead_type: leadType,
-    pipeline_stage: "1. Follow Up", // CRM-workflow default for every freshly exported lead — not a data claim. Corrected from "1. Qualification" per locked instruction 2026-08-02.
+    pipeline_stage: PIPELINE_STAGE_DEFAULT_FOR_NEW_LEADS, // CRM-workflow default for every freshly exported lead — not a data claim. See ISS-0036/the constant's own doc comment above.
     lead_urgency: leadUrgency,
     last_verified_date: lastVerifiedDate,
     payment_terms: null, preferred_ordering_days: null,

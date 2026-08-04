@@ -1427,3 +1427,37 @@ stopped per explicit instruction. Full detail: `docs/10_BUGS_AND_FIXES.md`,
    call, alter released membership, or touch the two pre-existing untracked scripts. Did not start
    Naseh or any other representative, did not import the CTO file into any external system, did
    not merge, did not delete the Downloads copies.
+
+## 2026-08-04 (same day) — corrected release-manifest wording, closed the final-output path/ISS-0036/ISS-0037 gaps found while auditing before Naseh
+
+1. Corrected both Kunz's and Meer's release-manifest JSON files: each artifact entry now records
+   `authoritativePath` (`campaigns/<id>/release/...`) and `downloadsConvenienceCopyPath`
+   (`~/Downloads/...`) separately, with explicit notes that Downloads is convenience/backup only
+   — the manifests previously listed only a Downloads path, stale now that the campaign `release/`
+   directory is authoritative. Hashes/bytes/artifact content untouched.
+2. Independently inspected (not assumed) the actual code paths for all 8 final-output artifacts.
+   Found none of the 4 generators (`generate-master-export.ts`, `generate-owner-review-pack.ts`,
+   `generate-cto-final-review.ts`, `verify-customer-leakage.ts`) had a `--campaign-id`-aware
+   default output path, and that no release-manifest generator script existed at all — both
+   Kunz's and Meer's manifests were hand-authored. Logged as ISS-0037 with exact file/line
+   citations before fixing.
+3. Fixed generically: new shared `scripts/lead-production/campaign-output.ts` module
+   (`defaultCampaignOutputPath`/`Dir`, `assertSafeToWrite` — refuses any write inside the Git
+   repo; refuses to silently overwrite an existing file under a `release/`/`manifests/` path
+   without `--force-overwrite-release`). Wired into all 4 generators as an additive fallback —
+   explicit `--out`/`--out-xlsx`/`--out-csv`/`--out-json` always wins, unchanged for every
+   existing invocation. Built the missing `generate-release-manifest.ts`, which hashes a
+   campaign's `release/` directory programmatically (never hand-typed) — closes the exact gap
+   that produced both hand-authored manifests. 25 new regression assertions
+   (`test:lead-production-campaign-output`).
+4. Resolved ISS-0036 (Pipeline Status/Stage source-of-truth ambiguity) in code: extracted the
+   previously-inline `"1. Follow Up"` literal in `master-field-resolver.ts` into an exported,
+   documented constant (`PIPELINE_STAGE_DEFAULT_FOR_NEW_LEADS`) that explicitly states it — not
+   the stale primary-source workbook — is authoritative, citing ISS-0036/`docs/09_DECISIONS.md`.
+   One new regression assertion. Did not touch the workbook itself (out of scope) or any Kunz/
+   Meer file.
+5. All 42 suites (41 + the new campaign-output suite), typecheck, build clean. Committed and
+   pushed code/tests/docs only — no production data, no secrets, the two pre-existing untracked
+   scripts (`scripts/export-operational-leads.ts`, `scripts/lead-production/generate-release-
+   review.ts`) confirmed untouched throughout. Did not run discovery, start Naseh, or modify any
+   Kunz/Meer file.

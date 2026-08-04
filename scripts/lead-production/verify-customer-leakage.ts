@@ -25,6 +25,7 @@ import { normaliseName, normalisePhone, extractAllUkPhoneComparisons, normaliseP
 import { parseAddressComponents, compareAddressComponents, type AddressComponents } from "./address-components";
 import { fuzzyNameCandidate } from "./fuzzy-name-match";
 import { isOnlyGenericAliasOrUncorroboratedDomain } from "./reevaluate-and-clear-probable-matches";
+import { defaultCampaignOutputPath, assertSafeToWrite } from "./campaign-output";
 
 // T/A ("trading as") alias extraction — the real customer master routinely embeds the actual
 // trading name inside the legal/account name (e.g. "Al Shukraan Ltd T/A Al Qasr Restaurant").
@@ -36,6 +37,7 @@ function extractTradingAsAlias(raw: string): string | null {
 }
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
+function flag(name: string): boolean { return process.argv.includes(`--${name}`); }
 
 const STRONG_NAME_SIM = 0.6;
 const MODERATE_NAME_SIM = 0.3;
@@ -445,13 +447,18 @@ async function main() {
   const combinedMasterPath = arg("combined-master");
   const customersPath = arg("customers");
   const campaignId = arg("campaign-id");
-  const outJson = arg("out-json");
-  const outXlsx = arg("out-xlsx");
+  // --campaign-id is already required below — reuse it to default --out-json/--out-xlsx
+  // (campaigns/<id>/audit/<id>-{zero-leakage-certificate.json,customer-leakage-audit.xlsx})
+  // when they're omitted, rather than requiring them to always be spelled out. Explicit
+  // --out-json/--out-xlsx always win.
+  const outJson = arg("out-json") ?? (campaignId ? defaultCampaignOutputPath(campaignId, "audit", `${campaignId}-zero-leakage-certificate.json`) : null);
+  const outXlsx = arg("out-xlsx") ?? (campaignId ? defaultCampaignOutputPath(campaignId, "audit", `${campaignId}-customer-leakage-audit.xlsx`) : null);
   const ctoReviewPath = arg("cto-review");
   const salesProNewLeadsPaths = (arg("salespro-new-leads") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const removedCountArg = arg("removed-count");
+  const forceOverwriteRelease = flag("force-overwrite-release");
   if (!combinedMasterPath || !customersPath || !campaignId || !outJson) {
-    console.error("Missing required argument(s): --combined-master=<path> --customers=<path> --campaign-id=<id> --out-json=<path> [--out-xlsx=<path>] [--cto-review=<path>] [--salespro-new-leads=<path,path,...>] [--removed-count=<n>]");
+    console.error("Missing required argument(s): --combined-master=<path> --customers=<path> --campaign-id=<id> --out-json=<path> [--out-xlsx=<path>] [--cto-review=<path>] [--salespro-new-leads=<path,path,...>] [--removed-count=<n>] (--out-json/--out-xlsx default to the campaign-scoped audit/ directory when omitted)");
     process.exit(1);
   }
 
@@ -550,6 +557,7 @@ async function main() {
   };
 
   await fs.mkdir(path.dirname(outJson), { recursive: true });
+  await assertSafeToWrite(outJson, { force: forceOverwriteRelease });
   await fs.writeFile(outJson, JSON.stringify(certificate, null, 2));
   console.log(`\nZero-leakage certificate: ${outJson}`);
   console.log(`RESULT: ${overallResult} (Master: ${masterResult}, CTO: ${ctoResult}, Sales Pro: ${salesProResult})`);
@@ -618,6 +626,7 @@ async function main() {
 
     XLSX.utils.book_append_sheet(outWb, XLSX.utils.json_to_sheet([certificate]), "Certificate");
     await fs.mkdir(path.dirname(outXlsx), { recursive: true });
+    await assertSafeToWrite(outXlsx, { force: forceOverwriteRelease });
     XLSX.writeFile(outWb, outXlsx);
     console.log(`Findings workbook: ${outXlsx}`);
   }

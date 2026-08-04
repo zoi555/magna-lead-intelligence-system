@@ -18,8 +18,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import * as XLSX from "xlsx";
 import { writeCsv } from "./csv";
+import { defaultCampaignOutputPath, assertSafeToWrite } from "./campaign-output";
 
 function arg(name: string): string | null { const a = process.argv.find((x) => x.startsWith(`--${name}=`)); return a ? a.slice(name.length + 3) : null; }
+function flag(name: string): boolean { return process.argv.includes(`--${name}`); }
 
 const DISJOINT_SHEETS = [
   "Operationally Usable Leads", "Held-Review", "Hard Rejects",
@@ -28,9 +30,12 @@ const DISJOINT_SHEETS = [
 
 async function main() {
   const combinedMasterPath = arg("combined-master");
-  const outCsv = arg("out-csv");
+  const campaignId = arg("campaign-id");
+  // --campaign-id supplies a default --out-csv (campaigns/<id>/release/<id>-master-combined.csv)
+  // when --out-csv is omitted — never a hardcoded representative name. Explicit --out-csv wins.
+  const outCsv = arg("out-csv") ?? (campaignId ? defaultCampaignOutputPath(campaignId, "release", `${campaignId}-master-combined.csv`) : null);
   if (!combinedMasterPath || !outCsv) {
-    console.error("Missing required argument(s): --combined-master=<path> --out-csv=<path>");
+    console.error("Missing required argument(s): --combined-master=<path> --out-csv=<path> (or --campaign-id=<id> to use the campaign-scoped release/ default)");
     process.exit(1);
   }
 
@@ -50,6 +55,7 @@ async function main() {
   }
 
   await fs.mkdir(path.dirname(outCsv), { recursive: true });
+  await assertSafeToWrite(outCsv, { force: flag("force-overwrite-release") });
   await fs.writeFile(outCsv, writeCsv(columnOrder, allRows));
   console.log(`Flattened CSV written: ${outCsv} (${allRows.length} rows, ${columnOrder.length} columns)`);
   for (const sheetName of DISJOINT_SHEETS) {
