@@ -1578,3 +1578,49 @@ the workbook is intentionally left stale and `docs/09_DECISIONS.md` is the sole 
 for this field going forward. Either way, do not let a future validation pass treat the workbook's
 literal `Allowed Values` cell as authoritative for `pipeline_stage` without cross-checking
 `docs/09_DECISIONS.md` first.
+
+## ISS-0037 — final-output generators are not campaign-aware; every path is still hand-specified, and no release-manifest generator exists (2026-08-04)
+
+**Blocking, before the next representative's release.** `run-full-territory.ts` and
+`run-sales-territory.ts` gained an optional `--campaign-id=` default-path flag in the post-Kunz/
+Meer storage restructure (this same pass). The generators that produce the actual final-review
+artifacts were checked and do **not** have equivalent support — inspected directly, not assumed:
+
+- `scripts/lead-production/generate-master-export.ts`, `main()` line 192-193: `arg("out")` is
+  required with no fallback of any kind (`if (!outArg) { ...error...; process.exit(1); }`). No
+  `--campaign-id`-aware default. (It does already accept `--campaign-id=` for provenance/
+  cross-campaign-dedup labelling — just not for choosing its own output directory.)
+- `scripts/lead-production/generate-owner-review-pack.ts`, `main()` line 391/400: `arg("out")`
+  required, no fallback, no campaign-id awareness at all (doesn't accept `--campaign-id=` in any
+  capacity).
+- `scripts/lead-production/generate-cto-final-review.ts`, `main()` line 114-117: `arg("out-xlsx")`
+  / `arg("out-csv")` both required, no fallback, no campaign-id awareness.
+- `scripts/lead-production/verify-customer-leakage.ts`, `main()` line 448-454: `arg("out-json")` /
+  `arg("out-xlsx")` required, no fallback; `--campaign-id=` IS already a required argument here
+  (used for the certificate's own `campaignId` field), but it is never used to derive a default
+  output path.
+- **No release-manifest generator script exists at all.** Both Kunz's
+  (`docs/release-manifests/campaign-003-kunz-full-allocation-2026-08-04.json`) and Meer's
+  (`docs/release-manifests/campaign-004-meer-full-allocation-2026-08-04.json`) manifests were
+  hand-authored (Python/direct JSON) this session, not produced by any script — there is nothing
+  to make campaign-aware yet because the automation itself doesn't exist.
+
+**What this means in practice**: none of the 4 generators above ever wrote directly into
+`~/Downloads` or into a campaign's `review/`/`audit/`/`release/`/`manifests/` subdirectory on
+their own — every single invocation this session specified an explicit working directory by hand
+(`.../consolidation/...`), and the moves into `~/Downloads` and then into
+`campaigns/<id>/release/` were separate, manual `cp` steps. The storage migration is **not**
+automated end-to-end; it is currently: generate anywhere → manually copy to Downloads → manually
+copy to the campaign `release/` directory → manually re-verify hashes at each step. This issue
+records that explicitly rather than letting the restructure be read as "the pipeline now writes
+straight to the campaign root" — it does not, yet.
+
+**Action**: none taken this pass (explicitly out of scope — no broad redesign). Before the next
+representative's campaign is run, either (a) add `--campaign-id=`-aware default output paths to
+all 4 generators above (mirroring the pattern already used in `run-full-territory.ts`/
+`run-sales-territory.ts`: explicit `--out=`/`--out-xlsx=`/etc. always wins, campaign-id only
+supplies a fallback default), routing to `campaigns/<id>/{review,audit,release}/` as appropriate,
+and build a small release-manifest generator that computes hashes programmatically into
+`campaigns/<id>/manifests/`, or (b) continue the current fully-manual copy-and-reverify workflow
+deliberately, with explicit owner sign-off that manual copying remains acceptable for the
+remaining representatives.

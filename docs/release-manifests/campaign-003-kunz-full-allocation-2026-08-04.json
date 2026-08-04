@@ -89,40 +89,48 @@
   },
   "generatedArtifacts": [
     {
-      "path": "/Users/homemac/Downloads/kunz-full-allocation-master-combined.xlsx",
+      "authoritativePath": "/Users/homemac/Data/aspectlead-lead-production/campaigns/campaign-003-kunz-full-allocation/release/kunz-full-allocation-master-combined.xlsx",
+      "downloadsConvenienceCopyPath": "/Users/homemac/Downloads/kunz-full-allocation-master-combined.xlsx",
       "sha256": "05c95fc2609b8a79d9ed8e054bc56c11a65aa178a06e1ef94195f4218958ca82",
       "bytes": 2779800
     },
     {
-      "path": "/Users/homemac/Downloads/kunz-full-allocation-master-combined.csv",
+      "authoritativePath": "/Users/homemac/Data/aspectlead-lead-production/campaigns/campaign-003-kunz-full-allocation/release/kunz-full-allocation-master-combined.csv",
+      "downloadsConvenienceCopyPath": "/Users/homemac/Downloads/kunz-full-allocation-master-combined.csv",
       "sha256": "79337931dbb14c199e65daebf088bd772cb538ba4f37f9393bc6361a70b8fb28",
       "bytes": 651714
     },
     {
-      "path": "/Users/homemac/Downloads/kunz-full-allocation-owner-review.xlsx",
+      "authoritativePath": "/Users/homemac/Data/aspectlead-lead-production/campaigns/campaign-003-kunz-full-allocation/release/kunz-full-allocation-owner-review.xlsx",
+      "downloadsConvenienceCopyPath": "/Users/homemac/Downloads/kunz-full-allocation-owner-review.xlsx",
       "sha256": "f8d8728946644bdc20fa88f532aed635355910e95b6a707b8e25bacc6acd1571",
       "bytes": 682719
     },
     {
-      "path": "/Users/homemac/Downloads/kunz-full-allocation-CTO-final-review.xlsx",
+      "authoritativePath": "/Users/homemac/Data/aspectlead-lead-production/campaigns/campaign-003-kunz-full-allocation/release/kunz-full-allocation-CTO-final-review.xlsx",
+      "downloadsConvenienceCopyPath": "/Users/homemac/Downloads/kunz-full-allocation-CTO-final-review.xlsx",
       "sha256": "f0f29a70942ead0388837564aa5d6569ca037417ba7e76edf7b8c3867e638d6d",
       "bytes": 202156
     },
     {
-      "path": "/Users/homemac/Downloads/kunz-full-allocation-CTO-final-review.csv",
+      "authoritativePath": "/Users/homemac/Data/aspectlead-lead-production/campaigns/campaign-003-kunz-full-allocation/release/kunz-full-allocation-CTO-final-review.csv",
+      "downloadsConvenienceCopyPath": "/Users/homemac/Downloads/kunz-full-allocation-CTO-final-review.csv",
       "sha256": "51ba8c627559796ffeb31a9bb52a6707a1fbc8f84babc570c90096217acf096f",
       "bytes": 77185
     },
     {
-      "path": "/Users/homemac/Downloads/kunz-full-allocation-customer-leakage-audit.xlsx",
+      "authoritativePath": "/Users/homemac/Data/aspectlead-lead-production/campaigns/campaign-003-kunz-full-allocation/release/kunz-full-allocation-customer-leakage-audit.xlsx",
+      "downloadsConvenienceCopyPath": "/Users/homemac/Downloads/kunz-full-allocation-customer-leakage-audit.xlsx",
       "sha256": "155d41a25bee4fef8601a51c662574893ea09c73ff60f8c85adaf8a2bb332329",
       "bytes": 75544
     },
     {
-      "path": "/Users/homemac/Downloads/kunz-full-allocation-zero-leakage-certificate.json",
+      "authoritativePath": "/Users/homemac/Data/aspectlead-lead-production/campaigns/campaign-003-kunz-full-allocation/release/kunz-full-allocation-zero-leakage-certificate.json",
+      "downloadsConvenienceCopyPath": "/Users/homemac/Downloads/kunz-full-allocation-zero-leakage-certificate.json",
       "sha256": "0ad40e5987a72520210ca8e67368a73646f4244b550902767914763e78076bf9",
       "bytes": 2337
     }
   ],
-  "note": "Metadata and hashes only \u2014 this file deliberately contains no customer or lead record contents. Generated artifacts listed above remain outside the Git repository (under ~/Downloads) and are not tracked."
+  "storageNote": "2026-08-04 (post-campaign storage restructure): the authoritative location for these artifacts is the campaign release/ directory under the temporary pipeline's data root (/Users/homemac/Data/aspectlead-lead-production/campaigns/campaign-003-kunz-full-allocation/release/) \u2014 every file there is byte-identical (SHA-256 verified) to the original ~/Downloads copy. ~/Downloads is now convenience/backup only, not the source of truth.",
+  "note": "Metadata and hashes only \u2014 this file deliberately contains no customer or lead record contents. Generated artifacts listed above remain outside the Git repository (under the campaign data root, with a convenience copy under ~/Downloads) and are not tracked."
 }
