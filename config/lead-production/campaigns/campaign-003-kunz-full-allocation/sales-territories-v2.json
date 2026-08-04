@@ -1,0 +1,25 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 9,
+  "representatives": [
+    {
+      "representative": "Kunz",
+      "role": "telesales",
+      "salesTerritory": "CM0, CM2, CM3, CM4, CM5, CM6, CM7, CM8, CM9",
+      "postcodeDistricts": [
+        "CM0",
+        "CM2",
+        "CM3",
+        "CM4",
+        "CM5",
+        "CM6",
+        "CM7",
+        "CM8",
+        "CM9"
+      ],
+      "districtCount": 9,
+      "mapsRequired": false
+    }
+  ]
+}
