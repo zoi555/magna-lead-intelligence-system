@@ -43,7 +43,7 @@ async function main() {
   const perfWithMiss = computePerformance(mismatchResults);
   assert(perfWithMiss.falsePositives.length === 1, `a wrongly-confirmed case is counted as a false positive (got ${perfWithMiss.falsePositives.length})`);
 
-  console.log("\n4. Real 20-case authoritative calibration results (if already generated):");
+  console.log("\n4. Real 20-case authoritative calibration results (original, if already generated):");
   const fs = await import("node:fs/promises");
   const resultsPath = "/Users/homemac/Data/aspectlead-lead-production/input/customer-masters/2026-08-03/entity-resolution-calibration-results-2026-08-03.json";
   const exists = await fs.access(resultsPath).then(() => true).catch(() => false);
@@ -54,6 +54,20 @@ async function main() {
     assert(real.performance.calibrationSetSize === 20, `real calibration set has the expected 20 labelled cases (got ${real.performance.calibrationSetSize})`);
   } else {
     console.log("  (skipped — no real calibration results present at", resultsPath, ")");
+  }
+
+  console.log("\n5. Expanded 100+-case calibration/holdout results (2026-08-04, if already generated):");
+  const expandedPath = "/Users/homemac/Data/aspectlead-lead-production/input/customer-masters/2026-08-03/entity-resolution-calibration-expanded-results-2026-08-04.json";
+  const expandedExists = await fs.access(expandedPath).then(() => true).catch(() => false);
+  if (expandedExists) {
+    const expanded = JSON.parse(await fs.readFile(expandedPath, "utf8"));
+    assert(expanded.results.length >= 100, `expanded calibration set has at least 100 labelled cases (got ${expanded.results.length})`);
+    assert(expanded.results.every((r: { correct: boolean }) => r.correct), `all expanded labelled cases are correct (got ${expanded.results.filter((r: { correct: boolean }) => !r.correct).length} incorrect)`);
+    assert(expanded.holdoutPerformance.calibrationSetSize > 0, `a genuine non-empty holdout subset was reported separately (got ${expanded.holdoutPerformance.calibrationSetSize} holdout cases)`);
+    assert(expanded.holdoutPerformance.confirmedPrecision === 1 && expanded.holdoutPerformance.confirmedRecall === 1, `holdout-set precision/recall are reported and both 100% (got ${expanded.holdoutPerformance.confirmedPrecision}/${expanded.holdoutPerformance.confirmedRecall})`);
+    assert(typeof expanded.performance.bySignalType === "object" && Object.keys(expanded.performance.bySignalType).length > 1, `results are broken down by trigger-signal type (got ${JSON.stringify(Object.keys(expanded.performance.bySignalType))})`);
+  } else {
+    console.log("  (skipped — no expanded calibration results present at", expandedPath, ")");
   }
 
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);

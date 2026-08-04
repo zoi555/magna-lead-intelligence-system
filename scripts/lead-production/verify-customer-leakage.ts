@@ -22,6 +22,8 @@ import path from "node:path";
 import * as XLSX from "xlsx";
 import { parseCsv } from "./csv";
 import { normaliseName, normalisePhone, extractAllUkPhoneComparisons, normalisePostcode, normaliseAddress, normaliseDomain, nameSimilarity } from "./normalize";
+import { parseAddressComponents, compareAddressComponents, type AddressComponents } from "./address-components";
+import { fuzzyNameCandidate } from "./fuzzy-name-match";
 
 // T/A ("trading as") alias extraction — the real customer master routinely embeds the actual
 // trading name inside the legal/account name (e.g. "Al Shukraan Ltd T/A Al Qasr Restaurant").
@@ -64,7 +66,8 @@ export interface CustomerIndexEntry {
   domains: string[]; // normalised, derived from emails
   postcode: string | null; // normalised canonical
   outward: string | null;
-  address: string | null; // normalised (normaliseAddress), for full-address corroboration
+  address: string | null; // normalised (normaliseAddress), for whole-string fallback corroboration
+  addressComponents: AddressComponents | null; // component-level parse, for the preferred comparison
 }
 
 export function buildCustomerIndex(csvText: string): CustomerIndexEntry[] {
@@ -106,6 +109,15 @@ export function buildCustomerIndex(csvText: string): CustomerIndexEntry[] {
       postcode: np.canonical,
       outward: np.outward,
       address: addrParts.length ? normaliseAddress(addrParts.join(", ")) : null,
+      // Real bug found via testing: Address 1/2/City alone never contain a postcode (it's a
+      // SEPARATE "Billing Zip" column), so parseAddressComponents's own postcode extraction found
+      // nothing and every customer's addressComponents.postcode was silently null — meaning
+      // postcodeMatch (required by BOTH compatiblePremises and premisesIdentifierConflict) could
+      // never be true for any real customer. Fixed by appending the already-parsed canonical
+      // postcode (`np`, computed above from Billing Zip/Shipping Zip) onto the address text before
+      // parsing, mirroring how a lead's own "Full Operating Address" field naturally already ends
+      // with its postcode.
+      addressComponents: addrParts.length ? parseAddressComponents([...addrParts, np.canonical ?? postcodeRaw].filter(Boolean).join(", ")) : null,
     });
   }
   return entries;
@@ -166,20 +178,46 @@ export function evaluateLeadCustomerPair(lead: LeadForVerification, cust: Custom
     // as its own tested identifier, not folded silently into the trading-name comparison).
     const custNameNorm = normaliseName(cust.name);
     const custLegalNameNorm = cust.legalName ? normaliseName(cust.legalName) : "";
-    const sim = Math.max(
+    const exactSim = Math.max(
       candNameNorm && custNameNorm ? nameSimilarity(candNameNorm, custNameNorm) : 0,
       candNameNorm && custLegalNameNorm ? nameSimilarity(candNameNorm, custLegalNameNorm) : 0,
     );
+    // Fuzzy spelling/word-boundary variation (Damerau-Levenshtein — see fuzzy-name-match.ts):
+    // catches minor misspellings ("Mohammed Grill"/"Mohamad Grill"), joined/split words ("Grill
+    // House"/"Grillhouse"), and singular/plural ("Rafiques"/"Rafique") that exact-token Jaccard
+    // similarity misses entirely (0 token overlap). Only reaches `sim` at FUZZY_SUPPORT_FLOOR
+    // (0.85) — high enough that it behaves exactly like the existing exact-similarity signal (it
+    // can support/corroborate an independent postcode/phone/domain match, or feed the dedicated
+    // fuzzy-only candidate branch below), but a fuzzy match on its own NEVER reaches STRONG_NAME_SIM
+    // by this path alone unless the words are genuinely almost identical — it never confirms alone.
+    const fuzzyVsName = candNameNorm && custNameNorm ? fuzzyNameCandidate(candNameNorm, custNameNorm) : null;
+    const fuzzyVsLegal = candNameNorm && custLegalNameNorm ? fuzzyNameCandidate(candNameNorm, custLegalNameNorm) : null;
+    const bestFuzzy = [fuzzyVsName, fuzzyVsLegal].filter((f): f is NonNullable<typeof f> => !!f).sort((a, b) => b.comparison.bestSimilarity - a.comparison.bestSimilarity)[0] ?? null;
+    const sim = Math.max(exactSim, bestFuzzy && bestFuzzy.supportsCorroboration ? bestFuzzy.comparison.bestSimilarity : 0);
     const conflictSim = nameSimilarity(stripLocationWords(candNameNorm), stripLocationWords(custNameNorm));
     const nameConflicts = conflictSim < CONFLICTING_NAME_FLOOR; // essentially unrelated names (ignoring a merely-shared town/area word) — a reassigned number/address, not the same business
     const samePostcode = !!candPostcode.canonical && candPostcode.canonical === cust.postcode;
     const sameDistrict = !!candPostcode.outward && candPostcode.outward === cust.outward;
     const nameCorroborates = sim >= MODERATE_NAME_SIM;
+    // A fuzzy-name-only candidate (no other signal at all) is gated to the same postal district —
+    // matches this codebase's existing "foundational geographic gate" principle and keeps an
+    // 8000+-row customer master from generating unbounded fuzzy-name noise. Never confirms alone;
+    // see the dedicated decision branch below (always PROBABLE, per the owner's explicit rule).
+    const hasFuzzyNameOnlyCandidate = !!bestFuzzy?.isCandidate && sameDistrict;
+    // Component-level address comparison (address-components.ts) is preferred over the whole-
+    // string Jaccard fallback: "same postcode but different unit/building: not confirmation"
+    // cannot be expressed by a flat bag-of-tokens score (two different shop numbers on the same
+    // road share every other token and score a HIGH Jaccard despite being different premises).
+    const candAddressComponents = lead.address ? parseAddressComponents(lead.address) : null;
+    const addressComparison = candAddressComponents && cust.addressComponents ? compareAddressComponents(candAddressComponents, cust.addressComponents) : null;
     // Full-address corroboration — genuinely useful when a full postcode isn't available but a
     // free-text address is (a common gap pre-enrichment); never a substitute for postcode when
-    // the postcode itself disagrees.
+    // the postcode itself disagrees. Used only as a fallback when component-level parsing didn't
+    // produce a usable comparison on either side.
     const addressSim = candAddressNorm && cust.address ? nameSimilarity(candAddressNorm, cust.address) : 0;
-    const sameAddress = addressSim >= STRONG_NAME_SIM && (!candPostcode.outward || !cust.outward || candPostcode.outward === cust.outward);
+    const wholeStringSameAddress = addressSim >= STRONG_NAME_SIM && (!candPostcode.outward || !cust.outward || candPostcode.outward === cust.outward);
+    const componentConflict = !!addressComparison?.premisesIdentifierConflict;
+    const sameAddress = !componentConflict && (!!addressComparison?.compatiblePremises || (!addressComparison && wholeStringSameAddress));
     // Model-defect fix (2026-08-03, authoritative-source rerun): an exact trading-name alias
     // (T/A-parsed) is just as reusable/generic as a bare trading name — real case: "Spice Hut" is
     // an exact T/A alias shared by 5 completely unrelated customers in different towns. The
@@ -203,7 +241,7 @@ export function evaluateLeadCustomerPair(lead: LeadForVerification, cust: Custom
     if (hasDomain) triggerSignals.push("domain");
     if (hasEmail) triggerSignals.push("email");
     if (hasExactAlias) triggerSignals.push("alias");
-    if (!triggerSignals.length && sim >= MODERATE_NAME_SIM) triggerSignals.push("fuzzy_name");
+    if (!triggerSignals.length && (exactSim >= MODERATE_NAME_SIM || !!bestFuzzy?.isCandidate)) triggerSignals.push("fuzzy_name");
 
     if (!hasPhone && !hasEmail && !hasDomain && !hasExactAlias && !samePostcode && !sameDistrict && !sameAddress) return null;
 
@@ -259,6 +297,13 @@ export function evaluateLeadCustomerPair(lead: LeadForVerification, cust: Custom
       tier = "probable"; signals.push("exact_postcode_moderate_name");
     } else if (sameDistrict && sim >= STRONG_NAME_SIM) {
       tier = "probable"; signals.push("same_district_strong_name");
+    } else if (hasFuzzyNameOnlyCandidate) {
+      // Fuzzy spelling/word-boundary variation (see fuzzy-name-match.ts) is a candidate-
+      // generation and corroboration-support mechanism ONLY, per the owner's explicit rule — it
+      // may never confirm a customer alone, however similar the strings are. Always PROBABLE, for
+      // human review, gated to the same postal district.
+      tier = "probable";
+      signals.push(`fuzzy_name_variation_same_district (${bestFuzzy!.comparison.method}, similarity ${bestFuzzy!.comparison.bestSimilarity.toFixed(2)})`);
     } else {
       // A genuine candidate WAS considered (exact postcode/district/address/alias overlap, or a
       // fuzzy-name hit) but resolved as not material — explicitly "clear", not silently dropped.

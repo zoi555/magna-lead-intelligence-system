@@ -5,7 +5,7 @@
 // matching pipeline.
 // npm run test:lead-production-customer-leakage-verifier
 
-import { buildCustomerIndex, verifyLeadAgainstIndex, type LeadForVerification } from "./lead-production/verify-customer-leakage";
+import { buildCustomerIndex, verifyLeadAgainstIndex, traceLeadCandidates, type LeadForVerification } from "./lead-production/verify-customer-leakage";
 
 let fails = 0;
 const assert = (c: boolean, m: string) => { if (!c) { console.error("  ✗", m); fails++; } else console.log("  ✓", m); };
@@ -21,7 +21,7 @@ const SAMPLE_CSV = [
 ].join("\n");
 
 function mkLead(o: Partial<LeadForVerification>): LeadForVerification {
-  return { leadId: o.leadId ?? "X1-00000001", district: o.district ?? "X1", tradingName: o.tradingName ?? "Test Lead", phone: o.phone ?? null, email: o.email ?? null, website: o.website ?? null, postcode: o.postcode ?? null, netsuiteAccountCode: o.netsuiteAccountCode ?? null };
+  return { leadId: o.leadId ?? "X1-00000001", district: o.district ?? "X1", tradingName: o.tradingName ?? "Test Lead", phone: o.phone ?? null, email: o.email ?? null, website: o.website ?? null, postcode: o.postcode ?? null, address: o.address ?? null, netsuiteAccountCode: o.netsuiteAccountCode ?? null };
 }
 
 async function main() {
@@ -88,6 +88,49 @@ async function main() {
   const c5 = index.find((c) => c.id === "C5")!;
   assert(c5.phones.length === 0 && c5.emails.length === 0 && c5.postcode === null, "the malformed row indexes to genuinely empty identifiers, never guessed values");
 
+  console.log("\n8. Component-level address matching — same postcode, DIFFERENT unit number, must never confirm on address alone (2026-08-04 entity-resolution follow-up):");
+  const shopIndex = buildCustomerIndex([
+    "Inactive,ID,Name,Company Name,Phone,Office Phone,Email,Invoice Email Address,Invoice WhatsApp Number,Billing Zip,Billing Address 1,Billing Address 2,Billing City",
+    'No,S001,Test Shop 4 Ltd,,,,,,,"IG1 4NF","Shop 4","12 High Street","Ilford"',
+  ].join("\n"));
+  const differentShopLead = mkLead({ leadId: "IG1-DIFFSHOP", tradingName: "Completely Different Business", postcode: "IG1 4NF", address: "Shop 9, 12 High Street, Ilford IG1 4NF" });
+  const differentShopFindings = verifyLeadAgainstIndex(differentShopLead, shopIndex);
+  assert(differentShopFindings.every((f) => f.tier !== "confirmed"), `a different shop number at the same postcode/street never confirms on address alone (got ${JSON.stringify(differentShopFindings.map((f) => f.tier))})`);
+  // Must NOT pass vacuously on an empty findings array — confirm the postcode/address candidate
+  // was genuinely traced (and explicitly resolved "clear"), not silently skipped altogether.
+  const differentShopTrace = traceLeadCandidates(differentShopLead, shopIndex);
+  assert(differentShopTrace.some((c) => c.customer.id === "S001" && c.tier === "clear"), `the different-shop-number candidate is traced and explicitly resolved "clear" (a genuine premises conflict), not silently absent (got ${JSON.stringify(differentShopTrace.map((c) => ({ id: c.customer.id, tier: c.tier })))})`);
+
+  console.log("\n9. Component-level address matching — same premises, conflicting operator identity, held PROBABLE (\"possible new operator\"), never auto-excluded:");
+  const samePremisesIndex = buildCustomerIndex([
+    "Inactive,ID,Name,Company Name,Phone,Office Phone,Email,Invoice Email Address,Invoice WhatsApp Number,Billing Zip,Billing Address 1,Billing Address 2,Billing City",
+    'No,S002,Original Kebab House Ltd,,,,,,,"BR1 5HS","34","Downham Way","Bromley"',
+  ].join("\n"));
+  const newOperatorLead = mkLead({ leadId: "BR1-NEWOP", tradingName: "Totally Different Trading Name", postcode: "BR1 5HS", address: "34 Downham Way, Bromley BR1 5HS" });
+  const newOperatorFindings = verifyLeadAgainstIndex(newOperatorLead, samePremisesIndex);
+  assert(newOperatorFindings.some((f) => f.tier === "probable"), `same premises with a flatly different trading name is held PROBABLE as a possible new operator (got ${JSON.stringify(newOperatorFindings.map((f) => f.tier))})`);
+  assert(newOperatorFindings.every((f) => f.tier !== "confirmed"), "never auto-confirmed/auto-excluded purely on same-premises address");
+
+  console.log("\n10. Fuzzy spelling/name-variation candidate generation — a genuine misspelling within the same district is PROBABLE, never CONFIRMED, on its own (2026-08-04 entity-resolution follow-up):");
+  const fuzzyIndex = buildCustomerIndex([
+    "Inactive,ID,Name,Company Name,Phone,Office Phone,Email,Invoice Email Address,Invoice WhatsApp Number,Billing Zip",
+    'No,F001,Mohamad Grill Ltd,,,,,,,"IG2 5AA"',
+  ].join("\n"));
+  const misspeltLead = mkLead({ leadId: "IG2-MISSPELT", tradingName: "Mohammed Grill", postcode: "IG2 5BB" });
+  const misspeltFindings = verifyLeadAgainstIndex(misspeltLead, fuzzyIndex);
+  // A high-confidence fuzzy match (>= FUZZY_SUPPORT_FLOOR) folds into the same `sim` score exact
+  // name similarity already uses, so it can be caught by either the dedicated fuzzy branch
+  // ("fuzzy_name_variation...") or the pre-existing same-district-strong-name branch — both are
+  // correct outcomes (PROBABLE, never confirmed); which label fires depends only on similarity
+  // magnitude, not on whether fuzzy matching genuinely drove the result (nameSimilarity's exact
+  // Jaccard token overlap for "mohammed grill"/"mohamad grill" is 0 — only fuzzy matching found this).
+  assert(misspeltFindings.some((f) => f.tier === "probable"), `a genuine misspelling ("Mohammed Grill" vs "Mohamad Grill") in the same district is flagged PROBABLE via fuzzy-name matching (got ${JSON.stringify(misspeltFindings.map((f) => ({ tier: f.tier, signals: f.signals })))})`);
+  assert(misspeltFindings.every((f) => f.tier !== "confirmed"), "fuzzy name similarity alone NEVER confirms, however close the spelling");
+
+  console.log("\n11. Fuzzy name matching does not fire across DIFFERENT postal districts with no other signal (geographic gate, consistent with the rest of this codebase):");
+  const distantMisspeltLead = mkLead({ leadId: "ZZ9-MISSPELT", tradingName: "Mohammed Grill", postcode: "ZZ9 9ZZ" });
+  assert(verifyLeadAgainstIndex(distantMisspeltLead, fuzzyIndex).length === 0, "a fuzzy-name-only match in a completely different district produces no finding at all");
+
   console.log("\n7. Real 5-district campaign-002 checkpoint proof (if a fixed combined workbook + certificate already exist):");
   const XLSX = await import("xlsx");
   const fs = await import("node:fs/promises");
@@ -98,11 +141,26 @@ async function main() {
     assert(cert.result === "PASS", `real zero-leakage certificate reports PASS (got "${cert.result}")`);
     assert(cert.masterResult === "PASS" && cert.ctoResult === "PASS" && cert.salesProResult === "PASS", `Master/CTO/Sales Pro all individually PASS (got ${cert.masterResult}/${cert.ctoResult}/${cert.salesProResult})`);
     assert(cert.confirmedLeakCount === 0, `real certificate reports 0 confirmed leaks (got ${cert.confirmedLeakCount})`);
-    assert(cert.releasedLeadCount === 170, `real certificate covers the corrected 170-lead usable population (175 usable minus 5 probable-matched leads now correctly held, got ${cert.releasedLeadCount})`);
+    // 167 = 172 (170 + Spice Hut + PHAT Buns re-cleared per the owner's explicit item-5 rule)
+    // minus 5 genuinely NEW probable matches ("JK FRIED CHICKEN", "The Grill Bros", "Grilled Peri
+    // Peri Ilford", "Chicken Hut Ilford", "Ben's Fried Chicken") surfaced only once the
+    // component-address/fuzzy-name matching landed this session and were never checked by the
+    // earlier (weaker) matcher run.
+    assert(cert.releasedLeadCount === 167, `real certificate covers the corrected 167-lead usable population (got ${cert.releasedLeadCount})`);
     assert(cert.authoritativeCustomerFilename === "CustomersProjects81_raw_snapshot_2026-08-03.csv", `certificate names the authoritative snapshot file (got "${cert.authoritativeCustomerFilename}")`);
     assert(cert.customerMasterChecksum === "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1", `certificate checksum matches the real authoritative CustomersProjects81.csv (got "${cert.customerMasterChecksum}")`);
     assert(cert.customerMasterRowCount === 8050 && cert.activeCount === 4558 && cert.inactiveCount === 3492, `certificate reports the exact authoritative row/active/inactive counts (got ${cert.customerMasterRowCount}/${cert.activeCount}/${cert.inactiveCount})`);
     assert(typeof cert.verifierCommitHash === "string" && cert.verifierCommitHash.length > 0, "certificate records the verifier's own git commit hash");
+    // Real bug this session: annotate-canonical-master.ts once wrote matched account codes into
+    // "NetSuite Customer Account Code" (a genuine matching INPUT elsewhere), creating a
+    // self-confirming feedback loop that surfaced as a genuine CONFIRMED leak inside a real
+    // SalesPro export CSV (RM1-015EC5DD "PHAT Buns - Romford", already explicitly cleared by the
+    // owner's item-5 rule). Assert the fix holds: SalesPro reports PASS and the certificate's
+    // entity-resolution block explicitly acknowledges the 2 owner-overridden releases via
+    // zeroConfirmedOrProbableRemaining, never silently hiding them.
+    assert(cert.salesProResult === "PASS", `real SalesPro exports individually PASS — no stale account-code artifacts remain (got "${cert.salesProResult}")`);
+    assert(cert.entityResolutionConfiguration?.zeroConfirmedOrProbableRemaining === true, "the entity-resolution certificate block confirms zero confirmed/probable remaining outside an explicit owner override");
+    assert(cert.entityResolutionConfiguration?.calibration?.holdoutSubsetSize > 0, `the certificate reports a genuine non-empty holdout subset size (got ${cert.entityResolutionConfiguration?.calibration?.holdoutSubsetSize})`);
   } else {
     console.log("  (skipped — no certificate present at", certPath, ")");
   }

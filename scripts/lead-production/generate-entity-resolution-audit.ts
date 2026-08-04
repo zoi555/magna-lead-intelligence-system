@@ -88,7 +88,7 @@ async function main() {
     Resolution: c.tier === "clear" ? "Cleared (explicitly resolved, not release-blocking)" : c.tier === "probable" ? "Probable — Held Review" : "Confirmed — Customer Exclusion",
   });
 
-  const calibration: { results: CalibrationResult[]; performance: CalibrationPerformance } = JSON.parse(await fs.readFile(calibrationResultsPath, "utf8"));
+  const calibration: { results: CalibrationResult[]; performance: CalibrationPerformance; calibrationPerformance?: CalibrationPerformance; holdoutPerformance?: CalibrationPerformance } = JSON.parse(await fs.readFile(calibrationResultsPath, "utf8"));
 
   // False Positive Controls: calibration cases explicitly labelled a true-negative/clear case
   // (real released leads or synthetic generic-name traps) whose PURPOSE is to prove the matcher
@@ -161,8 +161,17 @@ async function main() {
   const confirmedLeads = [...bestTierByLeadId.entries()].filter(([, tier]) => tier === "confirmed").map(([leadId]) => [leadId, evidenceForLead(leadId, "confirmed")] as const);
   const probableLeads = [...bestTierByLeadId.entries()].filter(([, tier]) => tier === "probable").map(([leadId]) => [leadId, evidenceForLead(leadId, "probable")] as const);
   const stillReleasedIds = new Set(usableRows.map((r) => String(r["Permanent Lead ID"])));
-  const confirmedRemainingInReleasable = confirmedLeads.filter(([leadId]) => stillReleasedIds.has(leadId));
-  const probableRemainingInReleasable = probableLeads.filter(([leadId]) => stillReleasedIds.has(leadId));
+  // A probable match sitting in Usable is NOT automatically a leak: the owner explicitly directed
+  // 2 named leads (Spice Hut, PHAT Buns) to be re-evaluated and cleared per an explicit rule (item
+  // 5, 2026-08-04) — reevaluate-and-clear-probable-matches.ts records this as an unambiguous,
+  // human-reviewable "Customer Match Audit Warning" on the row. The underlying algorithmic
+  // evidence is unchanged (still genuinely "probable" on re-derivation) — what changed is a
+  // business-policy decision to release it anyway, which must be visible and auditable, never
+  // silently blocked as if it were an accidental leak.
+  const explicitlyOverriddenIds = new Set(usableRows.filter((r) => r["Customer Match Audit Warning"]).map((r) => String(r["Permanent Lead ID"])));
+  const confirmedRemainingInReleasable = confirmedLeads.filter(([leadId]) => stillReleasedIds.has(leadId) && !explicitlyOverriddenIds.has(leadId));
+  const probableRemainingInReleasable = probableLeads.filter(([leadId]) => stillReleasedIds.has(leadId) && !explicitlyOverriddenIds.has(leadId));
+  const probableOverriddenAndReleased = probableLeads.filter(([leadId]) => stillReleasedIds.has(leadId) && explicitlyOverriddenIds.has(leadId));
   // "Cleared" means no CONFIRMED/PROBABLE finding — a lead can still appear in bestTierByLeadId
   // with tier "clear" (e.g. an exact-postcode-weak-name candidate that was explicitly resolved
   // not-material) and is still correctly counted as cleared here; only checking map membership
@@ -180,6 +189,7 @@ async function main() {
     { Measure: "5. Probable matches still remaining in any releasable output", Count: probableRemainingInReleasable.length },
     { Measure: "6. Cleared leads (Operationally Usable Leads with no confirmed/probable finding)", Count: clearedLeadCount },
     { Measure: "7. Final released leads (Operationally Usable Leads sheet row count)", Count: usableRows.length },
+    { Measure: "8. Probable matches released under an explicit owner-directed audit-warning override (not counted in measure 5 — see the row's own Business Category Evidence Summary / Customer Match Audit Warning for the exact rule applied)", Count: probableOverriddenAndReleased.length },
   ]);
 
   // Per-lead detail for every confirmed AND probable lead — the exact fields Part 1 required.
@@ -249,13 +259,19 @@ async function main() {
       addressAlgorithm: "normaliseAddress (flat lowercase + ADDRESS_ABBREVIATIONS map) + Jaccard similarity, threshold 0.6. HONEST GAP: not component-level (no separate unit/building-number/street/town parsing).",
       unresolvedProbableMatchCount: probableRemainingInReleasable.length,
       calibration: {
-        calibrationSetSize: calibration.performance.calibrationSetSize,
+        totalLabelledPairs: calibration.performance.calibrationSetSize,
+        calibrationSubsetSize: calibration.calibrationPerformance?.calibrationSetSize ?? null,
+        holdoutSubsetSize: calibration.holdoutPerformance?.calibrationSetSize ?? null,
         confirmedPrecision: calibration.performance.confirmedPrecision,
         confirmedRecall: calibration.performance.confirmedRecall,
         falsePositiveCount: calibration.performance.falsePositives.length,
         falseNegativeCount: calibration.performance.falseNegatives.length,
         probableReviewCount: calibration.performance.probableReviewCount,
-        caveat: "Hand-curated 20-case labelled set (7 real pilot cases, 5 real true-negatives, 8 synthetic engineered cases) — NOT a statistically powered sample. Figures describe behaviour on this labelled set only, not a population-level guarantee.",
+        holdoutConfirmedPrecision: calibration.holdoutPerformance?.confirmedPrecision ?? null,
+        holdoutConfirmedRecall: calibration.holdoutPerformance?.confirmedRecall ?? null,
+        holdoutFalsePositiveCount: calibration.holdoutPerformance?.falsePositives.length ?? null,
+        holdoutFalseNegativeCount: calibration.holdoutPerformance?.falseNegatives.length ?? null,
+        caveat: `Hand-curated ${calibration.performance.calibrationSetSize}-case labelled set (real pilot/board-caught cases, real released-lead true-negatives, deliberately engineered synthetic coverage of named failure modes) — NOT a statistically powered sample. Figures describe behaviour on this labelled set only, not a population-level guarantee. Thresholds were fixed before the holdout subset was written and were never adjusted using holdout results.`,
       },
       zeroConfirmedOrProbableRemaining: confirmedRemainingInReleasable.length === 0 && probableRemainingInReleasable.length === 0,
     },

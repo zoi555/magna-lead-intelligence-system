@@ -107,17 +107,27 @@ async function main() {
     const realWb = XLSX.readFile(realPath);
     const realUsable = XLSX.utils.sheet_to_json(realWb.Sheets["Operationally Usable Leads"], { defval: null }) as Record<string, unknown>[];
     assert(realUsable.length > 0, `real combined workbook has usable rows (got ${realUsable.length})`);
-    assert(Object.keys(realUsable[0]).length === 131, `real combined rows have 131 columns (got ${Object.keys(realUsable[0]).length})`);
+    // 129 Master columns + Campaign ID + Final Outcome + Matched Customer Name + Customer Match
+    // Evidence + Customer Master Checksum + Customer Match Audit Warning (2026-08-04
+    // entity-resolution audit: annotate-canonical-master.ts / reevaluate-and-clear-probable-
+    // matches.ts add these explicit structured customer-match columns) = 134. Columns only appear
+    // where at least one row in the sheet populates them, but XLSX unions keys across the whole
+    // sheet, so every row in the sheet reports the same column count either way.
+    assert(Object.keys(realUsable[0]).length >= 131, `real combined rows have at least the original 131 columns, more once customer-match annotation columns are added (got ${Object.keys(realUsable[0]).length})`);
     const districtsPresent = new Set(realUsable.map((r) => r["Postcode District"]));
-    for (const d of ["CM1", "IG1", "DA1", "BR1"]) assert(districtsPresent.has(d), `real combined workbook includes district ${d} in Operationally Usable Leads`);
-    // RM1 deliberately has ZERO usable rows as of the 2026-08-03 entity-resolution audit: RM1's
-    // only usable-population lead (RM1-015EC5DD, "PHAT Buns - Romford") is a probable customer
-    // match, correctly moved to Held-Review by hold-probable-customer-matches.ts. Losing RM1 from
-    // this sheet is the correct outcome of that fix, not a regression — assert it explicitly so a
-    // future unrelated change that silently drops RM1 rows still gets caught.
+    for (const d of ["CM1", "IG1", "RM1", "DA1", "BR1"]) assert(districtsPresent.has(d), `real combined workbook includes district ${d} in Operationally Usable Leads`);
+    // Model-defect fix (2026-08-04, entity-resolution audit item 5): RM1-015EC5DD ("PHAT Buns -
+    // Romford") was re-evaluated against the owner's explicit clearance rule — its only evidence
+    // was a shared franchise/brand domain at a DIFFERENT district, with no matching phone/address/
+    // postcode/legal-identity/account relationship — and correctly CLEARED back to Usable with an
+    // audit warning (reevaluate-and-clear-probable-matches.ts), reversing the earlier "RM1 has
+    // zero usable rows" state. Assert the corrected state explicitly so a future change can't
+    // silently re-introduce the wrong exclusion OR silently drop the audit-warning trail.
     const realHeld = XLSX.utils.sheet_to_json(realWb.Sheets["Held-Review"], { defval: null }) as Record<string, unknown>[];
-    assert(!districtsPresent.has("RM1"), "RM1 has zero rows in Operationally Usable Leads (its one candidate is a held probable customer match, not released)");
-    assert(realHeld.some((r) => r["Permanent Lead ID"] === "RM1-015EC5DD"), "RM1-015EC5DD (PHAT Buns - Romford) is present in Held-Review, not silently dropped");
+    assert(!realHeld.some((r) => r["Permanent Lead ID"] === "RM1-015EC5DD"), "RM1-015EC5DD (PHAT Buns - Romford) is no longer in Held-Review — cleared per the owner's explicit rule");
+    const phatBunsRow = realUsable.find((r) => r["Permanent Lead ID"] === "RM1-015EC5DD");
+    assert(!!phatBunsRow, "RM1-015EC5DD is present in Operationally Usable Leads");
+    assert(!!phatBunsRow && String(phatBunsRow["Customer Match Audit Warning"] ?? "").includes("AUDIT WARNING"), "the cleared row carries an explicit audit warning, never a silent clear");
     const historicalSheetName = realWb.SheetNames.find((n) => n.startsWith("RM1 Historical"));
     assert(!!historicalSheetName && historicalSheetName.length <= 31, `RM1 historical duplicates sheet name exists and is not silently truncated mid-word by Excel's 31-char limit (got "${historicalSheetName}")`);
     const historicalRows = historicalSheetName ? (XLSX.utils.sheet_to_json(realWb.Sheets[historicalSheetName], { defval: null }) as unknown[]) : [];
