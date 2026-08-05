@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 9,
+  "note": "All 9 districts (DA9-DA17) are newly run for Wajahat — no verbatim reuse in this campaign.",
+  "representatives": [
+    {
+      "representative": "Wajahat",
+      "role": "telesales",
+      "salesTerritory": "DA9-DA17",
+      "postcodeDistricts": ["DA9", "DA10", "DA11", "DA12", "DA13", "DA14", "DA15", "DA16", "DA17"],
+      "districtCount": 9,
+      "mapsRequired": false
+    }
+  ]
+}

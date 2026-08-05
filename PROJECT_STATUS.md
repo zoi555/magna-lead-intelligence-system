@@ -1680,3 +1680,43 @@ Kunz's conflict received before any Meer work proceeds.
 TW11–TW20 for new campaigns — or otherwise) before Meer preflight/config work begins. Just Eat
 `rating_count` capture (separate evidence field, never summed with Google reviews) remains an
 explicitly deferred, non-blocking follow-up.
+
+## 2026-08-05 — production batch complete: remaining 7 representatives (Saad, Saif, Shahzaib, Tahira, Wajahat, Hassan, Haleema) all released, certificates PASS
+
+Ran the full approved production batch on the frozen pipeline baseline (`16c3a7dc8fc912f1e1c5e747497a150e71528f4a`,
+"temporary-lead-production-v1") sequentially, per explicit owner instruction, without pausing for
+review between successful campaigns. Two owner corrections applied mid-batch (authoritative
+representative names/emails; territory model clarified as non-exclusive) and one self-caught
+correction (Tahira's DA1 and Hassan's BR1 are their own reused-verbatim campaign-002 pilot
+districts, not genuinely new — an earlier assumption in this same batch was wrong and corrected
+before any rework). Full narrative: `docs/15_AI_WORK_LOG.md` (2026-08-05).
+
+| Campaign | Rep | Districts | Released (ordinary+KA) | Certificate |
+|---|---|---|---|---|
+| 006 | Saad Rehman | IG7-IG11 | 106 (96+10) | PASS |
+| 007 | Muhammad Saifullah | RM1-RM10 | 175 (158+17) | PASS |
+| 008 | Shahzaib Khan | RM11-RM19 | 154 (138+16) | PASS |
+| 009 | Tahira Abbasi | DA1-DA8 | 135 (126+9) | PASS |
+| 010 | Wajahat Sajjad | DA9-DA17 | 178 (164+14) | PASS |
+| 011 | Hassan Asif | BR1-BR4 | 106 (99+7) | PASS |
+| 012 | Haleema Sadia | BR5-BR8 | 89 (84+5) | PASS |
+
+**Total released: 943 leads (869 ordinary + 74 key accounts) across all 7 campaigns.** Every
+campaign's Master and CTO zero-leakage certificate is PASS.
+
+**Real defect found and fixed**: ISS-0039 — the two-source-merge combined-master CSV went stale
+after leakage corrections for Saif/Tahira/Hassan (the 3 campaigns reusing a verbatim pilot
+district); fixed in all 3 by re-flattening the CSV and regenerating the release manifest after
+corrections. Detail: `docs/10_BUGS_AND_FIXES.md`, `docs/11_ISSUES_LOG.md` ISS-0039. Delivered CTO
+files and representative copies were never affected — always built from the already-corrected
+XLSX.
+
+All 45 `test:lead-production-*`/`test:je-*` suites, typecheck, and build clean at the end of the
+batch. Did not import any CTO file into Sales Pro, did not merge to main, did not create a PR.
+
+**Next action**: owner reviews all 7 delivered CTO files (`representatives/<rep>/current-release/
+final-review.{xlsx,csv}`) and the non-blocking documentation gaps noted per campaign (raw
+discovery counts, provenance-summary columns — consistent, known, out-of-scope gaps carried since
+Kunz/Meer/Naseh), then decides on committing/pushing this batch's code/config/docs and on any
+further representative work. Per the stop condition: no representative outside the approved 7 was
+started, no CTO file imported, no merge to main, no PR created.

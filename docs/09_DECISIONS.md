@@ -1453,3 +1453,75 @@ were not touched, moved, or regenerated.
 
 **See also:** `scripts/lead-production/campaign-output.ts`,
 `scripts/lead-production/generate-release-manifest.ts`, `docs/11_ISSUES_LOG.md` ISS-0037.
+
+## 2026-08-05 — territory model clarified: postcode districts are NON-EXCLUSIVE across representatives
+
+**Decision (owner correction, production-batch pass):** Magna sales territories do not confer
+exclusive ownership. A postcode district or sector may be assigned to any number of
+representatives across any number of campaigns, concurrently or historically. A historical or
+concurrent campaign covering a district does NOT make that district unavailable to another
+representative's new campaign. Territory assignment means "search and produce leads from these
+districts for this representative", never "this representative exclusively owns every lead or
+postcode within these districts."
+
+**Context:** during the production batch, Saif's assigned RM1-RM10 and Shahzaib Khan's assigned
+RM11-RM19 were found to overlap "Nauman"'s own, separately-completed historical RM1-RM14
+allocation. This was initially (incorrectly) treated as a blocking territory conflict, mirroring
+the Kunz/Meer/Naseh pattern — but that pattern is a DIFFERENT scenario (one representative's own
+historical territory vs their own current one, e.g. Kunz TW1-10 -> CM0-9). Overlap between TWO
+DIFFERENT representatives' district assignments is not the same thing and is explicitly allowed.
+
+**Verified, not assumed:** inspected `load-assignments.ts`'s `loadAssignmentFile()` — its
+`DuplicateTerritoryOwnershipError` check only ever operates on rows within the ONE file it loads
+(one campaign's own `assignments.csv`); it has no cross-campaign or cross-file awareness at all.
+No code defect existed — the earlier stop was an over-cautious manual judgement call extrapolating
+the wrong precedent, not a triggered validation.
+
+**What still applies, unchanged:**
+1. Within-campaign duplicate ownership — two rows in the SAME campaign's own assignments.csv
+   claiming the same (territory, role) still fails loudly (`DuplicateTerritoryOwnershipError`).
+2. Within-campaign duplicate premises — the same real business discovered in two districts of the
+   SAME representative's own campaign is still deduplicated (`dedupeAcrossDistricts`).
+3. Existing Magna customer suppression — active/inactive — applies regardless of territory; the
+   matcher never reads a district/campaign/representative field at all.
+4. A candidate is never auto-excluded merely because a different representative previously worked
+   the same district in an earlier campaign — only a genuine customer-master match or a genuine
+   within-campaign duplicate excludes.
+
+**Verification:** 6 new regression assertions
+(`test:lead-production-non-exclusive-territories`) prove all of the above directly, including
+loading two separate campaign assignment files that both claim the same district for different
+people (no error) alongside a genuine same-file duplicate (still throws).
+
+**Not altered:** Nauman's historical RM1-RM14 records, outputs, or provenance — untouched,
+immutable. No representative's territory was reassigned or retired.
+
+## 2026-08-05 — all five original "campaign-002-five-district-pilot" representatives have a verbatim-reusable pilot district; do not assume otherwise for a later full-allocation campaign
+
+**What happened:** mid-batch, while starting Tahira's campaign-009 (DA1-DA8), a filesystem check
+found `output/territories/campaign-002/tahira/da1/` with its own `postprocess-revision-manifest.
+json` (phone-fix reprocess) — proving DA1 was already discovered and enriched live under
+`campaign-002-five-district-pilot`, exactly the same pattern already known for Kunz's CM1,
+Naseh's IG1, and Saif's RM1. This contradicted an earlier, incorrect assumption in this same batch
+("no existing DA-prefixed output directories anywhere, all genuinely new" — wrong; never verified
+by an actual filesystem check, only inferred). Caught and corrected before any DA1 rework was
+started; Hassan's BR1 was then proactively checked too (before assuming either way) and found to
+follow the identical pattern.
+
+**Decision:** `campaign-002-five-district-pilot` assigned exactly one district to each of its 5
+original representatives — Kunz (CM1), Naseh (IG1), Saif (RM1), Tahira (DA1), Hassan (BR1). Every
+one of these 5 districts was later phone-fix-reprocessed (`postprocess-revision-manifest.json` in
+each district's own legacy output directory, `output/territories/campaign-002/<rep>/<district>/`)
+and is the AUTHORITATIVE, verbatim-reusable source for that district in any later full-allocation
+campaign for that same representative — never rediscovered, never rerun. The remaining
+representatives in this batch (Saad, Shahzaib, Wajahat, Haleema) were NOT part of the original
+5-district pilot and have no such reusable district — confirmed individually by direct filesystem
+search before starting each of their campaigns, not assumed.
+
+**How to apply:** before building any future full-allocation campaign config, always run a direct
+filesystem check (`find .../output/territories/campaign-002/<internal-name>/` and `find
+.../handover/<internal-name>-*`) for the representative's own historical work — never infer
+"genuinely new" from memory or from what a similarly-named representative's situation was. If a
+`campaign-002/<rep>/<district>/` directory with a `postprocess-revision-manifest.json` exists, use
+its `revisedFinalScoringPath` (the phone-fix-reprocessed checkpoint), not the original stage,
+exactly as done for CM1/IG1/RM1/DA1/BR1.

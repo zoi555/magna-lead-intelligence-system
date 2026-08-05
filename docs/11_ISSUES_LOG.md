@@ -1715,3 +1715,18 @@ rows, never broken out as their own report line items; not a data defect, a repo
 **Verification**: all affected tests re-run and pass; Naseh's already-corrected, already-PASS-
 certified release was not altered — none of the 3 leads above re-enter the release (all remain
 correctly excluded/held from the prior correction pass); Kunz's and Meer's files untouched.
+
+## ISS-0039 — RESOLVED (2026-08-05) — combined-master CSV side-artifact went stale after leakage corrections in two-source-merge campaigns
+
+Found and fixed during the production batch (campaigns 006–012, Saad/Saif/Shahzaib/Tahira/
+Wajahat/Hassan/Haleema). `apply-leakage-certificate-decisions.ts` only ever writes corrections to
+the combined-master XLSX, never regenerates the companion `-master-combined.csv` written earlier
+by `generate-full-allocation-master.ts` (the two-source merge used whenever a representative's own
+prior pilot district is reused verbatim alongside newly-discovered districts). Affected Saif
+(campaign-007), Tahira (campaign-009), and Hassan (campaign-011) — the three two-source-merge
+campaigns this batch — whose release CSV briefly held pre-correction row counts while the XLSX,
+CTO export, and delivered representative file were all already correct. No confirmed leak or
+unresolved probable match ever reached a delivered file. Full root cause, fix, and the outstanding
+process gap (no code enforces re-flattening the CSV after corrections — must be done manually,
+every time, for any future two-source-merge campaign) recorded in `docs/10_BUGS_AND_FIXES.md`
+(2026-08-05 entry).

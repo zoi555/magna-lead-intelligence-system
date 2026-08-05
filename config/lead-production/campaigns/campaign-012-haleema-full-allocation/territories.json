@@ -1,0 +1,40 @@
+{
+  "campaignId": "campaign-012-haleema-full-allocation",
+  "campaignVersion": "v1",
+  "effectiveDate": "2026-08-05",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-05 (production batch — remaining representatives)",
+  "description": "Haleema's full-territory production run: BR5-BR8 (4 districts). No prior Haleema work exists in any BR district — her historical allocation is EN6-EN11 (handover/haleema-en6-en11/, output/territories/haleema/) which has no BR connection. All 4 districts are genuinely new discovery. Confirmed by filesystem search before starting.",
+  "resolutionNote": "TERRITORY MODEL (owner correction, 2026-08-05, docs/09_DECISIONS.md): Magna postcode districts are NON-EXCLUSIVE across representatives. BR1-BR4 are Hassan's own current campaign-011 allocation, run immediately prior to this one — not a conflict (non-exclusive territory model). This is the FINAL representative in the approved production batch.",
+  "representative": {
+    "internalName": "Haleema",
+    "role": "telesales",
+    "representativeFullName": "Haleema Sadia",
+    "representativeEmail": "halima@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": "Haleema Sadia",
+    "regionRoute": "BR5-BR8",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["BR5", "BR6", "BR7", "BR8"],
+    "districtCount": 4
+  },
+  "alreadyCompletedElsewhere": {
+    "description": "None. No prior Haleema work exists in any BR district — confirmed by filesystem search (output/territories/haleema/ and handover/haleema-en6-en11/ both EN-prefixed only).",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["BR5", "BR6", "BR7", "BR8"],
+    "districtCount": 4,
+    "processingOrder": ["BR5", "BR6", "BR7", "BR8"]
+  },
+  "explicitlyExcluded": {
+    "en6ThroughEn11": "Haleema's previous, already-completed, historical territory. Immutable. Never rerun.",
+    "br1ThroughBr4": "Not part of Haleema's allocation — that is Hassan Asif's (campaign-011)."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  }
+}

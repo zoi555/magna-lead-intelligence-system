@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 3,
+  "note": "Only BR2-BR4 (the 3 newly-run districts) are listed here — BR1 is reused verbatim from campaign-002 and never goes through this campaign's live orchestrator.",
+  "representatives": [
+    {
+      "representative": "Hassan",
+      "role": "telesales",
+      "salesTerritory": "BR2-BR4",
+      "postcodeDistricts": ["BR2", "BR3", "BR4"],
+      "districtCount": 3,
+      "mapsRequired": false
+    }
+  ]
+}

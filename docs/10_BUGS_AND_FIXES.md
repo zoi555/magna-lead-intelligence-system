@@ -1332,3 +1332,56 @@ ALL PASSED; `npm run typecheck`/`build` clean.
 `scripts/test-lead-production-append-salespro-export.ts`,
 `docs/11_ISSUES_LOG.md` (ISS-0034 follow-up), `docs/09_DECISIONS.md`,
 `VERIFY_BEFORE_CLAIMING.md` (2026-08-04 second entry).
+
+## 2026-08-05 — production batch (Saad/Saif/Shahzaib/Tahira/Wajahat/Hassan/Haleema): combined-master CSV side-artifact went stale after leakage corrections (ISS-0039)
+
+**Bug (self-caught, found while auditing Saif's already-"complete" campaign-007 mid-batch):**
+`generate-full-allocation-master.ts` (the two-source merge script used whenever a representative's
+final population spans a reused-verbatim pilot district plus newly-discovered districts, e.g. RM1
++ RM2-RM10) writes BOTH `-master-combined.xlsx` and `-master-combined.csv` in one call. The
+independent leakage verifier then runs, finds confirmed leaks / unresolved probable matches, and
+`apply-leakage-certificate-decisions.ts` applies the corrections — but that script only ever
+writes to the XLSX (`--out=<path>.xlsx`), never regenerates the companion CSV. Result: the CSV
+sitting in `release/` silently kept the PRE-correction row counts and bucket assignments (e.g.
+Saif's CSV showed 188 usable leads and 45 Held-Review rows after the certificate had already
+corrected the XLSX to 175 usable / 53 held) while the XLSX, the CTO export (built from the XLSX),
+and the delivered representative file were all correct. The release manifest had also hashed the
+stale CSV.
+
+**Root cause:** no step in the two-source-merge pipeline re-flattens the CSV after
+`apply-leakage-certificate-decisions.ts` runs — the CSV write and the correction write are two
+independent, unlinked script invocations with no ordering enforced by any wrapper.
+
+**Impact:** Saif (campaign-007) and Tahira (campaign-009) and Hassan (campaign-011) — the three
+representatives this batch whose final population required the two-source merge (own prior pilot
+district reused verbatim + newly-discovered districts) — all had a stale `-master-combined.csv`
+in `release/` at the point their leakage certificate first went PASS. Shahzaib, Wajahat, and
+Haleema (single-source, no pilot district to reuse) were unaffected structurally, since their
+Master export writes no separate combined CSV at all — `flatten-combined-master-to-csv.ts` was
+run manually, and in each of those 3 cases it happened to be run only after corrections, so no
+staleness occurred there by construction. No confirmed customer leak or unresolved probable match
+was ever present in any DELIVERED CTO file or representative release copy — both are always built
+from the (correct) post-correction XLSX. The stale artifact was the side-by-side `.csv` release
+file only.
+
+**Fix:** for Saif and Tahira, re-ran `flatten-combined-master-to-csv.ts --force-overwrite-release`
+against the corrected XLSX immediately upon discovery, then regenerated both campaigns' release
+manifests (`--force-overwrite-release`) to hash the corrected CSV. Hassan's CSV was regenerated
+the same way as part of his normal flow (correction → immediate re-flatten), since this bug had
+already been identified by that point in the batch. For Wajahat and Haleema (single-source, no
+merge), `flatten-combined-master-to-csv.ts` was deliberately sequenced AFTER
+`apply-leakage-certificate-decisions.ts` from the start, avoiding the bug by construction rather
+than needing a later fix.
+
+**Process rule going forward (not yet enforced in code — a genuine remaining gap):** any campaign
+using the two-source merge pattern must re-run `flatten-combined-master-to-csv.ts
+--force-overwrite-release` against the corrected XLSX, and regenerate the release manifest,
+immediately after `apply-leakage-certificate-decisions.ts` — never rely on the CSV that
+`generate-full-allocation-master.ts` wrote before corrections. Recorded here rather than silently
+worked around because it is a real, repeatable process gap that will recur for any future
+two-source-merge campaign unless a wrapper script enforces the ordering.
+
+**Verification:** re-ran the independent leakage verifier against each corrected combined-master
+XLSX after every fix (all PASS), and independently re-flattened + re-hashed the CSV in each
+affected case; all 45 `test:lead-production-*`/`test:je-*` suites, typecheck, and build clean at
+the end of the batch.

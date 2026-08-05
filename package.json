@@ -62,6 +62,7 @@
     "test:lead-production-full-territory": "tsx scripts/test-lead-production-full-territory.ts",
     "lead-production:sales-territory": "tsx scripts/lead-production/run-sales-territory.ts",
     "test:lead-production-territory-v2": "tsx scripts/test-lead-production-territory-v2.ts",
+    "test:lead-production-non-exclusive-territories": "tsx scripts/test-lead-production-non-exclusive-territories.ts",
     "lead-production:master-export": "tsx scripts/lead-production/generate-master-export.ts",
     "test:lead-production-master-export": "tsx scripts/test-lead-production-master-export.ts",
     "test:lead-production-master-field-resolver": "tsx scripts/test-lead-production-master-field-resolver.ts",

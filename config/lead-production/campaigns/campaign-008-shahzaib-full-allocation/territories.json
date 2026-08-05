@@ -1,0 +1,40 @@
+{
+  "campaignId": "campaign-008-shahzaib-full-allocation",
+  "campaignVersion": "v1",
+  "effectiveDate": "2026-08-05",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-05 (production batch — remaining representatives)",
+  "description": "Shahzaib's full-territory production run: RM11-RM19 (9 districts). No prior Shahzaib work exists in any RM district — his historical allocation is HA6-HA9 (handover/shahzaib-ha6-ha9/, output/territories/shahzaib/) which has no RM connection. All 9 districts are genuinely new discovery.",
+  "resolutionNote": "TERRITORY MODEL (owner correction, 2026-08-05, docs/09_DECISIONS.md): Magna postcode districts are NON-EXCLUSIVE across representatives. RM1-RM14 also exist as a separate, complete, immutable historical allocation belonging to a DIFFERENT representative (\"Nauman\", output/territories/nauman/rm1-rm14, handover/nauman-rm1-rm14/) — this is explicitly NOT a conflict and does not block, reassign, or alter Nauman's own historical records. RM1-RM10 are ALSO Saif's own current campaign-007 allocation, run immediately prior to this one — also not a conflict (non-exclusive territory model). IDENTITY CONTROL (owner explicit correction, 2026-08-05): this representative is Shahzaib Khan, NOT Shahzaib Kazmi — two distinct real people.",
+  "representative": {
+    "internalName": "Shahzaib",
+    "role": "telesales",
+    "representativeFullName": "Shahzaib Khan",
+    "representativeEmail": "shahzaib@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": "Shahzaib Khan",
+    "regionRoute": "RM11-RM19",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["RM11", "RM12", "RM13", "RM14", "RM15", "RM16", "RM17", "RM18", "RM19"],
+    "districtCount": 9
+  },
+  "alreadyCompletedElsewhere": {
+    "description": "None. No prior Shahzaib work exists in any RM district — confirmed by filesystem search (output/territories/shahzaib/ contains only HA6-HA9 combine artifacts, handover/shahzaib-ha6-ha9/ is his only historical handover).",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["RM11", "RM12", "RM13", "RM14", "RM15", "RM16", "RM17", "RM18", "RM19"],
+    "districtCount": 9,
+    "processingOrder": ["RM11", "RM12", "RM13", "RM14", "RM15", "RM16", "RM17", "RM18", "RM19"]
+  },
+  "explicitlyExcluded": {
+    "ha6ThroughHa9": "Shahzaib's previous, already-completed, historical territory. Immutable. Never rerun.",
+    "rm1ThroughRm10": "Not part of Shahzaib's current allocation — that is Muhammad Saifullah's (campaign-007)."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  }
+}

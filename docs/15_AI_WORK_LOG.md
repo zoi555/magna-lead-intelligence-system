@@ -1461,3 +1461,82 @@ stopped per explicit instruction. Full detail: `docs/10_BUGS_AND_FIXES.md`,
    scripts (`scripts/export-operational-leads.ts`, `scripts/lead-production/generate-release-
    review.ts`) confirmed untouched throughout. Did not run discovery, start Naseh, or modify any
    Kunz/Meer file.
+
+## 2026-08-05 — production batch: remaining 7 representatives (Saad, Saif, Shahzaib, Tahira, Wajahat, Hassan, Haleema) run end-to-end on the frozen pipeline baseline
+
+Ran the approved production batch sequentially on the frozen pipeline baseline (commit
+`16c3a7dc8fc912f1e1c5e747497a150e71528f4a`, "temporary-lead-production-v1"), one representative
+after another, without pausing for owner review between successful campaigns, per explicit
+instruction.
+
+**Two corrections received and applied before/during the batch:**
+1. Owner supplied corrected, authoritative representative full names + emails after an initial,
+   genuinely-correct stop over an ambiguous/missing Sales Rep dropdown value (in particular
+   "Shahzaib Khan" vs. a different real person "Shahzaib Kazmi"). Stored `representativeFullName`/
+   `representativeEmail` separately per rep in each campaign's `territories.json`; the CTO Sales
+   Rep field uses the exact full name only (never concatenated with email, unlike Kunz/Meer/
+   Naseh's `Name <email>` convention).
+2. Owner corrected a territory-model misjudgement: postcode districts are NON-EXCLUSIVE across
+   representatives — a prior campaign's historical coverage of a district (Nauman's RM1-RM14) does
+   not block a different representative's current campaign in an overlapping range (Saif's
+   RM1-RM10, Shahzaib's RM11-RM19). Verified via direct code inspection that `load-assignments.
+   ts`'s duplicate check only ever scopes to a single loaded file — no code defect ever existed,
+   the stop was a judgement error. Logged in `docs/09_DECISIONS.md`, added 6-assertion regression
+   coverage (`test:lead-production-non-exclusive-territories`).
+
+**Self-caught correction mid-batch:** an earlier assumption that Tahira's DA1-DA8 was "all
+genuinely new" was wrong — a direct filesystem check (adopted as standard practice after this)
+found DA1 was Tahira's own `campaign-002-five-district-pilot` district, already discovered/
+enriched/phone-fix-reprocessed, following the identical precedent already known for Kunz's CM1/
+Naseh's IG1/Saif's RM1. Corrected before any DA1 rework began; proactively checked and confirmed
+the same for Hassan's BR1 before starting his campaign. See `docs/09_DECISIONS.md` (2026-08-05,
+"all five original pilot representatives...").
+
+**Per-campaign summary** (all 7: full 23-step process — config, preflight, live Just Eat
+discovery, 8-stage enrichment, cross-district + cross-campaign dedup, customer suppression,
+independent leakage verification with correction-and-reverify loop, owner-review pack, CTO
+export, 7-artifact release manifest, hash-verified copy to `representatives/<rep>/current-
+release/`):
+
+| Campaign | Rep | Districts | Reused-verbatim | Canonical candidates | Released (ordinary+KA) | Confirmed excl. | Held (probable) | Certificate |
+|---|---|---|---|---|---|---|---|---|
+| 006 | Saad Rehman | IG7-IG11 (5, all new) | — | 239 | 106 (96+10) | 2 | 0 | PASS |
+| 007 | Muhammad Saifullah | RM1-RM10 (10) | RM1 | 511 | 175 (158+17) | 5 | 8 | PASS |
+| 008 | Shahzaib Khan | RM11-RM19 (9, all new) | — | 373 | 154 (138+16) | 0 | 7 | PASS |
+| 009 | Tahira Abbasi | DA1-DA8 (8) | DA1 | 355 | 135 (126+9) | 0 | 2 | PASS |
+| 010 | Wajahat Sajjad | DA9-DA17 (9, all new) | — | 461 | 178 (164+14) | 1 | 1 | PASS |
+| 011 | Hassan Asif | BR1-BR4 (4) | BR1 | 273 | 106 (99+7) | 1 | 0 | PASS |
+| 012 | Haleema Sadia | BR5-BR8 (4, all new) | — | 214 | 89 (84+5) | 0 | 1 | PASS |
+
+**Total released across the batch: 943 leads (869 ordinary + 74 key accounts).** Every campaign's
+Master AND CTO leakage certificate is PASS (0 confirmed leaks remaining released, 0 unresolved
+probable leads remaining released, in every case).
+
+**Real defect found and fixed mid-batch:** ISS-0039 — the two-source-merge combined-master CSV
+side-artifact (Saif/Tahira/Hassan, the 3 campaigns needing a reused-verbatim pilot district)
+briefly held pre-correction row counts after `apply-leakage-certificate-decisions.ts` corrected
+only the XLSX. Fixed for all 3 by re-flattening the CSV and regenerating the release manifest
+post-correction. Full detail in `docs/10_BUGS_AND_FIXES.md` (2026-08-05) and `docs/11_ISSUES_LOG.
+md` ISS-0039 — including the outstanding process gap (no code enforces the ordering; must be done
+manually for any future two-source-merge campaign).
+
+**Two orphaned discovery runs recovered:** background `je:run` discovery calls for Tahira's DA5
+and Hassan's BR4 were killed mid-flight by an external interruption before completing, leaving a
+`discovery_runs` row stuck at `status=queued` (never claimed by a worker, zero API/scrape cost
+spent). Verified via direct Supabase query in both cases before acting — confirmed genuinely
+orphaned, not silently in progress — then used `--force-duplicate-run` to supersede. One of the
+two recovery attempts (DA5) used a malformed `--reason=` flag that does not exist in `je-run.ts`'s
+recognised-flag list, causing it to be absorbed into the literal territory-input string and
+triggering a second, garbled discovery run that queried 3 bogus extra postcode districts (SP6,
+RG20, RG22) alongside DA5 — self-caught via a Supabase query showing `derived_query_units`; that
+garbled run's output was never referenced by the actual pipeline (DA5's own clean, correctly-
+scoped run `d3d763ab-...` was used for the real pipeline continuation), so there was no data
+contamination, only wasted API cost on 3 irrelevant districts. Corrected the flag syntax
+(`--force-duplicate-run` only — no `--reason=` flag exists) for the second occurrence (BR4), which
+completed cleanly on the first attempt.
+
+**Verification:** all 45 `test:lead-production-*`/`test:je-*` suites individually re-run at the
+end of the batch, ALL PASSED; `npm run typecheck`/`build` clean. Did not import any CTO file into
+Sales Pro, did not merge to main, did not create a PR, did not start any representative outside
+the approved 7. Full commit/push status and final consolidated report recorded in
+`PROJECT_STATUS.md`.

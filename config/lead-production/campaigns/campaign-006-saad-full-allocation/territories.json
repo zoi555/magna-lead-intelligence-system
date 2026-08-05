@@ -1,0 +1,37 @@
+{
+  "campaignId": "campaign-006-saad-full-allocation",
+  "campaignVersion": "v1",
+  "effectiveDate": "2026-08-05",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-05 (production batch — remaining representatives)",
+  "description": "Saad's first full-territory production run under the current allocation: IG7-IG11 (5 districts). None previously piloted under any earlier campaign — all 5 newly discovered.",
+  "resolutionNote": "Saad's historical allocation (sales-territories-v2.json) is UB6-UB11 (handover/saad-ub6-ub11/) — a separate, immutable, completed prior campaign, not touched, reassigned, or included here. IG7-IG11 confirmed clean (no existing output/ directory for any of IG7-IG11, no overlap with Naseh's current IG1-IG6 or anyone else's allocation). Region/Route: not explicitly restated by the owner for this batch (unlike Kunz/Meer/Naseh, which each had an explicit human-readable label given directly). Set to the district-range string \"IG7-IG11\", matching the 100%-consistent historical convention observed across all 11 available prior CTO handover deliverables (every one uses the district range itself as Region/Route, e.g. nauman-rm1-rm14 -> \"RM1-RM14\", saad-ub6-ub11 -> \"UB6-UB11\") — not invented, evidence-based.",
+  "representative": {
+    "internalName": "Saad",
+    "role": "telesales",
+    "representativeFullName": "Saad Rehman",
+    "representativeEmail": "saadurrehman@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": "Saad Rehman",
+    "regionRoute": "IG7-IG11",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "description": "Saad's complete current postcode allocation — all newly run under this campaign.",
+    "postcodeDistricts": ["IG7", "IG8", "IG9", "IG10", "IG11"],
+    "districtCount": 5
+  },
+  "alreadyCompletedElsewhere": { "description": "None.", "postcodeDistricts": [], "sourceCampaignId": null, "sourceOutputDir": null },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["IG7", "IG8", "IG9", "IG10", "IG11"],
+    "districtCount": 5,
+    "processingOrder": ["IG7", "IG8", "IG9", "IG10", "IG11"]
+  },
+  "explicitlyExcluded": {
+    "ub6ThroughUb11": "Saad's previous, already-completed, historical territory. Immutable. Never rerun.",
+    "anyOtherRepresentativesDistricts": "Out of scope entirely."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"],
+    "explicitlyNotUsedForDiscovery": ["Uber Eats", "Deliveroo", "any other unapproved discovery source"]
+  }
+}

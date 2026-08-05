@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 9,
+  "note": "All 9 districts (RM11-RM19) are newly run for Shahzaib — no verbatim reuse in this campaign.",
+  "representatives": [
+    {
+      "representative": "Shahzaib",
+      "role": "telesales",
+      "salesTerritory": "RM11-RM19",
+      "postcodeDistricts": ["RM11", "RM12", "RM13", "RM14", "RM15", "RM16", "RM17", "RM18", "RM19"],
+      "districtCount": 9,
+      "mapsRequired": false
+    }
+  ]
+}

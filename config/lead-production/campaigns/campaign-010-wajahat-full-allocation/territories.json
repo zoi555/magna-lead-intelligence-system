@@ -1,0 +1,40 @@
+{
+  "campaignId": "campaign-010-wajahat-full-allocation",
+  "campaignVersion": "v1",
+  "effectiveDate": "2026-08-05",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-05 (production batch — remaining representatives)",
+  "description": "Wajahat's full-territory production run: DA9-DA17 (9 districts). No prior Wajahat work exists in any DA district — his historical allocation is WD17-WD25 (handover/wajahat-wd17-wd25/, output/territories/wajahat/) which has no DA connection. All 9 districts are genuinely new discovery. Confirmed by filesystem search before starting (lesson from Tahira's DA1 surprise earlier in this batch — every representative is checked directly, not assumed from memory).",
+  "resolutionNote": "TERRITORY MODEL (owner correction, 2026-08-05, docs/09_DECISIONS.md): Magna postcode districts are NON-EXCLUSIVE across representatives. DA1-DA8 are Tahira's own current campaign-009 allocation, run immediately prior to this one — not a conflict (non-exclusive territory model).",
+  "representative": {
+    "internalName": "Wajahat",
+    "role": "telesales",
+    "representativeFullName": "Wajahat Sajjad",
+    "representativeEmail": "Wajahat@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": "Wajahat Sajjad",
+    "regionRoute": "DA9-DA17",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["DA9", "DA10", "DA11", "DA12", "DA13", "DA14", "DA15", "DA16", "DA17"],
+    "districtCount": 9
+  },
+  "alreadyCompletedElsewhere": {
+    "description": "None. No prior Wajahat work exists in any DA district — confirmed by filesystem search (output/territories/wajahat/ and handover/wajahat-wd17-wd25/ both WD-prefixed only).",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["DA9", "DA10", "DA11", "DA12", "DA13", "DA14", "DA15", "DA16", "DA17"],
+    "districtCount": 9,
+    "processingOrder": ["DA9", "DA10", "DA11", "DA12", "DA13", "DA14", "DA15", "DA16", "DA17"]
+  },
+  "explicitlyExcluded": {
+    "wd17ThroughWd25": "Wajahat's previous, already-completed, historical territory. Immutable. Never rerun.",
+    "da1ThroughDa8": "Not part of Wajahat's allocation — that is Tahira Abbasi's (campaign-009)."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  }
+}

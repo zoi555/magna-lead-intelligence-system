@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 4,
+  "note": "All 4 districts (BR5-BR8) are newly run for Haleema — no verbatim reuse in this campaign.",
+  "representatives": [
+    {
+      "representative": "Haleema",
+      "role": "telesales",
+      "salesTerritory": "BR5-BR8",
+      "postcodeDistricts": ["BR5", "BR6", "BR7", "BR8"],
+      "districtCount": 4,
+      "mapsRequired": false
+    }
+  ]
+}

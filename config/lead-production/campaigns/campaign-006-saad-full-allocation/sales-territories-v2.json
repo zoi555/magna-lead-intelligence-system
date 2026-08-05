@@ -1,0 +1,15 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 5,
+  "representatives": [
+    {
+      "representative": "Saad",
+      "role": "telesales",
+      "salesTerritory": "IG7-IG11",
+      "postcodeDistricts": ["IG7", "IG8", "IG9", "IG10", "IG11"],
+      "districtCount": 5,
+      "mapsRequired": false
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 9,
+  "note": "Only RM2-RM10 (the 9 newly-run districts) are listed here — RM1 is reused verbatim from campaign-002 and never goes through this campaign's live orchestrator.",
+  "representatives": [
+    {
+      "representative": "Saif",
+      "role": "telesales",
+      "salesTerritory": "RM2-RM10",
+      "postcodeDistricts": ["RM2", "RM3", "RM4", "RM5", "RM6", "RM7", "RM8", "RM9", "RM10"],
+      "districtCount": 9,
+      "mapsRequired": false
+    }
+  ]
+}
