@@ -1508,7 +1508,11 @@ release/`):
 | 011 | Hassan Asif | BR1-BR4 (4) | BR1 | 273 | 106 (99+7) | 1 | 0 | PASS |
 | 012 | Haleema Sadia | BR5-BR8 (4, all new) | — | 214 | 89 (84+5) | 0 | 1 | PASS |
 
-**Total released across the batch: 943 leads (869 ordinary + 74 key accounts).** Every campaign's
+**Total released across the batch: 943 leads (865 ordinary + 78 key accounts)** — recomputed and
+verified directly from each campaign's authoritative combined-Master workbook during the
+2026-08-05 evidence-reconciliation pass (see the new dated entry below); the "869 ordinary + 74
+key accounts" split first reported here was a prose transcription error, not a data or pipeline
+defect. Every campaign's
 Master AND CTO leakage certificate is PASS (0 confirmed leaks remaining released, 0 unresolved
 probable leads remaining released, in every case).
 
@@ -1540,3 +1544,50 @@ end of the batch, ALL PASSED; `npm run typecheck`/`build` clean. Did not import 
 Sales Pro, did not merge to main, did not create a PR, did not start any representative outside
 the approved 7. Full commit/push status and final consolidated report recorded in
 `PROJECT_STATUS.md`.
+
+## 2026-08-05 (same day, evidence-reconciliation pass) — batch totals and task tracker corrected against authoritative files; no data or pipeline defect found
+
+Owner flagged three apparent contradictions in the prior report and required every figure be
+re-verified directly from each campaign's canonical Master/CTO/certificate/manifest files — not
+from prior prose — with no campaign rerun, no provider call, and no production file altered
+unless the audit found a genuine release defect. Wrote a read-only verification script (run from
+inside the repo for module resolution, never committed) that reads all 7 campaigns'
+`-master-combined.xlsx` (disjoint-sheet row counts, Key Accounts overlay, Held-Review split into
+leakage-driven probable holds vs. other subtypes via the `Customer Match Audit Warning` field),
+`-CTO-final-review.xlsx` (row/column counts), `zero-leakage-certificate.json`, `-release-
+manifest.json`, and byte-for-byte hash comparison against each `representatives/<rep>/current-
+release/` copy.
+
+**Findings — both were prose/process errors, not data or pipeline defects:**
+1. **Task tracker was never updated** — task IDs 94-99 (Saif through Haleema) still showed
+   `in_progress`/`pending` despite all 7 campaigns being genuinely complete on disk. Root cause:
+   no `TaskUpdate` call was made after any campaign finished during the batch itself. Fixed by
+   marking all 6 completed after independently confirming each campaign's release/review/audit/
+   manifests directories, certificate, and CTO file all exist and PASS — not by trusting the
+   prior report's claim.
+2. **Batch total arithmetic error** — the prior consolidated report and this doc's first version
+   both stated "869 ordinary + 74 key accounts" (still correctly summing to 943 released, but
+   with the ordinary/key-account split wrong by 4 in each direction). The authoritative,
+   file-derived split is **865 ordinary + 78 key accounts = 943**, confirmed by summing each
+   campaign's own `Operationally Usable Leads` row count minus its `Key Accounts` overlay count
+   directly from the Master workbook. A transcription slip when composing the summary line, not
+   an error in the underlying released data.
+3. **Saad's Excluded Groups figure** — the final consolidated chat report stated 27; the
+   authoritative Master workbook's `Excluded Groups` sheet has **29** rows, matching the number
+   originally reported live during Saad's own campaign run. 27 was a second, independent
+   transcription slip in the same summary pass as (2), not a re-derivation or a different
+   (mis-)computed value — no plausible alternate source for "27" was found. Not present in any
+   committed doc, only in chat prose.
+
+**Full authoritative per-campaign figures** (all recomputed from files, not prose) are recorded in
+`PROJECT_STATUS.md`'s 2026-08-05 evidence-reconciliation entry.
+
+**Confirmed unchanged by this pass:** all 7 campaigns' `release/`, `review/`, `audit/`,
+`manifests/` directories exist; every Master/CTO zero-leakage certificate is `masterResult: PASS,
+ctoResult: PASS`; every `representatives/<rep>/current-release/final-review.{xlsx,csv}` hash
+matches its `release/` source byte-for-byte; every campaign's disjoint-sheet reconciliation sums
+exactly to its own canonical candidate total (verified for all 7, not sampled). No release file
+was rewritten, no district was rerun, no provider call was made — this was a read-only audit.
+
+**Verification:** re-ran all 45 `test:lead-production-*`/`test:je-*` suites, typecheck, and build
+after the doc corrections (no production code changed, only documentation) — all clean.

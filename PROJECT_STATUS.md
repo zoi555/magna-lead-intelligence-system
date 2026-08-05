@@ -1701,7 +1701,11 @@ before any rework). Full narrative: `docs/15_AI_WORK_LOG.md` (2026-08-05).
 | 011 | Hassan Asif | BR1-BR4 | 106 (99+7) | PASS |
 | 012 | Haleema Sadia | BR5-BR8 | 89 (84+5) | PASS |
 
-**Total released: 943 leads (869 ordinary + 74 key accounts) across all 7 campaigns.** Every
+**Total released: 943 leads (865 ordinary + 78 key accounts) across all 7 campaigns** — figure
+recomputed and verified directly from each campaign's authoritative combined-Master workbook
+(2026-08-05 evidence-reconciliation pass; the original "869 ordinary + 74 key accounts" split in
+this entry's first version was a prose transcription error in the per-campaign summary, not a
+data or pipeline defect — see `docs/10_BUGS_AND_FIXES.md`). Every
 campaign's Master and CTO zero-leakage certificate is PASS.
 
 **Real defect found and fixed**: ISS-0039 — the two-source-merge combined-master CSV went stale
@@ -1720,3 +1724,44 @@ discovery counts, provenance-summary columns — consistent, known, out-of-scope
 Kunz/Meer/Naseh), then decides on committing/pushing this batch's code/config/docs and on any
 further representative work. Per the stop condition: no representative outside the approved 7 was
 started, no CTO file imported, no merge to main, no PR created.
+
+## 2026-08-05 (same day, evidence-reconciliation pass) — full batch figures re-verified directly against authoritative files; task tracker corrected; no data or pipeline defect found
+
+Owner required every figure from the prior report be re-derived directly from each campaign's
+canonical Master/CTO/certificate/manifest files (never from prior prose), with no campaign
+rerun, no provider call, and no production file altered. Full detail and methodology:
+`docs/15_AI_WORK_LOG.md` (2026-08-05, evidence-reconciliation entry). Summary:
+
+| Campaign | Canonical | Ordinary | KA | Released | Hot/Warm/Cold | Cust. excl. | Probable holds | Groups excl. | Commercial excl. | Bus.-cat. excl. | Hard rejects | Other held | Master rows(cols) | CTO rows(cols) | Cert | Manifest artifacts | Hash match |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 006 Saad | 239 | 96 | 10 | 106 | 33/73/0 | 2 | 0 | 29 | 26 | 8 | 47 | 21 | 106(134) | 106(28) | PASS/PASS | 11 | xlsx✓ csv✓ |
+| 007 Saif | 511 | 158 | 17 | 175 | 60/115/0 | 32 | 8 | 59 | 57 | 28 | 107 | 45 | 175(136) | 175(28) | PASS/PASS | 7 | xlsx✓ csv✓ |
+| 008 Shahzaib | 373 | 138 | 16 | 154 | 57/97/0 | 9 | 7 | 36 | 47 | 15 | 66 | 39 | 154(135) | 154(28) | PASS/PASS | 11 | xlsx✓ csv✓ |
+| 009 Tahira | 355 | 126 | 9 | 135 | 32/103/0 | 7 | 2 | 47 | 40 | 14 | 67 | 43 | 135(136) | 135(28) | PASS/PASS | 7 | xlsx✓ csv✓ |
+| 010 Wajahat | 461 | 164 | 14 | 178 | 61/117/0 | 15 | 1 | 59 | 51 | 19 | 87 | 51 | 178(135) | 178(28) | PASS/PASS | 11 | xlsx✓ csv✓ |
+| 011 Hassan | 273 | 99 | 7 | 106 | 36/70/0 | 7 | 0 | 36 | 36 | 21 | 48 | 19 | 106(136) | 106(28) | PASS/PASS | 7 | xlsx✓ csv✓ |
+| 012 Haleema | 214 | 84 | 5 | 89 | 25/64/0 | 1 | 1 | 31 | 19 | 15 | 37 | 21 | 89(135) | 89(28) | PASS/PASS | 11 | xlsx✓ csv✓ |
+| **TOTAL** | **2426** | **865** | **78** | **943** | **304/639/0** | **73** | **19** | **297** | **276** | **120** | **459** | **239** | — | — | 7/7 PASS | — | 14/14 ✓ |
+
+("Customer excl." = confirmed customer-master matches removed from release. "Probable holds" =
+unresolved-probable leakage matches held in Held-Review, identified via the `Customer Match Audit
+Warning` field — a strict subset of "Other held" which also includes phone-resolution-exceptions
+and business-category-review-required rows. Master/CTO row counts independently cross-checked:
+CTO rows equal each campaign's own released total in every case; every campaign's 7-sheet disjoint
+reconciliation sums exactly to its own canonical total. "Manifest artifacts" is 11 for the 4
+single-source campaigns and 7 for the 3 two-source-merge campaigns, matching the expected
+structural difference already documented for prior campaigns.)
+
+**Two corrections made, both reporting-layer, neither a data or pipeline defect:**
+- Batch total corrected from the erroneous "869 ordinary + 74 key accounts" to the authoritative
+  **865 ordinary + 78 key accounts = 943** (a summary-line arithmetic slip; every per-campaign row
+  was already correct).
+- Saad's Excluded Groups corrected from an erroneous "27" (chat prose only, never committed) to
+  the authoritative **29**, matching the figure originally reported live during Saad's own
+  campaign run.
+- Task tracker (#94–#99) updated from stale `in_progress`/`pending` to `completed` — all 6 were
+  independently re-verified against disk (directories, certificate, hashes) before marking, not
+  trusted from the prior report.
+
+All 45 suites, typecheck, and build re-run clean after these (documentation-only) corrections.
+No release file was rewritten, no district was rerun, no provider call was made.
