@@ -1,6 +1,6 @@
 // Fixture + real-config-driven proofs for Milestone 2 (district/Sales-Territory orchestration):
 // native sales-territories-v2.json loading, inclusive/non-contiguous range expansion,
-// representative-ownership validation across all 13 reps / 111 districts, cross-district
+// representative-ownership validation across all 14 reps / 115 districts, cross-district
 // dedup, per-district population invariant, territory status derivation, and one real
 // end-to-end request-plan-only smoke test of run-sales-territory.ts.
 // npm run test:lead-production-territory-v2
@@ -40,9 +40,9 @@ const CONFIG_PATH = "config/lead-production/sales-territories-v2.json";
 
 const EXPECTED_COUNTS: Record<string, number> = {
   Nauman: 14, Manraj: 24, Ayesha: 10, Kunz: 10, Meer: 10, Naseh: 5, Saad: 6, Saif: 6,
-  Shahzaib: 4, Tahira: 5, Wajahat: 6, Hassan: 5, Haleema: 6,
+  Shahzaib: 4, Tahira: 5, Wajahat: 6, Hassan: 5, Haleema: 6, Alam: 4,
 };
-const FIELD_SALES_REPS = new Set(["Nauman", "Manraj", "Ayesha"]);
+const FIELD_SALES_REPS = new Set(["Nauman", "Manraj", "Ayesha", "Alam"]);
 
 async function main() {
   await loadDotEnv();
@@ -51,11 +51,11 @@ async function main() {
   console.log("Native config loading and structural validation:");
   const config = await loadSalesTerritoriesV2(CONFIG_PATH);
   assert(config.assignmentVersion === "v2", "assignmentVersion is v2");
-  assert(config.totalRepresentatives === 13, `totalRepresentatives === 13 (got ${config.totalRepresentatives})`);
-  assert(config.totalDistricts === 111, `totalDistricts === 111 (got ${config.totalDistricts})`);
-  assert(config.representatives.length === 13, "exactly 13 representative entries present");
+  assert(config.totalRepresentatives === 14, `totalRepresentatives === 14 (got ${config.totalRepresentatives})`);
+  assert(config.totalDistricts === 115, `totalDistricts === 115 (got ${config.totalDistricts})`);
+  assert(config.representatives.length === 14, "exactly 14 representative entries present");
 
-  console.log("\nPer-representative district counts, role, and map requirement (all 13):");
+  console.log("\nPer-representative district counts, role, and map requirement (all 14):");
   for (const [name, expectedCount] of Object.entries(EXPECTED_COUNTS)) {
     const rep = findRepresentative(config, name);
     assert(!!rep, `${name} present in config`);
@@ -68,7 +68,7 @@ async function main() {
     assert(rep.mapsRequired === expectedMapsRequired, `${name}: mapsRequired === ${expectedMapsRequired}`);
   }
 
-  console.log("\nAll 111 Postcode Districts individually resolve to exactly the expected owner:");
+  console.log("\nAll 115 Postcode Districts individually resolve to exactly the expected owner:");
   let districtChecks = 0;
   for (const rep of config.representatives) {
     for (const district of rep.postcodeDistricts) {
@@ -77,9 +77,9 @@ async function main() {
       districtChecks++;
     }
   }
-  assert(districtChecks === 111, `checked all 111 districts individually (checked ${districtChecks})`);
+  assert(districtChecks === 115, `checked all 115 districts individually (checked ${districtChecks})`);
   const allDistrictsFlat = config.representatives.flatMap((r) => r.postcodeDistricts);
-  assert(new Set(allDistrictsFlat).size === 111, "111 unique Postcode Districts, no duplicates across the whole config");
+  assert(new Set(allDistrictsFlat).size === 115, "115 unique Postcode Districts, no duplicates across the whole config");
 
   console.log("\nEvery configured Postcode District is a real, recognised entry in the authoritative");
   console.log("postcode reference (ISS-0032 regression guard — catches a non-existent district like");
@@ -93,7 +93,7 @@ async function main() {
       refChecks++;
     }
   }
-  assert(refChecks === 111, `checked all 111 districts against the postcode reference (checked ${refChecks})`);
+  assert(refChecks === 115, `checked all 115 districts against the postcode reference (checked ${refChecks})`);
   assert(!postcodeRef.entry?.("HA10"), "HA10 itself is confirmed absent from the reference (the exact case this guard exists for)");
 
   console.log("\nSpecific assignment-spec cases:");
@@ -221,7 +221,7 @@ async function main() {
   assert(threwForUnconfigured, "a syntactically-valid but unassigned district (\"ZZ99\") throws UnconfiguredDistrictError rather than silently proceeding");
   let threwForCM1 = false;
   try { assertDistrictIsConfigured(config, "CM1"); } catch (e) { threwForCM1 = e instanceof UnconfiguredDistrictError; }
-  assert(threwForCM1, "CM1 (not in the current 111-district config) throws rather than silently passing — must be added to sales-territories-v2.json before the pilot can process it");
+  assert(threwForCM1, "CM1 (not in the current 115-district config) throws rather than silently passing — must be added to sales-territories-v2.json before the pilot can process it");
 
   console.log("\nEnd-to-end smoke test: run-sales-territory.ts --request-plan-only for Hassan (EN1-EN5, 5 districts, zero live calls):");
   const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "sales-territory-smoke-"));

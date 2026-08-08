@@ -454,11 +454,16 @@ async function main() {
   const outJson = arg("out-json") ?? (campaignId ? defaultCampaignOutputPath(campaignId, "audit", `${campaignId}-zero-leakage-certificate.json`) : null);
   const outXlsx = arg("out-xlsx") ?? (campaignId ? defaultCampaignOutputPath(campaignId, "audit", `${campaignId}-customer-leakage-audit.xlsx`) : null);
   const ctoReviewPath = arg("cto-review");
+  // Optional (2026-08-08, field-sales batch): the sheet name inside --cto-review differs by
+  // export template — generate-cto-final-review.ts writes "CTO Final Review", generate-field-
+  // sales-final-review.ts writes "Field Sales Final Review". Defaults to the original telesales
+  // name so all 7 already-delivered telesales campaigns' invocations are unaffected.
+  const ctoReviewSheetName = arg("cto-review-sheet") ?? "CTO Final Review";
   const salesProNewLeadsPaths = (arg("salespro-new-leads") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const removedCountArg = arg("removed-count");
   const forceOverwriteRelease = flag("force-overwrite-release");
   if (!combinedMasterPath || !customersPath || !campaignId || !outJson) {
-    console.error("Missing required argument(s): --combined-master=<path> --customers=<path> --campaign-id=<id> --out-json=<path> [--out-xlsx=<path>] [--cto-review=<path>] [--salespro-new-leads=<path,path,...>] [--removed-count=<n>] (--out-json/--out-xlsx default to the campaign-scoped audit/ directory when omitted)");
+    console.error("Missing required argument(s): --combined-master=<path> --customers=<path> --campaign-id=<id> --out-json=<path> [--out-xlsx=<path>] [--cto-review=<path>] [--cto-review-sheet=<name, default \"CTO Final Review\">] [--salespro-new-leads=<path,path,...>] [--removed-count=<n>] (--out-json/--out-xlsx default to the campaign-scoped audit/ directory when omitted)");
     process.exit(1);
   }
 
@@ -513,7 +518,7 @@ async function main() {
   let ctoResult: LeakageCertificate["ctoResult"] = "NOT_CHECKED";
   let ctoConfirmed: LeakageFinding[] = [];
   if (ctoReviewPath) {
-    const ctoCheck = await verifySheet(ctoReviewPath, "CTO Final Review", index);
+    const ctoCheck = await verifySheet(ctoReviewPath, ctoReviewSheetName, index);
     ctoConfirmed = ctoCheck.findings.filter((f) => f.tier === "confirmed");
     ctoResult = ctoConfirmed.length === 0 ? "PASS" : "FAIL";
     console.log(`\nCTO final-review population: ${ctoCheck.leads.length}, confirmed leaks: ${ctoConfirmed.length} -> ${ctoResult}`);

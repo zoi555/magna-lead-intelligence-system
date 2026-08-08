@@ -1730,3 +1730,75 @@ unresolved probable match ever reached a delivered file. Full root cause, fix, a
 process gap (no code enforces re-flattening the CSV after corrections — must be done manually,
 every time, for any future two-source-merge campaign) recorded in `docs/10_BUGS_AND_FIXES.md`
 (2026-08-05 entry).
+
+## ISS-0040 — `run-sales-territory.ts --resume` can invalidate all district orchestrator stage bookkeeping despite valid underlying checkpoints (2026-08-08)
+
+### Status
+**UNRESOLVED / NON-BLOCKING.** Found during campaign-016 (Jahangir Alam, SM4–SM7), recovered live
+with no data loss. Not fixed at the root cause — out of scope for this pass (no pipeline redesign
+authorised).
+
+### Problem
+Running `run-sales-territory.ts --representative=Alam ... --resume --live` to consolidate 4
+already-complete districts into a `territory-run-manifest.json` instead triggered
+`run-full-territory.ts`'s own config-hash invalidation logic: it computed a different hash for the
+"assignment" input (because the territory-level orchestrator resolves/passes assignment
+information differently than a direct per-district `run-full-territory.ts` invocation with an
+explicit `--assignments=<path>`), read this as "config input changed," and invalidated **every**
+recorded stage for **every** district — deleting all 8 stage records from each of SM4/SM5/SM6/SM7's
+`.orchestrator-run-manifest.json`. Each district then failed immediately at stage 1 (`phase1`, no
+`--discovery-run-id` supplied at the territory level) and the failure handler wrote the now-empty
+`stages: {}` back to disk (`run-full-territory.ts`'s "write manifest on failure so a future
+`--resume` can pick up cleanly" behaviour — safe in the single-district case, not safe when the
+config-hash invalidation itself was the spurious trigger).
+
+### Impact and recovery
+The underlying stage checkpoint **files and directories were never touched** — only the manifest's
+bookkeeping index was cleared. Confirmed via direct inspection immediately after the failure.
+Recovered by rebuilding each district's manifest with `run-full-territory.ts
+--checkpoint=<stage>=<dir>` overrides pointing at the correct (already-good, post-Google-repair)
+checkpoint directories for all 8 stages — this path only validates the anchor file and re-records
+it, making zero additional live API calls. No rediscovery, no re-enrichment, no data loss. Combined
+Master was then built by hand-authoring a minimal, correct `territory-run-manifest.json` directly
+(schema: `representative`/`role`/`salesTerritory`/`districts: {DISTRICT: {status: "complete",
+outDir: <checkpoint dir>}}`) rather than re-invoking the buggy script a second time.
+
+### Recommended future fix (not attempted here)
+`run-full-territory.ts`'s config-hash computation for the "assignment" dependency should be
+insensitive to *how* the assignment was resolved (direct `--assignments=<path>` vs. the
+territory-level orchestrator's own resolution), only to the resolved salesperson/role/mapRequired
+values actually changing. Alternatively, `run-sales-territory.ts` could pass through the identical
+`--assignments`/`--salesperson`/`--role` flags a direct invocation would use, so the hash matches.
+
+## ISS-0041 — `apply-leakage-certificate-decisions.ts` corrects the combined Master but not the companion per-representative workbook, creating a stale-copy risk (2026-08-08)
+
+### Status
+**UNRESOLVED / NON-BLOCKING.** Found during campaign-016 (Jahangir Alam). Related to ISS-0039
+(2026-08-05) — same root gap (leakage corrections are applied as a post-hoc overlay onto one
+output file, not propagated to sibling artifacts derived from the same pre-correction data) — but
+affects the `<rep>-master-representative.xlsx` workbook, not the combined-master CSV.
+
+### Problem
+`generate-master-export.ts` writes both `<rep>-master-combined.xlsx` and
+`<rep>-master-representative.xlsx` from the same in-memory candidate buckets in one run.
+`apply-leakage-certificate-decisions.ts` only ever edits the combined workbook afterward. For
+campaign-016, the independent leakage verifier found 6 confirmed customer leaks in the initial
+85-usable population; after correction the combined workbook and all downstream artifacts
+(field-sales final-review, owner-review pack, Master CSV) correctly reflected 75 usable — but
+`alam-master-representative.xlsx` still held the original 85-usable population, including all 6
+confirmed leaks, in its "Usable"/"Premium"/"Key Accounts" sheets.
+
+### Impact and recovery
+This file is not one of the 8 required campaign deliverables and was never copied to a
+representative's `current-release/` delivery folder (only the field-sales final-review XLSX/CSV
+are copied, per the established storage protocol) — so no confirmed leak reached anything actually
+delivered. Moved the stale file out of `release/` to
+`working/pre-correction-superseded/alam-master-representative-PRE-LEAKAGE-CORRECTION-superseded.xlsx`
+(preserved, not deleted) and regenerated the release manifest without it, rather than leave a
+stale leaked-customer file sitting in a certified-PASS release directory.
+
+### Recommended future fix (not attempted here)
+Extend `apply-leakage-certificate-decisions.ts` to also correct the companion
+`<rep>-master-representative.xlsx` (same bucket-membership changes), or have it regenerate that
+file from the corrected combined workbook's buckets rather than leaving it as an untouched sibling
+of the file it does correct.

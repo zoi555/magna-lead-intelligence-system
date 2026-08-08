@@ -1,0 +1,68 @@
+{
+  "campaignId": "campaign-016-alam-field-sales-allocation",
+  "campaignVersion": "v1",
+  "channel": "field_sales",
+  "effectiveDate": "2026-08-08",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-08 (Monday field-sales lead-generation batch)",
+  "description": "Jahangir Alam's field-sales allocation: SM4, SM5, SM6, SM7 (4 districts, Sutton area). All genuinely new.",
+  "resolutionNote": "TERRITORY MODEL (established 2026-08-05, docs/09_DECISIONS.md): postcode districts are NON-EXCLUSIVE across representatives. Manraj Dhillon's SM1-SM3 (campaign-014) is not a conflict.",
+  "representativeIdentityValidation": {
+    "method": "Owner-supplied identity, explicitly flagged by the owner as a NEW field-sales representative not yet confirmed on the authoritative Magna SalesPro representative dropdown/CSV.",
+    "matchResult": "NOT FOUND in the customer master's Sales Rep column (expected — owner explicitly stated he is unconfirmed). Confirmed no prior campaign/output/handover directory exists for either 'Alam' or 'Jahangir' anywhere in the repository.",
+    "disambiguationCheck": "IDENTITY CONTROL: a DIFFERENT, existing real person, 'Muhammad N Jehangir', appears in the customer master's Sales Rep column with real closed-won accounts. Different name structure (Jehangir as a surname-like token with middle initial 'N' vs. Jahangir as a first name + Alam as a surname) and a different email domain-local-part convention — treated as almost certainly a different person, but explicitly NOT conflated, given the Shahzaib Khan/Kazmi precedent from the prior batch. If this is in fact the same person under a different spelling, the owner must confirm — not assumed either way.",
+    "extractedFields": {
+      "representativeFirstName": "Jahangir",
+      "representativeLastName": "Alam",
+      "representativeFullName": "Jahangir Alam",
+      "representativeEmail": "mjalam@magnafoodservice.co.uk"
+    }
+  },
+  "representative": {
+    "internalName": "Alam",
+    "role": "field_sales",
+    "representativeFullName": "Jahangir Alam",
+    "representativeEmail": "mjalam@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": null,
+    "salesProRosterStatus": "pending_owner_confirmation",
+    "regionRoute": "SM4-SM7",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["SM4", "SM5", "SM6", "SM7"],
+    "districtCount": 4,
+    "areaDescription": "Sutton"
+  },
+  "sectorWhitelist": {
+    "SM4": ["SM4 4", "SM4 5", "SM4 6", "SM4 9"],
+    "SM5": ["SM5 1", "SM5 2", "SM5 3", "SM5 4", "SM5 9"],
+    "SM6": ["SM6 0", "SM6 6", "SM6 7", "SM6 8", "SM6 9"],
+    "SM7": ["SM7 1", "SM7 2", "SM7 3", "SM7 9"]
+  },
+  "sectorWhitelistSource": "Derived from the authoritative Supabase postcode_reference table (level='sector', district=<code>), never manually invented. Used for geography validation only — one Just Eat discovery query per DISTRICT, not per sector.",
+  "alreadyCompletedElsewhere": {
+    "description": "None. Alam is a genuinely new field-sales representative — no prior campaign/output/handover directory found anywhere.",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["SM4", "SM5", "SM6", "SM7"],
+    "districtCount": 4,
+    "processingOrder": ["SM4", "SM5", "SM6", "SM7"]
+  },
+  "explicitlyExcluded": {
+    "sm1ThroughSm3": "Not part of Alam's allocation — that is Manraj Dhillon's (campaign-014)."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  },
+  "outputTemplate": "field-sales-31-column-v1",
+  "fieldSalesRoutingStatus": "pending",
+  "releaseHoldNote": "Discovery, enrichment, qualification, and Master production proceed normally. Final SalesPro/CTO import release is HELD pending owner confirmation that Jahangir Alam's representative entry has been added to and verified on the authoritative SalesPro roster. The Master, owner-review pack, leakage audit, and certificate are still generated and verified in full — only the final field-sales-final-review file's release status is gated.",
+  "pipelineVersion": "temporary-lead-production-v1 (frozen baseline 16c3a7dc8fc912f1e1c5e747497a150e71528f4a, plus additive field-sales export template + CTO contact-position fix, 2026-08-08)",
+  "customerMasterVersion": {
+    "snapshotDate": "2026-08-03",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1"
+  }
+}

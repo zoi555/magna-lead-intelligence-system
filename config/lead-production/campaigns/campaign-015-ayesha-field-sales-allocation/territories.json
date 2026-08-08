@@ -1,0 +1,67 @@
+{
+  "campaignId": "campaign-015-ayesha-field-sales-allocation",
+  "campaignVersion": "v1",
+  "channel": "field_sales",
+  "effectiveDate": "2026-08-08",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-08 (Monday field-sales lead-generation batch)",
+  "description": "Ayesha Tahir's field-sales allocation: EN1, EN2, EN3 (3 districts, Enfield area). All genuinely new; no verbatim reuse.",
+  "resolutionNote": "TERRITORY MODEL (established 2026-08-05, docs/09_DECISIONS.md): postcode districts are NON-EXCLUSIVE across representatives. Ayesha's historical allocation is NW1-NW10 (field_sales, handover/ayesha-nw1-nw10/) — a separate, immutable, completed prior campaign with no EN-district connection, not touched here.",
+  "representativeIdentityValidation": {
+    "method": "Cross-checked against the customer master's own 'Sales Rep' column (input/customer-masters/2026-08-03/CustomersProjects81_raw_snapshot_2026-08-03.csv) — the only authoritative live SalesPro/NetSuite dropdown-reflecting source found on disk (no standalone roster CSV/JSON exists).",
+    "matchResult": "Exact, unambiguous match: 'Ayesha Tahir' appears verbatim, once, in the Sales Rep column.",
+    "extractedFields": {
+      "representativeFirstName": "Ayesha",
+      "representativeLastName": "Tahir",
+      "representativeFullName": "Ayesha Tahir",
+      "representativeEmail": null
+    },
+    "emailNote": "No email found for Ayesha anywhere in the repository (customer master, historical handover README/reports). Not fabricated. Not required by the field-sales output template.",
+    "disambiguationCheck": "No other 'Ayesha' variant found anywhere in the Sales Rep column. Not to be confused with 'Tahira Abbasi' (a different person, campaign-009, telesales, DA1-DA8) — different first name entirely, checked explicitly given the shared 'Tahir'/'Tahira' surname-like similarity."
+  },
+  "representative": {
+    "internalName": "Ayesha",
+    "role": "field_sales",
+    "representativeFullName": "Ayesha Tahir",
+    "representativeEmail": null,
+    "salesProRepresentativeValue": "Ayesha Tahir",
+    "salesProRosterStatus": "confirmed",
+    "regionRoute": "EN1-EN3",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["EN1", "EN2", "EN3"],
+    "districtCount": 3,
+    "areaDescription": "Enfield"
+  },
+  "sectorWhitelist": {
+    "EN1": ["EN1 1", "EN1 2", "EN1 3", "EN1 4", "EN1 9"],
+    "EN2": ["EN2 0", "EN2 6", "EN2 7", "EN2 8", "EN2 9"],
+    "EN3": ["EN3 4", "EN3 5", "EN3 6", "EN3 7"]
+  },
+  "sectorWhitelistSource": "Derived from the authoritative Supabase postcode_reference table (level='sector', district=<code>), never manually invented. Used for geography validation only — one Just Eat discovery query per DISTRICT, not per sector.",
+  "alreadyCompletedElsewhere": {
+    "description": "None. All 3 districts are genuinely new for Ayesha — confirmed by filesystem search (output/territories/ayesha/ and handover/ayesha-nw1-nw10/ are both NW-prefixed only).",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["EN1", "EN2", "EN3"],
+    "districtCount": 3,
+    "processingOrder": ["EN1", "EN2", "EN3"]
+  },
+  "explicitlyExcluded": {
+    "nw1ThroughNw10": "Ayesha's previous, already-completed, historical field-sales territory. Immutable. Never rerun."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  },
+  "outputTemplate": "field-sales-31-column-v1",
+  "fieldSalesRoutingStatus": "pending",
+  "pipelineVersion": "temporary-lead-production-v1 (frozen baseline 16c3a7dc8fc912f1e1c5e747497a150e71528f4a, plus additive field-sales export template + CTO contact-position fix, 2026-08-08)",
+  "customerMasterVersion": {
+    "snapshotDate": "2026-08-03",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 3,
+  "note": "All 3 districts (EN1-EN3) are newly run for Ayesha — no verbatim reuse in this campaign.",
+  "representatives": [
+    {
+      "representative": "Ayesha",
+      "role": "field_sales",
+      "salesTerritory": "EN1-EN3",
+      "postcodeDistricts": ["EN1", "EN2", "EN3"],
+      "districtCount": 3,
+      "mapsRequired": false
+    }
+  ]
+}

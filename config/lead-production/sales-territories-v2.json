@@ -2,10 +2,11 @@
   "assignmentVersion": "v2",
   "generatedAt": "2026-07-23T22:00:00Z",
   "supersedes": "territory-assignments-tonight.csv (the previous 22-representative table) - marked historical/inactive, not deleted",
-  "totalRepresentatives": 13,
-  "totalDistricts": 111,
+  "totalRepresentatives": 14,
+  "totalDistricts": 115,
   "corrections": [
-    "2026-07-25: Shahzaib's assignment corrected from HA6-HA10 (5 districts) to HA6-HA9 (4 districts). HA10 was not a real UK postcode district - the HA postcode area (Harrow) only spans HA0-HA9, confirmed against the pipeline's own authoritative postcode reference data (districtsInArea('HA') returns exactly HA0..HA9). The error was caught live: a discovery run for 'HA10' completed with genuinely 0 raw observations (Just Eat found nothing to query), which then correctly halted downstream enrichment (0 candidates). Verified this was the only invalid postcode district across all 13 representatives before correcting. See docs/10_BUGS_AND_FIXES.md and docs/11_ISSUES_LOG.md (ISS-0032)."
+    "2026-07-25: Shahzaib's assignment corrected from HA6-HA10 (5 districts) to HA6-HA9 (4 districts). HA10 was not a real UK postcode district - the HA postcode area (Harrow) only spans HA0-HA9, confirmed against the pipeline's own authoritative postcode reference data (districtsInArea('HA') returns exactly HA0..HA9). The error was caught live: a discovery run for 'HA10' completed with genuinely 0 raw observations (Just Eat found nothing to query), which then correctly halted downstream enrichment (0 candidates). Verified this was the only invalid postcode district across all 13 representatives before correcting. See docs/10_BUGS_AND_FIXES.md and docs/11_ISSUES_LOG.md (ISS-0032).",
+    "2026-08-08: Added Jahangir Alam (field_sales, SM4-SM7, 4 districts, mapsRequired=true matching the other 3 field_sales representatives in this file) — a genuinely new representative with no prior entry. Found live: run-full-territory.ts's resolveMapRequired() reads ONLY this global file (never the per-campaign config/lead-production/campaigns/<id>/sales-territories-v2.json files also maintained per campaign) and fails closed (UnknownRepresentativeError) for any representative absent here. Every other representative in this batch (Nauman/Manraj/Ayesha included) already had an entry from their own historical campaign, so this gap was never exercised until Alam's genuinely-first-ever live run. Alam's salesProRosterStatus in his own campaign-016 config remains pending_owner_confirmation — this global file is a separate, internal pipeline bookkeeping source (map-deliverable requirement only) and is not the Magna SalesPro CRM roster/dropdown; adding him here does not confirm or fabricate his SalesPro entry. See docs/10_BUGS_AND_FIXES.md."
   ],
   "terminology": {
     "postcodeArea": "The letter prefix of a postcode district, e.g. RM, KT, TW.",
@@ -242,6 +243,19 @@
       ],
       "districtCount": 6,
       "mapsRequired": false
+    },
+    {
+      "representative": "Alam",
+      "role": "field_sales",
+      "salesTerritory": "SM4\u2013SM7",
+      "postcodeDistricts": [
+        "SM4",
+        "SM5",
+        "SM6",
+        "SM7"
+      ],
+      "districtCount": 4,
+      "mapsRequired": true
     }
   ]
 }

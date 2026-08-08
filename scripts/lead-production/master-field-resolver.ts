@@ -107,6 +107,16 @@ function humaniseRole(raw: string): string {
   return raw.split(/[_\s]+/).filter(Boolean).map((w) => w[0].toUpperCase() + w.slice(1)).join("/");
 }
 
+// CTO permanent correction (owner instruction, 2026-08-08): the "Contact Position / Designation"
+// master field feeds directly into the delivered CTO/SalesPro "Lead Contact Position/Designation"
+// column (see generate-cto-final-review.ts) — unlike Decision-Maker Role, which stays internal.
+// The raw "owner_director" enum value must never reach that field; display "Owner" instead. No
+// other role value is remapped — scoped exactly to the one raw value the owner flagged, not a
+// general humanisation pass.
+function contactPositionDisplayValue(role: string): string {
+  return role === "owner_director" ? "Owner" : role;
+}
+
 // Note 1/Note 2 (locked policy 2026-08-02, rewritten 2026-08-04 per owner spec) — composed only
 // from evidence genuinely present on the dossier, never fabricated; blank where no reliable
 // evidence exists rather than invented filler. Explicitly never repeats Shop Name/Phone/
@@ -442,7 +452,7 @@ export function resolveMasterFields(dossier: Dossier, ctx: MasterFieldContext, v
     opening_time: null, closing_time: null, preferred_contact_time: null,
 
     contact_person: decisionMaker?.name ?? null,
-    contact_position: decisionMaker?.role ?? null,
+    contact_position: decisionMaker ? contactPositionDisplayValue(decisionMaker.role) : null,
     primary_director_name: directors[0] ?? null,
     other_current_directors: directors.length > 1 ? directors.slice(1).join("; ") : null,
     psc_owner_name: pscs.length ? pscs.join("; ") : null,

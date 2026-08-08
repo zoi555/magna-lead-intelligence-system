@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 2,
+  "note": "Both SE10 and SE18 are newly run for Nauman — no verbatim reuse in this campaign.",
+  "representatives": [
+    {
+      "representative": "Nauman",
+      "role": "field_sales",
+      "salesTerritory": "SE10, SE18",
+      "postcodeDistricts": ["SE10", "SE18"],
+      "districtCount": 2,
+      "mapsRequired": false
+    }
+  ]
+}

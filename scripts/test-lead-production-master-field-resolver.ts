@@ -51,6 +51,9 @@ async function main() {
   assert((r1a.fields.note_1 as string).includes("Jane Smith") && (r1a.fields.note_1 as string).toLowerCase().includes("significant control"), "Note 1 includes PSC evidence");
   assert((r1a.fields.note_1 as string).includes("Owner/Director"), `decision-maker role is humanised from "owner_director" to "Owner/Director" (got: ${r1a.fields.note_1})`);
   assert((r1a.fields.note_1 as string).includes("8 year"), "Note 1 includes company age");
+  assert(r1a.fields.contact_position === "Owner", `CTO permanent correction (2026-08-08): "Contact Position / Designation" — the field that flows directly into the delivered CTO/SalesPro "Lead Contact Position/Designation" column — must display "Owner", never the raw "owner_director" enum value (got: ${r1a.fields.contact_position})`);
+  const r1b = resolveMasterFields(mkDossier({ ranked_decision_maker: { name: "Ali Raza", role: "founder" } }), CTX);
+  assert(r1b.fields.contact_position === "founder", `only "owner_director" is remapped — other roles (e.g. "founder") pass through unchanged, scoped exactly to the owner-flagged value (got: ${r1b.fields.contact_position})`);
 
   console.log("\n2. Note 1 — legal company name reported ONLY when different from trading name:");
   const r2a = resolveMasterFields(mkDossier({ legal_company_name: "Test Restaurant" }, { tradingName: "Test Restaurant" }), CTX);

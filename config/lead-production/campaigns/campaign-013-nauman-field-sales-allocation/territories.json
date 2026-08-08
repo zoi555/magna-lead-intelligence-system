@@ -1,0 +1,67 @@
+{
+  "campaignId": "campaign-013-nauman-field-sales-allocation",
+  "campaignVersion": "v1",
+  "channel": "field_sales",
+  "effectiveDate": "2026-08-08",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-08 (Monday field-sales lead-generation batch)",
+  "description": "Nauman Khan's field-sales allocation: EXACTLY SE10 and SE18 (2 districts) — explicitly NOT the range SE10-SE18, which would incorrectly include SE11-SE17. Both districts genuinely new; no verbatim reuse.",
+  "resolutionNote": "TERRITORY MODEL (established 2026-08-05, docs/09_DECISIONS.md): postcode districts are NON-EXCLUSIVE across representatives. Nauman's historical allocation is RM1-RM14 (field_sales, ACCEPTED, status/REPRESENTATIVE_PROGRESS_REGISTER.csv, handover/nauman-rm1-rm14/) — a separate, immutable, completed prior campaign with no SE-district connection, not touched here.",
+  "representativeIdentityValidation": {
+    "method": "Cross-checked against the customer master's own 'Sales Rep' column (input/customer-masters/2026-08-03/CustomersProjects81_raw_snapshot_2026-08-03.csv) — the only authoritative live SalesPro/NetSuite dropdown-reflecting source found on disk (no standalone roster CSV/JSON exists).",
+    "matchResult": "Exact, unambiguous match: 'Nauman Khan' appears verbatim, once, in the Sales Rep column.",
+    "extractedFields": {
+      "representativeFirstName": "Nauman",
+      "representativeLastName": "Khan",
+      "representativeFullName": "Nauman Khan",
+      "representativeEmail": null
+    },
+    "emailNote": "No email found for Nauman anywhere in the repository (customer master, historical handover README/reports). Not fabricated. Not required by the field-sales output template (no representative-email column exists in the 31-column structure) — informational metadata only.",
+    "disambiguationCheck": "No other 'Nauman' variant found anywhere in the Sales Rep column. Unambiguous."
+  },
+  "representative": {
+    "internalName": "Nauman",
+    "role": "field_sales",
+    "representativeFullName": "Nauman Khan",
+    "representativeEmail": null,
+    "salesProRepresentativeValue": "Nauman Khan",
+    "salesProRosterStatus": "confirmed",
+    "regionRoute": "SE10, SE18",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["SE10", "SE18"],
+    "districtCount": 2,
+    "areaDescription": "Greenwich / Woolwich"
+  },
+  "sectorWhitelist": {
+    "SE10": ["SE10 0", "SE10 1", "SE10 8", "SE10 9"],
+    "SE18": ["SE18 1", "SE18 2", "SE18 3", "SE18 4", "SE18 5", "SE18 6", "SE18 7", "SE18 9"]
+  },
+  "sectorWhitelistSource": "Derived from the authoritative Supabase postcode_reference table (level='sector', district=<code>), never manually invented. Used for geography validation only — one Just Eat discovery query per DISTRICT, not per sector.",
+  "alreadyCompletedElsewhere": {
+    "description": "None. Both SE10 and SE18 are genuinely new for Nauman — confirmed by filesystem search (output/territories/nauman/ and handover/nauman-rm1-rm14/ are both RM-prefixed only).",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["SE10", "SE18"],
+    "districtCount": 2,
+    "processingOrder": ["SE10", "SE18"]
+  },
+  "explicitlyExcluded": {
+    "rm1ThroughRm14": "Nauman's previous, already-completed, historical field-sales territory. Immutable. Never rerun.",
+    "se11ThroughSe17": "Explicitly NOT part of this allocation — the owner instruction is EXACTLY SE10 and SE18, not the SE10-SE18 range."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  },
+  "outputTemplate": "field-sales-31-column-v1",
+  "fieldSalesRoutingStatus": "pending",
+  "pipelineVersion": "temporary-lead-production-v1 (frozen baseline 16c3a7dc8fc912f1e1c5e747497a150e71528f4a, plus additive field-sales export template + CTO contact-position fix, 2026-08-08)",
+  "customerMasterVersion": {
+    "snapshotDate": "2026-08-03",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1"
+  }
+}

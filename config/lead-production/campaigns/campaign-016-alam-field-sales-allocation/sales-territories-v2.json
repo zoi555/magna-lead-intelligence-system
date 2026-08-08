@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 4,
+  "note": "All 4 districts (SM4-SM7) are newly run for Alam — no verbatim reuse in this campaign.",
+  "representatives": [
+    {
+      "representative": "Alam",
+      "role": "field_sales",
+      "salesTerritory": "SM4-SM7",
+      "postcodeDistricts": ["SM4", "SM5", "SM6", "SM7"],
+      "districtCount": 4,
+      "mapsRequired": false
+    }
+  ]
+}

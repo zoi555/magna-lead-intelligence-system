@@ -1,0 +1,73 @@
+{
+  "campaignId": "campaign-014-manraj-field-sales-allocation",
+  "campaignVersion": "v1",
+  "channel": "field_sales",
+  "effectiveDate": "2026-08-08",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-08 (Monday field-sales lead-generation batch)",
+  "description": "Manraj Dhillon's field-sales allocation: SM1, SM2, SM3 (3 districts, Sutton area). All genuinely new; no verbatim reuse.",
+  "resolutionNote": "TERRITORY MODEL (established 2026-08-05, docs/09_DECISIONS.md): postcode districts are NON-EXCLUSIVE across representatives. Manraj's historical allocation is KT1-KT24 (field_sales, ACCEPTED, status/REPRESENTATIVE_PROGRESS_REGISTER.csv, handover/manraj-kt1-kt24/) — a separate, immutable, completed prior campaign with no SM-district connection, not touched here.",
+  "representativeIdentityValidation": {
+    "method": "Cross-checked against the customer master's own 'Sales Rep' column (input/customer-masters/2026-08-03/CustomersProjects81_raw_snapshot_2026-08-03.csv) — the only authoritative live SalesPro/NetSuite dropdown-reflecting source found on disk (no standalone roster CSV/JSON exists).",
+    "matchResult": "NOT FOUND — neither 'Manraj' nor 'Manraj Dhillon' nor 'Dhillon' appears anywhere in the Sales Rep column. This is NOT the same as ambiguous (no confusable near-duplicate name exists anywhere in the data) — it means Manraj has no won/closed customer currently logged against his name in NetSuite, which is unsurprising for a rep whose prior KT1-KT24 delivery is still marked ACCEPTED-pending-final-signoff rather than imported.",
+    "corroboratingEvidence": [
+      "A full, ACCEPTED historical field-sales campaign already exists for this exact person: handover/manraj-kt1-kt24/ (KT1-KT24, 24 districts, status/REPRESENTATIVE_PROGRESS_REGISTER.csv row 'Manraj,field_sales,KT1-KT24,...,ACCEPTED').",
+      "His own prior delivered SalesPro export used 'Field Sales Rep'='Manraj' (first-name-only, the pre-full-name-correction convention established for this project) and 'Sales Rep'=blank throughout — confirms the field_sales/Sales Rep-blank convention independently, from his own real prior file.",
+      "Owner supplied 'Manraj Dhillon' as the exact full name directly in this task's instructions — the same authoritative-override pattern used for Saad/Saif/Shahzaib/Tahira/Wajahat/Hassan/Haleema in the prior batch."
+    ],
+    "extractedFields": {
+      "representativeFirstName": "Manraj",
+      "representativeLastName": "Dhillon",
+      "representativeFullName": "Manraj Dhillon",
+      "representativeEmail": null
+    },
+    "emailNote": "No email found for Manraj anywhere in the repository. Not fabricated. Not required by the field-sales output template.",
+    "judgement": "Treated as CONFIRMED, not fail-closed: this is an absence of a specific cross-reference source (no won customers yet under this name), not an identity ambiguity (no competing candidate anywhere). Flagged prominently in the batch report so the owner can correct if this judgement is wrong."
+  },
+  "representative": {
+    "internalName": "Manraj",
+    "role": "field_sales",
+    "representativeFullName": "Manraj Dhillon",
+    "representativeEmail": null,
+    "salesProRepresentativeValue": "Manraj Dhillon",
+    "salesProRosterStatus": "confirmed",
+    "regionRoute": "SM1-SM3",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["SM1", "SM2", "SM3"],
+    "districtCount": 3,
+    "areaDescription": "Sutton"
+  },
+  "sectorWhitelist": {
+    "SM1": ["SM1 1", "SM1 2", "SM1 3", "SM1 4", "SM1 9"],
+    "SM2": ["SM2 5", "SM2 6", "SM2 7"],
+    "SM3": ["SM3 8", "SM3 9"]
+  },
+  "sectorWhitelistSource": "Derived from the authoritative Supabase postcode_reference table (level='sector', district=<code>), never manually invented. Used for geography validation only — one Just Eat discovery query per DISTRICT, not per sector.",
+  "alreadyCompletedElsewhere": {
+    "description": "None. All 3 districts are genuinely new for Manraj — confirmed by filesystem search (output/territories/manraj/ and handover/manraj-kt1-kt24/ are both KT-prefixed only).",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["SM1", "SM2", "SM3"],
+    "districtCount": 3,
+    "processingOrder": ["SM1", "SM2", "SM3"]
+  },
+  "explicitlyExcluded": {
+    "kt1ThroughKt24": "Manraj's previous, already-completed, historical field-sales territory. Immutable. Never rerun.",
+    "sm4ThroughSm7": "Not part of Manraj's allocation — that is Jahangir Alam's (campaign-016)."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  },
+  "outputTemplate": "field-sales-31-column-v1",
+  "fieldSalesRoutingStatus": "pending",
+  "pipelineVersion": "temporary-lead-production-v1 (frozen baseline 16c3a7dc8fc912f1e1c5e747497a150e71528f4a, plus additive field-sales export template + CTO contact-position fix, 2026-08-08)",
+  "customerMasterVersion": {
+    "snapshotDate": "2026-08-03",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1"
+  }
+}

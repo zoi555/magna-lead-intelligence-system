@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 3,
+  "note": "All 3 districts (SM1-SM3) are newly run for Manraj — no verbatim reuse in this campaign.",
+  "representatives": [
+    {
+      "representative": "Manraj",
+      "role": "field_sales",
+      "salesTerritory": "SM1-SM3",
+      "postcodeDistricts": ["SM1", "SM2", "SM3"],
+      "districtCount": 3,
+      "mapsRequired": false
+    }
+  ]
+}

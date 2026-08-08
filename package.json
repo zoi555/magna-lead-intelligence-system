@@ -66,6 +66,8 @@
     "lead-production:master-export": "tsx scripts/lead-production/generate-master-export.ts",
     "test:lead-production-master-export": "tsx scripts/test-lead-production-master-export.ts",
     "test:lead-production-master-field-resolver": "tsx scripts/test-lead-production-master-field-resolver.ts",
+    "lead-production:field-sales-final-review": "tsx scripts/lead-production/generate-field-sales-final-review.ts",
+    "test:lead-production-field-sales-final-review": "tsx scripts/test-lead-production-field-sales-final-review.ts",
     "test:lead-production-campaign-master-combined": "tsx scripts/test-lead-production-campaign-master-combined.ts",
     "test:lead-production-full-allocation-master-combine": "tsx scripts/test-lead-production-full-allocation-master-combine.ts",
     "test:lead-production-apply-leakage-certificate-decisions": "tsx scripts/test-lead-production-apply-leakage-certificate-decisions.ts",
