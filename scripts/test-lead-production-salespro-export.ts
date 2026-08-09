@@ -44,7 +44,10 @@ async function main() {
   assert(newLeads.header.length === 108, `new-leads file has exactly 108 columns (got ${newLeads.header.length})`);
   // 2026-07-26: commercial-review-v1 brand exclusion removed 6 previously-usable, non-key-account
   // UB1 candidates (42 -> 36) — see commercial-review-exclusion-audit.csv for the exact matches.
-  assert(newLeads.rows.length === 30, `new-leads file has exactly 30 rows (got ${newLeads.rows.length}) — down from 31 ("Chaiiwala® - Southall" now correctly caught as a Commercial Review Exclusion by the 2026-08-04 trademark-symbol brand-matching fix)`);
+  // 2026-08-09 owner commercial decision: "Sambal Express" changed from Exclude Whole Brand to
+  // Keep (Monday field-sales 287-lead pre-routing chain/group review) — a BRAND-LEVEL decision
+  // applying to every future run. Real UB1 candidate "Sambal Express" is retained again (30 -> 31).
+  assert(newLeads.rows.length === 31, `new-leads file has exactly 31 rows (got ${newLeads.rows.length}) — up from 30 ("Sambal Express" retained following the 2026-08-09 owner KEEP decision)`);
   assert(newLeads.header[0] === "Shop Name" && newLeads.header[6] === "Field Sales Rep" && newLeads.header[7] === "Sales Rep", "column order matches the CTO's exact existing labels/order (Shop Name, ..., Field Sales Rep, Sales Rep)");
   assert(newLeads.header.includes("Permanent Lead ID"), "Permanent Lead ID column is present");
 

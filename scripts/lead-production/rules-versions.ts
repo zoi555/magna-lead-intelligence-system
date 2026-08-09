@@ -64,10 +64,13 @@ export const RULES_VERSIONS = {
   outputSchemaVersion: "output-schema-v2-2026-07-23",
 
   // config/lead-production/commercial-review-v1/ (load-commercial-review.ts, applied by
-  // commercial-review-filter.ts) — the approved brand keep/exclude registry (141 brands
-  // reviewed: 28 kept, 113 excluded as whole brands) plus the permanent pharmacy/chemist type
-  // exclusion. Added 2026-07-26, applied at export time against already-enriched evidence only
-  // — no discovery/enrichment re-run required to apply a new commercial-review version.
+  // commercial-review-filter.ts) — the approved brand keep/exclude registry (164 brands
+  // reviewed as of 2026-08-09: 38 kept, 126 excluded as whole brands) plus the permanent
+  // pharmacy/chemist type exclusion. Added 2026-07-26, applied at export time against
+  // already-enriched evidence only — no discovery/enrichment re-run required to apply a new
+  // commercial-review version. 2026-08-09: owner commercial decisions from the 287-lead Monday
+  // field-sales pre-routing chain/group review applied in place (still v1 — see
+  // owner-decision-log.json and docs/09_DECISIONS.md).
   commercialReviewVersion: "commercial-review-v1",
 } as const;
 

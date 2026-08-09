@@ -1,9 +1,13 @@
 ﻿Brand Name,Decision
+Aksular,Keep
 Ali Baba,Exclude Whole Brand
+All Bar One,Exclude Whole Brand
+Ambala Karahi,Keep
 Amigos Burgers and Shakes,Exclude Whole Brand
 Aroma,Exclude Whole Brand
 Bargain Booze,Exclude Whole Brand
 Baskin Robbins,Exclude Whole Brand
+Best One,Exclude Whole Brand
 Black Sheep Coffee,Exclude Whole Brand
 Boba Tigers,Exclude Whole Brand
 Boots,Exclude Whole Brand
@@ -22,15 +26,21 @@ CeX,Exclude Whole Brand
 Chaiiwala,Exclude Whole Brand
 Charcoal Grill,Keep
 Chennai Biryani,Keep
+Chicken Hut,Keep
 Chicken Land,Keep
 Chicken World,Keep
 China Chef,Exclude Whole Brand
+Chipotle Mexican Grill,Exclude Whole Brand
 Chopstix Noodle Bar,Exclude Whole Brand
 Chutnei Charm,Keep
 Cinnamon Lounge,Exclude Whole Brand
+Co-op / Southern Co-operative,Exclude Whole Brand
 Coco di Mama,Exclude Whole Brand
+Costcutter,Exclude Whole Brand
 Creams,Keep
+Day's Stores,Exclude Whole Brand
 DESI SWAD,Exclude Whole Brand
+Dixy Chicken,Keep
 Dragon Garden,Exclude Whole Brand
 Eat Well,Exclude Whole Brand
 Ember Inns,Exclude Whole Brand
@@ -41,6 +51,7 @@ Fireaway Designer Pizza,Exclude Whole Brand
 Fishy Delishy,Exclude Whole Brand
 Five Guys,Exclude Whole Brand
 Flames,Keep
+Franco Manca,Exclude Whole Brand
 Georges,Exclude Whole Brand
 German Doner Kebab,Exclude Whole Brand
 Going Greek,Exclude Whole Brand
@@ -66,8 +77,10 @@ Lanzhou Chinese,Exclude Whole Brand
 Las Iguanas,Exclude Whole Brand
 Little Cafe,Keep
 Little Dessert Shop,Keep
+Little Kathmandu Kitchen,Keep
 Londis,Exclude Whole Brand
 Love Churros,Exclude Whole Brand
+M. Manze,Keep
 Majestic Wine,Exclude Whole Brand
 Make My Cakes,Exclude Whole Brand
 Mamma Mia Pizza,Exclude Whole Brand
@@ -100,8 +113,9 @@ Royal India,Keep
 Royal Rasoi,Exclude Whole Brand
 Saffron,Exclude Whole Brand
 Sam's Chicken,Keep
-Sambal Express,Exclude Whole Brand
+Sambal Express,Keep
 San Giorgio Pizzeria,Exclude Whole Brand
+Sankalp,Keep
 Scooperb,Keep
 Selekt Chicken,Keep
 Shah's Halal Food,Exclude Whole Brand
@@ -112,6 +126,8 @@ Shree Sai Vada Pav,Keep
 Simmons Bakers,Exclude Whole Brand
 Sizzling Pubs,Exclude Whole Brand
 SLAMBURGER,Keep
+Slim Chickens,Keep
+Spar,Exclude Whole Brand
 Spice Lounge,Exclude Whole Brand
 Spicy Sub,Keep
 STAR Food & Wine,Exclude Whole Brand
@@ -123,6 +139,7 @@ Sushi Daily,Exclude Whole Brand
 Sushi Handroll,Exclude Whole Brand
 Taco Bell,Exclude Whole Brand
 Tariq Halal Meats,Exclude Whole Brand
+Tasty African Food,Keep
 TGI Fridays,Exclude Whole Brand
 The Brothers Fish Bar,Exclude Whole Brand
 The Lunch Box,Exclude Whole Brand
@@ -139,7 +156,9 @@ Vaghaar,Exclude Whole Brand
 Vape Stop,Exclude Whole Brand
 Village Pizza,Exclude Whole Brand
 Vintage Inns,Exclude Whole Brand
+Waitrose,Exclude Whole Brand
 Wenzel's,Exclude Whole Brand
+Whale Tea / WHALETEA,Keep
 Wimpy,Exclude Whole Brand
 Woody Grill,Exclude Whole Brand
 YO! Sushi,Exclude Whole Brand

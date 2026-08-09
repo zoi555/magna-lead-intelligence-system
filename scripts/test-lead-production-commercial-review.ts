@@ -128,8 +128,8 @@ async function main() {
 
   console.log("\n7. Registry loader validates the real commercial-review-v1 files on disk:");
   const realRegistry = await loadCommercialReviewRegistry("config/lead-production/commercial-review-v1");
-  assert(realRegistry.keepBrands.length === 27, `real registry has 27 keep brands after the 2026-08-04 Black Sheep Coffee reclassification (got ${realRegistry.keepBrands.length})`);
-  assert(realRegistry.excludeBrands.length === 118, `real registry has 118 exclude brands after the 2026-08-02 union addition (Boots, Burger King, Greene King) + 2026-08-04 owner corrections (Haute Dolci, Black Sheep Coffee) (got ${realRegistry.excludeBrands.length})`);
+  assert(realRegistry.keepBrands.length === 38, `real registry has 38 keep brands after the 2026-08-09 owner commercial decisions (got ${realRegistry.keepBrands.length})`);
+  assert(realRegistry.excludeBrands.length === 126, `real registry has 126 exclude brands after the 2026-08-09 owner commercial decisions (got ${realRegistry.excludeBrands.length})`);
   assert(realRegistry.excludeBrands.includes("Boots"), "\"Boots\" is on the real exclude list");
   assert(realRegistry.excludeBrands.includes("Burger King"), "\"Burger King\" is on the real exclude list");
   assert(realRegistry.excludeBrands.includes("Greene King"), "\"Greene King\" is on the real exclude list");
@@ -202,6 +202,65 @@ async function main() {
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true });
   }
+
+  console.log("\n12. Owner commercial decisions (2026-08-09, Monday field-sales 287-lead pre-routing chain/group review) — real registry, real candidate names:");
+  const ownerExcludeCases: [string, string][] = [
+    ["Chipotle Mexican Grill", "Chipotle Mexican Grill - at The O2"],
+    ["Franco Manca", "Franco Manca Greenwich - Sourdough Pizza"],
+    ["Best One", "Best One - Sutton Common"],
+    ["Spar", "Spar - St Dunstan Service Station"],
+    ["All Bar One", "All Bar One - Sutton"],
+    ["Costcutter", "Costcutter"],
+    ["Waitrose", "Waitrose - Cheam"],
+    ["Londis", "Londis"],
+    ["Co-op / Southern Co-operative", "Co-op / Southern Co-operative"],
+    ["Day's Stores", "Day's Stores"],
+  ];
+  for (const [brand, candidateName] of ownerExcludeCases) {
+    const r = evaluateBrandDecision(mkDossier({ tradingName: candidateName }), realRegistry);
+    assert(r.excluded === true && r.matchedBrandName === brand, `owner EXCLUDE decision "${brand}" fires for "${candidateName}" (got excluded=${r.excluded}, matched=${r.matchedBrandName})`);
+  }
+  const costcutterSecondSite = evaluateBrandDecision(mkDossier({ tradingName: "Costcutter - Morden Convenience" }), realRegistry);
+  assert(costcutterSecondSite.excluded === true && costcutterSecondSite.matchedBrandName === "Costcutter", "Costcutter also excludes its second real batch site, \"Costcutter - Morden Convenience\"");
+
+  const ownerKeepCases: [string, string][] = [
+    ["Slim Chickens", "Slim Chickens - Greenwich"],
+    ["Dixy Chicken", "Dixy Chicken"],
+    ["Sambal Express", "Sambal Express"],
+    ["Whale Tea / WHALETEA", "Whale Tea / WHALETEA"],
+    ["Morley's", "Morley's - Plumstead Common Road"],
+    ["Tasty African Food", "Tasty African Food - Thomas Street"],
+    ["Aksular", "Aksular"],
+    ["Sankalp", "Sankalp"],
+    ["Little Kathmandu Kitchen", "Little Kathmandu Kitchen"],
+    ["Ambala Karahi", "Ambala Karahi"],
+    ["Chicken Hut", "Chicken Hut"],
+    ["Sam's Chicken", "Sam's Chicken - Sutton"],
+    ["Creams", "Creams - Enfield"],
+    ["Kebabish", "Kebabish"],
+    ["M. Manze", "M.Manze- Sutton"],
+  ];
+  for (const [brand, candidateName] of ownerKeepCases) {
+    const r = evaluateBrandDecision(mkDossier({ tradingName: candidateName }), realRegistry);
+    assert(r.excluded === false && r.keepOverride === true && r.matchedBrandName === brand, `owner KEEP decision "${brand}" fires for "${candidateName}" (got excluded=${r.excluded}, keepOverride=${r.keepOverride}, matched=${r.matchedBrandName})`);
+  }
+
+  console.log("\n  Sambal Express: explicit owner override of the prior EXCLUDE decision, proven both ways:");
+  assert(realRegistry.excludeBrands.includes("Sambal Express") === false, "\"Sambal Express\" is no longer on the exclude list");
+  assert(realRegistry.keepBrands.includes("Sambal Express") === true, "\"Sambal Express\" is now on the keep list");
+
+  console.log("\n  Unknown chain/group — size alone must NOT trigger automatic exclusion (no brand-size heuristic exists or is added by this change):");
+  const unknownLargeSoundingChain = mkDossier({ tradingName: "Global MegaChain Foods International - Branch 47" });
+  const rUnknown = evaluateBrandDecision(unknownLargeSoundingChain, realRegistry);
+  assert(rUnknown.excluded === false && rUnknown.keepOverride === false, "a candidate with an unregistered, large-sounding brand name is neither excluded nor kept by brand rule — falls through untouched, exactly as any other unregistered brand always has (never a size-based auto-exclude)");
+
+  console.log("\n  Known naming-pattern gap, found (not fixed) during this audit — recorded for transparency, not silently assumed solved:");
+  const littleWaitrose = evaluateBrandDecision(mkDossier({ tradingName: "Little Waitrose - Cheam" }), realRegistry);
+  assert(littleWaitrose.excluded === false, "\"Little Waitrose - Cheam\" (real batch candidate name) is NOT caught by the real matcher today — the qualifier-word-before-brand pattern (\"Little \" + brand, no separator) is not one of the matcher's anchored patterns. The brand decision IS correctly registered (see the \"Waitrose - Cheam\" case above); this is a naming-COVERAGE gap, not a registry-correctness gap. See docs/09_DECISIONS.md (2026-08-09) for the follow-up recommendation.");
+  const londisNoSeparator = evaluateBrandDecision(mkDossier({ tradingName: "Londis Beddington Gardens" }), realRegistry);
+  assert(londisNoSeparator.excluded === false, "\"Londis Beddington Gardens\" (real batch candidate name, single-word brand + bare space, no separator) is NOT caught either — this is a PRE-EXISTING gap (Londis was already an exclude brand before this session's changes), not something introduced here. Same known-gap class as Little Waitrose.");
+  const morleysNoSpaceAfterDash = evaluateBrandDecision(mkDossier({ tradingName: "Morley's -Plumstead Common Road" }), realRegistry);
+  assert(morleysNoSpaceAfterDash.keepOverride === false, "\"Morley's -Plumstead Common Road\" (real batch candidate name, note: no space after the dash) is NOT matched — a separate, real source-data formatting quirk (missing space after the separator breaks the `\\s+` requirement in the separator regex), distinct from the qualifier-prefix gap above. Harmless here since KEEP's effect is \"not excluded\" either way, but the decision is not actively recorded for this exact row. The properly-spaced form (\"Morley's - Plumstead Common Road\", see KEEP proof above) matches correctly.");
 
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);
   process.exit(fails === 0 ? 0 : 1);

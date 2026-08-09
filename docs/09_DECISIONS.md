@@ -1525,3 +1525,70 @@ filesystem check (`find .../output/territories/campaign-002/<internal-name>/` an
 `campaign-002/<rep>/<district>/` directory with a `postprocess-revision-manifest.json` exists, use
 its `revisedFinalScoringPath` (the phone-fix-reprocessed checkpoint), not the original stage,
 exactly as done for CM1/IG1/RM1/DA1/BR1.
+
+## 2026-08-09 — owner commercial chain/group decisions applied to commercial-review-v1; "chain size alone" is never grounds for automatic exclusion
+
+**What happened:** before Monday field-sales routing (Nauman/Manraj/Ayesha/Alam, campaigns
+013-016, 287 certified leads), a pre-routing chain/group audit was run to catch brands the
+existing commercial-review-v1 registry might have missed. 33 of the 287 leads were flagged as
+suspected chain/group (`route-planning/2026-08-10/combined/Monday_Field_Sales_All_Leads_287.xlsx`,
+`CHAIN REVIEW`/`GROUP SUMMARY` sheets). The owner reviewed the full list and made explicit
+brand-level decisions, overriding any assumption that chain size alone determines outcome.
+
+**Decision:** `config/lead-production/commercial-review-v1` updated in place (still v1 — matches
+the established practice of editing v1's files directly for owner-approved brand corrections,
+e.g. the 2026-08-02 Boots/Burger King/Greene King union and the 2026-08-04 Haute Dolci/Black Sheep
+Coffee corrections — see `BRAND_DECISION_FILES_README.txt`). Added to **exclude**: Chipotle
+Mexican Grill, Franco Manca, Best One, Spar, All Bar One, Costcutter, Waitrose, Co-op / Southern
+Co-operative, Day's Stores. Added to **keep**: Slim Chickens, Dixy Chicken, Whale Tea / WHALETEA,
+Tasty African Food, Aksular, Sankalp, Little Kathmandu Kitchen, Ambala Karahi, Chicken Hut,
+M. Manze. **Sambal Express changed from Exclude Whole Brand to Keep** — an explicit owner override
+of a prior decision (owner: "Sambal Express must now be treated as KEEP if an older registry entry
+says otherwise"). Londis, Creams, Kebabish, Morley's, and Sam's Chicken were reviewed and their
+existing decisions reconfirmed unchanged. Registry now totals 164 brands (38 keep, 126 exclude),
+up from 145 (27 keep, 118 exclude). Full per-brand provenance (decision source = Owner (Zoeb),
+decision date, reason, previous decision where changed) recorded in the new
+`config/lead-production/commercial-review-v1/owner-decision-log.json` — an append-only log; a
+changed decision is a new entry with `previousDecision` set, never an overwrite.
+
+**Standing commercial rule, going forward:** replace any reasoning equivalent to "large chain ->
+exclude" with: owner-approved exclusion list -> exclude; owner-approved keep list -> keep; unknown
+chain/group -> review using commercial fit, not chain size alone. Chain/group size may be recorded
+as evidence but must never by itself determine the outcome. The commercial-review-v1 registry
+itself remains a binary keep/exclude decision (unchanged schema) — an unregistered brand is simply
+not brand-excluded, exactly as before this change; no third "review" state was added to the live
+`evaluateBrandDecision`/`evaluateCommercialReviewExclusion` pipeline, since that would be a genuine
+schema change beyond this pass's scope. A brand-level "review required" classification is a
+human/audit-process concept (as demonstrated in the 287-lead chain/group audit itself), not a new
+pipeline state.
+
+**Known matching-coverage gap found, not fixed this pass (regression-tested and honestly recorded,
+not silently assumed solved — see `test:lead-production-commercial-review`, section 12):**
+`commercial-review-filter.ts`'s single-word-brand protection (deliberately exact-match-or-explicit-
+separator-only, to protect generic words like "Phoenix"/"Premier"/"Flames" from false-positive
+matches) does not catch two real naming patterns present in this batch's actual candidate data:
+(a) **qualifier-before-brand, no separator** — "Little Waitrose - Cheam" does not match brand
+"Waitrose"; same class as "Southern Co-Op- Banstead Nork Way" not matching "Co-op / Southern
+Co-operative", and "Sankalp Sattvik"/"Aksular Enfield Town" not matching their single-word brand
+registrations. (b) **brand-first, bare space, no separator at all** — "Londis Beddington Gardens"
+does not match brand "Londis" — this is a genuinely PRE-EXISTING gap (Londis was already an
+exclude brand before this session), not introduced by this change. A third, unrelated
+source-data-formatting quirk was also found: "Morley's -Plumstead Common Road" (no space after the
+dash) fails the separator regex's `\s+` requirement, while the properly-spaced form matches
+correctly. None of these gaps affect the current 287-lead batch's actual outcome (that population
+was built from a verified exact shop-name+postcode classification, not by re-running the live
+matcher) — but they mean these specific owner decisions are not yet fully deterministic against
+every real naming variant on a *future* live run. **Recommended future fix, not attempted here**
+(deliberately out of scope — the existing single-word protection is a considered, well-tested
+design and a blanket change carries real false-positive risk across 126 other exclude brands):
+extend the additive `brand-aliases-and-identifiers-v1.json` layer with an explicit, opt-in
+per-brand flag (e.g. `qualifierPrefixApproved`) enabling a narrow "brand appears as the first or
+second whole-word token, no separator required" pattern — scoped one brand at a time, never a
+blanket behaviour change.
+
+**Verification:** `test:lead-production-commercial-review` section 12 proves every one of the 10
+EXCLUDE and 15 KEEP owner decisions fires correctly for a representative real-or-realistic
+candidate name per brand, proves the Sambal Express override both ways (absent from exclude,
+present in keep), proves an unregistered "large-sounding" brand is neither excluded nor kept
+(no size heuristic exists), and separately proves (not silently omits) the three known naming-
+coverage gaps above.
