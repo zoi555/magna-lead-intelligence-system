@@ -1,13 +1,14 @@
 "use client";
 
-// Create New Run — the discovery run creation wizard (replaces the old standalone Run
-// Builder page; reached via the "Create New Run" button on /pipeline-runs). Ports the
-// working target-profile/territory/national-map pieces from the former /run-builder
-// verbatim (taxonomies, chain registry, custom fields, GeographySelector, national map) and
-// adds what never existed anywhere in this codebase before: multiple anchors, provider
-// selection, existing-customer exclusion, a real estimated volume + cost, a max-spend
-// control, real duplicate-territory/conflict detection, an owner-override acknowledgement,
-// and a review/confirm gate that a run cannot start without passing.
+// Create New Run — the discovery run creation wizard, reached via the "Create New Run"
+// button on /pipeline-runs (Main Runs). Refactored (2026-08-10, P4 control decision) into
+// the nine explicit governing stages: Identity, Source Mode, Geography, Limits/Cost,
+// Exclusions, Scoring Profile, Assignment, Outputs, Review. Business-type/taxonomy
+// targeting (business types, cuisines, service models, ownership, requested fields, tags)
+// is not one of the nine named stages — it is kept inside Exclusions, since it defines
+// scope in/out exactly like the rest of that stage (see docs/09_DECISIONS.md for this
+// judgment call). Anchors are likewise not a named stage — folded into Geography as
+// supporting map context.
 
 import React, { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -23,8 +24,9 @@ import {
   validateInternalKey, CustomFieldDraft,
 } from "@/lib/discovery/custom-config";
 import {
-  RunDraft, RunAnchor, newRunDraft, validateRunDraft, summariseRunDraft, saveRunDraft, loadRunDraft, clearRunDraft,
-  generateDefaultRunName, resetProfileToDefaults,
+  RunDraft, RunAnchor, AssignmentPolicyId, OutputTypeId, SourceModeId,
+  newRunDraft, validateRunDraft, summariseRunDraft, saveRunDraft, loadRunDraft, clearRunDraft,
+  generateDefaultRunName, resetProfileToDefaults, migrateDraft, ASSIGNMENT_LABELS, OUTPUT_LABELS,
 } from "@/lib/discovery/run-draft";
 import {
   ChainEntry, loadChainRegistry, saveChainRegistry, addChain, setChainEnabled,
@@ -37,7 +39,13 @@ import { GeographySelector } from "@/features/discovery/GeographySelector";
 import { AspectLeadMap } from "@/features/geospatial/AspectLeadMap";
 import { SOURCE_REGISTRY, MANUAL_IMPORT_STATUS } from "@/lib/sources/source-registry";
 
-const STEPS = ["Identity", "Territory", "Target profile", "Anchors", "Provider & spend", "Review & confirm"] as const;
+const STEPS = [
+  "Identity", "Source Mode", "Geography", "Limits & Cost", "Exclusions",
+  "Scoring Profile", "Assignment", "Outputs", "Review",
+] as const;
+const STEP_GEOGRAPHY = 2;
+const STEP_LIMITS = 3;
+const STEP_REVIEW = 8;
 
 function NewRunPageInner() {
   const searchParams = useSearchParams();
@@ -52,6 +60,7 @@ function NewRunPageInner() {
   const [includeInput, setIncludeInput] = React.useState("");
   const [excludeInput, setExcludeInput] = React.useState("");
   const [newChain, setNewChain] = React.useState("");
+  const [newManualExclusion, setNewManualExclusion] = React.useState("");
   const [mapFeeders, setMapFeeders] = React.useState<FeederRoadEntry[]>([]);
   const [mapView, setMapView] = React.useState<MapViewState | null>(null);
   const [territoryGeom, setTerritoryGeom] = React.useState<TerritoryGeometry[]>([]);
@@ -66,9 +75,14 @@ function NewRunPageInner() {
   const [anchorLng, setAnchorLng] = React.useState("");
   const [estimatedVolume, setEstimatedVolume] = React.useState<number | null>(null);
   const [estimating, setEstimating] = React.useState(false);
-  const [conflict, setConflict] = React.useState<{ overlaps: { runId: string; name: string; status: string; overlappingUnits: string[] }[]; identicalActiveConflict: boolean } | null>(null);
-  const [checkingConflict, setCheckingConflict] = React.useState(false);
-  const [overrideNote, setOverrideNote] = React.useState("");
+  interface OverlapEntry {
+    runId: string; name: string; reference: string | null; ownerLabel: string; sourceMode: string | null;
+    status: string; territoryInput: string | null; overlappingUnits: string[]; overlapType: "exact" | "partial";
+    createdAt: string; estimatedAdditionalCostGbp: number | null;
+  }
+  const [overlapResult, setOverlapResult] = React.useState<{ overlaps: OverlapEntry[]; materialOverlap: boolean } | null>(null);
+  const [checkingOverlap, setCheckingOverlap] = React.useState(false);
+  const [overlapNote, setOverlapNote] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [started, setStarted] = React.useState<{ status: string; completed: number; planned: number } | null>(null);
@@ -88,6 +102,18 @@ function NewRunPageInner() {
           if (!j.ok) { alert(`Could not load draft: ${j.error}`); setDraft(freshDraft()); return; }
           const run = j.run;
           if (run.status !== "draft") { alert(`This run is '${run.status}' — its configuration is frozen and cannot be reopened for editing.`); setDraft(freshDraft()); return; }
+
+          // Preferred path: the full v3 (or older) config_snapshot, migrated forward — this is
+          // the authoritative source once a run has been saved through this wizard at least once.
+          const fromSnapshot = migrateDraft(run.config_snapshot);
+          if (fromSnapshot) {
+            setDraft({ ...fromSnapshot, savedRunId: run.id });
+            announce(`Reopened draft "${run.name}" — all previous selections restored.`);
+            return;
+          }
+
+          // Fallback: reconstruct from the legacy target_filters bag + top-level columns, for
+          // rows created without a UI-built config_snapshot (e.g. direct repository calls).
           const tf = (run.target_filters ?? {}) as Record<string, unknown>;
           const base = freshDraft();
           const hydrated: RunDraft = {
@@ -103,13 +129,11 @@ function NewRunPageInner() {
               exclusions: (tf.exclusions as string[]) ?? base.profile.exclusions,
               excludeTerms: (tf.excludeTerms as string[]) ?? base.profile.excludeTerms,
             },
-            planning: {
-              anchors: Array.isArray(tf.anchors) ? (tf.anchors as RunAnchor[]) : [],
-              selectedProviders: Array.isArray(tf.selectedProviders) ? (tf.selectedProviders as string[]) : ["just_eat"],
-              existingCustomerExclusion: Boolean(tf.existingCustomerExclusion),
-              spendCeilingGbp: typeof tf.spendCeilingGbp === "number" ? (tf.spendCeilingGbp as number) : null,
-              ownerOverride: (tf.ownerOverride as RunDraft["planning"]["ownerOverride"]) ?? null,
-            },
+            anchors: Array.isArray(tf.anchors) ? (tf.anchors as RunAnchor[]) : [],
+            sourceMode: { mode: "just_eat_only", selectedProviders: Array.isArray(tf.selectedProviders) ? (tf.selectedProviders as string[]) : ["just_eat"] },
+            limitsAndCost: { ...base.limitsAndCost, spendCeilingGbp: typeof tf.spendCeilingGbp === "number" ? (tf.spendCeilingGbp as number) : null },
+            exclusions: { ...base.exclusions, existingCustomerExclusion: { ...base.exclusions.existingCustomerExclusion, requested: Boolean(tf.existingCustomerExclusion) } },
+            review: { ...base.review, overlapAcknowledgement: (tf.overlapAcknowledgement as RunDraft["review"]["overlapAcknowledgement"]) ?? null },
             savedRunId: run.id,
           };
           setDraft(hydrated);
@@ -134,9 +158,9 @@ function NewRunPageInner() {
     return () => { live = false; };
   }, [territoryInput]);
 
-  // estimate + conflict check refresh whenever we reach the provider/spend or review step
+  // estimate + conflict check refresh whenever we reach the relevant step
   React.useEffect(() => {
-    if (step < 4 || resolvedUnits.length === 0) return;
+    if (step < STEP_LIMITS || resolvedUnits.length === 0) return;
     setEstimating(true);
     fetch("/api/discovery/estimate", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ queryUnits: resolvedUnits }) })
       .then((r) => r.json()).then((j) => setEstimatedVolume(j.ok ? j.estimatedVolume : null)).catch(() => setEstimatedVolume(null))
@@ -144,17 +168,16 @@ function NewRunPageInner() {
   }, [step, resolvedUnits.join(",")]);
 
   React.useEffect(() => {
-    if (step < 5 || resolvedUnits.length === 0) return;
-    setCheckingConflict(true);
+    if (step < STEP_REVIEW || resolvedUnits.length === 0) return;
+    setCheckingOverlap(true);
     fetch("/api/discovery/runs/conflicts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ queryUnits: resolvedUnits, excludeRunId: draft?.savedRunId ?? null }) })
-      .then((r) => r.json()).then((j) => setConflict(j.ok ? { overlaps: j.overlaps, identicalActiveConflict: j.identicalActiveConflict } : null)).catch(() => setConflict(null))
-      .finally(() => setCheckingConflict(false));
+      .then((r) => r.json()).then((j) => setOverlapResult(j.ok ? { overlaps: j.overlaps, materialOverlap: j.materialOverlap } : null)).catch(() => setOverlapResult(null))
+      .finally(() => setCheckingOverlap(false));
   }, [step, resolvedUnits.join(","), draft?.savedRunId]);
 
   if (loadingSaved || !draft) return <div className="p-8 text-sm text-gray-500">Loading…</div>;
 
   const p = draft.profile;
-  const pl = draft.planning;
   const update = (fn: (d: RunDraft) => void) => setDraft((prev) => { if (!prev) return prev; const next = structuredClone(prev); fn(next); return next; });
   const toggle = (arr: string[], id: string) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id]);
   const validation = validateRunDraft(draft);
@@ -167,41 +190,60 @@ function NewRunPageInner() {
   const addAnchor = () => {
     const lat = parseFloat(anchorLat), lng = parseFloat(anchorLng);
     if (!anchorLabel.trim() || !Number.isFinite(lat) || !Number.isFinite(lng)) { alert("Anchor needs a label and valid latitude/longitude."); return; }
-    update((d) => { d.planning.anchors = [...d.planning.anchors, { id: `anchor_${Date.now()}`, label: anchorLabel.trim(), lat, lng }]; });
+    update((d) => { d.anchors = [...d.anchors, { id: `anchor_${Date.now()}`, label: anchorLabel.trim(), lat, lng }]; });
     setAnchorLabel(""); setAnchorLat(""); setAnchorLng("");
   };
   const addAnchorAtPoint = (pt: { lat: number; lng: number }) => {
-    update((d) => { d.planning.anchors = [...d.planning.anchors, { id: `anchor_${Date.now()}`, label: `Anchor ${d.planning.anchors.length + 1}`, lat: pt.lat, lng: pt.lng }]; });
+    update((d) => { d.anchors = [...d.anchors, { id: `anchor_${Date.now()}`, label: `Anchor ${d.anchors.length + 1}`, lat: pt.lat, lng: pt.lng }]; });
     announce("Anchor added from map click.");
   };
-  const removeAnchor = (id: string) => update((d) => { d.planning.anchors = d.planning.anchors.filter((a) => a.id !== id); });
+  const removeAnchor = (id: string) => update((d) => { d.anchors = d.anchors.filter((a) => a.id !== id); });
 
   const toggleProvider = (id: string, selectable: boolean) => {
     if (!selectable) return;
-    update((d) => { d.planning.selectedProviders = toggle(d.planning.selectedProviders, id); });
+    update((d) => { d.sourceMode.selectedProviders = toggle(d.sourceMode.selectedProviders, id); });
   };
+  const setSourceModeId = (mode: SourceModeId) => update((d) => { d.sourceMode.mode = mode; });
+  const toggleOutput = (type: OutputTypeId) => {
+    if (type === "canonical_audit") return; // required — cannot be deselected
+    update((d) => { d.outputs = d.outputs.map((o) => (o.type === type ? { ...o, requested: !o.requested } : o)); });
+  };
+  const setAssignmentPolicy = (policy: AssignmentPolicyId) => update((d) => { d.assignment.policy = policy; });
+  const addManualExclusion = () => {
+    const t = newManualExclusion.trim(); if (!t) return;
+    update((d) => { if (!d.exclusions.manualExclusions.includes(t)) d.exclusions.manualExclusions = [...d.exclusions.manualExclusions, t]; });
+    setNewManualExclusion("");
+  };
+  const removeManualExclusion = (t: string) => update((d) => { d.exclusions.manualExclusions = d.exclusions.manualExclusions.filter((x) => x !== t); });
 
-  const costGbp = pl.selectedProviders.length > 0 ? 0 : null;
-  const blockingConflict = conflict?.identicalActiveConflict ?? false;
-  const overrideRequired = blockingConflict && !pl.ownerOverride?.acknowledged;
-  const canConfirm = validation.ok && pl.selectedProviders.length > 0 && !overrideRequired;
+  const registryFor = (id: string) => SOURCE_REGISTRY.find((r) => r.id === id);
+  const costGbp = draft.sourceMode.selectedProviders.includes("just_eat") ? 0 : null;
+  // Territory overlap is PERMITTED (P4 control correction, 2026-08-10) — it is never a
+  // blocking conflict. An explicit acknowledgement is required only when overlap is
+  // MATERIAL (shares query units with a currently active — queued/running/cancelling —
+  // run), as evidence the user was warned, not as authorisation of a forbidden action.
+  const materialOverlap = overlapResult?.materialOverlap ?? false;
+  const acknowledgementRequired = materialOverlap && !draft.review.overlapAcknowledgement?.acknowledged;
+  const canConfirm = validation.ok && draft.sourceMode.selectedProviders.length > 0 && !acknowledgementRequired;
 
   function buildPayload() {
+    const d = draft!;
+    const snapshotDraft: RunDraft = { ...d, exclusions: { ...d.exclusions, geographyExclusions: geoExclusions } };
     return {
-      name: draft!.name, reference: draft!.reference, objective: draft!.objective,
-      territory_mode: draft!.territory.mode, territory_input: draft!.territory.input,
+      name: d.name, reference: d.reference, objective: d.objective,
+      territory_mode: d.territory.mode, territory_input: d.territory.input,
       exclusions: geoExclusions,
       search_terms: p.includeTerms,
       target_filters: {
         businessTypes: p.businessTypes, cuisines: p.cuisines, serviceModels: p.serviceModels,
         ownership: p.ownership, exclusions: p.exclusions, excludeTerms: p.excludeTerms,
-        anchors: pl.anchors, selectedProviders: pl.selectedProviders,
-        existingCustomerExclusion: pl.existingCustomerExclusion, spendCeilingGbp: pl.spendCeilingGbp,
-        ownerOverride: pl.ownerOverride,
+        anchors: d.anchors, selectedProviders: d.sourceMode.selectedProviders,
+        existingCustomerExclusion: d.exclusions.existingCustomerExclusion.requested, spendCeilingGbp: d.limitsAndCost.spendCeilingGbp,
+        overlapAcknowledgement: d.review.overlapAcknowledgement,
       },
       requested_fields: p.dataFields,
-      source_config: { source: pl.selectedProviders.includes("just_eat") ? "just_eat" : (pl.selectedProviders[0] ?? "manual_import") },
-      config_snapshot: draft as unknown as Record<string, unknown>,
+      source_config: { source: d.sourceMode.selectedProviders.includes("just_eat") ? "just_eat" : (d.sourceMode.selectedProviders[0] ?? "manual_import"), mode: d.sourceMode.mode },
+      config_snapshot: snapshotDraft as unknown as Record<string, unknown>,
     };
   }
 
@@ -232,8 +274,8 @@ function NewRunPageInner() {
       const j = await res.json();
       if (!j.ok) throw new Error(j.error || "Failed to save run");
       const runId = j.run.id;
-      update((d) => { d.savedRunId = runId; });
-      if (pl.selectedProviders.includes("just_eat")) {
+      update((d) => { d.savedRunId = runId; d.review.confirmedAtIso = new Date().toISOString(); });
+      if (draft!.sourceMode.selectedProviders.includes("just_eat")) {
         const q = await fetch(`/api/discovery/runs/${runId}/queue`, { method: "POST" });
         const qj = await q.json();
         if (!qj.ok) throw new Error(qj.error || "Failed to queue execution");
@@ -246,8 +288,8 @@ function NewRunPageInner() {
   }
 
   const providerRow = (id: string, name: string, selectable: boolean, statusLabel?: string) => {
-    const s = SOURCE_REGISTRY.find((r) => r.id === id);
-    const on = pl.selectedProviders.includes(id);
+    const s = registryFor(id);
+    const on = draft.sourceMode.selectedProviders.includes(id);
     return (
       <label key={id} className={`flex items-center justify-between gap-2 py-1.5 text-sm ${selectable ? "" : "opacity-60"}`}>
         <span className="flex items-center gap-2">
@@ -281,8 +323,8 @@ function NewRunPageInner() {
           {step === 0 && (
             <Card title="Run identity">
               <div className="grid sm:grid-cols-2 gap-3">
-                <Field label="Run name *"><input className={inp} value={draft.name} onChange={(e) => update((d) => { d.name = e.target.value; })} placeholder="e.g. TW independents — Q3" /></Field>
-                <Field label="Reference"><input className={inp} value={draft.reference} onChange={(e) => update((d) => { d.reference = e.target.value; })} placeholder="e.g. RUN-TW-001" /></Field>
+                <Field label="Run name *"><input className={inp} value={draft.name} onChange={(e) => update((d) => { d.name = e.target.value; })} placeholder="e.g. Independent chicken shops — Q3" /></Field>
+                <Field label="Reference"><input className={inp} value={draft.reference} onChange={(e) => update((d) => { d.reference = e.target.value; })} placeholder="e.g. RUN-0001" /></Field>
                 <Field label="Description / objective" wide><textarea className={inp} rows={2} value={draft.objective} onChange={(e) => update((d) => { d.objective = e.target.value; })} placeholder="What is this run for?" /></Field>
               </div>
             </Card>
@@ -290,11 +332,41 @@ function NewRunPageInner() {
 
           {step === 1 && (
             <>
+              <Card title="Source mode">
+                <Muted>The product preserves exactly two source modes. Selecting mode B represents intent and readiness only — Uber Eats and Deliveroo are not yet executable (no authorised source, ISS-0021).</Muted>
+                <div className="space-y-1.5 mt-2">
+                  <label className="flex items-start gap-2 text-sm">
+                    <input type="radio" name="sourceMode" checked={draft.sourceMode.mode === "just_eat_only"} onChange={() => setSourceModeId("just_eat_only")} className="mt-0.5" />
+                    <span><b>A. Just Eat only</b> — <span className="text-green-700">AVAILABLE</span></span>
+                  </label>
+                  <label className="flex items-start gap-2 text-sm">
+                    <input type="radio" name="sourceMode" checked={draft.sourceMode.mode === "just_eat_uber_deliveroo"} onChange={() => setSourceModeId("just_eat_uber_deliveroo")} className="mt-0.5" />
+                    <span><b>B. Just Eat + Uber Eats + Deliveroo</b> — <span className="text-amber-600">NOT YET PRODUCTION APPROVED</span> (multi-platform architecture represented; only Just Eat will actually execute)</span>
+                  </label>
+                </div>
+              </Card>
+              <Card title="Provider selection">
+                {providerRow("just_eat", "Just Eat", true)}
+                {providerRow("manual_import", "Manual import", true, MANUAL_IMPORT_STATUS)}
+                {providerRow("uber_eats", "Uber Eats", false)}
+                {providerRow("deliveroo", "Deliveroo", false)}
+                <p className="text-[11px] text-gray-400 mt-2">Uber Eats and Deliveroo are shown for visibility only — not selectable this session (paused pending authorised source / ingestion completion).</p>
+              </Card>
+            </>
+          )}
+
+          {step === STEP_GEOGRAPHY && (
+            <>
               <Card title="Territory">
                 <div className="grid sm:grid-cols-2 gap-3">
                   <Field label="Territory mode">
                     <select className={inp} value={draft.territory.mode} onChange={(e) => update((d) => { d.territory.mode = e.target.value as any; })}>
-                      {([["pilot", "Pilot"], ["manual_outcodes", "Manual postcode districts"], ["vp_coverage", "VP coverage"], ["full_uk", "Full UK"], ["custom", "Custom"]] as const).map(([m, label]) => <option key={m} value={m}>{label}</option>)}
+                      {/* "pilot" intentionally excluded from the selectable options — AspectLead is a
+                          Great Britain-wide product, not scoped to any one pilot territory (P4 control,
+                          2026-08-10). The RunTerritory type keeps "pilot" as a valid value only so an
+                          already-persisted old draft/run using it remains readable, never as something a
+                          user can newly choose. */}
+                      {([["manual_outcodes", "Manual postcode districts"], ["vp_coverage", "VP coverage"], ["full_uk", "Full UK"], ["custom", "Custom"]] as const).map(([m, label]) => <option key={m} value={m}>{label}</option>)}
                     </select>
                   </Field>
                   <Field label="Location rule">
@@ -305,7 +377,7 @@ function NewRunPageInner() {
                     </select>
                   </Field>
                   <Field label="Postcode areas, districts, sectors or pasted list" wide>
-                    <textarea className={inp} rows={3} value={draft.territory.input} onChange={(e) => update((d) => { d.territory.input = e.target.value; })} placeholder="TW   or   TW3, TW4   or a pasted list (comma or new line separated)" />
+                    <textarea className={inp} rows={3} value={draft.territory.input} onChange={(e) => update((d) => { d.territory.input = e.target.value; })} placeholder="A postcode area (e.g. SW), district(s) (e.g. SW1, SW2), a sector (e.g. SW1 2), or a pasted list — anywhere in Great Britain" />
                   </Field>
                 </div>
                 <p className="text-xs text-gray-500 mt-2">Preview resolves areas → districts/sectors and lets you exclude specific children before saving.</p>
@@ -327,10 +399,73 @@ function NewRunPageInner() {
                   {territoryGeom.length > 0 ? `Territory outline: ${territoryGeom.length} district${territoryGeom.length === 1 ? "" : "s"}.` : draft.territory.input ? `No district polygons matched "${draft.territory.input}".` : "Enter a territory above to outline it."}
                 </p>
               </Card>
+
+              <Card title="Reference points (anchors)">
+                <Muted>Optional reference points for this run (e.g. a high street centre) — supports territory review, not scope on its own. Click the map or enter coordinates manually.</Muted>
+                <AspectLeadMap mode="run-planning" territoryInput={draft.territory.input} anchors={draft.anchors} onMapClickPoint={addAnchorAtPoint} embeddedClassName="h-[420px]" />
+                <div className="grid sm:grid-cols-4 gap-2 my-2">
+                  <input className={inp} value={anchorLabel} onChange={(e) => setAnchorLabel(e.target.value)} placeholder="Label, e.g. Town Hall" />
+                  <input className={inp} value={anchorLat} onChange={(e) => setAnchorLat(e.target.value)} placeholder="Latitude" />
+                  <input className={inp} value={anchorLng} onChange={(e) => setAnchorLng(e.target.value)} placeholder="Longitude" />
+                  <button className={btn} onClick={addAnchor}>Add anchor</button>
+                </div>
+                {draft.anchors.length === 0 && <p className="text-xs text-gray-400">No anchors added yet — optional.</p>}
+                <ul className="space-y-1">
+                  {draft.anchors.map((a) => (
+                    <li key={a.id} className="flex items-center justify-between text-sm border border-gray-100 rounded px-2 py-1">
+                      <span>{a.label} <span className="text-gray-400 text-xs">({a.lat.toFixed(4)}, {a.lng.toFixed(4)})</span></span>
+                      <button onClick={() => removeAnchor(a.id)} className="text-gray-400 hover:text-gray-700">×</button>
+                    </li>
+                  ))}
+                </ul>
+              </Card>
             </>
           )}
 
-          {step === 2 && (
+          {step === STEP_LIMITS && (
+            <>
+              <Card title="Expected volume, cost, cap and approval — per source">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead><tr className="text-left text-gray-500"><th className="py-1 pr-3">Source</th><th className="py-1 pr-3">Expected volume</th><th className="py-1 pr-3">Estimated charge</th><th className="py-1 pr-3">Readiness</th><th className="py-1">Approval</th></tr></thead>
+                    <tbody>
+                      <tr className="border-t border-gray-100">
+                        <td className="py-1.5 pr-3 font-medium">Just Eat</td>
+                        <td className="py-1.5 pr-3">{estimating ? "Estimating…" : estimatedVolume == null ? "Not available" : `${estimatedVolume} (existing coverage)`}</td>
+                        <td className="py-1.5 pr-3">£0.00 (open lawful listing endpoint — genuinely free)</td>
+                        <td className="py-1.5 pr-3 text-green-700">AVAILABLE</td>
+                        <td className="py-1.5">Not required (free)</td>
+                      </tr>
+                      {draft.sourceMode.mode === "just_eat_uber_deliveroo" && (["uber_eats", "deliveroo"] as const).map((id) => {
+                        const s = registryFor(id);
+                        return (
+                          <tr key={id} className="border-t border-gray-100 opacity-70">
+                            <td className="py-1.5 pr-3 font-medium">{s?.name ?? id}</td>
+                            <td className="py-1.5 pr-3">Not available — no authorised source</td>
+                            <td className="py-1.5 pr-3">Not available — no approved cost model</td>
+                            <td className="py-1.5 pr-3 text-amber-600">{s?.statusLabel ?? s?.marketplaceStatus ?? "PENDING_AUTHORISATION"}</td>
+                            <td className="py-1.5 text-red-600">Blocked — provider not yet authorised</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+              <Card title="Maximum spend">
+                <Field label="Spend ceiling (£, optional)">
+                  <input className={inp} type="number" min="0" value={draft.limitsAndCost.spendCeilingGbp ?? ""} onChange={(e) => update((d) => { d.limitsAndCost.spendCeilingGbp = e.target.value === "" ? null : Number(e.target.value); })} placeholder="No ceiling set" />
+                </Field>
+                <label className="flex items-center gap-2 text-sm mt-3 opacity-60">
+                  <input type="checkbox" checked={false} disabled />
+                  Approve paid execution
+                </label>
+                <p className="text-[11px] text-gray-400 mt-1">Currently all selectable providers are free, so this ceiling is not enforced against a live cost yet. Paid-execution approval cannot be enabled in this vertical slice — no approved paid provider exists.</p>
+              </Card>
+            </>
+          )}
+
+          {step === 4 && (
             <>
               <Card title="Target profile — business types">
                 <BusinessTypePanel
@@ -402,101 +537,150 @@ function NewRunPageInner() {
                 </div>
               </Card>
               <Card title="Result tags"><ChipMulti items={RESULT_TAGS} selected={p.tags} onToggle={(id) => update((d) => { d.profile.tags = toggle(d.profile.tags, id); })} /></Card>
+
               <Card title="Existing-customer exclusion">
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" checked={pl.existingCustomerExclusion} onChange={() => update((d) => { d.planning.existingCustomerExclusion = !d.planning.existingCustomerExclusion; })} />
+                  <input type="checkbox" checked={draft.exclusions.existingCustomerExclusion.requested} onChange={() => update((d) => { d.exclusions.existingCustomerExclusion.requested = !d.exclusions.existingCustomerExclusion.requested; })} />
                   Exclude matches against the existing-customer reference data
                 </label>
-                <p className="text-[11px] text-gray-400 mt-1">Matching logic is real; the reference master is currently mock data (see Settings → source registry).</p>
+                <p className={`text-[11px] mt-1 ${draft.exclusions.existingCustomerExclusion.ready ? "text-gray-400" : "text-amber-600"}`}>
+                  {draft.exclusions.existingCustomerExclusion.ready
+                    ? "Matching logic is real and the reference master is live."
+                    : "NOT operational — matching logic is real, but the reference master is currently mock data (ISS-0001 unresolved). Requesting this does not suppress anything yet."}
+                </p>
               </Card>
-            </>
-          )}
 
-          {step === 3 && (
-            <Card title="Anchors">
-              <Muted>One or more reference points for this run (e.g. a high street centre). Multiple anchors were never supported before this screen — click the map or enter coordinates manually.</Muted>
-              <AspectLeadMap mode="run-planning" territoryInput={draft.territory.input} anchors={pl.anchors} onMapClickPoint={addAnchorAtPoint} embeddedClassName="h-[420px]" />
-              <div className="grid sm:grid-cols-4 gap-2 my-2">
-                <input className={inp} value={anchorLabel} onChange={(e) => setAnchorLabel(e.target.value)} placeholder="Label, e.g. Southall Town Hall" />
-                <input className={inp} value={anchorLat} onChange={(e) => setAnchorLat(e.target.value)} placeholder="Latitude" />
-                <input className={inp} value={anchorLng} onChange={(e) => setAnchorLng(e.target.value)} placeholder="Longitude" />
-                <button className={btn} onClick={addAnchor}>Add anchor</button>
-              </div>
-              {pl.anchors.length === 0 && <p className="text-xs text-gray-400">No anchors added yet — optional.</p>}
-              <ul className="space-y-1">
-                {pl.anchors.map((a) => (
-                  <li key={a.id} className="flex items-center justify-between text-sm border border-gray-100 rounded px-2 py-1">
-                    <span>{a.label} <span className="text-gray-400 text-xs">({a.lat.toFixed(4)}, {a.lng.toFixed(4)})</span></span>
-                    <button onClick={() => removeAnchor(a.id)} className="text-gray-400 hover:text-gray-700">×</button>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-
-          {step === 4 && (
-            <>
-              <Card title="Provider selection">
-                {providerRow("just_eat", "Just Eat", true)}
-                {providerRow("manual_import", "Manual import", true, MANUAL_IMPORT_STATUS)}
-                {providerRow("uber_eats", "Uber Eats", false)}
-                {providerRow("deliveroo", "Deliveroo", false)}
-                <p className="text-[11px] text-gray-400 mt-2">Uber Eats and Deliveroo are shown for visibility only — not selectable this session (paused pending authorised source / ingestion completion).</p>
+              <Card title="Commercial / brand / customer-suppression rule profiles">
+                <Muted>Forward-looking only — these will reference VERSIONED profiles from a controlled TEMP-PIPELINE → permanent promotion pass (next P4 milestone). None are implemented in this vertical slice; this app never depends on scripts/lead-production or config/lead-production directly.</Muted>
+                <dl className="text-xs mt-2 space-y-1">
+                  <div className="flex justify-between"><dt className="text-gray-500">Commercial rule profile</dt><dd className="text-amber-600">{draft.exclusions.commercialRuleProfile.profile ? `${draft.exclusions.commercialRuleProfile.profile.id} (${draft.exclusions.commercialRuleProfile.profile.version})` : draft.exclusions.commercialRuleProfile.blockedReason}</dd></div>
+                  <div className="flex justify-between"><dt className="text-gray-500">Brand/group decision profile</dt><dd className="text-amber-600">{draft.exclusions.brandGroupDecisionProfile.profile ? `${draft.exclusions.brandGroupDecisionProfile.profile.id} (${draft.exclusions.brandGroupDecisionProfile.profile.version})` : draft.exclusions.brandGroupDecisionProfile.blockedReason}</dd></div>
+                  <div className="flex justify-between"><dt className="text-gray-500">Customer suppression profile</dt><dd className="text-amber-600">{draft.exclusions.customerSuppressionProfile.profile ? `${draft.exclusions.customerSuppressionProfile.profile.id} (${draft.exclusions.customerSuppressionProfile.profile.version})` : draft.exclusions.customerSuppressionProfile.blockedReason}</dd></div>
+                </dl>
               </Card>
-              <Card title="Estimated volume &amp; cost">
-                <div className="grid sm:grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <div className="text-xs text-gray-500">Estimated record volume</div>
-                    <div className="font-semibold">{estimating ? "Estimating…" : estimatedVolume == null ? "Not available" : `${estimatedVolume} (existing Just Eat coverage in this territory)`}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-gray-500">Estimated cost</div>
-                    <div className="font-semibold">{costGbp == null ? "Not available" : `£${costGbp.toFixed(2)} (${pl.selectedProviders.join(", ") || "no provider selected"} — no per-record provider cost)`}</div>
-                  </div>
+
+              <Card title="Manual exclusions">
+                <TokenInput value={newManualExclusion} setValue={setNewManualExclusion} onAdd={addManualExclusion} tokens={draft.exclusions.manualExclusions} onRemove={removeManualExclusion} placeholder="Free-text manual exclusion note" />
+                <div className="mt-3">
+                  <Field label="Override policy">
+                    <select className={inp} value={draft.exclusions.overridePolicy} onChange={(e) => update((d) => { d.exclusions.overridePolicy = e.target.value as any; })}>
+                      <option value="none">None</option>
+                      <option value="owner_ack_required">Owner acknowledgement required to override an exclusion</option>
+                    </select>
+                  </Field>
                 </div>
-              </Card>
-              <Card title="Maximum spend">
-                <Field label="Spend ceiling (£, optional)">
-                  <input className={inp} type="number" min="0" value={pl.spendCeilingGbp ?? ""} onChange={(e) => update((d) => { d.planning.spendCeilingGbp = e.target.value === "" ? null : Number(e.target.value); })} placeholder="No ceiling set" />
-                </Field>
-                <p className="text-[11px] text-gray-400 mt-1">Recorded for this run. Currently all selectable providers are free, so this ceiling is not enforced against a live cost yet — it will gate provider selection once a paid source is authorised.</p>
               </Card>
             </>
           )}
 
           {step === 5 && (
+            <Card title="Scoring profile">
+              <Muted>A single, versioned, approved profile — no custom-weight editing in this vertical slice. Scoring stays deterministic and explainable.</Muted>
+              <dl className="text-sm mt-2 space-y-1">
+                <div className="flex justify-between"><dt className="text-gray-500">Name</dt><dd className="text-gray-900">{draft.scoringProfile.name}</dd></div>
+                <div className="flex justify-between"><dt className="text-gray-500">Profile ID</dt><dd className="text-gray-900 font-mono text-xs">{draft.scoringProfile.profileId}</dd></div>
+                <div className="flex justify-between"><dt className="text-gray-500">Version / source</dt><dd className="text-gray-900 font-mono text-xs">{draft.scoringProfile.version}</dd></div>
+              </dl>
+              <p className="text-xs text-gray-600 mt-2">{draft.scoringProfile.summary}</p>
+            </Card>
+          )}
+
+          {step === 6 && (
+            <Card title="Assignment policy">
+              <Muted>Configures downstream assignment POLICY only. No individual lead is assigned during run creation — actual assignment happens after qualification/scoring.</Muted>
+              <div className="space-y-1.5 mt-2">
+                {(["manual_management_review", "territory_based", "telesales", "field_sales", "both"] as AssignmentPolicyId[]).map((policy) => {
+                  const disabled = policy === "territory_based" && !draft.assignment.territoryBasedAvailable;
+                  return (
+                    <label key={policy} className={`flex items-start gap-2 text-sm ${disabled ? "opacity-50" : ""}`}>
+                      <input type="radio" name="assignmentPolicy" className="mt-0.5" disabled={disabled} checked={draft.assignment.policy === policy} onChange={() => setAssignmentPolicy(policy)} />
+                      <span>
+                        {ASSIGNMENT_LABELS[policy]}
+                        {policy === "manual_management_review" && <span className="text-gray-400"> — default</span>}
+                        {disabled && <span className="text-amber-600"> — not currently available (no rep/territory assignment table wired to runs yet)</span>}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
+
+          {step === 7 && (
+            <Card title="Requested outputs">
+              <Muted>P4-APP selects requested output TYPES only. P4-EXPORTS owns the actual controlled schemas and generators — this app never rewrites CTO or Sales Pro field mappings.</Muted>
+              <div className="space-y-1.5 mt-2">
+                {draft.outputs.map((o) => (
+                  <label key={o.type} className="flex items-start justify-between gap-2 text-sm">
+                    <span className="flex items-start gap-2">
+                      <input type="checkbox" className="mt-0.5" checked={o.requested} disabled={o.type === "canonical_audit"} onChange={() => toggleOutput(o.type)} />
+                      <span>{OUTPUT_LABELS[o.type]}{o.type === "canonical_audit" && <span className="text-gray-400"> — required</span>}</span>
+                    </span>
+                    <span className={o.ready ? "text-green-700 text-xs" : "text-amber-600 text-xs text-right max-w-[220px]"}>{o.ready ? "Ready" : o.blockedReason}</span>
+                  </label>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {step === STEP_REVIEW && (
             <>
-              <Card title="Duplicate-territory / conflict check">
-                {checkingConflict ? <p className="text-sm text-gray-500">Checking…</p> : conflict && conflict.overlaps.length > 0 ? (
-                  <div className="space-y-1.5">
-                    {conflict.overlaps.map((o) => (
-                      <div key={o.runId} className={`text-sm rounded px-2 py-1 border ${conflict.identicalActiveConflict ? "bg-red-50 border-red-200 text-red-700" : "bg-amber-50 border-amber-200 text-amber-700"}`}>
-                        Overlaps run <b>{o.name}</b> ({o.status}) on {o.overlappingUnits.join(", ")}
-                      </div>
-                    ))}
-                    {conflict.identicalActiveConflict && (
+              <Card title="Territory overlap — searching the same geography again is allowed">
+                <p className="text-[11px] text-gray-400 mb-2">AspectLead allows the same geography to be searched more than once. Overlap is detected and disclosed here, not blocked — acknowledgement is only required when this run overlaps another run that is currently active.</p>
+                {checkingOverlap ? <p className="text-sm text-gray-500">Checking…</p> : overlapResult && overlapResult.overlaps.length > 0 ? (
+                  <div className="space-y-2">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead><tr className="text-left text-gray-500">
+                          <th className="py-1 pr-2">Run</th><th className="py-1 pr-2">Owner</th><th className="py-1 pr-2">Source</th>
+                          <th className="py-1 pr-2">Status</th><th className="py-1 pr-2">Territory</th><th className="py-1 pr-2">Overlap</th>
+                          <th className="py-1 pr-2">Units</th><th className="py-1 pr-2">Created</th><th className="py-1">Add'l cost</th>
+                        </tr></thead>
+                        <tbody>
+                          {overlapResult.overlaps.map((o) => {
+                            const active = ["queued", "running", "cancelling"].includes(o.status);
+                            return (
+                              <tr key={o.runId} className={`border-t border-gray-100 ${active ? "bg-amber-50" : ""}`}>
+                                <td className="py-1 pr-2">{o.name}{o.reference && <span className="text-gray-400"> ({o.reference})</span>}</td>
+                                <td className="py-1 pr-2">{o.ownerLabel}</td>
+                                <td className="py-1 pr-2">{o.sourceMode ?? "—"}</td>
+                                <td className="py-1 pr-2">{o.status}{active ? "" : " (history)"}</td>
+                                <td className="py-1 pr-2">{o.territoryInput ?? "—"}</td>
+                                <td className="py-1 pr-2">{o.overlapType}</td>
+                                <td className="py-1 pr-2">{o.overlappingUnits.join(", ")}</td>
+                                <td className="py-1 pr-2">{new Date(o.createdAt).toLocaleDateString("en-GB")}</td>
+                                <td className="py-1">{o.estimatedAdditionalCostGbp == null ? "not available" : `£${o.estimatedAdditionalCostGbp.toFixed(2)}`}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    {materialOverlap && (
                       <div className="mt-2 border-t border-gray-100 pt-2">
                         <label className="flex items-start gap-2 text-sm">
-                          <input type="checkbox" className="mt-0.5" checked={!!pl.ownerOverride?.acknowledged}
-                            onChange={(e) => update((d) => { d.planning.ownerOverride = e.target.checked ? { acknowledged: true, note: overrideNote, at: new Date().toISOString() } : null; })} />
-                          I acknowledge this territory conflict and choose to proceed anyway (recorded on the run).
+                          <input type="checkbox" className="mt-0.5" checked={!!draft.review.overlapAcknowledgement?.acknowledged}
+                            onChange={(e) => update((d) => { d.review.overlapAcknowledgement = e.target.checked ? { acknowledged: true, note: overlapNote, acknowledgedBy: null, acknowledgedByEmail: null, acknowledgedAt: null, overlappingRunIds: [] } : null; })} />
+                          I acknowledge this territory overlaps a currently active run and choose to proceed (recorded on the run).
                         </label>
-                        {pl.ownerOverride?.acknowledged && (
-                          <input className={`${inp} mt-2`} value={overrideNote} onChange={(e) => { setOverrideNote(e.target.value); update((d) => { if (d.planning.ownerOverride) d.planning.ownerOverride.note = e.target.value; }); }} placeholder="Optional note (why this override is acceptable)" />
+                        {draft.review.overlapAcknowledgement?.acknowledged && (
+                          <>
+                            <input className={`${inp} mt-2`} value={overlapNote} onChange={(e) => { setOverlapNote(e.target.value); update((d) => { if (d.review.overlapAcknowledgement) d.review.overlapAcknowledgement.note = e.target.value; }); }} placeholder="Optional note (why this repeat/overlapping search is intended)" />
+                            <p className="text-[11px] text-gray-400 mt-1">This records that you were shown the overlap above and chose to proceed — repeated/overlapping searches are a legitimate, permitted part of the product, not a restricted action.</p>
+                          </>
                         )}
                       </div>
                     )}
                   </div>
-                ) : <p className="text-sm text-green-700">No conflicting active/queued run on this territory.</p>}
+                ) : <p className="text-sm text-green-700">No prior run on this territory yet — nothing to disclose.</p>}
               </Card>
               <Card title="Review">
                 <dl className="text-xs space-y-1">
                   {summariseRunDraft(draft).map((s) => (
                     <div key={s.label} className="flex justify-between gap-2"><dt className="text-gray-500">{s.label}</dt><dd className="text-gray-900 text-right">{s.value}</dd></div>
                   ))}
-                  <div className="flex justify-between gap-2"><dt className="text-gray-500">Anchors</dt><dd className="text-gray-900 text-right">{pl.anchors.length}</dd></div>
-                  <div className="flex justify-between gap-2"><dt className="text-gray-500">Provider(s)</dt><dd className="text-gray-900 text-right">{pl.selectedProviders.join(", ") || "none"}</dd></div>
-                  <div className="flex justify-between gap-2"><dt className="text-gray-500">Spend ceiling</dt><dd className="text-gray-900 text-right">{pl.spendCeilingGbp != null ? `£${pl.spendCeilingGbp}` : "none set"}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="text-gray-500">Anchors</dt><dd className="text-gray-900 text-right">{draft.anchors.length}</dd></div>
+                  <div className="flex justify-between gap-2"><dt className="text-gray-500">Provider(s)</dt><dd className="text-gray-900 text-right">{draft.sourceMode.selectedProviders.join(", ") || "none"}</dd></div>
                 </dl>
                 {!validation.ok && (
                   <div className="mt-2">{validation.errors.map((e) => <div key={e} className="text-xs text-red-600">● {e}</div>)}</div>
@@ -504,7 +688,7 @@ function NewRunPageInner() {
                 {started ? (
                   <div className="mt-3 text-sm text-green-700 bg-green-50 border border-green-200 rounded px-2 py-1.5">
                     Started — execution {started.status}, {started.completed}/{started.planned} postcode districts.
-                    {" "}<a href="/discovery-runs" className="underline">View in Discovery Runs</a>
+                    {" "}<a href="/pipeline-runs" className="underline">View in Main Runs</a>
                   </div>
                 ) : (
                   <div className="mt-3 flex gap-2">
@@ -512,7 +696,7 @@ function NewRunPageInner() {
                     <button disabled={busy || !canConfirm} className={canConfirm ? btn : btnDisabled} onClick={confirmAndStart}>{busy ? "Starting…" : "Confirm and start"}</button>
                   </div>
                 )}
-                {overrideRequired && <p className="text-xs text-red-600 mt-1">Confirm is blocked — acknowledge the territory conflict above to proceed.</p>}
+                {acknowledgementRequired && <p className="text-xs text-red-600 mt-1">Confirm is blocked — acknowledge the territory overlap above to proceed. Overlap itself is permitted; the acknowledgement is required evidence that you saw it.</p>}
               </Card>
             </>
           )}
