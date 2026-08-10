@@ -8,6 +8,28 @@
 -- hard block requiring an owner/admin-authorised override). Overlap is now DETECTED and
 -- DISCLOSED, never prohibited — see docs/09_DECISIONS.md for the full correction record.
 --
+-- P4 INDEPENDENT REVIEW, 2026-08-10 (same day, second correction pass) — two audit-safety
+-- defects fixed:
+--   (a) confirmedAtIso was only ever stamped by the BROWSER, before the queue call — so a
+--       run's immutable config_snapshot could read confirmedAtIso=null even though the run
+--       had genuinely been confirmed, or (worse) could carry a client timestamp for a
+--       confirmation that then failed to queue at all. This function now stamps
+--       config_snapshot.review.confirmedAtIso itself, from its own transaction timestamp,
+--       unconditionally on every successful queue — never from client input.
+--   (b) the disclosed-overlap acknowledgement was accepted at face value: the client sent
+--       acknowledged=true and this function stamped WHATEVER overlap existed at that
+--       instant, even if it differed from what the Review screen actually showed the user
+--       (a new run could become active in the gap between disclosure and confirm). This
+--       function now requires the client to record exactly which active run ids were
+--       DISCLOSED at acknowledgement time (target_filters.overlapAcknowledgement.
+--       disclosedOverlapRunIds), recomputes the current material overlap, and rejects with
+--       CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE if the two sets differ — in either direction
+--       (a run becoming active that wasn't disclosed, OR a disclosed run no longer being
+--       active) — rather than silently queuing against evidence the user never saw. This
+--       is still not an authorisation check: any authorised application user may
+--       acknowledge permitted overlap: no role is verified, only that the DISCLOSURE is
+--       fresh.
+--
 -- ---------------------------------------------------------------------------------------
 -- WHAT THIS FUNCTION STILL PREVENTS
 -- ---------------------------------------------------------------------------------------
@@ -42,15 +64,20 @@
 -- in an ACTIVE status (queued/running/cancelling) for the same tenant+source. Historical
 -- runs (completed/completed_with_warnings/failed/cancelled) are informational only — they
 -- never require acknowledgement, matching "historical completed runs should normally be
--- informational rather than treated as active conflicts". When material overlap exists,
--- the run's target_filters.overlapAcknowledgement.acknowledged must be true (the client
--- disclosure UI collects this — see /api/discovery/runs/conflicts and the Review step) or
--- the function rejects with CONFIRM_QUEUE_OVERLAP_ACK_REQUIRED. This is NOT an
--- authorisation check — no owner/admin role is verified, because proceeding with an
--- overlapping search is not a restricted action; only the disclosure evidence
+-- informational rather than treated as active conflicts". When material overlap exists:
+--   1. target_filters.overlapAcknowledgement.acknowledged must be true (the client
+--      disclosure UI collects this — see /api/discovery/runs/conflicts and the Review
+--      step), else CONFIRM_QUEUE_OVERLAP_ACK_REQUIRED.
+--   2. target_filters.overlapAcknowledgement.disclosedOverlapRunIds (the exact active run
+--      ids the Review screen showed when the box was ticked) must equal the run ids this
+--      function independently recomputes RIGHT NOW, else CONFIRM_QUEUE_STALE_OVERLAP_
+--      DISCLOSURE — the disclosure the user acted on is no longer accurate (something
+--      became active, or something that was active no longer is) and must be refreshed.
+-- This is NOT an authorisation check — no owner/admin role is verified, because proceeding
+-- with an overlapping search is not a restricted action; only the disclosure evidence
 -- (acknowledgedBy/acknowledgedByEmail/acknowledgedAt/overlappingRunIds) is stamped
--- server-side, so a queued run always carries real proof of what was disclosed at
--- confirmation time, not just a client claim of "acknowledged: true".
+-- server-side, so a queued run always carries real proof of what was disclosed AND
+-- verified fresh at confirmation time, not just a client claim of "acknowledged: true".
 --
 -- ---------------------------------------------------------------------------------------
 -- CANONICAL OVERLAP DATA
@@ -92,13 +119,14 @@ security definer
 set search_path = public
 as $$
 declare
-  v_run             discovery_runs;
-  v_units           text[];
-  v_overlap_run_ids uuid[];
-  v_ack             boolean;
-  v_email           text;
-  v_now             timestamptz := now();
-  v_execution       je_executions;
+  v_run               discovery_runs;
+  v_units             text[];
+  v_overlap_run_ids   uuid[];
+  v_disclosed_run_ids uuid[];
+  v_ack               boolean;
+  v_email             text;
+  v_now               timestamptz := now();
+  v_execution         je_executions;
 begin
   -- 1. Row-lock the target run FIRST — serialises repeat calls for the SAME run (duplicate-
   --    queue-request protection): a second concurrent call blocks here until the first
@@ -106,6 +134,22 @@ begin
   select * into v_run from discovery_runs where id = p_run_id for update;
   if not found then
     raise exception 'CONFIRM_QUEUE_RUN_NOT_FOUND: run % does not exist', p_run_id;
+  end if;
+
+  -- Normalise config_snapshot so the confirmedAtIso stamp below (step 4, unconditional on
+  -- every successful queue) can never silently no-op: jsonb_set only creates the FINAL path
+  -- segment if missing — an INTERMEDIATE segment ('review') that is absent, or present as
+  -- JSON null, makes the whole call a silent no-op rather than an error. This is reachable
+  -- for real: scripts/je-run.ts (the CLI discovery-run path) creates runs with
+  -- config_snapshot={} directly, with no 'review' key at all (P4 independent review,
+  -- 2026-08-10 — caught by test:confirm-and-queue-run-local while adding confirmedAtIso
+  -- stamping). Only 'review' is normalised HERE (unconditionally needed); 'overlapAcknowledgement'
+  -- is normalised separately, only inside the branch that actually writes into it below —
+  -- forcing it from null to {} for every run regardless of overlap would misrepresent a run
+  -- that never had anything to acknowledge.
+  v_run.config_snapshot := coalesce(v_run.config_snapshot, '{}'::jsonb);
+  if jsonb_typeof(v_run.config_snapshot -> 'review') is distinct from 'object' then
+    v_run.config_snapshot := jsonb_set(v_run.config_snapshot, '{review}', '{}'::jsonb);
   end if;
 
   -- 2. Eligibility.
@@ -143,7 +187,7 @@ begin
     where qu.run_id = p_run_id and qu.source = p_source;
 
   if array_length(v_units, 1) is not null then
-    select coalesce(array_agg(distinct r.id), array[]::uuid[])
+    select coalesce(array_agg(distinct r.id order by r.id), array[]::uuid[])
       into v_overlap_run_ids
       from discovery_runs r
       where r.tenant_id = v_run.tenant_id
@@ -157,16 +201,35 @@ begin
     v_overlap_run_ids := array[]::uuid[];
   end if;
 
+  v_ack := coalesce(((v_run.target_filters -> 'overlapAcknowledgement') ->> 'acknowledged')::boolean, false);
+  select coalesce(array_agg(distinct elem::uuid order by elem::uuid), array[]::uuid[])
+    into v_disclosed_run_ids
+    from jsonb_array_elements_text(coalesce(v_run.target_filters #> '{overlapAcknowledgement,disclosedOverlapRunIds}', '[]'::jsonb)) as elem;
+
   if array_length(v_overlap_run_ids, 1) is not null then
-    v_ack := coalesce(((v_run.target_filters -> 'overlapAcknowledgement') ->> 'acknowledged')::boolean, false);
+    -- Material overlap exists RIGHT NOW.
     if not v_ack then
       raise exception 'CONFIRM_QUEUE_OVERLAP_ACK_REQUIRED: run % overlaps % currently active run(s) on source ''%'' — acknowledge the disclosed overlap to proceed (overlap itself is permitted)', p_run_id, array_length(v_overlap_run_ids, 1), p_source;
     end if;
 
+    if v_disclosed_run_ids <> v_overlap_run_ids then
+      raise exception 'CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE: run % was acknowledged against overlapping run(s) % but the current overlap is now % — the disclosure you saw is no longer accurate; refresh and re-acknowledge before confirming', p_run_id, v_disclosed_run_ids, v_overlap_run_ids;
+    end if;
+
     select email into v_email from auth.users where id = p_actor_user_id;
 
+    -- Normalise review.overlapAcknowledgement to a real object ONLY here, right before
+    -- writing into it — 'review' itself is already guaranteed an object (step 1 above), but
+    -- overlapAcknowledgement could still be JSON null (the normal, honest default for a run
+    -- with nothing to acknowledge) or absent (a CLI-created run). Scoped to this branch so a
+    -- run that never had material overlap never gets a fabricated {} written in its place.
+    if jsonb_typeof(v_run.config_snapshot -> 'review' -> 'overlapAcknowledgement') is distinct from 'object' then
+      v_run.config_snapshot := jsonb_set(v_run.config_snapshot, '{review,overlapAcknowledgement}', '{}'::jsonb);
+    end if;
+
     -- Stamp disclosure evidence onto both mirrors. Never overwrites the user's own
-    -- acknowledged/note fields — only adds server-verified proof of what was acknowledged.
+    -- acknowledged/note/disclosedOverlapRunIds fields — only adds server-verified proof of
+    -- what was acknowledged (which, having just been checked above, is known-fresh).
     update discovery_runs set
       target_filters = jsonb_set(
         jsonb_set(
@@ -181,7 +244,7 @@ begin
       config_snapshot = jsonb_set(
         jsonb_set(
           jsonb_set(
-            jsonb_set(config_snapshot, '{review,overlapAcknowledgement,acknowledgedBy}', to_jsonb(p_actor_user_id::text)),
+            jsonb_set(v_run.config_snapshot, '{review,overlapAcknowledgement,acknowledgedBy}', to_jsonb(p_actor_user_id::text)),
             '{review,overlapAcknowledgement,acknowledgedByEmail}', to_jsonb(coalesce(v_email, p_actor_user_id::text))
           ),
           '{review,overlapAcknowledgement,acknowledgedAt}', to_jsonb(v_now)
@@ -190,12 +253,24 @@ begin
       )
       where id = p_run_id
       returning * into v_run;
+  elsif v_ack and array_length(v_disclosed_run_ids, 1) is not null then
+    -- No material overlap right now, but the user previously acknowledged one that has
+    -- since disappeared (e.g. it completed) — do NOT silently proceed as if nothing had
+    -- been disclosed; that would leave stale evidence implying the user saw today's (now
+    -- empty) picture. Require a fresh disclosure/acknowledgement instead.
+    raise exception 'CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE: run % was acknowledged against overlapping run(s) % but none of those are active any more — refresh the disclosure before confirming', p_run_id, v_disclosed_run_ids;
   end if;
 
   -- 4. Atomic transition — same transaction as everything above. A raised exception rolls
   --    back the whole transaction (including any overlap-evidence UPDATE), leaving nothing
-  --    partial.
-  update discovery_runs set status = 'queued', updated_at = v_now where id = p_run_id;
+  --    partial, and confirmedAtIso stays null. Stamp the server-authoritative confirmation
+  --    time unconditionally — every successful queue is a confirmation, overlap or not.
+  update discovery_runs set
+    status = 'queued',
+    updated_at = v_now,
+    config_snapshot = jsonb_set(v_run.config_snapshot, '{review,confirmedAtIso}', to_jsonb(v_now))
+    where id = p_run_id
+    returning * into v_run;
 
   insert into je_executions (tenant_id, run_id, source, status, planned_queries)
   values (v_run.tenant_id, p_run_id, p_source, 'queued', coalesce(jsonb_array_length(v_run.derived_query_units), 0))

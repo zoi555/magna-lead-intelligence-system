@@ -10,6 +10,16 @@
 // already been searched — not flagged as active. `materialOverlap` (any overlap with a
 // currently ACTIVE run — queued/running/cancelling) is the one signal the UI uses to
 // require an explicit acknowledgement before Confirm; it is not a rejection.
+//
+// P4 independent review, 2026-08-10: existing runs are now compared using the canonical
+// query_unit table — the SAME source confirm_and_queue_run (migration 0031) reads to
+// compute overlap authoritatively — instead of discovery_runs.derived_query_units, which
+// could disagree once a draft was edited after its first save (query_unit is now kept in
+// sync on every save, not just the first — see persistQueryUnits in run-service.ts). This
+// is not a second overlap algorithm: it is the same "shares >=1 query_unit" comparison,
+// just reading the same table the RPC does. The proposed (unsaved) run's side of the
+// comparison still comes from the client's freshly-resolved queryUnits — there is nothing
+// canonical to read for a run that hasn't been saved yet.
 
 import { NextResponse } from "next/server";
 import { getRepo } from "@/lib/discovery-engine/server";
@@ -37,11 +47,26 @@ export async function POST(req: Request) {
     const tenant_id = session.tenantId;
     const runs = await getRepo().listRuns(tenant_id);
     const proposed = new Set(queryUnits);
+    const db = createServiceClient();
+
+    const candidateRuns = runs.filter((r) => r.id !== excludeRunId);
+    const unitsByRun = new Map<string, Set<string>>();
+    if (candidateRuns.length) {
+      // Canonical source (query_unit) — see the header comment above for why this replaced
+      // discovery_runs.derived_query_units. Just Eat is the only source this vertical slice
+      // can queue, matching confirm_and_queue_run's own default source.
+      const qu = await db.from("query_unit").select("run_id, code").eq("source", "just_eat").in("run_id", candidateRuns.map((r) => r.id));
+      if (qu.error) throw new Error(`conflicts: query_unit lookup: ${JSON.stringify(qu.error)}`);
+      for (const row of (qu.data ?? []) as { run_id: string; code: string }[]) {
+        const set = unitsByRun.get(row.run_id) ?? new Set<string>();
+        set.add(row.code.toUpperCase());
+        unitsByRun.set(row.run_id, set);
+      }
+    }
 
     const rawOverlaps: { run: (typeof runs)[number]; overlappingUnits: string[]; overlapType: "exact" | "partial" }[] = [];
-    for (const r of runs) {
-      if (r.id === excludeRunId) continue;
-      const theirs = new Set((r.derived_query_units ?? []).map((u) => u.toUpperCase()));
+    for (const r of candidateRuns) {
+      const theirs = unitsByRun.get(r.id) ?? new Set<string>();
       const overlapping = [...proposed].filter((u) => theirs.has(u));
       if (!overlapping.length) continue;
       const exact = overlapping.length === proposed.size && overlapping.length === theirs.size;
@@ -53,7 +78,6 @@ export async function POST(req: Request) {
     const emailById = new Map<string, string>();
     if (ownerIds.length) {
       try {
-        const db = createServiceClient();
         const usersRes = await db.auth.admin.listUsers({ perPage: 200 });
         for (const u of usersRes.data?.users ?? []) if (u.email) emailById.set(u.id, u.email);
       } catch { /* best-effort only */ }

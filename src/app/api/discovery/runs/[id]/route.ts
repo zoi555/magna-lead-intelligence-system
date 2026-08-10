@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { getRepo } from "@/lib/discovery-engine/server";
-import { buildRunInput, type CreateRunParams } from "@/lib/discovery-engine/run-service";
+import { buildRunInput, persistQueryUnits, type CreateRunParams } from "@/lib/discovery-engine/run-service";
 import { loadPostcodeReference } from "@/lib/discovery-engine/geography/reference";
 import { JUST_EAT_GEOGRAPHY_SUPPORT } from "@/lib/discovery-engine/geography/planner";
 import { planTerritoryWithPlaces } from "@/lib/discovery-engine/geography/plan-with-places";
@@ -53,6 +53,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const plan = await planTerritoryWithPlaces(db, territory_input, ref, JUST_EAT_GEOGRAPHY_SUPPORT, params2.exclusions ?? []);
     const patch = buildRunInput(params2, plan);
     const run = await repo.updateRunDraft(id, patch);
+    // Keep the canonical query_unit table (read by confirm_and_queue_run and the overlap
+    // disclosure endpoint) in sync with an edited-then-resaved draft's territory — see
+    // persistQueryUnits' own doc comment (P4 independent review, 2026-08-10).
+    await persistQueryUnits(db, run, plan);
     return NextResponse.json({ ok: true, run, queryUnits: plan.queryUnits, expansionCount: plan.queryUnits.length });
   } catch (e) {
     return NextResponse.json({ ok: false, error: String((e as Error)?.message ?? e) }, { status: 500 });

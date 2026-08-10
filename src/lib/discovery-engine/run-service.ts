@@ -62,6 +62,27 @@ export async function saveRunFromPlan(repo: DiscoveryRepository, p: CreateRunPar
   return { run, plan };
 }
 
+/** Persist the canonical query_unit rows for a run's CURRENT plan — replaces any rows this
+ *  run previously had for this source (delete-then-insert, not upsert) so the table never
+ *  carries stale codes left over from an earlier territory before an edit. This is the
+ *  SAME canonical source confirm_and_queue_run reads to detect overlap and compute this
+ *  run's own units, so it must be kept in sync on every save that can change the territory
+ *  — not just the first one (P4 independent review, 2026-08-10: /api/discovery/runs/
+ *  conflicts previously compared against discovery_runs.derived_query_units instead of
+ *  this table, which could disagree once a draft was edited after its first save; see
+ *  docs/09_DECISIONS.md). */
+export async function persistQueryUnits(db: SupabaseClient, run: RunRecord, plan: TerritoryPlan, source = "just_eat"): Promise<void> {
+  const del = await db.from("query_unit").delete().eq("run_id", run.id).eq("source", source);
+  if (del.error) throw new Error(`persist query units (clear stale): ${JSON.stringify(del.error)}`);
+  const unitRows = plan.queryUnits.map((code) => ({
+    tenant_id: run.tenant_id, run_id: run.id, code, level: "postcode_district", source,
+  }));
+  if (unitRows.length) {
+    const ins = await db.from("query_unit").insert(unitRows);
+    if (ins.error) throw new Error(`persist query units: ${JSON.stringify(ins.error)}`);
+  }
+}
+
 /** Persist geography provenance (objective 7): one discovery_selection per original
  *  selection + the query units actually planned. Server-side (service client). */
 export async function persistGeographyProvenance(db: SupabaseClient, run: RunRecord, plan: TerritoryPlan, source = "just_eat"): Promise<void> {
@@ -76,13 +97,7 @@ export async function persistGeographyProvenance(db: SupabaseClient, run: RunRec
     const ins = await db.from("discovery_selection").insert(selectionRows).select("id, resolved_code");
     if (ins.error) throw new Error(`persist selections: ${JSON.stringify(ins.error)}`);
   }
-  const unitRows = plan.queryUnits.map((code) => ({
-    tenant_id: run.tenant_id, run_id: run.id, code, level: "postcode_district", source,
-  }));
-  if (unitRows.length) {
-    const ins = await db.from("query_unit").upsert(unitRows, { onConflict: "run_id,source,code" });
-    if (ins.error) throw new Error(`persist query units: ${JSON.stringify(ins.error)}`);
-  }
+  await persistQueryUnits(db, run, plan, source);
 }
 
 /** Atomic draft -> queued transition (migration 0031, confirm_and_queue_run) — replaces the

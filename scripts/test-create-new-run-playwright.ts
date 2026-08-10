@@ -58,6 +58,12 @@ async function fillWizardThroughToReview(page: Page, runName: string, territory:
 
   await page.getByRole("button", { name: "Next", exact: true }).click();
   // Step 3: Geography — territory + national map + anchors, all on one step now
+  // Great Britain wording (P4 independent review, 2026-08-10): the CURRENT product covers
+  // England/Scotland/Wales only — Northern Ireland is out of scope — so the territory-mode
+  // dropdown must say "Full Great Britain", never "Full UK".
+  const territoryModeOptionTexts = await page.locator('select').first().locator('option').allTextContents();
+  assert(territoryModeOptionTexts.includes("Full Great Britain"), `territory-mode dropdown offers "Full Great Britain" (got: ${JSON.stringify(territoryModeOptionTexts)})`);
+  assert(!territoryModeOptionTexts.some((t) => /\bFull UK\b/.test(t)), "territory-mode dropdown never says 'Full UK'");
   await page.locator(TERRITORY_TEXTAREA).fill(territory);
   await page.waitForTimeout(500);
   await page.getByRole("button", { name: "Preview geography" }).click().catch(() => {});
@@ -186,9 +192,22 @@ async function main() {
     await confirmBtn.click();
     await page.waitForSelector("text=Started —", { timeout: 15000 }).catch(() => {});
     await page.screenshot({ path: path.join(SCRATCHPAD, "22-confirmed-started.png"), fullPage: true });
-    const afterConfirm = await db.from("discovery_runs").select("status").eq("id", runId).maybeSingle();
+    const afterConfirm = await db.from("discovery_runs").select("status, config_snapshot").eq("id", runId).maybeSingle();
     assert(afterConfirm.data?.status === "queued", `run status is 'queued' after Confirm and start (got '${afterConfirm.data?.status}')`);
+    // confirmedAtIso is server-authoritative (P4 independent review, 2026-08-10) — stamped
+    // ONLY by confirm_and_queue_run, never by the browser. Prove it round-trips into the
+    // real DB row and is a genuine, current, parseable timestamp — not a client guess.
+    const confirmedAtIso = (afterConfirm.data?.config_snapshot as Record<string, any> | undefined)?.review?.confirmedAtIso;
+    assert(typeof confirmedAtIso === "string" && !Number.isNaN(Date.parse(confirmedAtIso)), `server-stamped confirmedAtIso is a real, parseable timestamp on the DB row (got ${JSON.stringify(confirmedAtIso)})`);
+    assert(Math.abs(Date.now() - Date.parse(confirmedAtIso)) < 60_000, "confirmedAtIso is current (within the last minute), not stale or fabricated");
   }
+
+  console.log("\n=== canonical run detail shows the server-persisted confirmation time ===");
+  await page.goto(`${baseUrl}/pipeline-runs/${runId}`, { waitUntil: "domcontentloaded" });
+  const confirmedAtRowVisible = await page.locator("text=Confirmed at").first().isVisible().catch(() => false);
+  assert(confirmedAtRowVisible, "the canonical run detail page shows a 'Confirmed at' row");
+  const confirmedAtStillSaysNotConfirmed = await page.locator("text=not yet confirmed").first().isVisible().catch(() => false);
+  assert(!confirmedAtStillSaysNotConfirmed, "the 'Confirmed at' row shows a real timestamp, not 'not yet confirmed', for a queued run");
 
   console.log("\n=== territory overlap handling: a SECOND draft on the SAME territory, now against an ACTIVE run ===");
   // Territory overlap is PERMITTED (P4 control correction, 2026-08-10) — both this run
@@ -222,12 +241,52 @@ async function main() {
   }
   const overlapDisabledAfterAck = await overlapConfirmBtn.isDisabled();
   assert(!overlapDisabledAfterAck, "Confirm and start becomes enabled once the overlap is acknowledged — overlap itself was never a block");
+
+  console.log("\n=== stale-disclosure race: a THIRD run becomes active on the same territory AFTER disclosure but BEFORE this confirm click ===");
+  // Real end-to-end proof of the audit-race fix (P4 independent review, 2026-08-10): the
+  // browser disclosed/acknowledged overlap against exactly {runId}. We now directly queue a
+  // third run on the same territory — bypassing the UI, as an out-of-band concurrent actor
+  // would — so the disclosure the browser is about to submit is stale BEFORE it submits it.
+  const raceRunName = `Playwright CNR race-run ${Date.now()}`;
+  const ownerUsers = await db.auth.admin.listUsers({ perPage: 200 });
+  const ownerUserId = ownerUsers.data?.users.find((u: any) => u.email === ownerEmail)?.id as string;
+  const firstRunUnits = await db.from("query_unit").select("code").eq("run_id", runId).eq("source", "just_eat");
+  const raceRun = await db.from("discovery_runs").insert({
+    tenant_id: tenantId, name: raceRunName, status: "draft",
+    territory_input: territory, territory_mode: "manual_outcodes",
+    target_filters: { selectedProviders: ["just_eat"] }, source_config: { source: "just_eat" }, config_snapshot: {},
+  }).select("id").single();
+  const raceRunId = (raceRun.data as { id: string }).id;
+  await db.from("query_unit").insert(((firstRunUnits.data ?? []) as { code: string }[]).map((u) => ({ tenant_id: tenantId, run_id: raceRunId, code: u.code, level: "postcode_district", source: "just_eat" })));
+  await db.from("discovery_runs").update({ target_filters: { selectedProviders: ["just_eat"], overlapAcknowledgement: { acknowledged: true, note: "race setup", disclosedOverlapRunIds: [runId], acknowledgedBy: null, acknowledgedByEmail: null, acknowledgedAt: null, overlappingRunIds: [] } } }).eq("id", raceRunId);
+  const raceQueue = await db.rpc("confirm_and_queue_run", { p_run_id: raceRunId, p_actor_user_id: ownerUserId, p_source: "just_eat" });
+  assert(!raceQueue.error, `the out-of-band race run queues successfully (setup step, not the assertion under test): ${raceQueue.error ? JSON.stringify(raceQueue.error) : "ok"}`);
+
+  await overlapConfirmBtn.click();
+  await page.waitForSelector("text=territory overlap changed", { timeout: 10000 }).catch(() => {});
+  const staleErrorVisible = await page.locator("text=territory overlap changed").first().isVisible().catch(() => false);
+  assert(staleErrorVisible, "the wizard surfaces the stale-disclosure error instead of silently queuing against outdated evidence");
+  const stillDraftAfterStale = await db.from("discovery_runs").select("status").eq("tenant_id", tenantId).eq("name", overlapRunName).maybeSingle();
+  assert(stillDraftAfterStale.data?.status === "draft", "the second draft is NOT queued by the rejected (stale) attempt — it stays 'draft'");
+  await page.screenshot({ path: path.join(SCRATCHPAD, "21b-stale-disclosure-rejected.png"), fullPage: true });
+
+  console.log("\n=== wizard reloads the overlap list and requires a FRESH acknowledgement ===");
+  await page.waitForTimeout(1000); // refreshOverlaps() round-trip
+  const overlapRowsAfterRace = await page.locator("table tbody tr").count();
+  assert(overlapRowsAfterRace === 2, `the reloaded overlap table shows exactly the two currently-active overlapping runs — the first run and the race run, and NOT this draft's own now-persisted row (excludeRunId correctly passed explicitly rather than relying on a stale pre-update closure) (got ${overlapRowsAfterRace} row(s))`);
+  const confirmDisabledAfterStale = await overlapConfirmBtn.isDisabled();
+  assert(confirmDisabledAfterStale, "Confirm and start is disabled again — the stale acknowledgement was cleared, a fresh one is required");
+  await page.locator('label:has-text("I acknowledge this territory overlaps") input[type="checkbox"]').check().catch(() => {});
+  await page.waitForTimeout(300);
+  assert(!(await overlapConfirmBtn.isDisabled()), "Confirm and start re-enables once the FRESH overlap (now including the race run) is acknowledged");
+
+  console.log("\n=== re-submitted confirm now succeeds against the fresh, accurate disclosure ===");
   await overlapConfirmBtn.click();
   await page.waitForSelector("text=Started —", { timeout: 15000 }).catch(() => {});
   const overlapRunRow = await db.from("discovery_runs").select("id,status,target_filters").eq("tenant_id", tenantId).eq("name", overlapRunName).maybeSingle();
-  assert(overlapRunRow.data?.status === "queued", `the SECOND, overlapping run ALSO reaches 'queued' (got '${overlapRunRow.data?.status}') — both runs are allowed to be active on the same territory`);
+  assert(overlapRunRow.data?.status === "queued", `the SECOND, overlapping run reaches 'queued' after re-acknowledging the FRESH disclosure (got '${overlapRunRow.data?.status}')`);
   const stampedAck = (overlapRunRow.data as any)?.target_filters?.overlapAcknowledgement;
-  assert(!!stampedAck?.acknowledgedBy && Array.isArray(stampedAck?.overlappingRunIds) && stampedAck.overlappingRunIds.includes(runId), "server-stamped overlap acknowledgement evidence names the first run as the one overlapped");
+  assert(!!stampedAck?.acknowledgedBy && Array.isArray(stampedAck?.overlappingRunIds) && stampedAck.overlappingRunIds.includes(runId) && stampedAck.overlappingRunIds.includes(raceRunId), "server-stamped overlap acknowledgement evidence names BOTH currently-active runs it actually overlapped, including the race run");
 
   console.log("\n=== queued run cannot be re-edited ===");
   await page.goto(`${baseUrl}/pipeline-runs/new?draftId=${runId}`, { waitUntil: "domcontentloaded" });

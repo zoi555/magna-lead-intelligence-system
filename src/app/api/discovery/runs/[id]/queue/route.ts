@@ -16,6 +16,7 @@ function statusForError(message: string): number {
   if (message.includes("CONFIRM_QUEUE_RUN_NOT_FOUND")) return 404;
   if (message.includes("CONFIRM_QUEUE_NOT_DRAFT")
     || message.includes("CONFIRM_QUEUE_OVERLAP_ACK_REQUIRED")
+    || message.includes("CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE")
     || message.includes("CONFIRM_QUEUE_DUPLICATE_EXECUTION")) return 409;
   if (message.includes("CONFIRM_QUEUE_SOURCE_NOT_SELECTED")
     || message.includes("CONFIRM_QUEUE_SOURCE_NOT_PERMITTED")) return 400;

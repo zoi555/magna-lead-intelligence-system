@@ -65,8 +65,12 @@ export class MemoryRepository implements DiscoveryRepository {
    *  when overlap is material (shares query units with an ACTIVE run) is rejected, and
    *  only duplicate EXECUTION of the SAME run/source is a hard block. No role check — the
    *  acknowledgement is disclosure evidence, not authorisation of a restricted action.
-   *  The authoritative, concurrency-proof version is tested against the real local
-   *  Postgres stack — see scripts/test-confirm-and-queue-run-local.ts. */
+   *  The disclosed run ids the client acknowledged must match what's actually active right
+   *  now, or this throws CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE instead of silently
+   *  stamping evidence the user never saw (P4 independent review, 2026-08-10). Also stamps
+   *  config_snapshot.review.confirmedAtIso on every successful queue. The authoritative,
+   *  concurrency-proof version is tested against the real local Postgres stack — see
+   *  scripts/test-confirm-and-queue-run-local.ts. */
   async confirmAndQueueRun(runId: string, actorUserId: string, source = "just_eat"): Promise<ExecutionRecord> {
     const run = this.runs.get(runId);
     if (!run) throw new Error(`CONFIRM_QUEUE_RUN_NOT_FOUND: run ${runId} does not exist`);
@@ -85,15 +89,25 @@ export class MemoryRepository implements DiscoveryRepository {
       ? [...this.runs.values()].filter((r) =>
           r.id !== runId && r.tenant_id === run.tenant_id && ["queued", "running", "cancelling"].includes(r.status)
           && (r.derived_query_units ?? []).some((u) => units.includes(u.toUpperCase())))
-        .map((r) => r.id)
+        .map((r) => r.id).sort()
       : [];
+    const ack = (run.target_filters as Record<string, unknown> | undefined)?.overlapAcknowledgement as Record<string, unknown> | undefined;
+    const acknowledged = Boolean(ack?.acknowledged);
+    const disclosedOverlapRunIds = (Array.isArray(ack?.disclosedOverlapRunIds) ? [...(ack!.disclosedOverlapRunIds as string[])] : []).sort();
+
     if (overlappingRunIds.length) {
-      const ack = (run.target_filters as Record<string, unknown> | undefined)?.overlapAcknowledgement as Record<string, unknown> | undefined;
-      if (!ack?.acknowledged) throw new Error(`CONFIRM_QUEUE_OVERLAP_ACK_REQUIRED: run ${runId} overlaps ${overlappingRunIds.length} currently active run(s) on source '${source}' — acknowledge the disclosed overlap to proceed`);
+      if (!acknowledged) throw new Error(`CONFIRM_QUEUE_OVERLAP_ACK_REQUIRED: run ${runId} overlaps ${overlappingRunIds.length} currently active run(s) on source '${source}' — acknowledge the disclosed overlap to proceed`);
+      if (disclosedOverlapRunIds.join(",") !== overlappingRunIds.join(",")) {
+        throw new Error(`CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE: run ${runId} was acknowledged against overlapping run(s) [${disclosedOverlapRunIds.join(", ")}] but the current overlap is now [${overlappingRunIds.join(", ")}] — refresh and re-acknowledge`);
+      }
       run.target_filters = { ...run.target_filters, overlapAcknowledgement: { ...ack, acknowledgedBy: actorUserId, acknowledgedByEmail: actorUserId, acknowledgedAt: now(), overlappingRunIds } };
-      run.config_snapshot = { ...(run.config_snapshot as Record<string, unknown>) };
+    } else if (acknowledged && disclosedOverlapRunIds.length) {
+      throw new Error(`CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE: run ${runId} was acknowledged against overlapping run(s) [${disclosedOverlapRunIds.join(", ")}] but none of those are active any more — refresh the disclosure`);
     }
 
+    const snapshot = (run.config_snapshot as Record<string, unknown> | undefined) ?? {};
+    const review = (snapshot.review as Record<string, unknown> | undefined) ?? {};
+    run.config_snapshot = { ...snapshot, review: { ...review, confirmedAtIso: now() } };
     run.status = "queued";
     run.updated_at = now();
     return this.createExecution(runId, run.tenant_id, run.derived_query_units?.length ?? 0);

@@ -53,11 +53,17 @@ export interface DiscoveryRepository {
   failRun(id: string, reason: string): Promise<FailRunResult>;
 
   // executions
-  /** Atomic draft -> queued transition with an authoritative, re-checked conflict guard and
-   *  server-verified owner/admin override validation — migration 0031
-   *  (confirm_and_queue_run). Replaces the old unconditional getRun/createExecution/
-   *  setRunStatus sequence for the queue moment specifically. actorUserId must come from an
-   *  already-verified session (requireSessionAndRole()), never from client-supplied JSON. */
+  /** Atomic draft -> queued transition — migration 0031 (confirm_and_queue_run). Territory
+   *  overlap between runs is PERMITTED; when material (shares query units with a currently
+   *  ACTIVE run), it requires a disclosure+acknowledgement that is re-verified fresh
+   *  server-side (the exact run ids the client disclosed must still match what's active
+   *  right now, else CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE — P4 independent review,
+   *  2026-08-10). No owner/admin role check — any authorised application user may
+   *  acknowledge permitted overlap. Also stamps the server-authoritative
+   *  config_snapshot.review.confirmedAtIso on every successful queue. Replaces the old
+   *  unconditional getRun/createExecution/setRunStatus sequence for the queue moment
+   *  specifically. actorUserId must come from an already-verified session
+   *  (requireSessionAndRole()), never from client-supplied JSON. */
   confirmAndQueueRun(runId: string, actorUserId: string, source?: string): Promise<ExecutionRecord>;
   createExecution(runId: string, tenantId: string, plannedQueries: number): Promise<ExecutionRecord>;
   setExecutionPlan(id: string, plannedQueries: number): Promise<void>;

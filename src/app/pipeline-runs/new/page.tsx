@@ -167,13 +167,34 @@ function NewRunPageInner() {
       .finally(() => setEstimating(false));
   }, [step, resolvedUnits.join(",")]);
 
-  React.useEffect(() => {
-    if (step < STEP_REVIEW || resolvedUnits.length === 0) return;
+  const refreshOverlaps = React.useCallback(async (excludeRunIdOverride?: string | null) => {
+    if (resolvedUnits.length === 0) { setOverlapResult(null); return; }
     setCheckingOverlap(true);
-    fetch("/api/discovery/runs/conflicts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ queryUnits: resolvedUnits, excludeRunId: draft?.savedRunId ?? null }) })
-      .then((r) => r.json()).then((j) => setOverlapResult(j.ok ? { overlaps: j.overlaps, materialOverlap: j.materialOverlap } : null)).catch(() => setOverlapResult(null))
-      .finally(() => setCheckingOverlap(false));
-  }, [step, resolvedUnits.join(","), draft?.savedRunId]);
+    try {
+      // excludeRunIdOverride lets a caller pass the just-saved run id explicitly instead of
+      // relying on draft.savedRunId — React state updates are async, so calling this right
+      // after update((d) => { d.savedRunId = runId }) (e.g. confirmAndStart's stale-
+      // disclosure recovery) would otherwise still read the PRE-update (null) value from
+      // this closure and show the draft's own row in its own overlap disclosure table.
+      const excludeRunId = excludeRunIdOverride !== undefined ? excludeRunIdOverride : (draft?.savedRunId ?? null);
+      const r = await fetch("/api/discovery/runs/conflicts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ queryUnits: resolvedUnits, excludeRunId }) });
+      const j = await r.json();
+      setOverlapResult(j.ok ? { overlaps: j.overlaps, materialOverlap: j.materialOverlap } : null);
+    } catch { setOverlapResult(null); } finally { setCheckingOverlap(false); }
+  }, [resolvedUnits.join(","), draft?.savedRunId]);
+
+  React.useEffect(() => {
+    if (step < STEP_REVIEW) return;
+    refreshOverlaps();
+  }, [step, refreshOverlaps]);
+
+  /** The exact currently-ACTIVE overlapping run ids the Review screen is showing right
+   *  now — what an acknowledgement ticked at this instant is disclosure evidence FOR. Sent
+   *  to the server, which re-verifies it is still accurate before allowing the queue
+   *  (CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE otherwise — P4 independent review, 2026-08-10). */
+  const currentActiveOverlapRunIds = (overlapResult?.overlaps ?? [])
+    .filter((o) => ["queued", "running", "cancelling"].includes(o.status))
+    .map((o) => o.runId);
 
   if (loadingSaved || !draft) return <div className="p-8 text-sm text-gray-500">Loading…</div>;
 
@@ -274,12 +295,34 @@ function NewRunPageInner() {
       const j = await res.json();
       if (!j.ok) throw new Error(j.error || "Failed to save run");
       const runId = j.run.id;
-      update((d) => { d.savedRunId = runId; d.review.confirmedAtIso = new Date().toISOString(); });
+      update((d) => { d.savedRunId = runId; });
       if (draft!.sourceMode.selectedProviders.includes("just_eat")) {
         const q = await fetch(`/api/discovery/runs/${runId}/queue`, { method: "POST" });
         const qj = await q.json();
-        if (!qj.ok) throw new Error(qj.error || "Failed to queue execution");
+        if (!qj.ok) {
+          // A browser-generated confirmation timestamp is never trusted as authoritative —
+          // confirmedAtIso is stamped ONLY by confirm_and_queue_run's own transaction, so a
+          // failed queue call correctly leaves it null (nothing above set it optimistically).
+          if (String(qj.error ?? "").includes("CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE")) {
+            // The overlap the user acknowledged is no longer accurate — something became
+            // (or stopped being) active since the Review screen was last shown. Clear the
+            // stale acknowledgement and pull a fresh disclosure rather than retrying blind.
+            update((d) => { d.review.overlapAcknowledgement = null; });
+            await refreshOverlaps(runId);
+            throw new Error("The territory overlap changed since you last reviewed it (another run became active, or one is no longer active). Review the updated overlap below and acknowledge it again before confirming.");
+          }
+          throw new Error(qj.error || "Failed to queue execution");
+        }
         setStarted({ status: qj.execution.status, completed: qj.execution.completed_queries, planned: qj.execution.planned_queries });
+        // Pull the server-authoritative confirmation evidence back into the local draft (the
+        // wizard never invents this timestamp itself) so the Review summary and sidebar
+        // reflect exactly what confirm_and_queue_run actually stamped, not a guess.
+        try {
+          const statusRes = await fetch(`/api/discovery/runs/${runId}/status`, { cache: "no-store" });
+          const statusJson = await statusRes.json();
+          const migrated = statusJson.ok ? migrateDraft(statusJson.run?.config_snapshot) : null;
+          if (migrated) update((d) => { d.review = migrated.review; });
+        } catch { /* non-fatal — the run is already queued; the detail page shows the authoritative value regardless */ }
         announce("Run confirmed and queued for Just Eat discovery.");
       } else {
         announce("Run confirmed. No queueable provider selected (manual import) — upload data for this run from the Import screen.");
@@ -365,8 +408,13 @@ function NewRunPageInner() {
                           Great Britain-wide product, not scoped to any one pilot territory (P4 control,
                           2026-08-10). The RunTerritory type keeps "pilot" as a valid value only so an
                           already-persisted old draft/run using it remains readable, never as something a
-                          user can newly choose. */}
-                      {([["manual_outcodes", "Manual postcode districts"], ["vp_coverage", "VP coverage"], ["full_uk", "Full UK"], ["custom", "Custom"]] as const).map(([m, label]) => <option key={m} value={m}>{label}</option>)}
+                          user can newly choose. The internal enum value for the next option stays
+                          "full_uk" (backwards compatibility with already-persisted runs — changing it
+                          would need a data migration for no user-facing benefit), but its LABEL says
+                          "Full Great Britain": the current product covers England, Scotland and Wales
+                          only — Northern Ireland is out of scope for the geospatial platform, so no
+                          user-facing text may say "UK" (P4 independent review, 2026-08-10). */}
+                      {([["manual_outcodes", "Manual postcode districts"], ["vp_coverage", "VP coverage"], ["full_uk", "Full Great Britain"], ["custom", "Custom"]] as const).map(([m, label]) => <option key={m} value={m}>{label}</option>)}
                     </select>
                   </Field>
                   <Field label="Location rule">
@@ -660,7 +708,7 @@ function NewRunPageInner() {
                       <div className="mt-2 border-t border-gray-100 pt-2">
                         <label className="flex items-start gap-2 text-sm">
                           <input type="checkbox" className="mt-0.5" checked={!!draft.review.overlapAcknowledgement?.acknowledged}
-                            onChange={(e) => update((d) => { d.review.overlapAcknowledgement = e.target.checked ? { acknowledged: true, note: overlapNote, acknowledgedBy: null, acknowledgedByEmail: null, acknowledgedAt: null, overlappingRunIds: [] } : null; })} />
+                            onChange={(e) => update((d) => { d.review.overlapAcknowledgement = e.target.checked ? { acknowledged: true, note: overlapNote, disclosedOverlapRunIds: currentActiveOverlapRunIds, acknowledgedBy: null, acknowledgedByEmail: null, acknowledgedAt: null, overlappingRunIds: [] } : null; })} />
                           I acknowledge this territory overlaps a currently active run and choose to proceed (recorded on the run).
                         </label>
                         {draft.review.overlapAcknowledgement?.acknowledged && (

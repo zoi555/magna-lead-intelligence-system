@@ -198,26 +198,45 @@ export function defaultOutputs(): RunOutputRequest[] {
  *  multiple times; overlap is detected and disclosed, never prohibited. This record is
  *  therefore evidence that the user was WARNED and chose to proceed, not an authorisation
  *  of an otherwise-forbidden action — no owner/admin role check applies to it, unlike a
- *  genuinely restricted action would. `acknowledged`/`note` are the user's stated intent;
- *  `acknowledgedBy`/`acknowledgedByEmail`/`acknowledgedAt`/`overlappingRunIds` are stamped
- *  server-side only, by confirm_and_queue_run, once it has independently recomputed the
- *  overlap evidence — so a queued run always carries real evidence of what it overlapped
- *  with at confirmation time, not just a client claim. */
+ *  genuinely restricted action would. `acknowledged`/`note`/`disclosedOverlapRunIds` are
+ *  the user's stated intent, captured client-side from exactly what the Review screen
+ *  displayed at the moment of ticking the box; `acknowledgedBy`/`acknowledgedByEmail`/
+ *  `acknowledgedAt`/`overlappingRunIds` are stamped server-side only, by
+ *  confirm_and_queue_run, once it has independently recomputed the overlap evidence AND
+ *  verified it still matches `disclosedOverlapRunIds` (P4 independent review correction,
+ *  2026-08-10 — an audit race let a run become active between disclosure and confirm, so
+ *  the acknowledgement could be stamped against overlap the user never actually saw; the
+ *  RPC now rejects with CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE if the disclosed and
+ *  recomputed sets differ, forcing a fresh disclosure+acknowledgement instead). So a
+ *  queued run always carries real evidence of what was ACTUALLY shown and acknowledged at
+ *  confirmation time, not just a client claim. */
 export interface RunOverlapAcknowledgement {
   acknowledged: boolean;
   note: string;
+  /** The exact set of currently-ACTIVE overlapping run ids the Review screen displayed
+   *  when the user ticked the acknowledgement box — client-recorded, then verified
+   *  server-side against a fresh recomputation before the run is allowed to queue. */
+  disclosedOverlapRunIds: string[];
   /** Server-verified actor who acknowledged — set ONLY by confirm_and_queue_run. */
   acknowledgedBy: string | null;
   /** That actor's email, for human-readable audit evidence. */
   acknowledgedByEmail: string | null;
   /** Server timestamp when the acknowledgement was recorded against real overlap evidence. */
   acknowledgedAt: string | null;
-  /** The specific run ids this acknowledgement was recorded against, stamped server-side. */
+  /** The specific run ids this acknowledgement was recorded against, stamped server-side —
+   *  equal to `disclosedOverlapRunIds` by construction once a queue succeeds (the RPC
+   *  rejects any mismatch rather than stamping something the user didn't see). */
   overlappingRunIds: string[];
 }
 
 export interface RunReview {
   overlapAcknowledgement: RunOverlapAcknowledgement | null;
+  /** Server-authoritative confirmation timestamp — stamped ONLY by confirm_and_queue_run
+   *  inside its atomic transaction (P4 independent review correction, 2026-08-10; a
+   *  browser-generated timestamp is never trusted as authoritative, since the wizard could
+   *  stamp this locally and then the queue call could still fail, leaving a false
+   *  impression the run was confirmed). Stays null until a queue attempt actually commits;
+   *  a failed or rolled-back attempt leaves it null. */
   confirmedAtIso: string | null;
 }
 
@@ -309,7 +328,11 @@ export function validateRunDraft(d: RunDraft): ValidationResult {
   const errors: string[] = [];
   const warnings: string[] = [];
   if (!d.name.trim()) errors.push("Run name is required.");
-  if (!d.territory.input.trim() && d.territory.mode !== "full_uk") errors.push("Territory: enter at least one postcode area, district or place, or choose Full UK.");
+  // "full_uk" is the internal/legacy enum value (kept for backwards compatibility with
+  // already-persisted runs) — the CURRENT product covers Great Britain only (England,
+  // Scotland, Wales; Northern Ireland is out of scope for the geospatial platform), so
+  // user-facing wording must never say "UK" (P4 independent review, 2026-08-10).
+  if (!d.territory.input.trim() && d.territory.mode !== "full_uk") errors.push("Territory: enter at least one postcode area, district or place, or choose Full Great Britain.");
   if (!d.profile.businessTypes.length) errors.push("Target profile: select at least one business type.");
   if (!d.profile.dataFields.length) errors.push("Requested data: select at least one field to collect.");
   if (!d.sourceMode.selectedProviders.length) errors.push("Source Mode: select at least one provider.");
@@ -419,7 +442,7 @@ export function migrateDraft(raw: unknown): RunDraft | null {
     const spendCeilingGbp = typeof pl.spendCeilingGbp === "number" ? pl.spendCeilingGbp : null;
     const legacyOverride = (pl.ownerOverride && typeof pl.ownerOverride === "object") ? pl.ownerOverride as Record<string, any> : null;
     const overlapAcknowledgement: RunOverlapAcknowledgement | null = legacyOverride
-      ? { acknowledged: Boolean(legacyOverride.acknowledged), note: String(legacyOverride.note ?? ""), acknowledgedBy: null, acknowledgedByEmail: null, acknowledgedAt: null, overlappingRunIds: [] }
+      ? { acknowledged: Boolean(legacyOverride.acknowledged), note: String(legacyOverride.note ?? ""), disclosedOverlapRunIds: [], acknowledgedBy: null, acknowledgedByEmail: null, acknowledgedAt: null, overlappingRunIds: [] }
       : null;
     const existingCustomerExclusionRequested = Boolean(pl.existingCustomerExclusion);
 
@@ -475,13 +498,16 @@ export function migrateDraft(raw: unknown): RunDraft | null {
       if (!rv.overlapAcknowledgement && rv.ownerOverride && typeof rv.ownerOverride === "object") {
         const oo = rv.ownerOverride as Record<string, any>;
         rv.overlapAcknowledgement = {
-          acknowledged: Boolean(oo.acknowledged), note: String(oo.note ?? ""),
+          acknowledged: Boolean(oo.acknowledged), note: String(oo.note ?? ""), disclosedOverlapRunIds: [],
           acknowledgedBy: null, acknowledgedByEmail: null, acknowledgedAt: null, overlappingRunIds: [],
         };
       }
       delete rv.ownerOverride;
       const oa = rv.overlapAcknowledgement;
       if (oa && typeof oa === "object") {
+        // Pre-correction v3 drafts (2026-08-10, before the audit-race fix) never had
+        // disclosedOverlapRunIds — default to empty rather than trusting anything stale.
+        if (!Array.isArray(oa.disclosedOverlapRunIds)) oa.disclosedOverlapRunIds = [];
         if (typeof oa.acknowledgedBy === "undefined") oa.acknowledgedBy = null;
         if (typeof oa.acknowledgedByEmail === "undefined") oa.acknowledgedByEmail = null;
         if (typeof oa.acknowledgedAt === "undefined") oa.acknowledgedAt = null;
