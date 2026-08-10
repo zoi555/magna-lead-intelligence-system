@@ -316,6 +316,105 @@ async function main() {
     assert(!(await confirmQueue(runG11f, actorUserId)).error, "an EXACT repeated territory in a separate run is allowed once accurately disclosed/acknowledged — never blocked");
   }
 
+  console.log("\n=== 12. Historical Just Eat query_unit backfill (P4 production pre-flight, 2026-08-11) ===");
+  {
+    /** Models a real pre-existing hosted row: derived_query_units populated, NO query_unit
+     *  rows at all (unlike makeDraftRun, which always writes query_unit). derivedQueryUnits
+     *  is passed through as-is (including deliberately malformed shapes for §12h). */
+    async function makeHistoricalRun(name: string, source: string, derivedQueryUnits: unknown, status = "completed"): Promise<string> {
+      const r = await db.from("discovery_runs").insert({
+        tenant_id: tenantId, name, status,
+        territory_input: "(historical)", territory_mode: "manual_outcodes",
+        derived_query_units: derivedQueryUnits,
+        target_filters: { selectedProviders: [source] },
+        source_config: { source },
+        config_snapshot: {},
+      }).select("id").single();
+      if (r.error) throw new Error(`makeHistoricalRun(${name}): ${JSON.stringify(r.error)}`);
+      const id = (r.data as { id: string }).id;
+      createdRunIds.push(id);
+      return id;
+    }
+    async function queryUnitCodesOf(runId: string): Promise<string[]> {
+      const r = await db.from("query_unit").select("code").eq("run_id", runId).order("code");
+      return ((r.data ?? []) as { code: string }[]).map((row) => row.code);
+    }
+    async function runBackfill(): Promise<number> {
+      const r = await db.rpc("backfill_legacy_just_eat_query_units");
+      if (r.error) throw new Error(`backfill_legacy_just_eat_query_units: ${JSON.stringify(r.error)}`);
+      return r.data as number;
+    }
+
+    console.log("  -- 12a/b. historical Just Eat run, derived_query_units populated, zero query_unit rows --");
+    const legacyA = await makeHistoricalRun("local-backfill-12a-legacy", "just_eat", ["BF1", "BF2"]);
+    assert((await queryUnitCodesOf(legacyA)).length === 0, "sanity: the historical run genuinely has zero query_unit rows before backfill (models the real hosted condition)");
+
+    console.log("  -- 12g. a DIFFERENT historical run already has ONE of its two codes present — must be preserved, not duplicated --");
+    const legacyG = await makeHistoricalRun("local-backfill-12g-partial", "just_eat", ["BF3", "BF4"]);
+    const preExisting = await db.from("query_unit").insert({ tenant_id: tenantId, run_id: legacyG, code: "BF3", level: "postcode_district", source: "just_eat" }).select("id").single();
+    if (preExisting.error) throw new Error(`seed pre-existing query_unit: ${JSON.stringify(preExisting.error)}`);
+    const preExistingRowId = (preExisting.data as { id: string }).id;
+
+    console.log("  -- 12h. historical UBER EATS run — must NOT be backfilled (out of scope) --");
+    const uberLegacy = await makeHistoricalRun("local-backfill-12h-uber", "uber_eats", ["BF5"]);
+
+    console.log("  -- malformed input: non-array derived_query_units must be skipped, not crash --");
+    const malformedRun = await makeHistoricalRun("local-backfill-12-malformed-object", "just_eat", { not: "an array" });
+    const malformedRun2 = await makeHistoricalRun("local-backfill-12-malformed-string", "just_eat", "BF6");
+
+    console.log("  -- malformed element: an invalid-shape code alongside a valid one — only the valid one backfills --");
+    const mixedShapeRun = await makeHistoricalRun("local-backfill-12-mixed-shape", "just_eat", ["BF7", "not-a-postcode", "123", ""]);
+
+    // C/D. run the SAME backfill logic embedded in migration 0031 (already applied once by
+    // `supabase db reset`, against whatever pre-existed then — re-invoking it here proves
+    // the logic itself against these freshly-created fixtures, and is the intended,
+    // documented way to safely re-run it).
+    const insertedFirstPass = await runBackfill();
+    // Every OTHER just_eat run in this whole script (sections 1-11) was created via
+    // makeDraftRun, which already writes query_unit for the SAME codes as
+    // derived_query_units — so they contribute zero new candidates here. Only this
+    // section's fixtures are missing/partial: legacyA (2 new: BF1,BF2), legacyG (1 new:
+    // BF4 — BF3 pre-exists), mixedShapeRun (1 new: BF7 — the other 3 elements are
+    // malformed/invalid-shape and correctly skipped) = 4 exactly.
+    assert(insertedFirstPass === 4, `first backfill pass inserts exactly the expected 4 rows: legacyA's 2 codes + legacyG's 1 missing code + mixedShapeRun's 1 valid code (got ${insertedFirstPass})`);
+
+    assert(JSON.stringify(await queryUnitCodesOf(legacyA)) === JSON.stringify(["BF1", "BF2"]), "12d: both codes from a fully-missing historical run are backfilled");
+
+    const legacyGCodesAfter = await queryUnitCodesOf(legacyG);
+    assert(JSON.stringify(legacyGCodesAfter) === JSON.stringify(["BF3", "BF4"]), `12g: the missing code (BF4) is backfilled AND the pre-existing code (BF3) is preserved, not duplicated (got ${JSON.stringify(legacyGCodesAfter)})`);
+    const preExistingRowStillThere = await db.from("query_unit").select("id").eq("id", preExistingRowId).maybeSingle();
+    assert(preExistingRowStillThere.data?.id === preExistingRowId, "12g: the pre-existing query_unit ROW ITSELF (same id) survives untouched — never deleted/recreated");
+
+    assert((await queryUnitCodesOf(uberLegacy)).length === 0, "12h: the historical Uber Eats run is NOT backfilled — still zero query_unit rows (Uber Eats is out of scope for this migration)");
+
+    assert((await queryUnitCodesOf(malformedRun)).length === 0, "malformed (object-shaped) derived_query_units produces zero backfilled rows, not an error or invented geography");
+    assert((await queryUnitCodesOf(malformedRun2)).length === 0, "malformed (string-shaped) derived_query_units produces zero backfilled rows, not an error or invented geography");
+
+    const mixedShapeCodes = await queryUnitCodesOf(mixedShapeRun);
+    assert(JSON.stringify(mixedShapeCodes) === JSON.stringify(["BF7"]), `only the valid-shaped code (BF7) is backfilled from a mixed-validity array — "not-a-postcode", "123" and "" are silently skipped, never guessed into a fabricated code (got ${JSON.stringify(mixedShapeCodes)})`);
+
+    // E. rerunning is a genuine no-op — no duplicates, no error, second pass inserts 0 for
+    // everything already covered by the first pass.
+    const insertedSecondPass = await runBackfill();
+    assert(insertedSecondPass === 0, `re-running the backfill inserts ZERO additional rows for data it already covered — fully idempotent (got ${insertedSecondPass})`);
+    assert(JSON.stringify(await queryUnitCodesOf(legacyA)) === JSON.stringify(["BF1", "BF2"]), "12e: no duplicate rows appear for legacyA after the second backfill pass");
+    assert(JSON.stringify(await queryUnitCodesOf(legacyG)) === JSON.stringify(["BF3", "BF4"]), "12e: no duplicate rows appear for legacyG after the second backfill pass");
+
+    // F. historical overlap disclosure now sees the backfilled run. The genuinely historical
+    // fixtures above are 'completed' (informational only, correctly never material) — to
+    // prove the CANONICAL DATA a backfilled run now carries is real and authoritative, flip
+    // legacyA to 'queued' (simulating an old run that is, in fact, still active) and confirm
+    // a brand-new overlapping run correctly detects material overlap against it — impossible
+    // before the backfill, since query_unit was empty for legacyA then.
+    const flipped = await db.from("discovery_runs").update({ status: "queued" }).eq("id", legacyA);
+    if (flipped.error) throw new Error(`flip legacyA to queued: ${JSON.stringify(flipped.error)}`);
+    const newOverlappingRun = await makeDraftRun("local-backfill-12f-new", ["BF1"]);
+    const noAckAgainstLegacy = await confirmQueue(newOverlappingRun, actorUserId);
+    assert(!!noAckAgainstLegacy.error && String((noAckAgainstLegacy.error as any).message).includes("CONFIRM_QUEUE_OVERLAP_ACK_REQUIRED"), "12f: a new run overlapping the (now-active) backfilled historical run is correctly detected as material overlap — the backfilled query_unit rows are genuinely authoritative, not decorative");
+    await setAck(newOverlappingRun, true, [legacyA]);
+    assert(!(await confirmQueue(newOverlappingRun, actorUserId)).error, "12f: once acknowledged against the backfilled run's real id, it queues normally");
+  }
+
   console.log("\n=== cleanup ===");
   for (const id of createdRunIds) {
     await db.from("je_executions").delete().eq("run_id", id);

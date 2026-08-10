@@ -1807,3 +1807,104 @@ prohibited. This directly reverses the 2026-08-10 "migration 0031 implemented" d
   all yet, regardless of overlap). Full local browser proof re-run: both an original run
   and a deliberately overlapping second run reach `status='queued'` in the same session,
   with server-stamped acknowledgement evidence naming the overlapped run.
+
+## 2026-08-11 — P4 independent review: audit-safe confirmation + overlap disclosure
+
+- **`config_snapshot.review.confirmedAtIso` is now server-stamped only**, inside
+  `confirm_and_queue_run`'s own transaction, from its own `now()` — never by the browser
+  beforehand. Stays `null` on any failed/rolled-back attempt; never rewritten by a later
+  rejected call. Fixed a related latent defect caught while adding this: `jsonb_set`
+  silently no-ops when an intermediate path segment (`review`) is missing entirely (a run
+  with `config_snapshot = {}` — reachable via `scripts/je-run.ts`, which never sets
+  `config_snapshot`) — the migration now normalises `review` before stamping into it.
+- **`RunOverlapAcknowledgement.disclosedOverlapRunIds`** added — the exact active run ids
+  the Review screen displayed at the moment the acknowledgement box was ticked, captured
+  client-side. `confirm_and_queue_run` recomputes the current material overlap and rejects
+  with `CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE` if the disclosed and recomputed sets differ
+  in either direction (a run becoming active that wasn't disclosed, or a disclosed run no
+  longer being active) — closes an audit race where the system could record an
+  acknowledgement against overlap the user never actually saw. Still not an authorisation
+  check — no role requirement; only the disclosure must be fresh.
+- **`/api/discovery/runs/conflicts`** switched from `discovery_runs.derived_query_units` to
+  the canonical `query_unit` table for comparing EXISTING runs — the same source
+  `confirm_and_queue_run` reads, closing a data-source inconsistency the two could
+  previously disagree on. `query_unit` is now kept in sync on every save (extracted
+  `persistQueryUnits`, delete-then-insert, wired into both POST and PATCH) — previously
+  PATCH never refreshed it after a territory edit.
+- **"Full UK" corrected to "Full Great Britain"** in the Run Builder's territory-mode
+  dropdown and its validation message — the current product's geospatial platform covers
+  England/Scotland/Wales only; Northern Ireland is out of scope. The internal `full_uk`
+  enum value is unchanged (backwards compatibility with already-persisted runs).
+
+### Hosted production pre-flight — historical Just Eat `query_unit` backfill
+
+Migration 0031 had **never been applied to the hosted `aspectlead-platform` project**
+(`rubhjkgygauuixiqouza`) at the point this review happened, so amending it in place (rather
+than adding a follow-up migration) was correct. Read-only inspection (2026-08-11, `SELECT`
+only, no writes) found:
+
+| Check | Result |
+|---|---|
+| Total `discovery_runs` | 222 |
+| Just Eat runs | 217 |
+| Uber Eats runs | 5 |
+| Total `query_unit` rows | 1 |
+| Just Eat runs with ≥1 `query_unit` row | 1 |
+| Uber Eats runs with ≥1 `query_unit` row | 0 |
+| Just Eat runs with non-array `derived_query_units` (`jsonb_typeof <> 'array'`) | 0 |
+| Candidate (run_id, code) pairs from the 217 Just Eat runs' `derived_query_units` | 231 |
+| Candidate codes NOT matching the postcode-district shape `^[A-Z]{1,2}[0-9][0-9A-Z]?$` | 0 |
+| Candidate pairs already present in `query_unit` (would be skipped by `ON CONFLICT`) | 1 |
+| **Rows the backfill is expected to insert on hosted** | **230** |
+
+Without a backfill, applying migration 0031 as-is would have made 216 of 217 historical Just
+Eat runs' territory invisible to overlap disclosure and to `confirm_and_queue_run`'s own
+materiality check — a real regression versus pre-migration behaviour (which read
+`derived_query_units` directly). Added `backfill_legacy_just_eat_query_units()` — a named,
+idempotent (`ON CONFLICT (run_id, source, code) DO NOTHING`), re-invocable SECURITY DEFINER
+function, invoked once automatically as part of migration 0031 (both the local reset just
+performed and the still-pending hosted apply). INSERT-only; never touches `discovery_runs`,
+`je_executions`, or any outlet/candidate/lead table; fails closed on malformed input (a run
+is only eligible if `derived_query_units` is genuinely a JSON array; a code is only inserted
+if it matches the postcode-district shape) rather than inventing geography for anything
+malformed — though read-only inspection found nothing malformed in the 217 hosted rows.
+
+**Uber Eats' 5 historical draft runs are deliberately NOT backfilled.** Uber Eats has no
+authorised production execution path (ISS-0021) and is not queueable through this vertical
+slice — `confirm_and_queue_run` already hard-rejects it via
+`CONFIRM_QUEUE_SOURCE_NOT_PERMITTED` regardless of `query_unit` content, so backfilling
+geography for a source that can never be queued would add data with no corresponding
+product behaviour to support.
+
+The exact statement used to derive the "230 rows" prediction (a dry-run `SELECT`, not the
+`INSERT` itself):
+
+```sql
+with eligible_runs as materialized (
+  select r.id as run_id, r.tenant_id, r.derived_query_units
+  from discovery_runs r
+  where (r.source_config ->> 'source') = 'just_eat'
+    and jsonb_typeof(r.derived_query_units) = 'array'
+),
+candidate_codes as materialized (
+  select distinct er.run_id, er.tenant_id, upper(trim(elem.value)) as code
+  from eligible_runs er,
+    lateral jsonb_array_elements_text(er.derived_query_units) as elem(value)
+)
+select
+  count(*) as candidate_total,
+  count(*) filter (where code ~ '^[A-Z]{1,2}[0-9][0-9A-Z]?$') as candidate_valid_shape,
+  count(*) filter (where code !~ '^[A-Z]{1,2}[0-9][0-9A-Z]?$') as candidate_invalid_shape,
+  count(*) filter (
+    where code ~ '^[A-Z]{1,2}[0-9][0-9A-Z]?$'
+      and not exists (
+        select 1 from query_unit qu
+        where qu.run_id = candidate_codes.run_id and qu.source = 'just_eat' and qu.code = candidate_codes.code
+      )
+  ) as would_insert
+from candidate_codes;
+```
+
+**Migration 0031 (with this backfill) was NOT applied to hosted Supabase as part of this
+review** — local verification only (`supabase db reset` + `test:confirm-and-queue-run-local`
+§12). Hosted application remains a separate, explicitly-authorised step.

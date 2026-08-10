@@ -281,3 +281,92 @@ end $$;
 
 revoke execute on function confirm_and_queue_run(uuid, uuid, text) from public, anon, authenticated;
 grant  execute on function confirm_and_queue_run(uuid, uuid, text) to service_role;
+
+-- ---------------------------------------------------------------------------------------
+-- ONE-TIME BACKFILL: historical Just Eat query_unit rows (P4 production pre-flight,
+-- 2026-08-11)
+-- ---------------------------------------------------------------------------------------
+-- confirm_and_queue_run and /api/discovery/runs/conflicts both now read query_unit as the
+-- canonical source of a run's geography — but this migration has never been applied to the
+-- hosted project, and query_unit has only ever been populated going forward from when this
+-- feature branch's app code started calling persistGeographyProvenance/persistQueryUnits.
+-- Read-only inspection of the hosted aspectlead-platform project (rubhjkgygauuixiqouza,
+-- 2026-08-11) found: 222 discovery_runs total (217 just_eat, 5 uber_eats), only 1
+-- query_unit row total (belonging to 1 just_eat run), and all 217 just_eat runs' own
+-- derived_query_units genuinely typed as a JSON array (jsonb_typeof = 'array' for every
+-- one — zero malformed rows). Applying this migration without a backfill would make 216 of
+-- 217 historical Just Eat runs' territory invisible to overlap disclosure and to
+-- confirm_and_queue_run's own materiality check for THEIR OWN query units — a real
+-- regression versus the pre-migration behaviour (which read derived_query_units directly).
+--
+-- Scope: JUST EAT ONLY. Uber Eats' 5 historical draft runs are deliberately NOT backfilled
+-- — Uber Eats has no authorised production execution path (ISS-0021), is not queueable
+-- through this vertical slice, and confirm_and_queue_run already hard-rejects it via
+-- CONFIRM_QUEUE_SOURCE_NOT_PERMITTED regardless of query_unit content. Backfilling
+-- geography for a source that can never be queued would add data with no corresponding
+-- product behaviour to support, for no benefit — see docs/09_DECISIONS.md.
+--
+-- Safety:
+--  - INSERT only, using the existing (run_id, source, code) unique constraint via
+--    ON CONFLICT DO NOTHING — never deletes or overwrites an existing query_unit row.
+--  - Never touches discovery_runs (status, config_snapshot, or anything else), je_executions,
+--    or any outlet/candidate/lead table.
+--  - Fails closed on malformed input: a run is only eligible if its derived_query_units is
+--    genuinely a JSON array (jsonb_typeof = 'array'); a candidate code is only inserted if
+--    it matches a standard UK postcode-district shape (1-2 letters, a digit, an optional
+--    trailing alphanumeric — e.g. "SW1", "M1", "EC1A"). Non-array or non-district-shaped
+--    values are silently skipped, never guessed into a fabricated code. Read-only
+--    inspection found zero malformed derived_query_units among the 217 hosted just_eat
+--    runs, so no rows are expected to be skipped in production — this guard exists for any
+--    future/edge-case row, not because bad hosted data was found.
+--  - Defined as a named, idempotent, re-invocable function (not a bare inline statement) so
+--    it can be safely called again — a no-op for already-backfilled rows — if a future gap
+--    of this same shape ever appears, and so this exact logic is directly testable via RPC
+--    (see scripts/test-confirm-and-queue-run-local.ts §12) without duplicating the SQL.
+--  - SECURITY DEFINER, fixed search_path=public, EXECUTE restricted to service_role only —
+--    same pattern as confirm_and_queue_run.
+--
+-- Invoked ONCE, immediately below, as part of this migration's application (local reset AND
+-- the eventual hosted apply). Read-only inspection (2026-08-11) predicts 230 new rows
+-- inserted out of 231 candidate (run_id, code) pairs across the 217 hosted just_eat runs (1
+-- already present) — the exact statement used to derive that count is reproduced in
+-- docs/09_DECISIONS.md as the production pre-flight record.
+create or replace function backfill_legacy_just_eat_query_units()
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_inserted integer;
+begin
+  with eligible_runs as materialized (
+    select r.id as run_id, r.tenant_id, r.derived_query_units
+    from discovery_runs r
+    where (r.source_config ->> 'source') = 'just_eat'
+      and jsonb_typeof(r.derived_query_units) = 'array'
+  ),
+  candidate_codes as materialized (
+    select distinct er.run_id, er.tenant_id, upper(trim(elem.value)) as code
+    from eligible_runs er,
+      lateral jsonb_array_elements_text(er.derived_query_units) as elem(value)
+  )
+  insert into query_unit (tenant_id, run_id, code, level, source)
+  select tenant_id, run_id, code, 'postcode_district', 'just_eat'
+  from candidate_codes
+  where code ~ '^[A-Z]{1,2}[0-9][0-9A-Z]?$'
+  on conflict (run_id, source, code) do nothing;
+
+  get diagnostics v_inserted = row_count;
+  return v_inserted;
+end $$;
+
+revoke execute on function backfill_legacy_just_eat_query_units() from public, anon, authenticated;
+grant  execute on function backfill_legacy_just_eat_query_units() to service_role;
+
+do $$
+declare v_count integer;
+begin
+  v_count := backfill_legacy_just_eat_query_units();
+  raise notice 'backfill_legacy_just_eat_query_units: inserted % historical query_unit row(s)', v_count;
+end $$;
