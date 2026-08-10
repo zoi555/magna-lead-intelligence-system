@@ -50,7 +50,7 @@ export default async function DataQualityExceptionsPage() {
       <div>
         <PageHeader title="Data-Quality Exceptions" subtitle="No outlets in the database yet." />
         <div className="rounded-card border border-bordergrey bg-card p-4 shadow-soft">
-          <EmptyState title="No data" hint='Run a discovery pass first, e.g. npm run je:run -- "UB1"' />
+          <EmptyState title="No data" hint='Run a discovery pass first, e.g. npm run je:run -- "<postcode district>"' />
         </div>
       </div>
     );

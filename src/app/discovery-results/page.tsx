@@ -15,7 +15,21 @@ export default async function DiscoveryResultsPage({
   searchParams: Promise<{ outcode?: string }>;
 }) {
   const sp = await searchParams;
-  const outcode = (sp.outcode ?? "UB1").toUpperCase();
+  // AspectLead is a Great Britain-wide product — there is no default district to show.
+  // Previously defaulted to "UB1" (a West London pilot artifact reachable from the
+  // dashboard's "Review Results" link and StatusBanner for any user, in any territory);
+  // removed 2026-08-10, see docs/09_DECISIONS.md.
+  if (!sp.outcode) {
+    return (
+      <div>
+        <PageHeader title="Discovery Results" subtitle="Real, database-backed discovery records — pick a postcode district to view." />
+        <div className="rounded-card border border-bordergrey bg-card p-4 shadow-soft">
+          <EmptyState title="Choose a postcode district" hint='Open a run from Main Runs or Discovery Runs and follow its "View canonical restaurant records" link, or visit /discovery-results?outcode=<DISTRICT> directly.' />
+        </div>
+      </div>
+    );
+  }
+  const outcode = sp.outcode.toUpperCase();
   const page = await fetchOutletResults(outcode);
 
   if (!page.configured) {

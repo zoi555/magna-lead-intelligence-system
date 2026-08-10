@@ -45,6 +45,7 @@ export function ImportPanel() {
   const [format, setFormat] = React.useState<Format>("csv");
   const [content, setContent] = React.useState("");
   const [fileName, setFileName] = React.useState<string | null>(null);
+  const [territoryInput, setTerritoryInput] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [result, setResult] = React.useState<ImportResult | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -61,12 +62,14 @@ export function ImportPanel() {
 
   async function runImport(confirm: boolean) {
     if (!content.trim()) { setError("Upload a CSV or JSON file first."); return; }
+    const anchorOutcodes = territoryInput.split(/[,\s]+/).map((t) => t.trim().toUpperCase()).filter(Boolean);
+    if (!anchorOutcodes.length) { setError("Enter at least one postcode district (e.g. SW1) this import's geography should be validated against — there is no national default."); return; }
     setBusy(true); setError(null);
     try {
       const res = await fetch("/api/discovery/import", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ source, format, content, confirm, fileName }),
+        body: JSON.stringify({ source, format, content, confirm, fileName, anchorOutcodes }),
       });
       const j = (await res.json()) as ImportResult;
       if (!j.ok) throw new Error(j.error || "Import failed");
@@ -111,6 +114,17 @@ export function ImportPanel() {
           {fileName && <span className="text-[12px] text-muted">{fileName} ({content.length.toLocaleString()} bytes)</span>}
         </div>
 
+        <label className="mt-3 block text-[13px]">
+          <span className="mb-1 block text-muted">Postcode district(s) this import is for <span className="text-[11px]">(e.g. SW1, or SW1, SW2 — anywhere in Great Britain; required, no default)</span></span>
+          <input
+            type="text"
+            value={territoryInput}
+            onChange={(e) => setTerritoryInput(e.target.value)}
+            placeholder="e.g. SW1"
+            className="w-full rounded-btn border border-bordergrey px-3 py-1.5 text-[13px] outline-none focus:border-actionblue"
+          />
+        </label>
+
         {format === "csv" && (
           <a href={TEMPLATES[source]} download className="mt-3 inline-block text-[12.5px] text-actionblue hover:text-actionhover">
             ↓ Download {source === "uber_eats" ? "Uber Eats" : "Deliveroo"} CSV template
@@ -120,8 +134,8 @@ export function ImportPanel() {
         {error && <p role="alert" className="mt-3 rounded border border-red-200 bg-red-50 px-2 py-1 text-[12.5px] text-red-700">{error}</p>}
 
         <div className="mt-4 flex gap-2">
-          <button disabled={busy || !content.trim()} onClick={() => runImport(false)}
-            className={`rounded-btn px-3 py-1.5 text-[13px] font-medium ${busy || !content.trim() ? "bg-gray-200 text-gray-400" : "bg-actionblue text-white hover:bg-actionhover"}`}>
+          <button disabled={busy || !content.trim() || !territoryInput.trim()} onClick={() => runImport(false)}
+            className={`rounded-btn px-3 py-1.5 text-[13px] font-medium ${busy || !content.trim() || !territoryInput.trim() ? "bg-gray-200 text-gray-400" : "bg-actionblue text-white hover:bg-actionhover"}`}>
             {busy ? "Validating…" : "Dry-run validate"}
           </button>
           {result?.dryRun && (

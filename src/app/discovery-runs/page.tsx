@@ -25,7 +25,7 @@ export default async function DiscoveryRunsPage() {
       <div>
         <PageHeader title="Discovery Runs" subtitle="Real discovery_runs history." />
         <div className="rounded-card border border-bordergrey bg-card p-4 shadow-soft">
-          <EmptyState title="No runs yet" hint='Run: npm run je:run -- "UB1"' />
+          <EmptyState title="No runs yet" hint='Run: npm run je:run -- "<postcode district>"' />
         </div>
       </div>
     );

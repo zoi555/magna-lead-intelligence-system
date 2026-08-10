@@ -36,19 +36,24 @@ export const ENVIRONMENT_LABEL = resolveEnvironmentLabel();
 
 export type NavItem = { label: string; href: string };
 
+// 2026-08-10 (P4 control addendum — national GB product, no reachable TW-only screen):
+// "Coverage Map" now points at /national-map (the genuinely GB-wide map workbench) instead
+// of the former /coverage-map, which is TW-specific and reads a single hardcoded local TW
+// export file. "Export Review" removed from navigation entirely — it is likewise
+// TW-specific with no national equivalent built yet; its route/code is left untouched
+// (not deleted) for when a national successor replaces it. See docs/09_DECISIONS.md.
 export const NAV_ITEMS: NavItem[] = [
   { label: "Overview", href: "/" },
-  { label: "Pipeline Runs", href: "/pipeline-runs" },
+  { label: "Main Runs", href: "/pipeline-runs" },
   { label: "Discovery Runs", href: "/discovery-runs" },
   { label: "Discovery Results", href: "/discovery-results" },
-  { label: "Coverage Map", href: "/coverage-map" },
+  { label: "National Map", href: "/national-map" },
   { label: "Territories", href: "/territories" },
   { label: "Data-Quality Exceptions", href: "/data-quality-exceptions" },
   { label: "Audit / Evidence", href: "/audit" },
   { label: "Import", href: "/import" },
   { label: "Leads", href: "/leads" },
   { label: "Telesales", href: "/telesales" },
-  { label: "Export Review", href: "/export-review" },
   { label: "Settings", href: "/settings" },
   { label: "Admin", href: "/admin" },
 ];

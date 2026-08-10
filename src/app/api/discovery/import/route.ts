@@ -70,11 +70,17 @@ export async function POST(req: Request) {
     const content = String(body.content ?? "");
     const confirm = Boolean(body.confirm);
     const originalFilename: string | null = body.fileName ? String(body.fileName) : null;
-    const anchorOutcodes: string[] = Array.isArray(body.anchorOutcodes) && body.anchorOutcodes.length ? body.anchorOutcodes : ["UB1"];
+    // AspectLead is a Great Britain-wide product — there is no safe national default
+    // territory to validate an import's geography against, so this is required, not
+    // defaulted (previously defaulted to "UB1", a West London pilot artifact that would
+    // have silently mis-validated every import outside that one district; removed
+    // 2026-08-10, see docs/09_DECISIONS.md).
+    const anchorOutcodes: string[] = Array.isArray(body.anchorOutcodes) ? body.anchorOutcodes.map((v: unknown) => String(v)).filter(Boolean) : [];
 
     if (source !== "uber_eats" && source !== "deliveroo") return NextResponse.json({ ok: false, error: "source must be 'uber_eats' or 'deliveroo'" }, { status: 400 });
     if (format !== "csv" && format !== "json") return NextResponse.json({ ok: false, error: "format must be 'csv' or 'json'" }, { status: 400 });
     if (!content.trim()) return NextResponse.json({ ok: false, error: "content is empty" }, { status: 400 });
+    if (!anchorOutcodes.length) return NextResponse.json({ ok: false, error: "anchorOutcodes is required — specify the postcode district(s) this import's geography should be validated against (no national default exists)." }, { status: 400 });
 
     const adapter = source === "uber_eats" ? new UberEatsAdapter() : new DeliverooAdapter();
     const observedAt = new Date().toISOString();

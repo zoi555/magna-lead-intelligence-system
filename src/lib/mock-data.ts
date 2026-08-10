@@ -52,10 +52,12 @@ export const pipelineRuns = [
   { id: "RUN-0039", territory: "UB1 2 (manual test)", date: "2026-07-05", discovered: 18, dedup: 15, cost: "£0.30", status: "Complete" },
 ];
 
+// Illustrative examples only, deliberately spread across Great Britain — AspectLead is a
+// national product, not scoped to any one pilot territory (P4 control addendum, 2026-08-10).
 export const territories = [
-  { name: "West London — July batch", items: "3 outer, 2 inner", postcodes: "~640", lastUsed: "2026-07-11", status: "Draft" },
-  { name: "UB1 2 (manual test)", items: "1 inner sector", postcodes: "~14", lastUsed: "2026-07-05", status: "Complete" },
-  { name: "Expansion probe — Slough", items: "1 expansion list", postcodes: "~210", lastUsed: "—", status: "Draft" },
+  { name: "Manchester — July batch", items: "3 outer, 2 inner", postcodes: "~640", lastUsed: "2026-07-11", status: "Draft" },
+  { name: "M1 2 (manual test)", items: "1 inner sector", postcodes: "~14", lastUsed: "2026-07-05", status: "Complete" },
+  { name: "Expansion probe — Bristol", items: "1 expansion list", postcodes: "~210", lastUsed: "—", status: "Draft" },
 ];
 
 export const discoveredLeads = [
