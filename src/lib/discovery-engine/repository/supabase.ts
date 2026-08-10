@@ -101,6 +101,13 @@ export class SupabaseRepository implements DiscoveryRepository {
     });
   }
 
+  async confirmAndQueueRun(runId: string, actorUserId: string, source = "just_eat"): Promise<ExecutionRecord> {
+    const r = await this.db.rpc("confirm_and_queue_run", { p_run_id: runId, p_actor_user_id: actorUserId, p_source: source });
+    if (r.error) throw new Error(`confirmAndQueueRun: ${JSON.stringify(r.error)}`);
+    const row = Array.isArray(r.data) ? r.data[0] : r.data;
+    if (!row) throw new Error("confirmAndQueueRun: no execution returned");
+    return row as ExecutionRecord;
+  }
   async createExecution(runId: string, tenantId: string, plannedQueries: number): Promise<ExecutionRecord> {
     const r = await this.db.from("je_executions")
       .insert({ run_id: runId, tenant_id: tenantId, planned_queries: plannedQueries, status: "queued" })

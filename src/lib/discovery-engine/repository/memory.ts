@@ -59,6 +59,46 @@ export class MemoryRepository implements DiscoveryRepository {
     return { downgraded: true };
   }
 
+  /** Non-atomic in-memory approximation of migration 0031's confirm_and_queue_run.
+   *  Territory overlap between DIFFERENT runs is PERMITTED (P4 control correction,
+   *  2026-08-10) — detected and disclosed, never blocked; only a missing acknowledgement
+   *  when overlap is material (shares query units with an ACTIVE run) is rejected, and
+   *  only duplicate EXECUTION of the SAME run/source is a hard block. No role check — the
+   *  acknowledgement is disclosure evidence, not authorisation of a restricted action.
+   *  The authoritative, concurrency-proof version is tested against the real local
+   *  Postgres stack — see scripts/test-confirm-and-queue-run-local.ts. */
+  async confirmAndQueueRun(runId: string, actorUserId: string, source = "just_eat"): Promise<ExecutionRecord> {
+    const run = this.runs.get(runId);
+    if (!run) throw new Error(`CONFIRM_QUEUE_RUN_NOT_FOUND: run ${runId} does not exist`);
+    if (run.status !== "draft") throw new Error(`CONFIRM_QUEUE_NOT_DRAFT: run ${runId} is '${run.status}', not 'draft'`);
+    if (source !== "just_eat") throw new Error(`CONFIRM_QUEUE_SOURCE_NOT_PERMITTED: source '${source}' has no authorised operational execution path`);
+    const selected = ((run.source_config as Record<string, unknown> | undefined)?.source === source)
+      || Array.isArray((run.target_filters as Record<string, unknown> | undefined)?.selectedProviders)
+        && ((run.target_filters as Record<string, unknown>).selectedProviders as string[]).includes(source);
+    if (!selected) throw new Error(`CONFIRM_QUEUE_SOURCE_NOT_SELECTED: source '${source}' is not selected in run ${runId}'s configuration`);
+    if ([...this.executions.values()].some((e) => e.run_id === runId && e.source === source && ["queued", "running", "cancelling"].includes(e.status))) {
+      throw new Error(`CONFIRM_QUEUE_DUPLICATE_EXECUTION: run ${runId} already has an active ${source} execution`);
+    }
+
+    const units = [...new Set((run.derived_query_units ?? []).map((u) => u.toUpperCase()))];
+    const overlappingRunIds = units.length
+      ? [...this.runs.values()].filter((r) =>
+          r.id !== runId && r.tenant_id === run.tenant_id && ["queued", "running", "cancelling"].includes(r.status)
+          && (r.derived_query_units ?? []).some((u) => units.includes(u.toUpperCase())))
+        .map((r) => r.id)
+      : [];
+    if (overlappingRunIds.length) {
+      const ack = (run.target_filters as Record<string, unknown> | undefined)?.overlapAcknowledgement as Record<string, unknown> | undefined;
+      if (!ack?.acknowledged) throw new Error(`CONFIRM_QUEUE_OVERLAP_ACK_REQUIRED: run ${runId} overlaps ${overlappingRunIds.length} currently active run(s) on source '${source}' — acknowledge the disclosed overlap to proceed`);
+      run.target_filters = { ...run.target_filters, overlapAcknowledgement: { ...ack, acknowledgedBy: actorUserId, acknowledgedByEmail: actorUserId, acknowledgedAt: now(), overlappingRunIds } };
+      run.config_snapshot = { ...(run.config_snapshot as Record<string, unknown>) };
+    }
+
+    run.status = "queued";
+    run.updated_at = now();
+    return this.createExecution(runId, run.tenant_id, run.derived_query_units?.length ?? 0);
+  }
+
   async createExecution(runId: string, tenantId: string, plannedQueries: number): Promise<ExecutionRecord> {
     const rec: ExecutionRecord = {
       id: randomUUID(), tenant_id: tenantId, run_id: runId, source: "just_eat", status: "queued",

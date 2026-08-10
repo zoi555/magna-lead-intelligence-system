@@ -9,6 +9,7 @@ export interface SessionTenant {
   tenantId: string;
   role: string;
   userId: string;
+  email: string | null;
 }
 
 export class NoTenantMembershipError extends Error {
@@ -30,5 +31,5 @@ export async function resolveTenantForSession(): Promise<SessionTenant> {
   const { data, error } = await supabase.from("tenant_members").select("tenant_id, role").limit(1).maybeSingle();
   if (error) throw new Error(`resolveTenantForSession: ${error.message}`);
   if (!data) throw new NoTenantMembershipError();
-  return { tenantId: (data as { tenant_id: string }).tenant_id, role: (data as { role: string }).role, userId: userData.user.id };
+  return { tenantId: (data as { tenant_id: string }).tenant_id, role: (data as { role: string }).role, userId: userData.user.id, email: userData.user.email ?? null };
 }

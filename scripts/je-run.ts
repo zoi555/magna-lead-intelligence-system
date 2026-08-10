@@ -29,6 +29,10 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+// Synthetic actor id for this CLI script — confirm_and_queue_run only checks the actor's
+// role when a genuine conflict/override is involved; this CLI path never exercises that.
+const TEST_ACTOR_ID = "00000000-0000-0000-0000-000000000001";
+
 async function loadDotEnv() {
   for (const f of [".env.local", ".env"]) {
     try { const txt = await fs.readFile(path.resolve(process.cwd(), f), "utf8");
@@ -135,7 +139,7 @@ async function main() {
 
   const runName = `Just Eat discovery — ${input} — ${new Date().toISOString().slice(0, 10)}`;
   const { run } = await saveRunFromPlan(repo, { tenant_id: tenantId, name: runName, territory_mode: "manual_outcodes", territory_input: input }, plan);
-  const exec = await queueJustEatExecution(repo, run.id);
+  const exec = await queueJustEatExecution(repo, run.id, TEST_ACTOR_ID);
   console.log(`Run ${run.id} queued (execution ${exec.id}).`);
 
   // --- ISS-0031 requirement 6: write the bidirectional linkage now that both run ids exist.

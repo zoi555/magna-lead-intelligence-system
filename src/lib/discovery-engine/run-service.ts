@@ -85,12 +85,15 @@ export async function persistGeographyProvenance(db: SupabaseClient, run: RunRec
   }
 }
 
-export async function queueJustEatExecution(repo: DiscoveryRepository, runId: string): Promise<ExecutionRecord> {
-  const run = await repo.getRun(runId);
-  if (!run) throw new Error(`Run ${runId} not found`);
-  const execution = await repo.createExecution(run.id, run.tenant_id, run.derived_query_units.length);
-  await repo.setRunStatus(run.id, "queued");
-  return execution;
+/** Atomic draft -> queued transition (migration 0031, confirm_and_queue_run) — replaces the
+ *  old unconditional getRun/createExecution/setRunStatus sequence. Territory overlap
+ *  between runs is PERMITTED — actorUserId is used only to stamp server-side evidence of
+ *  who acknowledged a disclosed overlap, not to authorise anything (there is nothing
+ *  restricted here to authorise). Comes from an already-verified session
+ *  (requireSessionAndRole()), never from client-supplied JSON. See
+ *  docs/APP_RESUMPTION_AUDIT.md §L and docs/09_DECISIONS.md for the full design. */
+export async function queueJustEatExecution(repo: DiscoveryRepository, runId: string, actorUserId: string): Promise<ExecutionRecord> {
+  return repo.confirmAndQueueRun(runId, actorUserId, "just_eat");
 }
 
 export interface RunStatusView {

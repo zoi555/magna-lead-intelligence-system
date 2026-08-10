@@ -53,6 +53,12 @@ export interface DiscoveryRepository {
   failRun(id: string, reason: string): Promise<FailRunResult>;
 
   // executions
+  /** Atomic draft -> queued transition with an authoritative, re-checked conflict guard and
+   *  server-verified owner/admin override validation — migration 0031
+   *  (confirm_and_queue_run). Replaces the old unconditional getRun/createExecution/
+   *  setRunStatus sequence for the queue moment specifically. actorUserId must come from an
+   *  already-verified session (requireSessionAndRole()), never from client-supplied JSON. */
+  confirmAndQueueRun(runId: string, actorUserId: string, source?: string): Promise<ExecutionRecord>;
   createExecution(runId: string, tenantId: string, plannedQueries: number): Promise<ExecutionRecord>;
   setExecutionPlan(id: string, plannedQueries: number): Promise<void>;
   getExecution(id: string): Promise<ExecutionRecord | null>;
