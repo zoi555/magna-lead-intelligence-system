@@ -18,6 +18,10 @@ import { parseSearchResponse, parseSearchRestaurant } from "../src/lib/discovery
 import { normaliseUkPhone } from "../src/lib/discovery-engine/just-eat/phone";
 import { JUST_EAT_FIELD_CATALOGUE, COLLECTED_FIELD_KEYS } from "../src/lib/discovery-engine/just-eat/field-catalogue";
 import { saveRun, queueJustEatExecution } from "../src/lib/discovery-engine/run-service";
+
+// Synthetic actor id — confirm_and_queue_run only checks the actor's role when a genuine
+// conflict/override applies; MemoryRepository has no seeded tenant members for these runs.
+const TEST_ACTOR_ID = "00000000-0000-0000-0000-000000000001";
 import { referenceFromEntries } from "../src/lib/discovery-engine/geography/reference";
 import type { AdapterConfig } from "../src/lib/discovery-engine/adapter";
 import type { PostcodeReferenceEntry } from "@zoi555/geospatial-map";
@@ -99,7 +103,7 @@ async function main() {
   const repo = new MemoryRepository();
   const { run } = await saveRun(repo, { tenant_id: "tenant-A", name: "TW test run", territory_input: "UB1, UB2" }, geoRef);
   assert(run.derived_query_units.length === 2, "run derived 2 postcode districts from territory text");
-  const exec = await queueJustEatExecution(repo, run.id);
+  const exec = await queueJustEatExecution(repo, run.id, TEST_ACTOR_ID);
   assert(exec.status === "queued" && (await repo.getRun(run.id))!.status === "queued", "execution queued + run status queued");
 
   // ---- claim + execute ----
@@ -119,7 +123,10 @@ async function main() {
   assert(prov.find((p) => p.field_key === "telephone")!.value === null, "telephone provenance honest (null, unavailable)");
 
   // ---- content-hash duplicate on a second pass ----
-  const exec2 = await queueJustEatExecution(repo, run.id);
+  // confirm_and_queue_run (migration 0031) requires status='draft' to queue — re-opening the
+  // same run for a second discovery pass is an explicit administrative action, not implicit.
+  await repo.setRunStatus(run.id, "draft");
+  const exec2 = await queueJustEatExecution(repo, run.id, TEST_ACTOR_ID);
   const claimed2 = await repo.claimNextExecution("worker-1", 60);
   const res2 = await executeJustEatRun(repo, run, claimed2!, { adapter: adapter(), config: cfg(), workerId: "worker-1" });
   assert(res2.duplicateObservations === 5, "second pass links 5 duplicate observations by content hash");
@@ -141,16 +148,16 @@ async function main() {
   assert(q.field_availability_by_response_type.search !== undefined, "field availability reported by response type");
 
   // ---- cancellation ----
-  const { run: run2 } = await saveRun(repo, { tenant_id: "tenant-A", name: "cancel run", territory_input: "UB1" }, geoRef);
-  await queueJustEatExecution(repo, run2.id);
+  const { run: run2 } = await saveRun(repo, { tenant_id: "tenant-A", name: "cancel run", territory_input: "UB3" }, geoRef);
+  await queueJustEatExecution(repo, run2.id, TEST_ACTOR_ID);
   const c = await repo.claimNextExecution("worker-1", 60);
   await repo.requestCancel(c!.id);
   const rc = await executeJustEatRun(repo, run2, c!, { adapter: adapter(), config: { ...cfg(), outcodes: ["UB1"] }, workerId: "worker-1" });
   assert(rc.cancelled && rc.status === "cancelled", "cancellation stops the run and marks it cancelled");
 
   // ---- bounded retry / stale re-claim ----
-  const { run: run3 } = await saveRun(repo, { tenant_id: "tenant-A", name: "retry run", territory_input: "UB1" }, geoRef);
-  const e3 = await queueJustEatExecution(repo, run3.id);
+  const { run: run3 } = await saveRun(repo, { tenant_id: "tenant-A", name: "retry run", territory_input: "UB4" }, geoRef);
+  const e3 = await queueJustEatExecution(repo, run3.id, TEST_ACTOR_ID);
   const first = await repo.claimNextExecution("worker-1", 60);
   const noneWhileFresh = await repo.claimNextExecution("worker-2", 60);
   assert(first!.id === e3.id && (noneWhileFresh === null || noneWhileFresh.id !== e3.id), "fresh lease is not re-claimed by another worker");
@@ -176,8 +183,8 @@ async function main() {
   assert(good !== null && isUuid(good!.run_id), "valid claimed row → returned with a UUID run_id");
 
   // ---- queue creation always writes a valid run_id; worker drains empty queue cleanly ----
-  const { run: run4 } = await saveRun(repo, { tenant_id: "tenant-A", name: "queue run", territory_input: "UB1" }, geoRef);
-  const e4 = await queueJustEatExecution(repo, run4.id);
+  const { run: run4 } = await saveRun(repo, { tenant_id: "tenant-A", name: "queue run", territory_input: "UB5" }, geoRef);
+  const e4 = await queueJustEatExecution(repo, run4.id, TEST_ACTOR_ID);
   assert(isUuid(e4.run_id) && e4.run_id === run4.id, "queue creation writes a valid run_id (= run.id)");
   const emptyRepo = new MemoryRepository();
   const drained = await runWorkerOnce(emptyRepo, { workerId: "w", onLog: () => {} });
@@ -189,7 +196,7 @@ async function main() {
 
   // 1/1: a successful single query ends with completed_queries === 1 (was showing 0/1)
   const { run: rOk } = await saveRun(rep, { tenant_id: "t", name: "ok", territory_input: "UB1" }, geoRef);
-  const eOk = await queueJustEatExecution(rep, rOk.id);
+  const eOk = await queueJustEatExecution(rep, rOk.id, TEST_ACTOR_ID);
   const cOk = await rep.claimNextExecution("w1", 60);
   const rOkRes = await executeJustEatRun(rep, rOk, cOk!, { adapter: adapter(), config: cfg1(["UB1"]), workerId: "w1" });
   const execOk = await rep.getExecution(eOk.id);
@@ -198,7 +205,7 @@ async function main() {
 
   // 0/1: a failed query is NOT counted completed; failure represented; completed_with_warnings
   const { run: rFail } = await saveRun(rep, { tenant_id: "t", name: "fail", territory_input: "UB2" }, geoRef);
-  await queueJustEatExecution(rep, rFail.id);
+  await queueJustEatExecution(rep, rFail.id, TEST_ACTOR_ID);
   const cFail = await rep.claimNextExecution("w1", 60);
   const rFailRes = await executeJustEatRun(rep, rFail, cFail!, { adapter: adapter(), config: cfg1(["UB2"]), workerId: "w1" });
   const execFail = await rep.getExecution(cFail!.id);
@@ -206,16 +213,16 @@ async function main() {
   assert(execFail!.completed_queries === 0 && execFail!.status === "completed_with_warnings", "failed single query row shows 0/1 with warnings status");
 
   // cancellation: completed reflects work done before cancel; status cancelled
-  const { run: rCan } = await saveRun(rep, { tenant_id: "t", name: "cancel", territory_input: "UB1" }, geoRef);
-  const eCan = await queueJustEatExecution(rep, rCan.id);
+  const { run: rCan } = await saveRun(rep, { tenant_id: "t", name: "cancel", territory_input: "UB3" }, geoRef);
+  const eCan = await queueJustEatExecution(rep, rCan.id, TEST_ACTOR_ID);
   const cCan = await rep.claimNextExecution("w1", 60);
   await rep.requestCancel(eCan.id);
   const rCanRes = await executeJustEatRun(rep, rCan, cCan!, { adapter: adapter(), config: cfg1(["UB1"]), workerId: "w1" });
   assert(rCanRes.cancelled && rCanRes.status === "cancelled" && rCanRes.completedQueries === 0, "cancel before the query → cancelled, 0 completed");
 
   // retry/idempotency: a resumed attempt skips the already-completed query (no double increment)
-  const { run: rRetry } = await saveRun(rep, { tenant_id: "t", name: "retry", territory_input: "UB1" }, geoRef);
-  const eRetry = await queueJustEatExecution(rep, rRetry.id);
+  const { run: rRetry } = await saveRun(rep, { tenant_id: "t", name: "retry", territory_input: "UB4" }, geoRef);
+  const eRetry = await queueJustEatExecution(rep, rRetry.id, TEST_ACTOR_ID);
   const cRetry = await rep.claimNextExecution("w1", 60);
   const rRetryRes = await executeJustEatRun(rep, rRetry, { ...cRetry!, completed_queries: 1 }, { adapter: adapter(), config: cfg1(["UB1"]), workerId: "w1" });
   assert(rRetryRes.completedQueries === 1 && (await rep.getExecution(eRetry.id))!.completed_queries === 1, "resume skips the completed query — completedQueries stays 1 (no double increment)");

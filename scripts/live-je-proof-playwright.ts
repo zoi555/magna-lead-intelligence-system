@@ -29,6 +29,8 @@ const RUN_NAME = `Just Eat proof — ${TERRITORY} — ${new Date().toISOString()
 
 async function main() {
   await loadDotEnv();
+  const { assertLocalSupabaseTarget } = await import("./lib/local-only-guard");
+  assertLocalSupabaseTarget();
   await fs.mkdir(SCRATCHPAD, { recursive: true });
   const { hasServiceCredentials, createServiceClient } = await import("../src/lib/discovery-engine/supabase-client");
   if (!hasServiceCredentials()) { console.log("SKIP: no service credentials configured."); process.exit(0); }
@@ -107,7 +109,7 @@ async function main() {
   console.log(`  Run ID: ${runId}`);
   if (needsOverride) {
     const tf = runRow.data!.target_filters as Record<string, unknown>;
-    assert(!!(tf.ownerOverride as any)?.acknowledged, "owner override was recorded on the run");
+    assert(!!(tf.overlapAcknowledgement as any)?.acknowledged, "territory overlap acknowledgement was recorded on the run");
   }
 
   console.log("\n=== Waiting for the worker (running in the background) to process the execution ===");

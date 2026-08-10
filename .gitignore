@@ -68,3 +68,6 @@ data/imports/
 
 # TypeScript incremental build info
 *.tsbuildinfo
+
+# Playwright browser-proof screenshots (test evidence, not committed)
+.playwright-proof/

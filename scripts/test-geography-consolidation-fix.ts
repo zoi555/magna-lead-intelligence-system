@@ -17,6 +17,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { readFileSync } from "node:fs";
 
+// Synthetic actor id — confirm_and_queue_run only checks the actor's role when a genuine
+// conflict/override applies; these runs use unique synthetic territories, never conflicting.
+const TEST_ACTOR_ID = "00000000-0000-0000-0000-000000000001";
+
 async function loadDotEnv() {
   for (const f of [".env.local", ".env"]) {
     try {
@@ -31,6 +35,8 @@ async function loadDotEnv() {
 
 async function main() {
   await loadDotEnv();
+  const { assertLocalSupabaseTarget } = await import("./lib/local-only-guard");
+  assertLocalSupabaseTarget();
   const { hasServiceCredentials, createServiceClient } = await import("../src/lib/discovery-engine/supabase-client");
   if (!hasServiceCredentials()) {
     console.log("test:geography-consolidation-fix — SKIPPED (set SUPABASE_SERVICE_ROLE_KEY in .env.local to run).");
@@ -87,7 +93,7 @@ async function main() {
 
     const { run: runA } = await saveRun(repo, { tenant_id: tenantId, name: "geo-fix-selftest-run-A", territory_input: "UB1" }, geoRef);
     runAId = runA.id;
-    const execA = await queueJustEatExecution(repo, runA.id);
+    const execA = await queueJustEatExecution(repo, runA.id, TEST_ACTOR_ID);
     const claimedA = await repo.claimNextExecution("geo-fix-test-a", 60);
     assert(claimedA?.id === execA.id, "run A execution claimed");
     const resA = await executeJustEatRun(repo, runA, claimedA!, {
@@ -123,7 +129,7 @@ async function main() {
 
     const { run: runB } = await saveRun(repo, { tenant_id: tenantId, name: "geo-fix-selftest-run-B", territory_input: "W5" }, geoRef);
     runBId = runB.id;
-    const execB = await queueJustEatExecution(repo, runB.id);
+    const execB = await queueJustEatExecution(repo, runB.id, TEST_ACTOR_ID);
     const claimedB = await repo.claimNextExecution("geo-fix-test-b", 60);
     assert(claimedB?.id === execB.id, "run B execution claimed");
     const resB = await executeJustEatRun(repo, runB, claimedB!, {
@@ -161,7 +167,7 @@ async function main() {
 
     const { run: runC } = await saveRun(repo, { tenant_id: tenantId, name: "geo-fix-selftest-run-C", territory_input: "UB1" }, geoRef);
     runCId = runC.id;
-    const execC = await queueJustEatExecution(repo, runC.id);
+    const execC = await queueJustEatExecution(repo, runC.id, TEST_ACTOR_ID);
     const claimedC = await repo.claimNextExecution("geo-fix-test-c", 60);
     assert(claimedC?.id === execC.id, "run C execution claimed");
     await executeJustEatRun(repo, runC, claimedC!, {

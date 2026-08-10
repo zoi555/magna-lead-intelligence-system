@@ -63,6 +63,27 @@ const overlap = planTerritory("UB, UB1, UB1 1", ref, JUST_EAT_GEOGRAPHY_SUPPORT)
 assert(overlap.queryUnits.filter((u) => u === "UB1").length === 1, "overlapping selections (UB + UB1 + UB1 1) yield UB1 exactly once (no duplicate query units)");
 assert(overlap.queryUnits.every((u) => /^[A-Z]{1,2}\d[A-Z\d]?$/.test(u)), "district-only source produces only district query units");
 
+// 9b. CROSS-PLAN overlap (what the confirm_and_queue_run migration's conflict check relies
+// on — two SEPARATE runs' resolved query units, not just dedup within one run's own
+// selections). Proves the canonical query_unit table really represents overlap for the
+// selection kinds this app's Run Builder can currently produce (Area/District/Sector/Unit
+// via free-text postcode parsing — map polygon selections are defined in the underlying
+// @zoi555/geospatial-map package but are not reachable through this app's current UI/API,
+// so they are out of scope here; place/town selections resolve to pending_data with ZERO
+// query units, so they never falsely claim a conflict — see assertion 4/6 above).
+const runA_area = planTerritory("UB", ref, JUST_EAT_GEOGRAPHY_SUPPORT);          // Area
+const runB_district = planTerritory("UB1", ref, JUST_EAT_GEOGRAPHY_SUPPORT);     // District contained in the area
+assert(runA_area.queryUnits.includes("UB1") && runB_district.queryUnits.includes("UB1"), "Area selection (UB) and its contained District selection (UB1) resolve to an overlapping query unit (UB1)");
+
+const runC_sector = planTerritory("UB1 1", ref, JUST_EAT_GEOGRAPHY_SUPPORT);     // Sector within UB1
+assert(runB_district.queryUnits.includes("UB1") && runC_sector.queryUnits.includes("UB1"), "Sector selection (UB1 1) canonicalises to the same query unit (UB1) as its containing District selection");
+
+const runD_unit = planTerritory("UB1 1AA", ref, JUST_EAT_GEOGRAPHY_SUPPORT);     // Unit within UB1
+assert(runB_district.queryUnits.includes("UB1") && runD_unit.queryUnits.includes("UB1"), "Unit selection (UB1 1AA) canonicalises to the same query unit (UB1) as its containing District selection");
+
+const runE_other = planTerritory("HA0", ref, JUST_EAT_GEOGRAPHY_SUPPORT);        // genuinely different district
+assert(!runB_district.queryUnits.some((u) => runE_other.queryUnits.includes(u)), "genuinely non-overlapping territory (UB1 vs HA0) shares no query unit");
+
 // 10. mixed geography input + exclusions
 const mixed = planTerritory("UB1, UB2, HA0, Southall", ref, JUST_EAT_GEOGRAPHY_SUPPORT, ["UB2"]);
 assert(mixed.queryUnits.includes("UB1") && mixed.queryUnits.includes("HA0") && !mixed.queryUnits.includes("UB2"), "mixed input resolves postcodes; excluded UB2 is removed before execution");

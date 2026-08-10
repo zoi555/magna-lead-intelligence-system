@@ -31,6 +31,8 @@ const SCRATCHPAD = "/private/tmp/claude-501/-Users-homemac-Projects-magna-lead-i
 
 async function main() {
   await loadDotEnv();
+  const { assertLocalSupabaseTarget } = await import("./lib/local-only-guard");
+  assertLocalSupabaseTarget();
   const baseUrl = (process.argv.find((a) => a.startsWith("--base-url=")) ?? "--base-url=http://localhost:3000").split("=")[1];
   await fs.mkdir(SCRATCHPAD, { recursive: true });
 

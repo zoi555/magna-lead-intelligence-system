@@ -23,6 +23,8 @@ const assert = (c: boolean, m: string) => { if (!c) { console.error("  ✗", m);
 
 async function main() {
   await loadDotEnv();
+  const { assertLocalSupabaseTarget } = await import("./lib/local-only-guard");
+  assertLocalSupabaseTarget();
   const { hasServiceCredentials, createServiceClient } = await import("../src/lib/discovery-engine/supabase-client");
   if (!hasServiceCredentials()) { console.log("SKIP: no service credentials configured."); process.exit(0); }
   const realOwnerEmail = process.env.INITIAL_OWNER_EMAIL;

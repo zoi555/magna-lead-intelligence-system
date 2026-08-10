@@ -16,6 +16,10 @@ import { executeJustEatRun } from "../src/lib/discovery-engine/worker/execute";
 import { JustEatEnrichedAdapter } from "../src/lib/discovery-engine/just-eat/adapter-v2";
 import { parseEnrichedSearchResponse, parseEnrichedSearchRestaurant, isRecognisedEnrichedResponse } from "../src/lib/discovery-engine/just-eat/parse-v2";
 import { saveRun, queueJustEatExecution } from "../src/lib/discovery-engine/run-service";
+
+// Synthetic actor id — confirm_and_queue_run only checks the actor's role when a genuine
+// conflict/override applies; MemoryRepository has no seeded tenant members for these runs.
+const TEST_ACTOR_ID = "00000000-0000-0000-0000-000000000001";
 import { referenceFromEntries } from "../src/lib/discovery-engine/geography/reference";
 import type { AdapterConfig } from "../src/lib/discovery-engine/adapter";
 import type { JustEatEnrichedFetchResult } from "../src/lib/sources/just-eat";
@@ -141,7 +145,7 @@ async function main() {
   // ---- end-to-end via executeJustEatRun: 10. duplicate restaurants across query points dedup ----
   const repo = new MemoryRepository();
   const { run } = await saveRun(repo, { tenant_id: "tenant-A", name: "CM dedup test", territory_input: "CM1, CM2" }, geoRef);
-  const exec = await queueJustEatExecution(repo, run.id);
+  const exec = await queueJustEatExecution(repo, run.id, TEST_ACTOR_ID);
   const claimed = await repo.claimNextExecution("worker-1", 60);
   // CM1 and CM2 both return the SAME fixture (simulating an overlapping delivery-area duplicate)
   const dedupAdapter = new JustEatEnrichedAdapter(async () => okResult(FIXTURE));
@@ -154,7 +158,7 @@ async function main() {
   // ---- 15. ISS-0035: sanitised provider error retained in the execution record ----
   const repo2 = new MemoryRepository();
   const { run: run2 } = await saveRun(repo2, { tenant_id: "tenant-A", name: "CM failure test", territory_input: "CM1" }, geoRef);
-  await queueJustEatExecution(repo2, run2.id);
+  await queueJustEatExecution(repo2, run2.id, TEST_ACTOR_ID);
   const claimed2 = await repo2.claimNextExecution("worker-1", 60);
   const failAdapter = new JustEatEnrichedAdapter(async () => failResult(429, "HTTP 429 Too Many Requests", 2));
   const failCfg: AdapterConfig = { enabled: true, maxCallsPerRun: 50, requestDelayMs: 0, outcodes: ["CM1"] };
@@ -181,7 +185,7 @@ async function main() {
 
   const repo3 = new MemoryRepository();
   const { run: run3 } = await saveRun(repo3, { tenant_id: "tenant-A", name: "CM manifest test", territory_input: "CM1" }, geoRef);
-  await queueJustEatExecution(repo3, run3.id);
+  await queueJustEatExecution(repo3, run3.id, TEST_ACTOR_ID);
   const claimed3 = await repo3.claimNextExecution("worker-1", 60);
   const okAdapter = new JustEatEnrichedAdapter(async () => okResult(FIXTURE));
   await executeJustEatRun(repo3, run3, claimed3!, { adapter: okAdapter, config: { enabled: true, maxCallsPerRun: 50, requestDelayMs: 0, outcodes: ["CM1"] }, workerId: "worker-1" });

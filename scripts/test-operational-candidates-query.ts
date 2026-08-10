@@ -22,6 +22,8 @@ async function loadDotEnv() {
 
 async function main() {
   await loadDotEnv();
+  const { assertLocalSupabaseTarget } = await import("./lib/local-only-guard");
+  assertLocalSupabaseTarget();
   const { hasServiceCredentials, createServiceClient } = await import("../src/lib/discovery-engine/supabase-client");
   if (!hasServiceCredentials()) {
     console.log("test:operational-candidates-query — SKIPPED (set SUPABASE_SERVICE_ROLE_KEY in .env.local to run).");

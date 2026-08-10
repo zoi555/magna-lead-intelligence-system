@@ -32,6 +32,7 @@
     "je:worker": "tsx scripts/je-worker.ts",
     "seed:postcode-reference": "tsx scripts/seed-postcode-reference.ts",
     "test:geography-standard": "tsx scripts/test-geography-standard.ts",
+    "test:confirm-and-queue-run-local": "tsx scripts/test-confirm-and-queue-run-local.ts",
     "test:multi-source": "tsx scripts/test-multi-source.ts",
     "test:uber-parse": "tsx scripts/test-uber-parse.ts",
     "test:uber-import": "tsx scripts/test-uber-import.ts",

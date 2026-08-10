@@ -9,6 +9,10 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { readFileSync } from "node:fs";
 
+// Synthetic actor id — confirm_and_queue_run only checks the actor's role when a genuine
+// conflict/override applies; this run uses a unique synthetic territory, never conflicting.
+const TEST_ACTOR_ID = "00000000-0000-0000-0000-000000000001";
+
 async function loadDotEnv() {
   for (const f of [".env.local", ".env"]) {
     try {
@@ -23,6 +27,8 @@ async function loadDotEnv() {
 
 async function main() {
   await loadDotEnv();
+  const { assertLocalSupabaseTarget } = await import("./lib/local-only-guard");
+  assertLocalSupabaseTarget();
   const { hasServiceCredentials, createAnonClient } = await import("../src/lib/discovery-engine/supabase-client");
   if (!hasServiceCredentials()) {
     console.log("test:je-supabase — SKIPPED (set SUPABASE_SERVICE_ROLE_KEY in .env.local to run).");
@@ -51,7 +57,7 @@ async function main() {
   const { run } = await saveRun(repo, { tenant_id: tenantId, name: "integration-selftest", territory_input: "UB1" }, geoRef);
   let runId = run.id;
   try {
-    const exec = await queueJustEatExecution(repo, runId);
+    const exec = await queueJustEatExecution(repo, runId, TEST_ACTOR_ID);
     const claimed = await repo.claimNextExecution("it-worker", 60);
     assert(claimed?.id === exec.id, "execution claimed via RPC (FOR UPDATE SKIP LOCKED)");
     const res = await executeJustEatRun(repo, run, claimed!, { adapter: new JustEatAdapter(fetcher), config: { enabled: true, maxCallsPerRun: 50, requestDelayMs: 0, outcodes: ["UB1"] }, workerId: "it-worker" });
