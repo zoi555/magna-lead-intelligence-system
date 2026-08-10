@@ -1,5 +1,16 @@
 # Project Status — Magna Lead Intelligence System
 
+## P4-APP branch note — 2026-08-10
+
+Active work on `feature/p4-app-runs-builder` (base `0858bd92ae51ed605f885eed6d4785950f9bfb27`,
+cut from `feature/mvp-vertical-slice-001`) is the Main Runs / Create New Run (Run Builder)
+vertical slice, isolated from the TEMP-PIPELINE campaign work below. Canonical status for
+this branch: `docs/APP_RESUMPTION_AUDIT.md`, `docs/09_DECISIONS.md` (2026-08-10 entry),
+`docs/15_AI_WORK_LOG.md` (2026-08-10 entry), `docs/BRANCH_REGISTER.md` (2026-08-10 entry).
+The remainder of this file (below) predates that split and largely documents
+`feature/mvp-vertical-slice-001`'s history, including TEMP-PIPELINE campaign work that is
+out of scope for the P4-APP branch — not updated for this branch's work.
+
 ## Current state — 2026-07-14 (AspectLead / Lead Discovery module)
 
 Active build on branch `feature/mvp-vertical-slice-001`. The Lead Discovery pipeline (FSA + live

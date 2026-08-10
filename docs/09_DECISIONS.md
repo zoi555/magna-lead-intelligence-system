@@ -1592,3 +1592,218 @@ candidate name per brand, proves the Sambal Express override both ways (absent f
 present in keep), proves an unregistered "large-sounding" brand is neither excluded nor kept
 (no size heuristic exists), and separately proves (not silently omits) the three known naming-
 coverage gaps above.
+
+---
+
+## 2026-08-10 — P4-APP Run Builder: nine-stage refactor, config_snapshot v3 (P4 control decision, branch `feature/p4-app-runs-builder`)
+
+Accepted by P4 control review after the APP_RESUMPTION_AUDIT (see
+`docs/APP_RESUMPTION_AUDIT.md`). Architecture decisions, recorded per this file's own rule
+("do not introduce a new architecture pattern without logging it here"):
+
+- **Canonical route restructure:** `/pipeline-runs` becomes the DB-backed Main Runs screen
+  (was: a mixed legacy TW/FSA file-monitor page); the legacy monitor is relocated
+  unmodified to `/pipeline-runs/legacy-monitor`. `/pipeline-runs/[id]` becomes canonical
+  run detail/status, reusing (not forking) `/discovery-runs`'s `fetchRunDetail`/
+  `RunResultsMap`. `/discovery-runs` is left untouched — kept as source
+  execution/attempt visibility.
+- **Run Builder stages:** refactored from 6 ad-hoc steps to the 9 governing stages
+  (Identity, Source Mode, Geography, Limits/Cost, Exclusions, Scoring Profile, Assignment,
+  Outputs, Review). Two judgment calls, made because the governing 9-stage spec does not
+  name a slot for either: (1) business-type/taxonomy targeting (business types, cuisines,
+  service models, ownership, requested fields, tags — the former "Target profile" step)
+  is kept inside **Exclusions**, since it defines in/out-of-scope exactly like the rest of
+  that stage; (2) run **anchors** (map reference points) are folded into **Geography** as
+  supporting context, not a stage of their own.
+- **config_snapshot v3:** `src/lib/discovery/run-draft.ts`, `CURRENT_SCHEMA_VERSION = 3`.
+  A single strongly-typed `RunDraft` object is the complete, immutable source of run
+  configuration once a run is queued, covering all nine stages plus review/approval
+  metadata. No new `discovery_runs` columns were added for the new stages — Limits/Cost,
+  Scoring Profile, Assignment and Outputs live inside `config_snapshot` only, per explicit
+  control instruction (avoid a column-per-stage schema sprawl for a first vertical
+  slice). `migrateDraft()` upgrades older v1/v2 drafts losslessly; a previously persisted
+  run's snapshot always remains readable via `describeConfigSnapshot()`, even if
+  malformed.
+- **Scoring Profile:** references the one existing authoritative formula
+  (`docs/42_SCORING_AND_COMMERCIAL_FORMULA.md`) by id+version. No new commercial weights
+  were invented; no custom-weight editing exists.
+- **Assignment:** policy-only (no individual lead assignment at run-creation time, no new
+  CRM/salesperson model). `territory_based` is modelled but marked unavailable —
+  `sales_region`/`sales_territory`/`delivery_coverage` exist in schema (migration 0013)
+  but no rep-assignment table is wired to runs yet.
+- **Outputs:** P4-APP records requested output *types* only
+  (`canonical_audit`/`representative`/`sales_pro`/`cto`/`maps`); P4-EXPORTS continues to
+  own the actual SalesPro/CTO schemas and generators — none were touched.
+- **TEMP-PIPELINE promotion addendum (forward-looking only):** `config_snapshot`'s
+  Exclusions stage carries `commercialRuleProfile` / `brandGroupDecisionProfile` /
+  `customerSuppressionProfile` fields, typed as `{ id, version } | null`, always `null` in
+  this vertical slice. This lets a future controlled TEMP-PIPELINE → permanent promotion
+  pass (the next P4 milestone) reference versioned profiles without another schema
+  redesign. The app does not import or depend on `scripts/lead-production/**` or
+  `config/lead-production/**` anywhere, and this pass did not port or modify that
+  TEMP-PIPELINE implementation.
+- **Conflict/queue atomicity:** designed (advisory-transaction-lock + authoritative
+  re-check against the existing `query_unit` table, inside the same transaction as the
+  draft→queued status flip) but **not implemented** — a migration is required and was
+  deliberately held for explicit owner/P4 approval before being written or applied. Full
+  design and rationale in `docs/APP_RESUMPTION_AUDIT.md` §L. A simplistic UNIQUE
+  constraint on territory was explicitly ruled out (per control instruction) because it
+  cannot express the "identical overlap + active status, unless owner-overridden" rule.
+
+---
+
+## 2026-08-10 (same day, continued) — migration 0031 implemented + applied LOCAL ONLY; local Supabase test stack; national GB product cleanup
+
+P4 control approval, same day: local Supabase stack approved for browser/integration
+testing; conflict/queue migration approved with mandatory amendments (row lock,
+server-verified owner/admin override, defined conflict-blocking statuses, 64-bit advisory
+lock, proven query_unit canonicalisation coverage); national TW/UB1/pilot cleanup made
+mandatory (owner override of the earlier "out of scope" classification).
+
+- **Test-safety guard**: `scripts/lib/local-only-guard.ts` — `assertLocalSupabaseTarget()`
+  fails closed unless `NEXT_PUBLIC_SUPABASE_URL` resolves to a recognised local host
+  (localhost/127.0.0.1/0.0.0.0/::1/the local CLI's `kong` service/*.local). No bypass flag
+  exists by design. Applied to every P4 mutating/live test entry point: `test-create-new-
+  run.ts`, `test-create-new-run-playwright.ts`, `test-route-protection-playwright.ts`,
+  `test-auth-bootstrap-playwright.ts`, `test-owner-bootstrap-idempotency.ts`, `test-
+  settings-playwright.ts`, `test-je-supabase.ts`, `test-geography-consolidation-fix.ts`,
+  `test-operational-candidates-query.ts`, plus the new `test-confirm-and-queue-run-
+  local.ts` and `seed-postcode-reference-local-synthetic.ts`. TEMP-PIPELINE tests
+  untouched, per instruction. **Incident that motivated this**: running
+  `test-create-new-run.ts` directly (outside its usual npm-run context) earlier the same
+  day executed its live-DB section for real against the hosted project (a service-role key
+  being present was mistakenly sufficient), leaving an orphaned `discovery_runs` row —
+  found and removed; the guard exists so this class of mistake fails immediately instead.
+- **Local Supabase stack**: `supabase init` + `supabase start`, ports shifted +100
+  (54421-54429) to avoid colliding with another already-running local project on this
+  host (`aspect-service-intelligence-local`). `auto_expose_new_tables = true` added —
+  none of the 30 migrations contain explicit GRANTs to service_role/anon/authenticated
+  (verified), so the hosted project's access relies entirely on the CLI's older
+  auto-expose default; a fresh local stack under the newer stricter default cannot reach
+  any table with service_role until this is set. `additional_redirect_urls` widened to
+  `http://localhost:3000/**` and `http://127.0.0.1:3000/**` — the CLI's default
+  `site_url` is `127.0.0.1`, but `next dev`/Playwright use `localhost`; without both,
+  `generateLink`'s `redirectTo` silently falls back to `site_url` instead of
+  `/auth/callback`, and sign-in tests appear to hang on `/login` with an unconsumed
+  token fragment. All local-only config; none of this touches the hosted project.
+  `.env.local-stack` (gitignored, worktree-only) holds the local stack's standard,
+  publicly-documented local demo keys — the real hosted `.env.local` is never read for
+  these keys when `.env.local-stack` is sourced first (explicit shell env vars take
+  precedence over `.env.local`'s values of the same name, in both Next.js and this
+  repo's script `loadDotEnv()`). `scripts/seed-postcode-reference-local-synthetic.ts`
+  seeds a minimal real-shaped `postcode_reference` fixture (UB/HA areas, UB1-9/HA0
+  districts, UB1 sectors) since the real national seed
+  (`npm run seed:postcode-reference`) reads a large gitignored external asset
+  (`public/map/postcode_labels.geojson`) not present in this worktree.
+- **Migration 0031 (`confirm_and_queue_run`)**: implemented with every mandatory
+  amendment — `SELECT ... FOR UPDATE` row lock on the target run first (serialises
+  duplicate-queue-request race and drives `CONFIRM_QUEUE_NOT_DRAFT`/
+  `CONFIRM_QUEUE_DUPLICATE_EXECUTION`), then a `pg_advisory_xact_lock` on a 64-bit
+  `hashtextextended(tenant_id || ':' || source)` key (not the narrower 32-bit
+  `hashtext`), then an authoritative re-check against the real `query_unit` table
+  (proven to represent every geography-selection kind this app's Run Builder can
+  currently produce — see `scripts/test-geography-standard.ts`'s "CROSS-PLAN overlap"
+  assertions and this migration's own header comment), then server-verified owner/admin
+  override validation (re-derives the actor's role from `tenant_members` — a client-
+  supplied `acknowledged: true` boolean is never itself treated as authorisation; the
+  hosted project's `discovery_runs_update` RLS policy already lets an authenticated user
+  PATCH `target_filters` directly, so this cannot be skipped), then the atomic
+  draft→queued transition. **Conflict-blocking statuses are deliberately narrower than
+  the existing client-side check**: `queued`/`running`/`cancelling` only — `draft` is
+  excluded (two drafts coexisting is harmless; only the transition to `queued` needs
+  serialising against already-committed state), unlike `/api/discovery/runs/conflicts`'s
+  `{draft, queued, running}` warning set. This divergence is deliberate and documented in
+  the migration itself, not an oversight. Applied and integration-tested **only** against
+  the local stack (`supabase db reset`, from-clean-DB proof re-run at the end of this
+  session) — **never applied to the hosted project**.
+- **`config_snapshot.review.ownerOverride`** gained `authorisedActorId`/`approvedBy`/
+  `approvedAt` — null until the migration itself stamps them post-validation; the user's
+  own `acknowledged`/`note`/`at` fields are recorded separately as claimed intent, never
+  conflated with server-verified proof. `SessionTenant` (auth) gained `email`.
+- **National GB product cleanup** (owner override of the earlier scope classification):
+  `/api/discovery/import` no longer defaults `anchorOutcodes` to `["UB1"]` — it is now
+  required (400 if missing), and the Import screen (`ImportPanel.tsx`) gained the
+  postcode-district input field it was previously missing entirely (every real import
+  was silently validated against UB1 before this). `/discovery-results` no longer
+  defaults to `UB1` when no `?outcode=` is given — shows a neutral "choose a district"
+  prompt instead. `/discovery-runs`, `/audit`, `/data-quality-exceptions` empty-state
+  hints genericised (`"<postcode district>"` instead of a literal `"UB1"`). `/run-setup`
+  (TW-hardcoded legacy screen) now redirects to `/pipeline-runs/new`, matching the
+  existing `/run-builder` stub pattern. Main nav (`NAV_ITEMS`): "Coverage Map" now
+  points at `/national-map` (the genuinely GB-wide map, previously unlinked from nav
+  despite being the actual national equivalent) instead of the TW-specific
+  `/coverage-map`; "Export Review" removed from nav entirely (no national equivalent
+  exists yet) — both routes' code is untouched, just unlinked, so they fail safely
+  until a national successor replaces them. `mock-data.ts`'s `territories` export (the
+  only mock export actually rendered by a reachable screen, `/territories`) genericised
+  away from West-London/UB1 examples to GB-spread ones; its other exports (TW/UB1-
+  flavoured) are dead code, not currently imported by anything. Run Builder placeholder
+  text (`"e.g. TW independents"`, `"RUN-TW-001"`, the territory textarea's `"TW..."`
+  example, the anchor label's `"Southall Town Hall"` example) genericised. `MapEngine.tsx`
+  + `west-london-map.data.ts` + `MockMapPanel.tsx` confirmed fully unreachable dead code
+  (nothing imports them) — left untouched, not deleted. `RunTerritory.mode`'s `"pilot"`
+  value and the wizard's "Pilot" territory-mode label are **not** a defect — verified by
+  grep that `"pilot"` is never branched on anywhere in the planner/geography code; it
+  carries zero geographic payload, a free-choice classification tag usable for any GB
+  territory. `src/lib/pipeline/*` (the legacy TW/FSA file-based pipeline library) is left
+  untouched — still genuinely used by `/telesales`, `/leads`, `/api/run-state` (reachable,
+  nav-linked) but is itself architecturally generic (reads whatever the local run-state
+  file contains, no hardcoded territory in the code); `/coverage-map`, `/export-review`,
+  `/api/tw-map-data` are TW-specific by design (a real, working, separate feature, not
+  pilot debris) and are now unlinked from nav rather than redesigned, per explicit
+  instruction not to undertake a redesign to preserve them.
+
+---
+
+## 2026-08-10 (same day, correction) — TERRITORY OVERLAP IS PERMITTED, not blocked
+
+Owner clarification, same day, superseding this migration's original design: **AspectLead
+must allow the same geography to be searched multiple times.** Overlap between runs — Area
+vs contained District/Sector/Unit, District vs contained Sector/Unit, or an exact
+territorial repeat in a separate run — is expected and legitimate (the future Coverage Map
+architecture depends on this history: how many times a geography has been searched, last
+search date, run history, candidate yield). It must be **detected and disclosed**, never
+prohibited. This directly reverses the 2026-08-10 "migration 0031 implemented" decision's
+"identical overlap among active runs blocks unless owner/admin-authorised" rule.
+
+- **Migration 0031 rewritten** (still local-only, unapplied to the hosted project): the
+  "identical overlap blocks" check and its owner/admin role verification are removed
+  entirely. The function now only rejects on (a) run-state/eligibility problems, and (b) a
+  missing **overlap acknowledgement** when the run shares query units with a currently
+  ACTIVE (queued/running/cancelling) run — historical (completed/failed/cancelled) overlap
+  is informational only, never gated. The acknowledgement check has **no role
+  requirement** — any authenticated actor may acknowledge, because proceeding with an
+  overlapping search is not a restricted action; only disclosure evidence
+  (`acknowledgedBy`/`acknowledgedByEmail`/`acknowledgedAt`/`overlappingRunIds`) is stamped
+  server-side.
+- **Advisory lock removed.** It existed solely to serialise the now-deleted "identical
+  overlap blocks" check across different runs. With overlap no longer prohibited, two
+  different runs queueing concurrently on the same territory is the *intended* outcome, not
+  a race to prevent — nothing left needs cross-run serialisation. Duplicate-EXECUTION
+  protection for the *same* run+source remains fully covered by the existing row lock
+  (`SELECT ... FOR UPDATE` on the target run) plus an explicit active-execution check.
+  Reasoning recorded in the migration's own header comment, per instruction to explain the
+  locking change.
+- **`config_snapshot.review.ownerOverride` renamed to `overlapAcknowledgement`**
+  throughout (type, wizard state, API payload, run-detail evidence card) — "override"
+  falsely implied a restricted action being bypassed; this is disclosure evidence, not
+  authorisation. `migrateDraft()` folds forward any already-created `ownerOverride`-shaped
+  draft/snapshot losslessly.
+- **`/api/discovery/runs/conflicts`** (route path kept for compatibility) rewritten as a
+  disclosure endpoint: per-overlap run id/name/owner/source mode/status/territory/
+  overlapping units/exact-vs-partial/created date/estimated additional cost, plus a
+  `materialOverlap` flag (any overlap with an ACTIVE run) that drives the UI's
+  acknowledgement requirement — replaces the old binary `identicalActiveConflict` block.
+- **Review step UI** reframed: a "Territory overlap" disclosure table (always shown when
+  any overlap exists, active or historical) + an acknowledgement checkbox that only
+  appears (and only gates Confirm) when overlap is material.
+- **Local integration tests rewritten** (`scripts/test-confirm-and-queue-run-local.ts`) —
+  all P4-specified cases proven against real local Postgres: Area-vs-District (allow after
+  ack), exact repeat in two runs (allow after ack), repeat against a historical completed
+  run (allow, no ack needed), District-vs-Sector and District-vs-Unit canonicalisation
+  (allow after ack), genuinely non-overlapping (allow, no ack), same run/source queued
+  twice concurrently (exactly one execution), same run/source already running (duplicate
+  rejected), overlapping paid-source run (still blocked — no paid source is authorised at
+  all yet, regardless of overlap). Full local browser proof re-run: both an original run
+  and a deliberately overlapping second run reach `status='queued'` in the same session,
+  with server-stamped acknowledgement evidence naming the overlapped run.

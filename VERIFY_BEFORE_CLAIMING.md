@@ -705,3 +705,39 @@ cap, Notes rewrite, Lead Urgency recalibration, cross-representative combined Ma
   (brand/is-brand, offer_percent, is_sponsored, opening_times array, offline_reason,
   delivery_zipcode) — recorded honestly as permanent gaps in the field catalogue's unavailable
   list, never fabricated. Full detail: `docs/11_ISSUES_LOG.md` ISS-0035.
+
+## 2026-08-10 — P4-APP Main Runs / Run Builder vertical slice (branch `feature/p4-app-runs-builder`)
+
+- Claim: "The nine-stage Run Builder, DB-backed Main Runs screen, and canonical run
+  detail/status compile cleanly, do not break existing tests, and are code-complete for
+  this vertical slice — except the conflict/queue atomicity fix, which is design-only, and
+  local browser proof, which was not attempted."
+- Verification commands run: `npm run typecheck` (clean); `npm run build` (clean, all 39
+  routes compiled including new `/pipeline-runs/[id]` and `/pipeline-runs/legacy-monitor`);
+  `npm run test:run-draft`, `test:custom-config`, `test:discovery-run-recovery`,
+  `test:multi-source`, `test:geography-standard`, `test:geography-gate`, `test:uber-parse`,
+  `test:uber-import`, `test:je-enriched-adapter`, `test:je-stage1` — all 10 individually
+  re-run, ALL PASSED (pure unit/fixture, no network/DB — unaffected by this change, confirms
+  no regression in shared modules).
+- NOT run: any live/service-role/Playwright suite (`test-create-new-run.ts`'s live section,
+  `test-create-new-run-playwright.ts`, `test-route-protection-playwright.ts`,
+  `test-auth-bootstrap-playwright.ts`, `test-owner-bootstrap-idempotency.ts`,
+  `test-settings-playwright.ts`) — the configured Supabase environment's non-production
+  status was not proven, so per instruction these were skipped rather than risked against
+  what may be the one real project. `scripts/test-create-new-run-playwright.ts` still
+  encodes the OLD 6-step wizard (hardcoded step count/selectors) and will fail against the
+  new 9-step flow until updated — known, not fixed, this pass.
+- NOT attempted: local browser proof (desktop/mobile walkthrough of the full run-builder
+  journey). A passing build is explicitly not being claimed as equivalent to browser-tested.
+- Remaining risk: the conflict/queue draft→queued atomicity race (two runs could both pass
+  a stale client-side conflict check and both queue on overlapping territory) is designed
+  but **not implemented** — no migration was written or applied; see
+  `docs/APP_RESUMPTION_AUDIT.md` §L for the full design pending approval. 6 pre-existing
+  high-severity npm vulnerabilities remain unremediated (recorded, not touched).
+- Files: `src/lib/discovery/run-draft.ts`, `src/app/pipeline-runs/new/page.tsx`,
+  `src/app/pipeline-runs/page.tsx`, `src/app/pipeline-runs/[id]/page.tsx` (new),
+  `src/app/pipeline-runs/[id]/CancelExecutionButton.tsx` (new),
+  `src/app/pipeline-runs/legacy-monitor/page.tsx` (new),
+  `src/components/pipeline/LegacyPipelineMonitor.tsx` (new),
+  `src/lib/discovery-engine/reports/run-detail.ts`. Not committed yet — awaiting ChatGPT P4
+  control review.

@@ -77,3 +77,31 @@ branches — do not confuse a commit SHA with a branch name anywhere in this doc
    contains every commit `main` has, plus 92 more).
 
 No branch was created, merged, or deleted producing this audit.
+
+## Update 2026-08-10 — `feature/p4-app-runs-builder` (P4-APP vertical slice)
+
+A dedicated branch was created off `feature/mvp-vertical-slice-001` to isolate the P4-APP
+Main Runs / Run Builder vertical slice from the TEMP-PIPELINE campaign work that continued
+accumulating on `feature/mvp-vertical-slice-001` after the fork point (Kunz, Meer, Naseh,
+Nauman, Manraj, Ayesha, Alam, Saad, Saif, Shahzaib, Tahira, Wajahat, Hassan, Haleema — none
+of that is P4-APP scope). This split was not recorded anywhere in-repo before this entry —
+context for *why* lived only in an external ChatGPT "P4 control" conversation, not in the
+codebase. This entry is the authoritative in-repo record going forward.
+
+- **Branch:** `feature/p4-app-runs-builder`
+- **Base commit:** `0858bd92ae51ed605f885eed6d4785950f9bfb27` (tip of
+  `feature/mvp-vertical-slice-001` at fork time — "feat: apply owner chain/brand commercial
+  decisions")
+- **Scope:** Main Runs (`/pipeline-runs`) + Create New Run / Run Builder (nine explicit
+  stages) + persisted run detail/status (`/pipeline-runs/[id]`) — one vertical slice only.
+- **Explicit exclusions (must remain untouched on this branch):**
+  `scripts/lead-production/**`, `scripts/test-lead-production-*`,
+  `config/lead-production/**`, TEMP campaign outputs, CTO/SalesPro field mappings and
+  export schemas (P4-EXPORTS scope), external lead-production data
+  (`~/Data/aspectlead-lead-production/`, outside git), and the independent
+  `geospatial-platform` repository. The legacy TW/FSA file-based pipeline monitor
+  (`src/lib/pipeline/*`, formerly the primary `/pipeline-runs` UI) is preserved unmodified
+  at `/pipeline-runs/legacy-monitor` — relocated, not rewritten.
+- **Full audit + control decisions:** `docs/APP_RESUMPTION_AUDIT.md`.
+- No merge to `main` or to `feature/mvp-vertical-slice-001` has occurred as part of this
+  work; nothing on this branch has been pushed unless explicitly instructed.

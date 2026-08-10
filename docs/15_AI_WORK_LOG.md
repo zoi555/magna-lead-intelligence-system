@@ -1591,3 +1591,148 @@ was rewritten, no district was rerun, no provider call was made — this was a r
 
 **Verification:** re-ran all 45 `test:lead-production-*`/`test:je-*` suites, typecheck, and build
 after the doc corrections (no production code changed, only documentation) — all clean.
+
+## 2026-08-10 — P4-APP Main Runs / Run Builder vertical slice, branch `feature/p4-app-runs-builder`
+
+Dedicated P4-APP session on a new branch cut from `feature/mvp-vertical-slice-001` at
+`0858bd92ae51ed605f885eed6d4785950f9bfb27`, to isolate app work from ongoing TEMP-PIPELINE
+campaign work. First pass: read-only `APP_RESUMPTION_AUDIT` (repo state, routes, schema,
+tests — verified against current code/migrations, not prior documentation claims),
+presented in-conversation and accepted by P4 control review with architecture amendments.
+Implemented in this session, per those amendments:
+
+- `src/lib/discovery/run-draft.ts`: `config_snapshot` schema v3 — a single typed `RunDraft`
+  covering all nine governing Run Builder stages (Identity, Source Mode, Geography,
+  Limits/Cost, Exclusions, Scoring Profile, Assignment, Outputs, Review). `migrateDraft()`
+  upgrades v1/v2 losslessly; `describeConfigSnapshot()` renders any snapshot version
+  tolerantly for run-detail screens.
+- `src/app/pipeline-runs/new/page.tsx`: wizard refactored from 6 ad-hoc steps to the 9
+  governing stages. Source Mode represents both product modes honestly (Just Eat
+  AVAILABLE; Uber Eats/Deliveroo NOT YET PRODUCTION APPROVED, never enabled). Limits/Cost
+  shows a real per-source volume/cost/readiness/approval table. Scoring Profile references
+  the existing `docs/42_SCORING_AND_COMMERCIAL_FORMULA.md` formula — no new weights
+  invented. Assignment is policy-only (no new CRM model). Outputs records requested types
+  only, honestly marked ready/blocked; CTO/Sales Pro explicitly deferred to P4-EXPORTS.
+- `src/app/pipeline-runs/page.tsx`: now the DB-backed Main Runs screen (was a mixed
+  legacy/DB page) — reads `discovery_runs` via a new `fetchMainRunsOverview()` added to
+  the existing `src/lib/discovery-engine/reports/run-detail.ts` reporting module.
+- `src/app/pipeline-runs/[id]/page.tsx` + `CancelExecutionButton.tsx`: canonical run
+  detail/status, reusing `fetchRunDetail`/`RunResultsMap` from `/discovery-runs/[id]`
+  rather than forking them; adds saved-snapshot display, conflict/override evidence, and a
+  cooperative-cancellation control on the existing cancel endpoint.
+- `src/components/pipeline/LegacyPipelineMonitor.tsx` +
+  `src/app/pipeline-runs/legacy-monitor/page.tsx`: the local TW/FSA file-based pipeline
+  monitor relocated **unmodified** off the primary `/pipeline-runs` URL — not deleted, not
+  rewritten, not touched beyond the move.
+- **Not implemented, by design**: the conflict/queue draft→queued atomicity fix. Race
+  analysed (client-side conflict check is stale by the time `confirm_and_start` actually
+  transitions a run to `queued`); a `SECURITY DEFINER` Postgres function using an
+  advisory transaction lock + an authoritative re-check against the existing `query_unit`
+  table was designed (not a UNIQUE constraint — explicitly ruled out, cannot express the
+  override-bypass rule) and reported for approval in `docs/APP_RESUMPTION_AUDIT.md` §L.
+  **No migration file was written or applied.**
+- **Not attempted**: local browser proof. Only one Supabase project appears to exist for
+  this app and its non-production status could not be verified without risk; per
+  instruction, live/browser testing against an unproven environment was skipped rather
+  than claimed on the strength of a passing build alone.
+
+**Verification:** `npm run typecheck` clean; `npm run build` clean (all routes compile,
+including the two new `/pipeline-runs/[id]` and `/pipeline-runs/legacy-monitor`); all 10
+relevant deterministic/unit test suites (`test:run-draft`, `test:custom-config`,
+`test:discovery-run-recovery`, `test:multi-source`, `test:geography-standard`,
+`test:geography-gate`, `test:uber-parse`, `test:uber-import`, `test:je-enriched-adapter`,
+`test:je-stage1`) pass unchanged. Live/Playwright suites gated behind service credentials
+were **not** run this session. `scripts/test-create-new-run-playwright.ts` still encodes
+the old 6-step wizard and needs updating before it will pass against the new 9-step flow —
+flagged, not fixed, in this pass. 6 pre-existing high-severity npm vulnerabilities remain
+unremediated, recorded as a risk, not touched (`npm audit fix` deliberately not run). No
+commit, push, merge or deploy performed — stopped for ChatGPT P4 control review per
+instruction. Full detail: `docs/APP_RESUMPTION_AUDIT.md`, `docs/09_DECISIONS.md`
+(2026-08-10 entry), `docs/BRANCH_REGISTER.md` (2026-08-10 entry).
+
+## 2026-08-10 (same day, continued) — local Supabase stack, migration 0031 implemented + browser-proven locally, national GB product cleanup
+
+Second P4 control round, same day/session. Full detail in `docs/09_DECISIONS.md`'s
+"migration 0031 implemented + applied LOCAL ONLY" entry — summary here:
+
+- Built `scripts/lib/local-only-guard.ts` (fails closed unless the Supabase target is
+  demonstrably local; no bypass flag) and applied it to every P4 mutating/live test entry
+  point, after an incident where running `test-create-new-run.ts` directly executed its
+  live section against the hosted project and left an orphaned row (found and removed).
+- Stood up a genuinely isolated local Supabase stack (`supabase init`/`start`, ports
+  shifted to avoid an unrelated already-running local project, `auto_expose_new_tables`
+  and `additional_redirect_urls` fixed for CLI-default/local-dev host mismatches), a
+  worktree-only `.env.local-stack` (gitignored) that never touches the hosted
+  `.env.local`, and a synthetic local `postcode_reference` seed.
+- Implemented `supabase/migrations/0031_confirm_and_queue_run.sql` with every mandatory
+  amendment from the P4 review: row lock, 64-bit advisory lock, authoritative
+  `query_unit`-based conflict re-check (canonicalisation coverage proven in
+  `test-geography-standard.ts`), server-verified owner/admin override (never trusts a
+  client-supplied acknowledgement), defined and documented conflict-blocking statuses.
+  Wired through `DiscoveryRepository.confirmAndQueueRun()` (Supabase + in-memory
+  implementations), `run-service.ts`, and the queue API route (now maps structured RPC
+  errors to 404/403/409/400). Applied and integration-tested **only** against the local
+  stack — `scripts/test-confirm-and-queue-run-local.ts` (new), all scenarios pass
+  against real Postgres including genuine concurrent-call races via `Promise.all`.
+  **Never applied to the hosted project.**
+- Full 9-stage Create New Run journey browser-proven against the local stack with a real
+  bootstrapped owner account: `test-auth-bootstrap-playwright.ts`,
+  `test-route-protection-playwright.ts` (all 15 protected routes), and the updated
+  `test-create-new-run-playwright.ts` (draft save/reopen/back-forward/refresh, real
+  conflict warning, real override control, authorised queue via the new migration,
+  immutable queued state, canonical `/pipeline-runs/[id]`, Main Runs listing, mobile
+  viewport) — all pass, screenshots in `.playwright-proof/create-new-run/` (gitignored).
+  One real test bug found and fixed along the way: the "second draft" conflict-check step
+  was silently recovering the first draft from localStorage (same `savedRunId`), which
+  self-excluded it from the conflict comparison — not an app defect.
+- National GB product cleanup (owner-mandated, overriding the earlier "out of scope"
+  read): removed the `/api/discovery/import` `UB1` default (now required, with a UI field
+  added since none existed), the `/discovery-results` `UB1` default (neutral prompt
+  instead), genericised empty-state hints and Run Builder placeholder text, redirected
+  `/run-setup` to the real Run Builder, repointed the "Coverage Map" nav item at the
+  actual national map and removed "Export Review" from nav (routes untouched, just
+  unlinked), and genericised the one mock-data example actually rendered by a reachable
+  screen (`/territories`). Confirmed `MapEngine.tsx`/`west-london-map.data.ts`/
+  `MockMapPanel.tsx` are fully unreachable dead code (left untouched). Final grep audit:
+  zero category-C (product-visible defect) occurrences remain — see the corrected
+  implementation report for the full classification table.
+- Verification: `npm run typecheck`/`build` clean; all 10 deterministic/unit suites pass;
+  the new local migration integration suite passes against a freshly-reset local DB
+  (clean-DB proof); the full local Playwright suite passes. No commit, push, merge,
+  deploy, or hosted-project write. Stopped for ChatGPT P4 control review.
+
+## 2026-08-10 (same day, correction round) — territory overlap corrected to PERMITTED, not blocked
+
+Third P4 control round, same day/session: owner clarification that AspectLead must allow
+the same geography to be searched multiple times — overlap is detected/disclosed, never
+prohibited. Full detail in `docs/09_DECISIONS.md`'s "TERRITORY OVERLAP IS PERMITTED" entry
+— summary here:
+
+- Rewrote `supabase/migrations/0031_confirm_and_queue_run.sql`: removed the
+  identical-overlap-blocks-unless-owner/admin-authorised logic and the advisory lock
+  (explained why it's no longer needed in the migration header); kept the row lock +
+  duplicate-active-execution guard; added an overlap-acknowledgement-required check
+  (material = shares query units with an ACTIVE run) with no role restriction, stamping
+  server-side disclosure evidence only.
+- Renamed `config_snapshot.review.ownerOverride` → `overlapAcknowledgement` throughout
+  (`run-draft.ts`, wizard, API payload, run-detail evidence card) — "override" falsely
+  implied a restricted action; `migrateDraft()` folds forward old-shaped snapshots
+  losslessly.
+- Rewrote `/api/discovery/runs/conflicts` as a rich overlap-disclosure endpoint (run
+  id/name/owner/source/status/territory/units/exact-vs-partial/created date/estimated
+  cost, plus a `materialOverlap` flag) and the Review step UI (disclosure table always
+  shown, acknowledgement checkbox only when material).
+- Rewrote `scripts/test-confirm-and-queue-run-local.ts` for all 9 P4-specified cases
+  (Area-vs-District, exact repeat×2, repeat vs historical completed run, District-vs-
+  Sector, District-vs-Unit, non-overlapping, same-run-concurrent, same-run-already-
+  running, overlapping paid source) — all pass against real local Postgres, clean-DB
+  proof re-run.
+- Re-ran the full local browser proof (`test-create-new-run-playwright.ts`, restructured
+  so the overlap check happens against a genuinely ACTIVE run): both the original run and
+  a deliberately overlapping second run reach `status='queued'` in the same session, with
+  server-stamped acknowledgement evidence naming the overlapped run — screenshot evidence
+  in `.playwright-proof/create-new-run/21-overlap-acknowledged.png`.
+- Verification: `npm run typecheck`/`build` clean; all 10 deterministic/unit suites pass;
+  local migration integration suite passes on a freshly-reset DB; full local Playwright
+  suite (auth bootstrap, route protection, create-new-run) passes. No commit, push,
+  merge, deploy, or hosted-project write. Stopped for ChatGPT P4 control review.
