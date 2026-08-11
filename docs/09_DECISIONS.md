@@ -1908,3 +1908,27 @@ from candidate_codes;
 **Migration 0031 (with this backfill) was NOT applied to hosted Supabase as part of this
 review** — local verification only (`supabase db reset` + `test:confirm-and-queue-run-local`
 §12). Hosted application remains a separate, explicitly-authorised step.
+
+### 2026-08-11 — Migration 0031 applied to hosted Supabase (explicit P4 control approval)
+
+Applied under a separate, explicit P4 control authorisation naming the exact approved
+branch head (`55f80d531824d62e6e175ca014662589635058a2`) and project
+(`aspectlead-platform`, `rubhjkgygauuixiqouza`). Preceded by a mandatory pre-migration
+logical backup (`roles.sql`/`schema.sql`/`data.sql`, SHA-256-verified, stored outside the
+repo — see `docs/15_AI_WORK_LOG.md` for the path and full evidence-file location; the
+backup directory itself is never committed). Applied via
+`mcp__claude_ai_Supabase__apply_migration` (a scoped, named migration application — not
+`supabase db push`, not a database reset, not `supabase link`).
+
+Result: `query_unit` 1 → 231 rows (230 inserted by `backfill_legacy_just_eat_query_units`,
+exactly matching the read-only pre-flight prediction); `discovery_runs`/`je_executions`
+counts and status distributions unchanged; 0 duplicate `(run_id,source,code)` rows; 0 Uber
+Eats rows inserted; both new functions confirmed `SECURITY DEFINER` with `EXECUTE`
+restricted to `service_role` only; a second backfill invocation inserted 0 rows
+(idempotency confirmed); zero new security-advisor findings attributable to this
+migration. Full before/after evidence recorded outside the repo alongside the backup (see
+work log).
+
+The feature branch was **not** merged, the application was **not** deployed, no Vercel
+alias was changed, and no discovery job was run as part of this step — this authorisation
+covered the database migration only.

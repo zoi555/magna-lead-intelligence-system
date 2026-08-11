@@ -1736,3 +1736,44 @@ prohibited. Full detail in `docs/09_DECISIONS.md`'s "TERRITORY OVERLAP IS PERMIT
   local migration integration suite passes on a freshly-reset DB; full local Playwright
   suite (auth bootstrap, route protection, create-new-run) passes. No commit, push,
   merge, deploy, or hosted-project write. Stopped for ChatGPT P4 control review.
+
+## 2026-08-10/11 — P4 independent review: audit-safe confirmation + overlap disclosure, hosted production pre-flight
+
+- Fixed two audit-safety gaps ChatGPT P4's independent review found: `confirmedAtIso` is
+  now stamped server-side only, inside `confirm_and_queue_run`'s own transaction (caught
+  and fixed a related latent bug — `jsonb_set` silently no-ops on a missing intermediate
+  `review` key, reachable via `scripts/je-run.ts`); overlap acknowledgement now records
+  `disclosedOverlapRunIds` and the RPC rejects `CONFIRM_QUEUE_STALE_OVERLAP_DISCLOSURE`
+  if the disclosed and recomputed active-overlap sets differ. Switched
+  `/api/discovery/runs/conflicts` to read the canonical `query_unit` table (same source
+  the RPC reads) instead of `derived_query_units`, and fixed PATCH never refreshing
+  `query_unit` after a territory edit. Corrected "Full UK" → "Full Great Britain" in the
+  Run Builder. Full detail: `docs/09_DECISIONS.md` (2026-08-11 entry). Committed
+  `1fa8157`, pushed.
+- Read-only inspection of the hosted `aspectlead-platform` project found 217 historical
+  Just Eat runs but only 1 `query_unit` row — applying 0031 as-is would have made 216 of
+  them invisible to overlap disclosure. Added `backfill_legacy_just_eat_query_units()` —
+  idempotent, INSERT-only, Just-Eat-only (Uber Eats explicitly excluded, documented) — to
+  migration 0031 itself (never yet applied to hosted). Extended
+  `test-confirm-and-queue-run-local.ts` §12 to model the real hosted condition end-to-end
+  (all 8 required cases pass; all 34 total local integration cases green). Committed
+  `55f80d5`, pushed. Migration NOT yet applied to hosted at this point — local
+  verification only.
+- **Hosted migration 0031 applied 2026-08-11 06:37 UTC**, under explicit P4 control
+  approval, after a mandatory pre-migration logical backup (`roles.sql`/`schema.sql`/
+  `data.sql` via `supabase db dump --db-url`, SHA-256-verified, stored outside the repo at
+  `~/Backups/aspectlead-platform/pre-migration-0031-20260811-063238/`, direct DB password
+  supplied via an env var already present in the environment — never printed, echoed, or
+  logged). Applied via `apply_migration` (scoped, named — not a broad `db push`, no
+  reset). Pre- and post-migration read-only snapshots matched the approved pre-flight
+  exactly: `query_unit` 1→231 (230 inserted, matching the predicted count exactly),
+  `discovery_runs`/`je_executions` counts and status distributions unchanged, 0
+  duplicate `(run_id,source,code)` rows, 0 Uber Eats rows inserted. Confirmed
+  `confirm_and_queue_run`/`backfill_legacy_just_eat_query_units` both exist,
+  `SECURITY DEFINER`, executable only by `service_role` (not `anon`/`authenticated`/
+  `public`). Second backfill invocation inserted 0 rows (idempotency confirmed).
+  `get_advisors(security)` showed zero new findings attributable to 0031 (all 6 WARNs are
+  pre-existing, unrelated functions/settings). Full evidence in the same backup
+  directory's `pre-migration-evidence.md`. No merge, no deploy, no Vercel alias change, no
+  discovery job run, no hosted data altered beyond the approved backfill. Feature branch
+  remains unmerged; backup preserved pending migration/merge/deploy/browser verification.
