@@ -65,6 +65,16 @@ export interface DiscoveryRepository {
    *  specifically. actorUserId must come from an already-verified session
    *  (requireSessionAndRole()), never from client-supplied JSON. */
   confirmAndQueueRun(runId: string, actorUserId: string, source?: string): Promise<ExecutionRecord>;
+  /** Canonical query_unit codes for a run+source — the SAME canonical source
+   *  confirm_and_queue_run and /api/discovery/runs/conflicts read to detect overlap.
+   *  Used to restore the overlap-check input when a persisted draft is reopened, without
+   *  requiring the user to revisit Geography and re-click "Preview geography" (P4 control
+   *  correction, 2026-08-12 — reopened-draft overlap-disclosure gap: resolvedUnits was
+   *  browser-only state, never restored from a persisted draft, so Review could show a
+   *  false "nothing to disclose" until Geography was revisited). Never falls back to
+   *  discovery_runs.derived_query_units when canonical rows exist — see persistQueryUnits'
+   *  own header comment for why those two can disagree after an edit. */
+  getQueryUnitsForRun(runId: string, source?: string): Promise<string[]>;
   createExecution(runId: string, tenantId: string, plannedQueries: number): Promise<ExecutionRecord>;
   setExecutionPlan(id: string, plannedQueries: number): Promise<void>;
   getExecution(id: string): Promise<ExecutionRecord | null>;

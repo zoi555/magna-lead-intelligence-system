@@ -115,6 +115,11 @@ export interface RunStatusView {
   run: RunRecord;
   executions: ExecutionRecord[];
   quality: Awaited<ReturnType<DiscoveryRepository["getQualityReport"]>> | null;
+  /** Canonical query_unit codes for this run's own selected source (or 'just_eat' by
+   *  default) — lets a reopened draft restore its overlap-check input from the persisted,
+   *  authoritative table instead of requiring the user to revisit Geography and re-preview
+   *  (P4 control correction, 2026-08-12). */
+  queryUnits: string[];
 }
 
 export async function getRunStatus(repo: DiscoveryRepository, runId: string): Promise<RunStatusView | null> {
@@ -123,5 +128,8 @@ export async function getRunStatus(repo: DiscoveryRepository, runId: string): Pr
   const executions = await repo.listExecutionsForRun(runId);
   const latest = executions[executions.length - 1];
   const quality = latest ? await repo.getQualityReport(latest.id) : null;
-  return { run, executions, quality };
+  const sc = (run.source_config as Record<string, unknown> | undefined) ?? {};
+  const source = typeof sc.source === "string" ? sc.source : "just_eat";
+  const queryUnits = await repo.getQueryUnitsForRun(runId, source);
+  return { run, executions, quality, queryUnits };
 }

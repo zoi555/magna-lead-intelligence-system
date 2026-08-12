@@ -81,7 +81,13 @@ function NewRunPageInner() {
     createdAt: string; estimatedAdditionalCostGbp: number | null;
   }
   const [overlapResult, setOverlapResult] = React.useState<{ overlaps: OverlapEntry[]; materialOverlap: boolean } | null>(null);
-  const [checkingOverlap, setCheckingOverlap] = React.useState(false);
+  // Explicit overlap-check state — deliberately distinct from "materialOverlap": that flag
+  // only means anything once overlapCheckStatus === "ok". "unavailable" (no canonical/
+  // resolved query units to check yet) and "error" (the lookup itself failed) must NEVER be
+  // conflated with a genuine "zero overlapping runs" result (P4 control correction,
+  // 2026-08-12 — the reopened-draft bug was exactly this conflation: an empty resolvedUnits
+  // array was silently read as "no prior run on this territory").
+  const [overlapCheckStatus, setOverlapCheckStatus] = React.useState<"checking" | "unavailable" | "error" | "ok">("unavailable");
   const [overlapNote, setOverlapNote] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -102,6 +108,17 @@ function NewRunPageInner() {
           if (!j.ok) { alert(`Could not load draft: ${j.error}`); setDraft(freshDraft()); return; }
           const run = j.run;
           if (run.status !== "draft") { alert(`This run is '${run.status}' — its configuration is frozen and cannot be reopened for editing.`); setDraft(freshDraft()); return; }
+
+          // Restore the overlap-check input from the CANONICAL query_unit table (not
+          // browser-only state) so a reopened draft can be disclosure-checked at Review
+          // without the user having to revisit Geography and re-click "Preview geography"
+          // (P4 control correction, 2026-08-12 — the reopened-draft overlap-disclosure gap:
+          // resolvedUnits used to start empty on every mount regardless of what was already
+          // persisted, so Review could show a false "nothing to disclose" for an active
+          // territory overlap until Geography was manually revisited). Only ever the
+          // authoritative persisted units — never invented, never derived_query_units when
+          // canonical rows exist (see getQueryUnitsForRun's own header comment).
+          if (Array.isArray(j.queryUnits) && j.queryUnits.length > 0) setResolvedUnits(j.queryUnits);
 
           // Preferred path: the full v3 (or older) config_snapshot, migrated forward — this is
           // the authoritative source once a run has been saved through this wizard at least once.
@@ -168,8 +185,11 @@ function NewRunPageInner() {
   }, [step, resolvedUnits.join(",")]);
 
   const refreshOverlaps = React.useCallback(async (excludeRunIdOverride?: string | null) => {
-    if (resolvedUnits.length === 0) { setOverlapResult(null); return; }
-    setCheckingOverlap(true);
+    // Canonical/resolved query units genuinely unavailable — a brand-new draft that hasn't
+    // previewed its geography yet, or a persisted run whose territory resolves to nothing.
+    // This is NOT "zero overlapping runs found" and must never be displayed as such.
+    if (resolvedUnits.length === 0) { setOverlapResult(null); setOverlapCheckStatus("unavailable"); return; }
+    setOverlapCheckStatus("checking");
     try {
       // excludeRunIdOverride lets a caller pass the just-saved run id explicitly instead of
       // relying on draft.savedRunId — React state updates are async, so calling this right
@@ -179,8 +199,10 @@ function NewRunPageInner() {
       const excludeRunId = excludeRunIdOverride !== undefined ? excludeRunIdOverride : (draft?.savedRunId ?? null);
       const r = await fetch("/api/discovery/runs/conflicts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ queryUnits: resolvedUnits, excludeRunId }) });
       const j = await r.json();
-      setOverlapResult(j.ok ? { overlaps: j.overlaps, materialOverlap: j.materialOverlap } : null);
-    } catch { setOverlapResult(null); } finally { setCheckingOverlap(false); }
+      if (!j.ok) { setOverlapResult(null); setOverlapCheckStatus("error"); return; }
+      setOverlapResult({ overlaps: j.overlaps, materialOverlap: j.materialOverlap });
+      setOverlapCheckStatus("ok");
+    } catch { setOverlapResult(null); setOverlapCheckStatus("error"); }
   }, [resolvedUnits.join(","), draft?.savedRunId]);
 
   React.useEffect(() => {
@@ -245,7 +267,16 @@ function NewRunPageInner() {
   // run), as evidence the user was warned, not as authorisation of a forbidden action.
   const materialOverlap = overlapResult?.materialOverlap ?? false;
   const acknowledgementRequired = materialOverlap && !draft.review.overlapAcknowledgement?.acknowledged;
-  const canConfirm = validation.ok && draft.sourceMode.selectedProviders.length > 0 && !acknowledgementRequired;
+  // Fail-closed overlap verification (P4 control correction, 2026-08-12): only Just Eat is
+  // queueable in this vertical slice, so only a run that has Just Eat selected needs a
+  // genuinely-completed overlap check before it can be confirmed — a manual-import-only run
+  // has no query units to check and its own flow is unaffected (per instruction, do not
+  // invent query units where none exist). "ok" is the ONLY status that counts as verified —
+  // "unavailable" (nothing resolved yet) and "error" (the lookup itself failed) must never
+  // silently permit confirmation, matching confirm_and_queue_run's own fail-closed design.
+  const overlapCheckRequired = draft.sourceMode.selectedProviders.includes("just_eat");
+  const overlapVerified = !overlapCheckRequired || overlapCheckStatus === "ok";
+  const canConfirm = validation.ok && draft.sourceMode.selectedProviders.length > 0 && !acknowledgementRequired && overlapVerified;
 
   function buildPayload() {
     const d = draft!;
@@ -675,7 +706,21 @@ function NewRunPageInner() {
             <>
               <Card title="Territory overlap — searching the same geography again is allowed">
                 <p className="text-[11px] text-gray-400 mb-2">AspectLead allows the same geography to be searched more than once. Overlap is detected and disclosed here, not blocked — acknowledgement is only required when this run overlaps another run that is currently active.</p>
-                {checkingOverlap ? <p className="text-sm text-gray-500">Checking…</p> : overlapResult && overlapResult.overlaps.length > 0 ? (
+                {overlapCheckStatus === "checking" ? <p className="text-sm text-gray-500">Checking…</p>
+                : overlapCheckStatus === "unavailable" ? (
+                  <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+                    Territory not yet resolved for this run — overlap has not been checked. Visit Geography and preview the territory, or click Refresh below.
+                    <div className="mt-1.5 flex gap-2">
+                      <button type="button" className="text-xs underline" onClick={() => setStep(STEP_GEOGRAPHY)}>Go to Geography</button>
+                      <button type="button" className="text-xs underline" onClick={() => refreshOverlaps()}>Refresh check</button>
+                    </div>
+                  </div>
+                ) : overlapCheckStatus === "error" ? (
+                  <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1.5">
+                    Could not verify territory overlap — the check itself failed, this is not "no overlap".
+                    <button type="button" className="ml-2 text-xs underline" onClick={() => refreshOverlaps()}>Retry check</button>
+                  </div>
+                ) : overlapResult && overlapResult.overlaps.length > 0 ? (
                   <div className="space-y-2">
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
@@ -745,6 +790,7 @@ function NewRunPageInner() {
                   </div>
                 )}
                 {acknowledgementRequired && <p className="text-xs text-red-600 mt-1">Confirm is blocked — acknowledge the territory overlap above to proceed. Overlap itself is permitted; the acknowledgement is required evidence that you saw it.</p>}
+                {overlapCheckRequired && !overlapVerified && overlapCheckStatus !== "checking" && <p className="text-xs text-red-600 mt-1">Confirm is blocked — territory overlap must be verified (see above) before this run can be queued.</p>}
               </Card>
             </>
           )}

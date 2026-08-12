@@ -113,6 +113,15 @@ export class MemoryRepository implements DiscoveryRepository {
     return this.createExecution(runId, run.tenant_id, run.derived_query_units?.length ?? 0);
   }
 
+  /** No separate query_unit store in this in-memory test double — approximate with
+   *  derived_query_units, the same approximation confirmAndQueueRun already uses here (see
+   *  its own header comment). The authoritative, real-canonical-table version is exercised
+   *  against the real Postgres stack. */
+  async getQueryUnitsForRun(runId: string, _source = "just_eat"): Promise<string[]> {
+    const run = this.runs.get(runId);
+    if (!run) return [];
+    return [...new Set((run.derived_query_units ?? []).map((u) => u.toUpperCase()))];
+  }
   async createExecution(runId: string, tenantId: string, plannedQueries: number): Promise<ExecutionRecord> {
     const rec: ExecutionRecord = {
       id: randomUUID(), tenant_id: tenantId, run_id: runId, source: "just_eat", status: "queued",
