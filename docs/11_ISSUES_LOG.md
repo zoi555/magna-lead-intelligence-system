@@ -1802,3 +1802,90 @@ Extend `apply-leakage-certificate-decisions.ts` to also correct the companion
 `<rep>-master-representative.xlsx` (same bucket-membership changes), or have it regenerate that
 file from the corrected combined workbook's buckets rather than leaving it as an untouched sibling
 of the file it does correct.
+
+## ISS-0042 — RESOLVED (2026-08-16) — field-sales batch (campaigns 017-020) certificate-FAIL: two real customer-match evidence gaps and one recall gap in `customer-match-materiality.ts`
+
+**Found during pre-flight/independent leakage verification for the next field-sales batch**
+(campaign-017 Ayesha EN4-EN9, campaign-018 Nauman, campaign-019 Alam, campaign-020 Manraj — none
+yet run live at the time of this fix). Two real leaked leads, root-caused individually against
+real candidate/customer data, not assumed:
+
+1. **"BRIM Burgers - Barnet" (candidate EN5-4550C39D, campaign-017) vs customer F373 ("Fast Food
+   Bros Trading Limited T/A Brim")** — postcode disagrees entirely (F373's registered billing
+   address is Hemel Hempstead; the candidate trades in Barnet) and the trading names have no
+   meaningful overlap. The only shared identifier is the website-verified email
+   (`info@brimburgers.com`), which `customer-match-materiality.ts` never checked at all — the
+   customer master's Email/Invoice Email Address columns were already loaded data, just never
+   compared. **Fixed**: new unconditional `exact_email` confirmed-tier route, mirroring the
+   existing `exact_phone` route (a shared, exact, hard-to-coincidentally-collide identifier).
+2. **"Rooster Chicken Purley" (candidate CR8-17C07635, campaign-020) vs customer R176 ("ROOSTER
+   POINT")** — trading names share only the generic word "rooster" (Jaccard similarity well below
+   even the moderate postcode+name floor); no phone/email identifier is shared either. The only
+   evidence is a component-level address match (same building number + street, "926 Brighton
+   Road") at an exact matching postcode — a route that did not exist at all before this fix.
+   **Fixed**: new `exact_address_same_postcode` confirmed-tier route, reusing
+   `address-components.ts` unchanged (already used by `verify-customer-leakage.ts` — not a new
+   parser), gated on exact full-postcode agreement (never merely same district) plus
+   `compatiblePremises && !premisesIdentifierConflict`, so it cannot fire on a coincidental
+   same-street-different-postcode-sector case.
+3. **Structural recall gap** — both new evidence routes were useless without a wider fix: every
+   customer-match check up to final-scoring only ever evaluates the ONE customer phase1's
+   name-similarity search happened to suspect (`priorMatchedCustomerId`). A customer whose trading
+   name bears no resemblance to the candidate's raw Just Eat listing name (case 2 above) is
+   invisible to that chain no matter how good its own evidence is — it is never even considered.
+   This is the same generic root cause the independent verifier (`verify-customer-leakage.ts`)
+   already closes by doing a fresh full-index scan against the FINAL enriched record; the
+   operational pipeline never did. **Fixed**: `run-final-scoring-stage-v2.ts` gained
+   `scanFullCustomerIndex`, run unconditionally against every customer at final-scoring time (the
+   first point where phone/email/address are all simultaneously available), using the same
+   `assessCustomerMatchMateriality` evidence rules; only the more material of the chain-suspected
+   result and the full-scan result is ever used, so an already-correct release/exclusion can never
+   become less material. Kept structurally separate from `verify-customer-leakage.ts`'s own
+   evaluator (deliberately — that script's header explains an independent release-gate check must
+   not share logic with the pipeline it audits).
+
+**Also closed in the same pass** (a documented, honestly-recorded matching-coverage gap from the
+2026-08-09 owner chain/brand review, `docs/09_DECISIONS.md`, found again while pre-flighting this
+batch's real candidate names): `commercial-review-filter.ts`'s single-word-brand protection did
+not catch (a) qualifier-before-brand with no separator ("Little Waitrose - Cheam" vs brand
+"Waitrose") or (b) brand-first bare-space branch suffix with no separator at all ("Londis
+Beddington Gardens" vs brand "Londis"), plus one unrelated formatting quirk (no space after a
+dash separator). Fixed via two additive alias-file entries (`Little Waitrose`, `Southern Co-op` /
+`Southern Co-operative` — reusing the existing multi-word prefix match, no new logic) and a new
+opt-in-per-brand `bareBranchSuffixApproved` flag (`Londis`, `Aksular`, `Sankalp` — distinctive,
+non-generic brand words only; the single-word exact-match default, and its Phoenix/Premier/Flames
+false-positive protection, is unchanged for every brand that has not opted in). `load-commercial-
+review.ts`'s canonicalBrand guard widened from exclude-only to keep-or-exclude, since a KEEP
+brand's naming-coverage gap is just as real and just as safe to close additively as an EXCLUDE
+brand's.
+
+**Regression tests**: `customer-match-materiality.ts` — cases 17-20 in
+`test-lead-production-customer-suppression-fix.ts` (both real leaked leads, a false-positive guard
+proving component-address-without-exact-postcode does NOT auto-confirm, and a backward-
+compatibility proof that pre-existing call sites/fixtures with no email/address populated never
+fabricate a match). `commercial-review-filter.ts` — section 13/14 in `test-lead-production-
+commercial-review.ts` (all three 2026-08-09 gaps now close correctly, plus explicit false-positive
+proofs that the new capabilities are opt-in per brand, never a blanket relaxation — including a
+worst-case hypothetical proving the bare-branch-suffix matching primitive itself cannot match a
+fused word like "Pretzel" even if a brand opted in).
+
+**Verification**: `npm run typecheck` clean; `npm run build` clean; all 47
+`test:lead-production-*`/`test:je-*` suites individually re-run, ALL PASSED (one transient
+network flake on `test:je-supabase`'s live Supabase connection, unrelated to this fix — passed
+cleanly on immediate re-run, and that suite does not exercise either changed file).
+
+**Update (same day, later) — live campaigns run, certificate status found stale against this fix**:
+all four campaigns (017 Ayesha EN4-EN9, 018 Nauman, 019 Alam, 020 Manraj) have since been run live
+through discovery/checkpoints/final-scoring/release/independent-verification. Their zero-leakage
+certificates on disk (`~/Data/aspectlead-lead-production/campaigns/campaign-0{17,18,19,20}-*/
+audit/*-zero-leakage-certificate.json`) all carry `verifierCommitHash: 0858bd92...` — the commit
+**before** this fix landed — and read: campaign-017 `masterResult: PASS` (0 confirmed leaks
+recorded at that run, so the BRIM Burgers case above may not have been in that specific release
+population, or may have been caught only after this fix — not yet re-derived); campaigns 018/019/
+020 `masterResult: FAIL` (each from unresolved probable matches recorded by the independent
+verifier, not necessarily the confirmed-leak cases documented above). None of the four campaigns'
+checkpoints, release files, or certificates have been regenerated against this fix. **Not
+committed or pushed.** Needs an explicit owner decision before any further action on these four
+campaigns: whether to re-run final-scoring + independent-verification against the corrected code
+for all four (including the one currently showing PASS, since that result predates this fix), and
+how to handle any output already in `release/`/`current-release/` for them.

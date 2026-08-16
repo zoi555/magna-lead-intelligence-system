@@ -1591,3 +1591,32 @@ was rewritten, no district was rerun, no provider call was made — this was a r
 
 **Verification:** re-ran all 45 `test:lead-production-*`/`test:je-*` suites, typecheck, and build
 after the doc corrections (no production code changed, only documentation) — all clean.
+
+## 2026-08-16 — field-sales batch pre-flight (campaigns 017-020): ISS-0042 root-caused and fixed before any live call
+
+Continued a session already in progress against real config-only campaigns 017 (Ayesha,
+EN4-EN9), 018 (Nauman), 019 (Alam), and 020 (Manraj). The working tree already held an uncommitted
+fix (`customer-match-materiality.ts`, `run-final-scoring-stage-v2.ts`,
+`commercial-review-filter.ts`, `load-commercial-review.ts`, the brand-aliases config, and two test
+files) for two real customer-match leaks found during pre-flight — "BRIM Burgers - Barnet" (only
+matches customer F373 via email; postcode and name both disagree) and "Rooster Chicken Purley"
+(only matches customer R176 via a component-level address match; names share only the word
+"rooster") — plus a structural fix so a customer with zero name-similarity to a candidate is no
+longer invisible to the whole operational pipeline once enrichment data exists
+(`scanFullCustomerIndex`). The same pass also closed the honestly-recorded, previously-unfixed
+2026-08-09 commercial-review naming-coverage gap (Little Waitrose/Londis/Aksular/Sankalp/Southern
+Co-op).
+
+This pass verified that work rather than re-deriving it: ran `npm run typecheck` (clean), the two
+directly-affected test suites individually (`test-lead-production-commercial-review.ts`,
+`test-lead-production-customer-suppression-fix.ts` — both ALL PASSED, including the new real-case
+regression sections), all 47 `test:lead-production-*`/`test:je-*` suites individually (ALL PASSED
+— one transient network flake on the live `test:je-supabase` integration test, confirmed
+unrelated to the changed files and cleared on immediate re-run), and `npm run build` (clean, all
+routes generate). Then wrote up the fix in `docs/11_ISSUES_LOG.md` (ISS-0042), `docs/10_BUGS_AND_
+FIXES.md`, `VERIFY_BEFORE_CLAIMING.md`, and `PROJECT_STATUS.md` — none of which had been updated
+for this fix yet, per this project's rule that a fixed bug must be logged.
+
+**Not done:** no live discovery or enrichment call for campaigns 017-020 (config-only — no
+`release/`/`review/`/`audit/`/`manifests/` directories exist for any of the four yet); no commit
+or push. Full detail: `docs/11_ISSUES_LOG.md` ISS-0042.

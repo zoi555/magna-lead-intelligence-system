@@ -1385,3 +1385,49 @@ two-source-merge campaign unless a wrapper script enforces the ordering.
 XLSX after every fix (all PASS), and independently re-flattened + re-hashed the CSV in each
 affected case; all 45 `test:lead-production-*`/`test:je-*` suites, typecheck, and build clean at
 the end of the batch.
+
+## 2026-08-16 — field-sales batch pre-flight (campaigns 017-020): customer-match-materiality.ts had no email or address evidence route, and never rescanned the full customer index after enrichment (ISS-0042)
+
+**Bug:** two real candidates from the upcoming field-sales batch (Ayesha's campaign-017, Manraj's
+campaign-020) would have leaked past every existing check. "BRIM Burgers - Barnet" only matches
+its real Magna customer (F373) via a shared verified email — postcode and trading name both
+disagree. "Rooster Chicken Purley" only matches its real Magna customer (R176, "ROOSTER POINT")
+via a component-level street/building address match at an exact matching postcode — the names
+share only the generic word "rooster". `customer-match-materiality.ts` had no email-comparison
+route and no address-comparison route at all, and even if it had, nothing would have called it:
+every customer-match check up to final-scoring only ever evaluates the one customer phase1's
+name-similarity search happened to suspect, never the full customer index.
+
+**Root cause:** `assessCustomerMatchMateriality` was built around phone/domain/postcode+name
+evidence only — email and free-text address were both already-loaded customer-master fields
+(Email/Invoice Email Address, Address 1/2/City) that nothing in this module ever read. Separately,
+`run-final-scoring-stage-v2.ts` only ever refines a match phase1 already suspected — by design,
+for the same reason `customer-resolution-after-google.ts` never opens a fresh search (documented
+tradeoff, see ISS-0038) — so a customer with zero name-similarity overlap to the candidate is
+structurally invisible to the whole operational pipeline, no matter how strong its own evidence
+is once enrichment data exists.
+
+**Fix:** added `exact_email` (unconditional confirm on a shared exact email, mirroring
+`exact_phone`) and `exact_address_same_postcode` (component-level address match via the existing
+`address-components.ts`, gated on exact full-postcode agreement and no premises-identifier
+conflict) evidence tiers to `customer-match-materiality.ts`. Added `scanFullCustomerIndex` to
+`run-final-scoring-stage-v2.ts`, run unconditionally against every customer at final-scoring time
+(the first point candidate phone/email/address are all simultaneously available), using the same
+evidence rules; only the more material of the phase1-chain result and the full-scan result is
+used, so an already-correct outcome can never be made less material. Both new fields on
+`MatchedCustomerRecord`/`CustomerMatchMaterialityInput` are optional — every pre-existing call
+site and test fixture with no email/address populated degrades to "no evidence" exactly like any
+other missing identifier, never a fabricated match (proven in test case 20).
+
+**Also fixed in the same pass:** `commercial-review-filter.ts`'s single-word-brand naming-coverage
+gap, honestly recorded but not fixed on 2026-08-09 (`docs/09_DECISIONS.md`) — see the full ISS-0042
+detail in `docs/11_ISSUES_LOG.md` for the alias-file and `bareBranchSuffixApproved` fix.
+
+**Impact:** neither leaked lead has been released — both belong to campaigns 017/020, which have
+config only and have not yet been run live. Caught before any live discovery or paid enrichment
+call for this batch, not after.
+
+**Verification:** `npm run typecheck`/`build` clean; all 47 `test:lead-production-*`/`test:je-*`
+suites individually re-run, ALL PASSED (one unrelated transient network flake on the live
+`test:je-supabase` integration test, cleared on immediate re-run). Full detail, real-case
+evidence, and regression test references: `docs/11_ISSUES_LOG.md` ISS-0042.

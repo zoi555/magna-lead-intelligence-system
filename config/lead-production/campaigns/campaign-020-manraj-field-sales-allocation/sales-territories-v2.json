@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 5,
+  "note": "Campaign-scoped documentation copy only — mapsRequired for the live pipeline is resolved from the GLOBAL config/lead-production/sales-territories-v2.json (Manraj already has an entry there, field_sales, mapsRequired=true from his original KT1-KT24 allocation), never from this per-campaign file. All 5 districts (CR4-CR8) are newly run for Manraj in this campaign.",
+  "representatives": [
+    {
+      "representative": "Manraj",
+      "role": "field_sales",
+      "salesTerritory": "CR4, CR5, CR6, CR7, CR8",
+      "postcodeDistricts": ["CR4", "CR5", "CR6", "CR7", "CR8"],
+      "districtCount": 5,
+      "mapsRequired": false
+    }
+  ]
+}

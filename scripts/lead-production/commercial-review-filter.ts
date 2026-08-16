@@ -32,6 +32,24 @@
 // name. Scoped to this file only (not the shared normalize.ts), since it is specific to brand-
 // registry naming, not general name comparison.
 //
+// Second, NARROWER relaxation (2026-08-15, closes the documented gap found 2026-08-09 —
+// docs/09_DECISIONS.md — "Londis Beddington Gardens"/"Aksular Enfield Town"/"Sankalp Sattvik"
+// never matched their own single-word brands): a single-word brand ALSO matches a bare-space
+// (no separator at all) branch suffix, but ONLY when that specific brand has explicitly opted
+// in via `bareBranchSuffixApproved` in brand-aliases-and-identifiers-v1.json — never a default.
+// This is deliberately NOT the same relaxation as the dash-separator one above: removing the
+// separator requirement entirely for every single-word brand would reopen exactly the Phoenix/
+// Premier/Flames false-positive risk this file exists to prevent (e.g. "Premier Kebab House"
+// would wrongly match brand "Premier"). Scoped one brand at a time, applied only to distinctive
+// non-generic brand words (Londis, Aksular, Sankalp) — see the alias file for the current list.
+// Two further real gaps in the SAME 2026-08-09 finding were closed WITHOUT any new matching
+// logic at all, purely via new alias-file entries reusing the existing multi-word prefix match:
+// "Little Waitrose - Cheam" (alias "Little Waitrose" of brand "Waitrose") and "Southern Co-Op-
+// Banstead Nork Way" (alias "Southern Co-op" of brand "Co-op / Southern Co-operative") — a
+// recognised-qualifier-plus-brand phrase is just another multi-word brand string once
+// registered as an alias, so it gets separator, bare-space-suffix, and punctuation-variant
+// matching for free from the machinery that already existed for "Village Pizza Hounslow".
+//
 // Explicit keep rules are checked FIRST and unconditionally override any exclude match (per
 // requirement) — a keep-list brand can never be excluded by the brand rule.
 
@@ -95,9 +113,14 @@ const SEPARATOR_CLASS = "[-–—:]"; // hyphen, en-dash, em-dash, colon
 // the RAW-string separator patterns needed this.
 const TRADEMARK_SYMBOL_CLASS = "[®™©]?";
 
-// "Brand - Branch", "Brand: Branch" — brand first, at the very start of the raw name.
+// "Brand - Branch", "Brand: Branch" — brand first, at the very start of the raw name. The
+// trailing `\s*` (not `\s+`) is deliberate (2026-08-15 fix, real gap: "Morley's -Plumstead
+// Common Road" has no space between the separator and the branch name, while "Morley's -
+// Plumstead Common Road" with a space already matched) — tolerating a missing space after the
+// separator is a pure formatting-variant fix: the separator character itself is still required
+// and still anchored immediately after the brand, so it adds no new false-positive surface.
 function matchesBrandBeforeSeparator(candidateRaw: string, brandOriginal: string): boolean {
-  const re = new RegExp(`^\\s*${escapeRegExp(brandOriginal)}${TRADEMARK_SYMBOL_CLASS}\\s*${SEPARATOR_CLASS}\\s+`, "i");
+  const re = new RegExp(`^\\s*${escapeRegExp(brandOriginal)}${TRADEMARK_SYMBOL_CLASS}\\s*${SEPARATOR_CLASS}\\s*`, "i");
   return re.test(candidateRaw);
 }
 
@@ -122,11 +145,20 @@ function matchesBracketedBrand(candidateRaw: string, brandOriginal: string): boo
 
 // Applies every anchored pattern for ONE brand string (the canonical name, or one of its
 // aliases) against one candidate name field. Never a bare substring test.
-function matchesOneBrandString(candidate: { raw: string; normalised: string }, brandOriginal: string, brandNormalised: string): boolean {
+//
+// `allowBareBranchSuffix` (2026-08-15, opt-in per brand via BrandAliasEntry.
+// bareBranchSuffixApproved — see its own doc comment): when true, extends the existing
+// multi-word "brand appears as a leading whole-word phrase, no separator required" prefix
+// match (already used for e.g. "Village Pizza Hounslow") to ALSO cover a single-word brand
+// (e.g. "Londis Beddington Gardens" -> brand "Londis"). Still fully anchored (start-of-string,
+// whole-word boundary via the trailing space) — never a substring test — and still gated
+// false by default, so every brand without the flag keeps today's exact-or-separator-only
+// behaviour (the Phoenix/Premier/Flames false-positive protection is unaffected).
+function matchesOneBrandString(candidate: { raw: string; normalised: string }, brandOriginal: string, brandNormalised: string, allowBareBranchSuffix: boolean): boolean {
   const brandKey = brandComparisonKey(brandNormalised);
   if (!candidate.normalised || !brandKey) return false;
   if (candidate.normalised === brandKey) return true; // exact
-  if (brandKey.includes(" ") && candidate.normalised.startsWith(`${brandKey} `)) return true; // multi-word prefix, e.g. "Village Pizza Hounslow"
+  if ((brandKey.includes(" ") || allowBareBranchSuffix) && candidate.normalised.startsWith(`${brandKey} `)) return true; // leading whole-word-phrase prefix, e.g. "Village Pizza Hounslow" (multi-word, always) or "Londis Beddington Gardens" (single-word, opt-in only)
   if (matchesBrandBeforeSeparator(candidate.raw, brandOriginal)) return true;
   if (matchesBrandAfterSeparator(candidate.raw, brandOriginal)) return true;
   if (matchesAtBrand(candidate.raw, brandOriginal)) return true;
@@ -136,12 +168,16 @@ function matchesOneBrandString(candidate: { raw: string; normalised: string }, b
 
 // Tries the canonical brand name, then every known alias for it (Nisa Local -> Nisa Express,
 // etc.) — an alias match is reported with the CANONICAL brand name for audit consistency (the
-// exclusion is "you matched brand X", not "you matched some alias string").
+// exclusion is "you matched brand X", not "you matched some alias string"). The
+// bareBranchSuffixApproved opt-in (if set on the entry) applies to the canonical brand string
+// AND every one of its aliases equally — it describes "this brand's single-word forms may
+// bare-space-prefix-match", not a per-alias-string setting.
 function matchesBrand(candidate: { raw: string; normalised: string }, brandOriginal: string, brandNormalised: string, aliasEntry: BrandAliasEntry | undefined): boolean {
-  if (matchesOneBrandString(candidate, brandOriginal, brandNormalised)) return true;
+  const allowBareBranchSuffix = aliasEntry?.bareBranchSuffixApproved ?? false;
+  if (matchesOneBrandString(candidate, brandOriginal, brandNormalised, allowBareBranchSuffix)) return true;
   if (aliasEntry) {
     for (const alias of aliasEntry.aliases) {
-      if (matchesOneBrandString(candidate, alias, normaliseName(alias))) return true;
+      if (matchesOneBrandString(candidate, alias, normaliseName(alias), allowBareBranchSuffix)) return true;
     }
   }
   return false;

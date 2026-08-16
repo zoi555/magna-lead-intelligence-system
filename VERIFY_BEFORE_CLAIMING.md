@@ -705,3 +705,38 @@ cap, Notes rewrite, Lead Urgency recalibration, cross-representative combined Ma
   (brand/is-brand, offer_percent, is_sponsored, opening_times array, offline_reason,
   delivery_zipcode) — recorded honestly as permanent gaps in the field catalogue's unavailable
   list, never fabricated. Full detail: `docs/11_ISSUES_LOG.md` ISS-0035.
+
+## 2026-08-16 — field-sales batch (campaigns 017-020) pre-flight fix: claim, command, result, remaining risk
+
+- Claim: "the two real customer-match evidence gaps and the recall gap found while pre-flighting
+  campaigns 017-020 (ISS-0042) are fixed, tested with the real leaked-lead data, and do not
+  regress anything already passing — including the 2026-08-09 commercial-review naming-coverage
+  gaps closed in the same pass."
+- Commands run: `npm run typecheck` (clean); `npx tsx scripts/test-lead-production-commercial-
+  review.ts` (ALL PASSED, including new sections 13/14 proving the 3 real 2026-08-09 gaps now
+  close and the new opt-in mechanism cannot introduce a Phoenix/Premier/Flames-class false
+  positive even in a deliberate worst-case hypothetical); `npx tsx scripts/test-lead-production-
+  customer-suppression-fix.ts` (ALL PASSED, including new cases 17-20 — both real leaked leads
+  now confirm, a false-positive guard proving component-address-without-exact-postcode does NOT
+  auto-confirm, and a backward-compatibility proof that every pre-existing call site/fixture with
+  no email/address populated never fabricates a match); every other `test:lead-production-*`/
+  `test:je-*` suite run individually (47 total) — ALL PASSED; `npm run build` (clean, all routes
+  generate).
+- One transient failure on live `test:je-supabase` (a network-dependent integration test that does
+  not exercise either changed file) — re-ran it directly immediately after, passed cleanly with
+  all 12 assertions green. Treated as a flake, not a regression, since it is unrelated to this
+  session's changes and passed on retry without any code change.
+- Files changed: `scripts/lead-production/customer-match-materiality.ts` (new `exact_email`/
+  `exact_address_same_postcode` evidence tiers), `scripts/lead-production/run-final-scoring-
+  stage-v2.ts` (`scanFullCustomerIndex`, full-index rescan at final-scoring time),
+  `scripts/lead-production/commercial-review-filter.ts` (bare-branch-suffix + separator-spacing
+  fixes), `scripts/lead-production/load-commercial-review.ts` (canonicalBrand guard widened to
+  keep-or-exclude), `config/lead-production/commercial-review-v1/brand-aliases-and-identifiers-
+  v1.json` (5 new alias/flag entries), `scripts/test-lead-production-commercial-review.ts`,
+  `scripts/test-lead-production-customer-suppression-fix.ts`. Full narrative, real-case evidence,
+  and root cause: `docs/11_ISSUES_LOG.md` ISS-0042, `docs/10_BUGS_AND_FIXES.md` (2026-08-16).
+- Remaining risk: this was a pre-flight fix — campaigns 017-020 (Ayesha EN4-EN9, Nauman, Alam,
+  Manraj) have config only (`assignments.csv`/`sales-territories-v2.json`/`territories.json`), no
+  live discovery has been run for any of the four representatives, and no owner authorisation to
+  start live/paid calls for this batch has been given yet. Not committed or pushed at the point
+  this entry was written — awaiting instruction.

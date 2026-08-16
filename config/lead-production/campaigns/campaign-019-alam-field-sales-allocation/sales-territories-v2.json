@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 3,
+  "note": "Campaign-scoped documentation copy only — mapsRequired for the live pipeline is resolved from the GLOBAL config/lead-production/sales-territories-v2.json (Alam already has an entry there, field_sales, mapsRequired=true, added 2026-08-08), never from this per-campaign file. Owner specified CR0-CR3 (4 districts); CR1 does not exist in the authoritative postcode geography and was excluded — see territories.json's geographyValidationFinding. CR0/CR2/CR3 are newly run for Alam in this campaign.",
+  "representatives": [
+    {
+      "representative": "Alam",
+      "role": "field_sales",
+      "salesTerritory": "CR0, CR2, CR3",
+      "postcodeDistricts": ["CR0", "CR2", "CR3"],
+      "districtCount": 3,
+      "mapsRequired": false
+    }
+  ]
+}

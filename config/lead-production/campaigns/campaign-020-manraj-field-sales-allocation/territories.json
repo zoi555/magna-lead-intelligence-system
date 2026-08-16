@@ -1,0 +1,76 @@
+{
+  "campaignId": "campaign-020-manraj-field-sales-allocation",
+  "campaignVersion": "v1",
+  "channel": "field_sales",
+  "effectiveDate": "2026-08-15",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-15 (next field-sales lead-generation batch, following campaign-016)",
+  "description": "Manraj Dhillon's field-sales allocation: EXACTLY CR4, CR5, CR6, CR7, CR8 (5 districts). Territories are NON-EXCLUSIVE across representatives (established 2026-08-05, docs/09_DECISIONS.md).",
+  "resolutionNote": "TERRITORY MODEL (established 2026-08-05, docs/09_DECISIONS.md): postcode districts are NON-EXCLUSIVE across representatives. Manraj's historical allocation is KT1-KT24 (field_sales, ACCEPTED) and his prior field-sales batch was campaign-014-manraj-field-sales-allocation (SM1-SM3) — both separate, immutable, completed prior campaigns, not touched here.",
+  "representativeIdentityValidation": {
+    "method": "Cross-checked against the customer master's own 'Sales Rep' column (input/customer-masters/2026-08-03/CustomersProjects81_raw_snapshot_2026-08-03.csv) — the only authoritative live SalesPro/NetSuite dropdown-reflecting source found on disk (no standalone roster CSV/JSON exists).",
+    "matchResult": "NOT FOUND — neither 'Manraj' nor 'Manraj Dhillon' nor 'Dhillon' appears anywhere in the Sales Rep column. Identical finding to campaign-014 (2026-08-08) — not a new or worsening gap.",
+    "corroboratingEvidence": [
+      "A full, ACCEPTED historical field-sales campaign already exists for this exact person (KT1-KT24, 24 districts).",
+      "A second, already-completed field-sales batch (campaign-014-manraj-field-sales-allocation, SM1-SM3) exists for this exact person, run under the same judgement (treated as CONFIRMED, not blocked).",
+      "Owner supplied 'Manraj Dhillon' as the exact full name AND his email directly in this task's instructions (locked identity, 2026-08-15) — the same authoritative-override pattern used throughout this project."
+    ],
+    "extractedFields": {
+      "representativeFirstName": "Manraj",
+      "representativeLastName": "Dhillon",
+      "representativeFullName": "Manraj Dhillon",
+      "representativeEmail": "manraj@magnafoodservice.co.uk"
+    },
+    "emailNote": "Email supplied directly by the owner in this task's instructions (locked identity, 2026-08-15) — not derived/guessed. Not fabricated. (campaign-014 recorded no email; this is a genuine update, not a contradiction.)",
+    "judgement": "Treated as CONFIRMED, not fail-closed — same reasoning as campaign-014: this is an absence of a specific cross-reference source (no won customers yet under this name in NetSuite), not an identity ambiguity (no competing candidate anywhere in the data), and the owner has now twice supplied this exact full name directly as authoritative. Flagged in the batch report for owner visibility, consistent with campaign-014's own precedent."
+  },
+  "representative": {
+    "internalName": "Manraj",
+    "role": "field_sales",
+    "representativeFullName": "Manraj Dhillon",
+    "representativeEmail": "manraj@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": "Manraj Dhillon",
+    "salesProRosterStatus": "confirmed",
+    "regionRoute": "CR4, CR5, CR6, CR7, CR8",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["CR4", "CR5", "CR6", "CR7", "CR8"],
+    "districtCount": 5,
+    "areaDescription": "Mitcham / Coulsdon / Warlingham / Thornton Heath / Purley"
+  },
+  "sectorWhitelist": {
+    "CR4": ["CR4 1", "CR4 2", "CR4 3", "CR4 4", "CR4 9"],
+    "CR5": ["CR5 1", "CR5 2", "CR5 3", "CR5 9"],
+    "CR6": ["CR6 0", "CR6 9"],
+    "CR7": ["CR7 6", "CR7 7", "CR7 8", "CR7 9"],
+    "CR8": ["CR8 1", "CR8 2", "CR8 3", "CR8 4", "CR8 5", "CR8 9"]
+  },
+  "sectorWhitelistSource": "Derived from the authoritative Supabase postcode_reference table (level='sector', district=<code>), never manually invented. Used for geography validation only — one Just Eat discovery query per DISTRICT, not per sector.",
+  "alreadyCompletedElsewhere": {
+    "description": "None. All 5 districts confirmed genuinely new for Manraj by direct filesystem search of output/territories/ and handover/ before this campaign started.",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["CR4", "CR5", "CR6", "CR7", "CR8"],
+    "districtCount": 5,
+    "processingOrder": ["CR4", "CR5", "CR6", "CR7", "CR8"]
+  },
+  "explicitlyExcluded": {
+    "kt1ThroughKt24": "Manraj's original, already-completed, historical field-sales territory. Immutable. Never rerun.",
+    "sm1ThroughSm3": "Manraj's prior field-sales batch (campaign-014). Immutable. Never rerun.",
+    "neighbouringDistricts": "No districts outside the exact owner-listed set (CR4-CR8) are added — explicitly instructed not to add neighbouring districts."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  },
+  "outputTemplate": "field-sales-31-column-v1",
+  "fieldSalesRoutingStatus": "pending",
+  "pipelineVersion": "temporary-lead-production-v1 (frozen baseline 16c3a7dc8fc912f1e1c5e747497a150e71528f4a, plus additive field-sales export template + CTO contact-position fix, 2026-08-08), commercial-review matching-coverage fix (2026-08-15)",
+  "customerMasterVersion": {
+    "snapshotDate": "2026-08-03",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1"
+  }
+}

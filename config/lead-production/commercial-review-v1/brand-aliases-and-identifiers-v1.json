@@ -1,6 +1,6 @@
 {
   "version": "brand-aliases-and-identifiers-v1",
-  "note": "Additive layer on top of brands_to_exclude_final.csv / corrected_brand_decisions.csv — never edits those core Brand Name lists. Each entry's canonicalBrand MUST already exist in brands_to_exclude_final.csv (cross-checked on load, fails closed otherwise). Adds recognised alternate trading names, confirmed domains, and confirmed Companies House group identifiers, used only as ADDITIONAL exact-match evidence — never a fuzzy/substring match. Where no real, verified domain or company number is known, the array is left empty rather than guessed.",
+  "note": "Additive layer on top of brands_to_exclude_final.csv / corrected_brand_decisions.csv — never edits those core Brand Name lists. Each entry's canonicalBrand MUST already exist in brands_to_exclude_final.csv OR brands_to_keep_final.csv (cross-checked on load, fails closed otherwise — widened 2026-08-15 from exclude-only to keep-or-exclude). Adds recognised alternate trading names, confirmed domains, confirmed Companies House group identifiers, and (2026-08-15) an opt-in bareBranchSuffixApproved flag — used only as ADDITIONAL exact-match/anchored-prefix evidence — never a fuzzy/substring match. Where no real, verified domain or company number is known, the array is left empty rather than guessed.",
   "entries": [
     {
       "canonicalBrand": "Nisa Local",
@@ -16,6 +16,47 @@
       "domains": [],
       "companyIdentifiers": ["00024694"],
       "companyIdentifierRationale": "Greene King plc, Companies House company number 00024694 — public UK company registration data. Enables matching a candidate whose own decisive Companies House record shows this number (or a confirmed subsidiary/group relationship to it) as a Greene King-owned business even where the trading name alone gives no indication. No candidate in the historical dataset was found to carry this number directly (confirmed in the prior read-only audit) — this entry establishes the matching capability for future candidates, not a retroactive claim about existing data."
+    },
+    {
+      "canonicalBrand": "Waitrose",
+      "aliases": ["Little Waitrose"],
+      "aliasRationale": "Real batch candidate name (2026-08-09 owner chain/group review, documented gap in docs/09_DECISIONS.md): 'Little Waitrose - Cheam' did not match brand 'Waitrose' because 'Little' precedes the brand word with no separator. Registering 'Little Waitrose' as its own multi-word alias reuses the EXISTING multi-word branch-name prefix match (already proven for 'Village Pizza Hounslow') — no new matching logic required. 'Little Waitrose' is Waitrose's own real, recognised smaller-format shop brand, not a guessed variant.",
+      "domains": [],
+      "companyIdentifiers": []
+    },
+    {
+      "canonicalBrand": "Co-op / Southern Co-operative",
+      "aliases": ["Southern Co-op", "Southern Co-operative"],
+      "aliasRationale": "Real batch candidate name (2026-08-09 owner chain/group review, documented gap): 'Southern Co-Op- Banstead Nork Way' did not match brand 'Co-op / Southern Co-operative' — the candidate's own word order ('Southern Co-op...') differs from the registered brand string's ('Co-op / Southern Co-operative'). Registering 'Southern Co-op' (the chain's own real trading name) as an alias reuses the existing multi-word prefix match; normalisation already collapses the hyphen/case variants ('Co-Op' vs 'Co-op'), so no separate punctuation handling was needed. 'Southern Co-operative' added alongside for the fully-spelled-out form.",
+      "domains": [],
+      "companyIdentifiers": []
+    },
+    {
+      "canonicalBrand": "Londis",
+      "aliases": [],
+      "aliasRationale": "No alias needed — see bareBranchSuffixApproved below.",
+      "domains": [],
+      "companyIdentifiers": [],
+      "bareBranchSuffixApproved": true,
+      "bareBranchSuffixRationale": "Real batch candidate name (2026-08-09 owner chain/group review, PRE-EXISTING gap — Londis was already an EXCLUDE brand before this session's changes): 'Londis Beddington Gardens' did not match brand 'Londis' — single-word brand directly followed by a branch/location phrase with a bare space, no separator character at all. 'Londis' is a distinctive registered convenience-store fascia name, not a generic word — opting it in to the bare-branch-suffix match carries none of the Phoenix/Premier/Flames coincidental-overlap risk the single-word exact-match default exists to prevent."
+    },
+    {
+      "canonicalBrand": "Aksular",
+      "aliases": [],
+      "aliasRationale": "No alias needed — see bareBranchSuffixApproved below.",
+      "domains": [],
+      "companyIdentifiers": [],
+      "bareBranchSuffixApproved": true,
+      "bareBranchSuffixRationale": "Real batch candidate name (2026-08-09 owner chain/group review, documented gap): 'Aksular Enfield Town' did not match KEEP brand 'Aksular' — single-word brand + bare-space branch phrase, same gap class as Londis above. 'Aksular' is a distinctive registered brand name, not a generic word — safe to opt in."
+    },
+    {
+      "canonicalBrand": "Sankalp",
+      "aliases": [],
+      "aliasRationale": "No alias needed — see bareBranchSuffixApproved below.",
+      "domains": [],
+      "companyIdentifiers": [],
+      "bareBranchSuffixApproved": true,
+      "bareBranchSuffixRationale": "Real batch candidate name (2026-08-09 owner chain/group review, documented gap): 'Sankalp Sattvik' did not match KEEP brand 'Sankalp' — single-word brand + bare-space branch/qualifier phrase, same gap class as Londis/Aksular above. 'Sankalp' is a distinctive registered brand name, not a generic word — safe to opt in."
     }
   ]
 }

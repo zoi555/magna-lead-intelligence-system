@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 6,
+  "note": "Campaign-scoped documentation copy only — mapsRequired for the live pipeline is resolved from the GLOBAL config/lead-production/sales-territories-v2.json (Ayesha already has an entry there, field_sales, mapsRequired=true from her original NW1-NW10 allocation), never from this per-campaign file. All 6 districts (EN4-EN9) are newly run for Ayesha in this campaign.",
+  "representatives": [
+    {
+      "representative": "Ayesha",
+      "role": "field_sales",
+      "salesTerritory": "EN4, EN5, EN6, EN7, EN8, EN9",
+      "postcodeDistricts": ["EN4", "EN5", "EN6", "EN7", "EN8", "EN9"],
+      "districtCount": 6,
+      "mapsRequired": false
+    }
+  ]
+}

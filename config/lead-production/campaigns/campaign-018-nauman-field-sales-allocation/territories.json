@@ -1,0 +1,69 @@
+{
+  "campaignId": "campaign-018-nauman-field-sales-allocation",
+  "campaignVersion": "v1",
+  "channel": "field_sales",
+  "effectiveDate": "2026-08-15",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-15 (next field-sales lead-generation batch, following campaign-016)",
+  "description": "Nauman Khan's field-sales allocation: EXACTLY SE8 (1 district). Territories are NON-EXCLUSIVE across representatives (established 2026-08-05, docs/09_DECISIONS.md).",
+  "resolutionNote": "TERRITORY MODEL (established 2026-08-05, docs/09_DECISIONS.md): postcode districts are NON-EXCLUSIVE across representatives. Nauman's historical allocation is RM1-RM14 (field_sales, ACCEPTED) and his prior field-sales batch was campaign-013-nauman-field-sales-allocation (SE10, SE18) — both separate, immutable, completed prior campaigns, not touched here.",
+  "representativeIdentityValidation": {
+    "method": "Cross-checked against the customer master's own 'Sales Rep' column (input/customer-masters/2026-08-03/CustomersProjects81_raw_snapshot_2026-08-03.csv) — the only authoritative live SalesPro/NetSuite dropdown-reflecting source found on disk (no standalone roster CSV/JSON exists).",
+    "matchResult": "Exact, unambiguous match: 'Nauman Khan' appears verbatim in the Sales Rep column (29 rows).",
+    "extractedFields": {
+      "representativeFirstName": "Nauman",
+      "representativeLastName": "Khan",
+      "representativeFullName": "Nauman Khan",
+      "representativeEmail": "nauman.khan@magnafoodservice.co.uk"
+    },
+    "emailNote": "Email supplied directly by the owner in this task's instructions (locked identity, 2026-08-15) — not derived/guessed. Not fabricated. (campaign-013 recorded no email; this is a genuine update, not a contradiction.)",
+    "disambiguationCheck": "No other 'Nauman' variant found in the Sales Rep column. Unambiguous."
+  },
+  "representative": {
+    "internalName": "Nauman",
+    "role": "field_sales",
+    "representativeFullName": "Nauman Khan",
+    "representativeEmail": "nauman.khan@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": "Nauman Khan",
+    "salesProRosterStatus": "confirmed",
+    "regionRoute": "SE8",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["SE8"],
+    "districtCount": 1,
+    "areaDescription": "Deptford"
+  },
+  "sectorWhitelist": {
+    "SE8": ["SE8 3", "SE8 4", "SE8 5", "SE8 9"]
+  },
+  "sectorWhitelistSource": "Derived from the authoritative Supabase postcode_reference table (level='sector', district=<code>), never manually invented. Used for geography validation only — one Just Eat discovery query per DISTRICT, not per sector.",
+  "alreadyCompletedElsewhere": {
+    "description": "None. SE8 confirmed genuinely new for Nauman by direct filesystem search of output/territories/ and handover/ before this campaign started (SE10/SE18 from campaign-013 and RM1-RM14 are the only prior Nauman output).",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["SE8"],
+    "districtCount": 1,
+    "processingOrder": ["SE8"]
+  },
+  "explicitlyExcluded": {
+    "rm1ThroughRm14": "Nauman's original, already-completed, historical field-sales territory. Immutable. Never rerun.",
+    "se10AndSe18": "Nauman's prior field-sales batch (campaign-013). Immutable. Never rerun.",
+    "neighbouringDistricts": "No districts outside the exact owner-listed set (SE8 only) are added — explicitly instructed not to add neighbouring districts."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  },
+  "outputTemplate": "field-sales-31-column-v1",
+  "fieldSalesRoutingStatus": "pending",
+  "pipelineVersion": "temporary-lead-production-v1 (frozen baseline 16c3a7dc8fc912f1e1c5e747497a150e71528f4a, plus additive field-sales export template + CTO contact-position fix, 2026-08-08), commercial-review matching-coverage fix (2026-08-15)",
+  "customerMasterVersion": {
+    "snapshotDate": "2026-08-03",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1"
+  },
+  "discoveryRunId": "dc017266-250c-43c1-8c3a-1129b91b59d6",
+  "discoveryRunNote": "Live Just Eat discovery already run at pipeline pre-flight time (2026-08-15): 1/1 outcode, 927 outlets, 927 canonical observations, 63 candidates after consolidation."
+}

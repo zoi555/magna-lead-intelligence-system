@@ -143,7 +143,7 @@ async function main() {
   assert(rChaiiwalaReal.excluded === true, "'Chaiiwala® - Ilford Lane' (real registry, real candidate IG1-34DC85F9) matches EXCLUDE brand 'Chaiiwala'");
   const overlap = realRegistry.keepBrands.filter((b) => realRegistry.excludeNormalised.has(normaliseName(b)));
   assert(overlap.length === 0, "zero overlap between keep and exclude in the real registry");
-  assert(realRegistry.aliasEntries.length === 2, `real registry loads the alias/identifier layer (expected 2 entries, got ${realRegistry.aliasEntries.length})`);
+  assert(realRegistry.aliasEntries.length === 7, `real registry loads the alias/identifier layer (expected 7 entries after the 2026-08-15 matching-coverage fix, got ${realRegistry.aliasEntries.length})`);
 
   console.log("\n9. Locked-policy matching fixes (2026-08-02) — confirmed real leaks, now caught:");
   const registry9 = mkRegistry(
@@ -254,13 +254,56 @@ async function main() {
   const rUnknown = evaluateBrandDecision(unknownLargeSoundingChain, realRegistry);
   assert(rUnknown.excluded === false && rUnknown.keepOverride === false, "a candidate with an unregistered, large-sounding brand name is neither excluded nor kept by brand rule — falls through untouched, exactly as any other unregistered brand always has (never a size-based auto-exclude)");
 
-  console.log("\n  Known naming-pattern gap, found (not fixed) during this audit — recorded for transparency, not silently assumed solved:");
+  console.log("\n13. Matching-coverage gap CLOSED (2026-08-15, pre-flight for campaigns 017-020) — the same real batch candidate names that were an honestly-recorded known gap on 2026-08-09 now match correctly:");
   const littleWaitrose = evaluateBrandDecision(mkDossier({ tradingName: "Little Waitrose - Cheam" }), realRegistry);
-  assert(littleWaitrose.excluded === false, "\"Little Waitrose - Cheam\" (real batch candidate name) is NOT caught by the real matcher today — the qualifier-word-before-brand pattern (\"Little \" + brand, no separator) is not one of the matcher's anchored patterns. The brand decision IS correctly registered (see the \"Waitrose - Cheam\" case above); this is a naming-COVERAGE gap, not a registry-correctness gap. See docs/09_DECISIONS.md (2026-08-09) for the follow-up recommendation.");
+  assert(littleWaitrose.excluded === true && littleWaitrose.matchedBrandName === "Waitrose", `"Little Waitrose - Cheam" now matches EXCLUDE brand "Waitrose" via the new "Little Waitrose" alias — recognised-qualifier-before-brand, closed WITHOUT any new matching logic, purely by registering the qualifier+brand phrase as its own multi-word alias (got excluded=${littleWaitrose.excluded}, matched=${littleWaitrose.matchedBrandName})`);
   const londisNoSeparator = evaluateBrandDecision(mkDossier({ tradingName: "Londis Beddington Gardens" }), realRegistry);
-  assert(londisNoSeparator.excluded === false, "\"Londis Beddington Gardens\" (real batch candidate name, single-word brand + bare space, no separator) is NOT caught either — this is a PRE-EXISTING gap (Londis was already an exclude brand before this session's changes), not something introduced here. Same known-gap class as Little Waitrose.");
+  assert(londisNoSeparator.excluded === true && londisNoSeparator.matchedBrandName === "Londis", `"Londis Beddington Gardens" now matches EXCLUDE brand "Londis" via the new opt-in bareBranchSuffixApproved flag — single-word brand, bare space, no separator (got excluded=${londisNoSeparator.excluded}, matched=${londisNoSeparator.matchedBrandName})`);
   const morleysNoSpaceAfterDash = evaluateBrandDecision(mkDossier({ tradingName: "Morley's -Plumstead Common Road" }), realRegistry);
-  assert(morleysNoSpaceAfterDash.keepOverride === false, "\"Morley's -Plumstead Common Road\" (real batch candidate name, note: no space after the dash) is NOT matched — a separate, real source-data formatting quirk (missing space after the separator breaks the `\\s+` requirement in the separator regex), distinct from the qualifier-prefix gap above. Harmless here since KEEP's effect is \"not excluded\" either way, but the decision is not actively recorded for this exact row. The properly-spaced form (\"Morley's - Plumstead Common Road\", see KEEP proof above) matches correctly.");
+  assert(morleysNoSpaceAfterDash.keepOverride === true && morleysNoSpaceAfterDash.matchedBrandName === "Morley's", `"Morley's -Plumstead Common Road" (no space after the dash) now matches KEEP brand "Morley's" — the separator regex's trailing \\s+ relaxed to \\s*, a pure formatting-tolerance fix that adds no new false-positive surface (got keepOverride=${morleysNoSpaceAfterDash.keepOverride}, matched=${morleysNoSpaceAfterDash.matchedBrandName})`);
+
+  console.log("\n  Additional real batch candidate names from the same 2026-08-09 finding, not previously tested individually:");
+  const aksularBareBranch = evaluateBrandDecision(mkDossier({ tradingName: "Aksular Enfield Town" }), realRegistry);
+  assert(aksularBareBranch.excluded === false && aksularBareBranch.keepOverride === true && aksularBareBranch.matchedBrandName === "Aksular", `"Aksular Enfield Town" matches KEEP brand "Aksular" via bareBranchSuffixApproved (got excluded=${aksularBareBranch.excluded}, keepOverride=${aksularBareBranch.keepOverride}, matched=${aksularBareBranch.matchedBrandName})`);
+  const sankalpBareBranch = evaluateBrandDecision(mkDossier({ tradingName: "Sankalp Sattvik" }), realRegistry);
+  assert(sankalpBareBranch.excluded === false && sankalpBareBranch.keepOverride === true && sankalpBareBranch.matchedBrandName === "Sankalp", `"Sankalp Sattvik" matches KEEP brand "Sankalp" via bareBranchSuffixApproved (got excluded=${sankalpBareBranch.excluded}, keepOverride=${sankalpBareBranch.keepOverride}, matched=${sankalpBareBranch.matchedBrandName})`);
+  const southernCoOp = evaluateBrandDecision(mkDossier({ tradingName: "Southern Co-Op- Banstead Nork Way" }), realRegistry);
+  assert(southernCoOp.excluded === true && southernCoOp.matchedBrandName === "Co-op / Southern Co-operative", `"Southern Co-Op- Banstead Nork Way" (word order differs from the registered brand string, hyphen/case variant of "Co-op") matches EXCLUDE brand "Co-op / Southern Co-operative" via the new "Southern Co-op" alias (got excluded=${southernCoOp.excluded}, matched=${southernCoOp.matchedBrandName})`);
+
+  console.log("\n  Case-variant proof (normalisation already lowercases everything — no code change needed, verified explicitly):");
+  const waitroseUpper = evaluateBrandDecision(mkDossier({ tradingName: "LITTLE WAITROSE - CHEAM" }), realRegistry);
+  assert(waitroseUpper.excluded === true && waitroseUpper.matchedBrandName === "Waitrose", `all-caps "LITTLE WAITROSE - CHEAM" still matches EXCLUDE brand "Waitrose" (got excluded=${waitroseUpper.excluded}, matched=${waitroseUpper.matchedBrandName})`);
+  const londisLower = evaluateBrandDecision(mkDossier({ tradingName: "londis beddington gardens" }), realRegistry);
+  assert(londisLower.excluded === true && londisLower.matchedBrandName === "Londis", `all-lowercase "londis beddington gardens" still matches EXCLUDE brand "Londis" (got excluded=${londisLower.excluded}, matched=${londisLower.matchedBrandName})`);
+
+  console.log("\n  Regression: the 2026-08-09 batch's OTHER already-passing owner decisions are unaffected by this fix (spot-check against the same real registry):");
+  const chipotleUnaffected = evaluateBrandDecision(mkDossier({ tradingName: "Chipotle Mexican Grill - at The O2" }), realRegistry);
+  assert(chipotleUnaffected.excluded === true && chipotleUnaffected.matchedBrandName === "Chipotle Mexican Grill", "\"Chipotle Mexican Grill - at The O2\" (existing dash-separator path, untouched by this fix) still excludes correctly");
+  const sambalStillKeep = evaluateBrandDecision(mkDossier({ tradingName: "Sambal Express" }), realRegistry);
+  assert(sambalStillKeep.excluded === false && sambalStillKeep.keepOverride === true, "Sambal Express remains KEEP — the explicit owner override is untouched by this fix");
+
+  console.log("\n14. False-positive protection preserved — the new capabilities are opt-in per brand, never a blanket relaxation:");
+  const falsePosRegistry = mkRegistry(
+    [],
+    ["Pret", "Phoenix", "Premier"],
+    [], // no alias entries for Pret/Phoenix/Premier — none has opted into bareBranchSuffixApproved
+  );
+  const pretzelLand = evaluateBrandDecision(mkDossier({ tradingName: "Pretzel Land" }), falsePosRegistry);
+  assert(pretzelLand.excluded === false, "\"Pretzel Land\" does NOT match single-word EXCLUDE brand \"Pret\" — \"Pretzel\" is one fused word with no space after \"Pret\", so even the bare-branch-suffix mechanism's own whole-word-boundary check (\"pret \" with a trailing space) could never match it even if Pret were hypothetically opted in; Pret is not registered with bareBranchSuffixApproved at all here, so this is doubly protected");
+  const pretAManger = evaluateBrandDecision(mkDossier({ tradingName: "Pret A Manger" }), falsePosRegistry);
+  assert(pretAManger.excluded === false, "\"Pret A Manger\" (a real, different, unrelated brand name that happens to start with the word \"Pret\") is NOT excluded by brand \"Pret\" either — Pret has no bareBranchSuffixApproved flag in this fixture, so only exact-equality/separator matching applies, exactly as for every other unopted single-word brand");
+  // "Pret" is NOT opted into bareBranchSuffixApproved anywhere in the real registry — this next
+  // fixture is a deliberate worst-case hypothetical (as if it HAD opted in), proving the
+  // matching PRIMITIVE itself is safe, not that Pret should ever actually be opted in.
+  const pretzelWithFlagRegistry = mkRegistry([], ["Pret"], [
+    { canonicalBrand: "Pret", aliases: [], domains: [], companyIdentifiers: [], bareBranchSuffixApproved: true },
+  ]);
+  const pretzelEvenIfOptedIn = evaluateBrandDecision(mkDossier({ tradingName: "Pretzel Land" }), pretzelWithFlagRegistry);
+  assert(pretzelEvenIfOptedIn.excluded === false, "even in a hypothetical fixture where brand \"Pret\" HAS bareBranchSuffixApproved=true, \"Pretzel Land\" still does NOT match — \"pretzel land\".startsWith(\"pret \") is false (no space after \"pret\" in the fused word \"pretzel\"), proving the mechanism itself is inherently safe against word-fusion false positives, independent of which brands happen to opt in");
+  const phoenixStillProtected = evaluateBrandDecision(mkDossier({ tradingName: "Phoenix Fried Chicken" }), falsePosRegistry);
+  assert(phoenixStillProtected.excluded === false, "\"Phoenix Fried Chicken\" remains unmatched against single-word EXCLUDE brand \"Phoenix\" (unchanged, no opt-in) — this fix does not broaden unrelated commercial logic");
+  const premierStillProtected = evaluateBrandDecision(mkDossier({ tradingName: "Premier Kebab House" }), falsePosRegistry);
+  assert(premierStillProtected.excluded === false, "\"Premier Kebab House\" remains unmatched against single-word EXCLUDE brand \"Premier\" (unchanged, no opt-in)");
 
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);
   process.exit(fails === 0 ? 0 : 1);

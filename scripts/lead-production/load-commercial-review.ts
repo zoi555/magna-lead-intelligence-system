@@ -26,6 +26,15 @@ export interface BrandAliasEntry {
   aliases: string[];
   domains: string[];
   companyIdentifiers: string[];
+  /** Opt-in, per-brand only (2026-08-15 — closes the documented "brand + branch/location
+   *  words, no separator" naming-coverage gap, docs/09_DECISIONS.md 2026-08-09): when true,
+   *  this brand's single-word canonical name (and its aliases) may ALSO match a candidate
+   *  whose normalised name starts with "brand " followed directly by a branch/location word,
+   *  with no separator character required (e.g. "Londis Beddington Gardens"). Never applied
+   *  by default — a generic single word (Phoenix/Premier/Flames) opting in would reintroduce
+   *  exactly the false-positive risk the single-word exact-match default protects against, so
+   *  this is scoped one brand at a time to distinctive, non-generic brand words only. */
+  bareBranchSuffixApproved?: boolean;
 }
 
 export interface CommercialReviewRegistry {
@@ -119,17 +128,21 @@ export async function loadCommercialReviewRegistry(dir: string): Promise<Commerc
 
   // Additive alias/domain/company-identifier layer (locked policy 2026-08-02) — optional file;
   // its absence is not an error (older registry versions won't have one), but if present, every
-  // canonicalBrand MUST already exist in brands_to_exclude_final.csv, fails closed otherwise, so
-  // an alias entry can never silently reference a brand that was never actually approved for
-  // exclusion.
+  // canonicalBrand MUST already exist in EITHER brands_to_exclude_final.csv OR
+  // brands_to_keep_final.csv, fails closed otherwise, so an alias entry can never silently
+  // reference a brand that was never actually reviewed and decided at all. (Widened 2026-08-15
+  // from exclude-only to keep-or-exclude: a KEEP brand's naming-coverage gaps — e.g. "Aksular
+  // Enfield Town" not matching KEEP brand "Aksular" — are just as real and just as safe to close
+  // additively as an EXCLUDE brand's; the guard's purpose was always "never reference an
+  // unapproved brand," not "exclude-only.")
   const aliasesPath = path.join(dir, "brand-aliases-and-identifiers-v1.json");
   let aliasEntries: BrandAliasEntry[] = [];
   const aliasFileExists = await fs.access(aliasesPath).then(() => true).catch(() => false);
   if (aliasFileExists) {
     const parsed = JSON.parse(await fs.readFile(aliasesPath, "utf8")) as { entries: BrandAliasEntry[] };
     for (const entry of parsed.entries) {
-      if (!excludeSet.has(entry.canonicalBrand)) {
-        throw new Error(`Commercial review registry (${version}): brand-aliases-and-identifiers-v1.json references canonicalBrand "${entry.canonicalBrand}", which is not in brands_to_exclude_final.csv — refusing to proceed on an alias entry for an unapproved brand.`);
+      if (!excludeSet.has(entry.canonicalBrand) && !keepSet.has(entry.canonicalBrand)) {
+        throw new Error(`Commercial review registry (${version}): brand-aliases-and-identifiers-v1.json references canonicalBrand "${entry.canonicalBrand}", which is not in brands_to_exclude_final.csv or brands_to_keep_final.csv — refusing to proceed on an alias entry for an unapproved brand.`);
       }
     }
     aliasEntries = parsed.entries;

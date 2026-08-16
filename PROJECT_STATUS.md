@@ -1765,3 +1765,45 @@ structural difference already documented for prior campaigns.)
 
 All 45 suites, typecheck, and build re-run clean after these (documentation-only) corrections.
 No release file was rewritten, no district was rerun, no provider call was made.
+
+## 2026-08-16 — field-sales batch pre-flight: ISS-0042 (customer-match evidence + recall gaps) and the 2026-08-09 commercial-review naming-coverage gaps both fixed and tested, ahead of any live call for campaigns 017-020
+
+Config-only campaigns 017 (Ayesha, EN4-EN9), 018 (Nauman), 019 (Alam), and 020 (Manraj) were
+created for the next field-sales batch (following campaign-016). Pre-flighting against real
+candidate/customer names surfaced two real customer-match leaks that would have reached these
+campaigns and a previously-known, honestly-recorded naming-coverage gap — all fixed before any
+live discovery or paid enrichment call for this batch.
+
+- **ISS-0042 (customer-match-materiality.ts + run-final-scoring-stage-v2.ts):** "BRIM Burgers -
+  Barnet" (campaign-017) only matches real customer F373 via a shared exact email — postcode and
+  trading name both disagree; "Rooster Chicken Purley" (campaign-020) only matches real customer
+  R176 via a component-level street/building address match at an exact matching postcode — the
+  names share only the generic word "rooster". Neither an email-evidence route nor an
+  address-evidence route existed before this fix, and even with them, nothing would have called
+  them for a customer with zero name-similarity overlap — every existing check only ever refines
+  the ONE customer phase1's name search happened to suspect. Fixed with two new confirmed-tier
+  evidence routes (`exact_email`, `exact_address_same_postcode`) plus a new unconditional
+  full-customer-index rescan at final-scoring time (`scanFullCustomerIndex`), mirroring the
+  independent verifier's own already-existing full-index approach but staying structurally
+  separate from it by design.
+- **Commercial-review naming-coverage gap** (honestly recorded, not fixed, on 2026-08-09 — see
+  that date's entry above): "Little Waitrose - Cheam", "Londis Beddington Gardens", "Aksular
+  Enfield Town", "Sankalp Sattvik", and "Southern Co-Op- Banstead Nork Way" now all match their
+  correct owner-approved brand decision. Closed via two additive alias-file entries (reusing the
+  existing multi-word prefix match, no new logic) and a new opt-in-per-brand
+  `bareBranchSuffixApproved` flag (Londis/Aksular/Sankalp only — distinctive, non-generic brand
+  words) — the single-word exact-match default and its Phoenix/Premier/Flames false-positive
+  protection is unchanged for every brand that has not opted in.
+- Verified: `npm run typecheck`/`build` clean; all 47 `test:lead-production-*`/`test:je-*` suites
+  individually re-run, ALL PASSED (one transient network flake on the live `test:je-supabase`
+  integration test, unrelated to this fix, cleared on immediate re-run). Full detail:
+  `docs/11_ISSUES_LOG.md` ISS-0042, `docs/10_BUGS_AND_FIXES.md`, `VERIFY_BEFORE_CLAIMING.md`
+  (2026-08-16 entries).
+- **Not done:** no live discovery or enrichment call has been made for campaigns 017-020 — all
+  four have config only. Not committed or pushed — reporting first, per the established pattern
+  of fixing/verifying before any live/paid call.
+
+**Next action:** owner reviews the ISS-0042 fix (particularly the two real leaked-lead cases) and
+the reopened-then-closed commercial-review naming-coverage gap, then decides on committing/pushing
+this fix and on authorising live discovery for Ayesha (campaign-017), Nauman (campaign-018), Alam
+(campaign-019), and/or Manraj (campaign-020).

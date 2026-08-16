@@ -32,11 +32,14 @@
 // evidence), unchanged.
 
 import { normaliseName, normalisePhone, normaliseDomain, normaliseCompanyNumber, normalisePostcode, nameSimilarity } from "./normalize";
+import { parseAddressComponents, compareAddressComponents } from "./address-components";
 
 export type CustomerMatchEvidenceTier =
   | "exact_company_number"
   | "exact_phone"
+  | "exact_email"
   | "exact_domain"
+  | "exact_address_same_postcode"
   | "exact_postcode_and_strong_identity"
   | "exact_postcode_and_moderate_identity"
   | "none";
@@ -61,6 +64,13 @@ export interface MatchedCustomerRecord {
   domain: string | null;
   domains: string[];
   companyNumber: string | null;
+  // Added 2026-08-16 (field-sales batch certificate-FAIL root-cause fix, ISS-0042): exact email
+  // and free-text address, so this module can check the same two identifiers
+  // verify-customer-leakage.ts already independently checks. Optional — pre-existing call sites
+  // (and every existing test fixture) never set these; they degrade to "no evidence" rather than
+  // guessing, exactly like any other missing identifier already handled here.
+  emails?: string[];
+  address?: string | null;
 }
 
 export interface CustomerMatchMaterialityInput {
@@ -69,6 +79,9 @@ export interface CustomerMatchMaterialityInput {
   candidatePhone: string | null;
   candidateDomain: string | null;
   candidateCompanyNumber: string | null;
+  // Added 2026-08-16 (ISS-0042) — see MatchedCustomerRecord above for why.
+  candidateEmail?: string | null;
+  candidateAddress?: string | null;
   matchedCustomer: MatchedCustomerRecord | null;
 }
 
@@ -104,6 +117,19 @@ export function assessCustomerMatchMateriality(input: CustomerMatchMaterialityIn
     return { material: true, outcomeTier: "confirmed", evidenceTier: "exact_phone", reason: `Exact normalised phone match (${candPhone}).` };
   }
 
+  // Exact email match (ISS-0042, 2026-08-16) — this route did not exist at all before this fix,
+  // even though the customer master's Email/Invoice Email Address columns and the candidate's
+  // own website-verified email were both already available data. Mirrors the exact_phone route
+  // immediately above (unconditional confirm — a shared, exact, hard-to-coincidentally-collide
+  // identifier). Real case: "BRIM Burgers - Barnet" only matched customer F373 via its verified
+  // email; every other identifier (postcode, name) disagreed because F373's registered billing
+  // address is a different town entirely.
+  const candEmail = input.candidateEmail ? input.candidateEmail.trim().toLowerCase() : null;
+  const custEmails = (cust.emails ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean);
+  if (candEmail && custEmails.includes(candEmail)) {
+    return { material: true, outcomeTier: "confirmed", evidenceTier: "exact_email", reason: `Exact email match (${candEmail}).` };
+  }
+
   // Model-defect fix (2026-08-03, customer-suppression forensic audit): a domain match ALONE
   // was treated as confirmed, unconditionally — but a shared email/website domain can legitimately
   // be shared across unrelated businesses (a reseller, a shared agency-built site template, a
@@ -134,6 +160,36 @@ export function assessCustomerMatchMateriality(input: CustomerMatchMaterialityIn
   }
 
   const sameFullPostcode = normalisePostcode(input.candidatePostcode).canonical != null && normalisePostcode(input.candidatePostcode).canonical === normalisePostcode(cust.postcode).canonical;
+
+  // Component-level address match (ISS-0042, 2026-08-16) — same building number + street + exact
+  // postcode is materially stronger evidence than name similarity, and catches the case
+  // name-similarity-based routes below structurally cannot: a business trading under a NEW name
+  // at a customer's OLD premises (no name overlap at all). Real cases: "Rooster Chicken Purley"
+  // vs customer R176 "ROOSTER POINT" (926 Brighton Road, exact same postcode+building+street,
+  // Jaccard name similarity ~0.2 — below even the moderate floor below); "Morley's Fried Chicken -
+  // Kenley" vs customer C569 "CHICKEN WORLD CROYDON NEW" (74 Godstone Road, exact same
+  // postcode+building+street, essentially unrelated names). Reuses address-components.ts
+  // unchanged (already used by verify-customer-leakage.ts) — not a new parser. Gated on
+  // sameFullPostcode (not merely same district) so this never fires on a coincidental
+  // same-street-different-postcode-sector case; compatiblePremises already refuses to fire when
+  // unit/building number explicitly conflict (premisesIdentifierConflict).
+  if (sameFullPostcode && input.candidateAddress && cust.address) {
+    // Real gap already found and fixed once for verify-customer-leakage.ts's own address index
+    // (2026-08-04): a customer master's Address 1/2/City columns never contain a postcode (it's a
+    // separate "Billing Zip" column), so parseAddressComponents' own postcode extraction finds
+    // nothing on that side unless the canonical postcode is appended to the text first. The
+    // candidate's own address text (from Google's formattedAddress) already ends with a postcode,
+    // but appending is harmless (parseAddressComponents takes the FIRST embedded postcode match).
+    const candComponents = parseAddressComponents(`${input.candidateAddress}, ${input.candidatePostcode ?? ""}`);
+    const custComponents = parseAddressComponents(`${cust.address}, ${cust.postcode ?? ""}`);
+    if (candComponents && custComponents) {
+      const cmp = compareAddressComponents(candComponents, custComponents);
+      if (cmp.compatiblePremises && !cmp.premisesIdentifierConflict) {
+        return { material: true, outcomeTier: "confirmed", evidenceTier: "exact_address_same_postcode", reason: `Exact full postcode match (${cust.postcode}) plus a matching street/building address ("${input.candidateAddress}" vs "${cust.address}") — confirmed same physical premises regardless of trading-name similarity.` };
+      }
+    }
+  }
+
   const sim = nameSimilarity(normaliseName(input.candidateName), normaliseName(cust.tradingName));
   if (sameFullPostcode && sim >= STRONG_IDENTITY_NAME_SIM_FLOOR) {
     return { material: true, outcomeTier: "confirmed", evidenceTier: "exact_postcode_and_strong_identity", reason: `Exact full postcode match (${cust.postcode}) plus strong name correspondence (similarity ${sim.toFixed(2)} >= ${STRONG_IDENTITY_NAME_SIM_FLOOR}) — confirmed, not merely probable.` };

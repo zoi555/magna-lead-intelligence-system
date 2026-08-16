@@ -149,11 +149,44 @@ async function main() {
   const partialAliasMatch = matchCandidateToCustomers(partialAliasCandidate, [spiceHutCustomer]);
   assert(!partialAliasMatch.rulesTriggered.includes("exact_trading_name_alias"), `a candidate name that only PARTIALLY overlaps the alias (extra words) does not fire the exact-alias rule even with matching postcode (got rules ${JSON.stringify(partialAliasMatch.rulesTriggered)})`);
 
-  console.log("\n16. REAL CASE — GOODMAYES FISH AND CHIPS (customer G210, real leaked lead IG3-5C1156E1 \"MT doughnuts (donuts) - Goodmayes\", Naseh campaign-005). Deliberately NOT auto-confirmed at phase1 or its post-enrichment re-check stages — the match signal here is full-address-plus-corroboration on a completely different trading name (doughnut shop vs fish & chips), discoverable only via Google-enriched address data that becomes available AFTER phase1 runs. customer-resolution-after-google.ts's own header comment documents this as a deliberate risk tradeoff (\"never opens a fresh search across the whole customer file... risks pulling an already-cleared candidate back onto weak evidence\") — not a bug to silently patch. The independent verifier (which runs against the fully-enriched final Master, with no such restriction) is the correct, intentional safety net for exactly this category of miss:");
+  console.log("\n16. REAL CASE — GOODMAYES FISH AND CHIPS (customer G210, real leaked lead IG3-5C1156E1 \"MT doughnuts (donuts) - Goodmayes\", Naseh campaign-005). phase1 correctly finds nothing PRE-enrichment (no phone/address is available yet at that point) — that part of the design is unchanged and still correct. ISS-0042 (2026-08-16) closed the part of this that WAS a real defect: no later stage ever ran a fresh full-index search using the phone/email/address enrichment adds, so a genuine match with zero name similarity was invisible all the way to release. See case 18 below for the fixed behaviour once the candidate's enriched address is available.");
   const goodmayesCustomer = mkCustomer({ customerId: "G210", tradingName: "GOODMAYES FISH AND CHIPS", isActive: false, postcode: "IG3 9UF" });
   const mtDoughnutsCandidatePreEnrichment = mkCandidate({ name: "MT doughnuts (donuts) - Goodmayes", postcode: "IG3 9UF" }); // no phone/address pre-enrichment, per real Just Eat discovery data
   const mtDoughnutsMatch = matchCandidateToCustomers(mtDoughnutsCandidatePreEnrichment, [goodmayesCustomer]);
-  assert(mtDoughnutsMatch.matchTier === "none", `phase1 correctly finds no name/postcode-based signal at all for two completely differently-named businesses — confirming this is genuinely NOT phase1's job to catch (got tier "${mtDoughnutsMatch.matchTier}")`);
+  assert(mtDoughnutsMatch.matchTier === "none", `phase1 correctly finds no name/postcode-based signal at all pre-enrichment for two completely differently-named businesses (got tier "${mtDoughnutsMatch.matchTier}")`);
+
+  console.log("\n17. REAL CASE — ISS-0042 (2026-08-16, field-sales batch certificate-FAIL root cause): \"BRIM Burgers - Barnet\" (real leaked lead EN5-4550C39D, campaign-017) only matches customer F373 (\"Fast Food Bros Trading Limited T/A Brim\") via its website-verified email — postcode disagrees entirely (F373's registered billing address is Hemel Hempstead, the candidate trades in Barnet) and the name has no meaningful overlap either. customer-match-materiality.ts never checked email at all before this fix, even though the customer master's Email/Invoice Email Address columns were already loaded data:");
+  const brimMateriality = assessCustomerMatchMateriality({
+    candidatePostcode: "EN5 5UZ", candidateName: "BRIM Burgers - Barnet", candidatePhone: "020 8922 4832", candidateEmail: "info@brimburgers.com", candidateDomain: null, candidateCompanyNumber: null,
+    matchedCustomer: { postcode: "HP3 9HL", tradingName: "Fast Food Bros Trading Limited T/A Brim", phone: "07873268887", alternatePhones: ["0794714007", "447301354898"], domain: null, domains: [], companyNumber: null, emails: ["info@brimburgers.com"], address: "30 Lawn Ln, Hemel Hempstead" },
+  });
+  assert(brimMateriality.outcomeTier === "confirmed" && brimMateriality.evidenceTier === "exact_email", `exact email now fires as confirmed evidence even across different postal districts and unrelated names (got tier "${brimMateriality.outcomeTier}", evidence "${brimMateriality.evidenceTier}")`);
+  const brimNoEmailRegression = assessCustomerMatchMateriality({
+    candidatePostcode: "EN5 5UZ", candidateName: "BRIM Burgers - Barnet", candidatePhone: "020 8922 4832", candidateEmail: null, candidateDomain: null, candidateCompanyNumber: null,
+    matchedCustomer: { postcode: "HP3 9HL", tradingName: "Fast Food Bros Trading Limited T/A Brim", phone: "07873268887", alternatePhones: ["0794714007", "447301354898"], domain: null, domains: [], companyNumber: null, emails: ["info@brimburgers.com"], address: "30 Lawn Ln, Hemel Hempstead" },
+  });
+  assert(brimNoEmailRegression.outcomeTier !== "confirmed", "sanity check: with the candidate email genuinely absent (the old gap reproduced), this case correctly stays unconfirmed — proves the fix, not a tautology");
+
+  console.log("\n18. REAL CASE — ISS-0042: \"Rooster Chicken Purley\" (real leaked lead CR8-17C07635, campaign-020) matches customer R176 (\"ROOSTER POINT\") only via a component-level address match (same building number + street + exact postcode, \"926 Brighton Road\") — the trading names share only the generic word \"rooster\" (Jaccard similarity well below even the moderate postcode+name floor) and no phone/email identifier is shared at all. customer-match-materiality.ts had no address-comparison route whatsoever before this fix:");
+  const roosterMateriality = assessCustomerMatchMateriality({
+    candidatePostcode: "CR8 2LN", candidateName: "Rooster Chicken Purley", candidatePhone: "07391323543", candidateAddress: "926 Brighton Rd, Purley CR8 2LN, UK", candidateDomain: null, candidateCompanyNumber: null,
+    matchedCustomer: { postcode: "CR8 2LN", tradingName: "ROOSTER POINT", phone: "02086456333", alternatePhones: ["7365485192"], domain: null, domains: [], companyNumber: null, emails: [], address: "926 Brighton Road, Purely" },
+  });
+  assert(roosterMateriality.outcomeTier === "confirmed" && roosterMateriality.evidenceTier === "exact_address_same_postcode", `component-level address + exact postcode now confirms even with near-zero name similarity (got tier "${roosterMateriality.outcomeTier}", evidence "${roosterMateriality.evidenceTier}")`);
+
+  console.log("\n19. Sanity check: a component-level address match WITHOUT exact postcode agreement must NOT auto-confirm (a false positive guard — two premises can share a street name across different postcode sectors):");
+  const addressWithoutPostcodeMatch = assessCustomerMatchMateriality({
+    candidatePostcode: "CR8 2LN", candidateName: "Some Business", candidatePhone: null, candidateAddress: "10 High Street, Purley CR8 2LN, UK", candidateDomain: null, candidateCompanyNumber: null,
+    matchedCustomer: { postcode: "CR8 9ZZ", tradingName: "Unrelated Business", phone: null, alternatePhones: [], domain: null, domains: [], companyNumber: null, emails: [], address: "10 High Street, Purley" },
+  });
+  assert(addressWithoutPostcodeMatch.outcomeTier !== "confirmed", `component address similarity alone, without an exact full-postcode match, is NOT auto-confirmed (got "${addressWithoutPostcodeMatch.outcomeTier}")`);
+
+  console.log("\n20. Backward compatibility: matchedCustomer records with no emails/address fields at all (every pre-2026-08-16 call site and test fixture) still evaluate without throwing and without ever fabricating a match on the new routes:");
+  const noNewFieldsMateriality = assessCustomerMatchMateriality({
+    candidatePostcode: "AA1 1AA", candidateName: "Some Business", candidatePhone: null, candidateEmail: "someone@example.com", candidateAddress: "1 Made Up Street, AA1 1AA", candidateDomain: null, candidateCompanyNumber: null,
+    matchedCustomer: { postcode: "AA1 1AA", tradingName: "Completely Unrelated Trading Name", phone: null, alternatePhones: [], domain: null, domains: [], companyNumber: null },
+  });
+  assert(noNewFieldsMateriality.outcomeTier !== "confirmed", `a matchedCustomer record with no emails/address populated never fabricates a confirmed match on the new routes (got "${noNewFieldsMateriality.outcomeTier}")`);
 
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);
   process.exit(fails === 0 ? 0 : 1);

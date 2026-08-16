@@ -29,7 +29,7 @@ import { assessPhysicalPremises } from "./physical-premises";
 import { calculateScore } from "./scoring";
 import { calculateChannelSuitability } from "./channel-suitability";
 import { assignFinalOutcome } from "./final-outcome";
-import { assessCustomerMatchMateriality, findConfirmedCustomerMasterMatch } from "./customer-match-materiality";
+import { assessCustomerMatchMateriality, findConfirmedCustomerMasterMatch, type CustomerMatchMaterialityResult, type MatchedCustomerRecord } from "./customer-match-materiality";
 import { classifyQualificationV2 } from "./qualification-v2";
 import { RULES_VERSIONS } from "./rules-versions";
 import { loadCustomerFile } from "./load-customers";
@@ -45,6 +45,52 @@ async function findFile(dir: string, suffix: string): Promise<string> {
   const match = (await fs.readdir(dir)).find((e) => e.endsWith(suffix));
   if (!match) throw new Error(`No file ending in "${suffix}" found in ${dir}.`);
   return path.join(dir, match);
+}
+
+// ISS-0042 (2026-08-16, field-sales batch certificate-FAIL root cause): every customer-match
+// check up to this point (phase1, FSA, Google, Companies House) only ever evaluates the ONE
+// customer phase1's original name-similarity search happened to suspect
+// (`priorMatchedCustomerId`), decided BEFORE Google/website enrichment populates the candidate's
+// phone/email/address. A real customer whose trading name bears no resemblance to the candidate's
+// raw Just Eat listing name (a business rebranded at the same premises) is invisible to that
+// chain no matter how good its own evidence is — it is never even considered. This is the SAME
+// generic root cause the independent verifier (verify-customer-leakage.ts) already closes by
+// doing a fresh full-index scan against the FINAL enriched record; the operational pipeline never
+// did. scanFullCustomerIndex reuses the SAME assessCustomerMatchMateriality evidence rules
+// (extended with email + component-address matching, see customer-match-materiality.ts) against
+// EVERY customer, at final-scoring time — the first point where the candidate's phone/email/
+// address are all simultaneously available. It stays a structurally separate evaluator from
+// verify-customer-leakage.ts's evaluateLeadCustomerPair (deliberately — that script's own header
+// explains why an independent release-gate check must not share logic with the pipeline it
+// audits), just closing the same evidence and recall gaps on this side too.
+const OUTCOME_TIER_RANK: Record<CustomerMatchMaterialityResult["outcomeTier"], number> = { confirmed: 2, probable: 1, none: 0 };
+function moreMaterial(a: CustomerMatchMaterialityResult, b: CustomerMatchMaterialityResult): CustomerMatchMaterialityResult {
+  return OUTCOME_TIER_RANK[b.outcomeTier] > OUTCOME_TIER_RANK[a.outcomeTier] ? b : a;
+}
+function toMatchedCustomerRecord(c: { postcode: string | null; tradingName: string; phone: string | null; alternatePhones: string[]; email: string | null; alternateEmails: string[]; address: string | null; companyNumber: string | null }): MatchedCustomerRecord {
+  const domains = [c.email, ...c.alternateEmails].map((e) => (e && e.includes("@") ? e.split("@")[1] : null)).filter((d): d is string => !!d);
+  return {
+    postcode: c.postcode, tradingName: c.tradingName, phone: c.phone, alternatePhones: c.alternatePhones,
+    domain: domains[0] ?? null, domains, companyNumber: c.companyNumber,
+    emails: [c.email, ...c.alternateEmails].filter((e): e is string => !!e), address: c.address,
+  };
+}
+function scanFullCustomerIndex(
+  candidate: { postcode: string | null; name: string; phone: string | null; email: string | null; address: string | null; domain: string | null; companyNumber: string | null },
+  customers: { customerId: string; postcode: string | null; tradingName: string; phone: string | null; alternatePhones: string[]; email: string | null; alternateEmails: string[]; address: string | null; companyNumber: string | null }[],
+): { result: CustomerMatchMaterialityResult; matchedCustomerId: string | null } {
+  let best: CustomerMatchMaterialityResult = { material: false, outcomeTier: "none", evidenceTier: "none", reason: "Full customer-index rescan found no matching identifier." };
+  let bestId: string | null = null;
+  for (const c of customers) {
+    const r = assessCustomerMatchMateriality({
+      candidatePostcode: candidate.postcode, candidateName: candidate.name, candidatePhone: candidate.phone,
+      candidateEmail: candidate.email, candidateAddress: candidate.address, candidateDomain: candidate.domain,
+      candidateCompanyNumber: candidate.companyNumber, matchedCustomer: toMatchedCustomerRecord(c),
+    });
+    if (OUTCOME_TIER_RANK[r.outcomeTier] > OUTCOME_TIER_RANK[best.outcomeTier]) { best = r; bestId = c.customerId; }
+    if (best.outcomeTier === "confirmed") break; // one confirmed hit is sufficient — no need to keep scanning
+  }
+  return { result: best, matchedCustomerId: bestId };
 }
 
 type DecisionCategory = "genuine_hard_failure" | "channel_specific_failure" | "significant_conflict" | "recoverable_evidence_gap" | "optional_enrichment_gap" | "scoring_only_weakness" | "suspected_model_defect" | "not_applicable_terminal_exclusion";
@@ -324,12 +370,31 @@ async function main() {
     const custDomainsForMateriality = matchedCustomer
       ? [matchedCustomer.email, ...matchedCustomer.alternateEmails].map((e) => (e && e.includes("@") ? e.split("@")[1] : null)).filter((d): d is string => !!d)
       : [];
-    const materiality = assessCustomerMatchMateriality({
-      candidatePostcode: postcode, candidateName: tradingName, candidatePhone: phone, candidateDomain: website?.officialDomain ?? null,
-      candidateCompanyNumber: chDecisive ? chResult?.plausibleCompanies?.[0]?.companyNumber ?? null : null,
-      matchedCustomer: matchedCustomer ? { postcode: matchedCustomer.postcode, tradingName: matchedCustomer.tradingName, phone: matchedCustomer.phone, alternatePhones: matchedCustomer.alternatePhones, domain: custDomainsForMateriality[0] ?? null, domains: custDomainsForMateriality, companyNumber: matchedCustomer.companyNumber } : null,
+    // Candidate email/address, available only from this point on (website extraction ran BEFORE
+    // final-scoring; Google's formattedAddress is only trustworthy when Google's own match was
+    // decisive) — same source fields "Verified Email"/"Full Operating Address" are built from at
+    // export time (candidate-dossier.ts), just read here instead of re-derived differently.
+    const candidateEmail = website?.email?.value ?? null;
+    const candidateAddress = googleDecisive ? correctedGoogleBest?.formattedAddress ?? null : null;
+    const candidateCompanyNumberForMateriality = chDecisive ? chResult?.plausibleCompanies?.[0]?.companyNumber ?? null : null;
+    const chainMateriality = assessCustomerMatchMateriality({
+      candidatePostcode: postcode, candidateName: tradingName, candidatePhone: phone, candidateEmail, candidateAddress,
+      candidateDomain: website?.officialDomain ?? null, candidateCompanyNumber: candidateCompanyNumberForMateriality,
+      matchedCustomer: matchedCustomer ? { postcode: matchedCustomer.postcode, tradingName: matchedCustomer.tradingName, phone: matchedCustomer.phone, alternatePhones: matchedCustomer.alternatePhones, domain: custDomainsForMateriality[0] ?? null, domains: custDomainsForMateriality, companyNumber: matchedCustomer.companyNumber, emails: [matchedCustomer.email, ...matchedCustomer.alternateEmails].filter((e): e is string => !!e), address: matchedCustomer.address } : null,
     });
-    if (hasUnresolvedCustomerConflictBefore && materiality.outcomeTier === "confirmed") {
+    // ISS-0042 full-index rescan (2026-08-16) — see scanFullCustomerIndex's header comment. Runs
+    // regardless of whether phase1/FSA/Google/Companies House ever suspected a customer at all,
+    // because the whole point is to catch the customer none of them suspected. Only the MORE
+    // material of the two results is ever used — this can never make an already-correct exclusion
+    // or an already-correct release less material than it was.
+    const fullScan = scanFullCustomerIndex(
+      { postcode, name: tradingName, phone, email: candidateEmail, address: candidateAddress, domain: website?.officialDomain ?? null, companyNumber: candidateCompanyNumberForMateriality },
+      customersLoaded.customers,
+    );
+    const materiality = moreMaterial(chainMateriality, fullScan.result);
+    const materialityFromFullScanOnly = materiality === fullScan.result && fullScan.result !== chainMateriality && fullScan.result.outcomeTier !== "none";
+    const conflictSuspectedBefore = hasUnresolvedCustomerConflictBefore || materialityFromFullScanOnly;
+    if (materiality.outcomeTier === "confirmed") {
       masterRows.push({
         candidateId, tradingName, postcode, phone: null, website: null,
         v1Bucket: "customer_master_exclusion", v1Level: null, v1Channel: v1Row?.channel ?? null, v1Score: null,
@@ -337,13 +402,15 @@ async function main() {
         qualificationStatus: "customer_master_exclusion", channelEligibility: "neither", enrichmentCompletenessBand: "minimal", enrichmentCompletenessFraction: 0,
         commercialPriorityScore: null, maxPossibleScore: null, finalOutcome: null,
         googleReclassified, googleOutcomeBefore, googleOutcomeAfter,
-        customerConflictMaterialityChanged: true, hasUnresolvedCustomerConflictBefore: true, hasUnresolvedCustomerConflictAfter: true, customerConflictReason: materiality.reason,
-        outcomeChanged: true, changeReason: `Customer-match evidence corroboration reached the "confirmed" tier post-Companies-House: ${materiality.reason}`,
+        customerConflictMaterialityChanged: true, hasUnresolvedCustomerConflictBefore: conflictSuspectedBefore, hasUnresolvedCustomerConflictAfter: true, customerConflictReason: materiality.reason,
+        outcomeChanged: true, changeReason: materialityFromFullScanOnly
+          ? `Full customer-index rescan (post-enrichment, ISS-0042) found a "confirmed" match no earlier stage ever suspected — customer ${fullScan.matchedCustomerId}: ${materiality.reason}`
+          : `Customer-match evidence corroboration reached the "confirmed" tier post-Companies-House: ${materiality.reason}`,
       });
       continue;
     }
-    const hasUnresolvedCustomerConflictAfter = hasUnresolvedCustomerConflictBefore && materiality.outcomeTier === "probable";
-    const customerConflictMaterialityChanged = hasUnresolvedCustomerConflictBefore !== hasUnresolvedCustomerConflictAfter;
+    const hasUnresolvedCustomerConflictAfter = materiality.outcomeTier === "probable";
+    const customerConflictMaterialityChanged = conflictSuspectedBefore !== hasUnresolvedCustomerConflictAfter;
 
     const finalOutcome = assignFinalOutcome(candidateId, gates, scoring, channel, hasUnresolvedCustomerConflictAfter, !!validPhone);
     const qualification = classifyQualificationV2({ hardGates: gates, materialCustomerConflict: hasUnresolvedCustomerConflictAfter, channelSuitability: channel, hasValidPhone: !!validPhone, stagesWithDecisiveEvidence, totalStagesConsidered: 4 });
@@ -373,7 +440,7 @@ async function main() {
       enrichmentCompletenessBand: qualification.enrichmentCompletenessBand, enrichmentCompletenessFraction: Math.round(qualification.enrichmentCompletenessFraction * 100) / 100,
       commercialPriorityScore: scoring.totalScore, maxPossibleScore: scoring.maxPossibleScore, finalOutcome,
       googleReclassified, googleOutcomeBefore, googleOutcomeAfter,
-      customerConflictMaterialityChanged, hasUnresolvedCustomerConflictBefore, hasUnresolvedCustomerConflictAfter, customerConflictReason: materiality.reason,
+      customerConflictMaterialityChanged, hasUnresolvedCustomerConflictBefore: conflictSuspectedBefore, hasUnresolvedCustomerConflictAfter, customerConflictReason: materiality.reason,
       outcomeChanged, changeReason: changeReasonParts.join(" ") || null,
     });
   }

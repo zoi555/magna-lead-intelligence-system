@@ -1,0 +1,76 @@
+{
+  "campaignId": "campaign-019-alam-field-sales-allocation",
+  "campaignVersion": "v1",
+  "channel": "field_sales",
+  "effectiveDate": "2026-08-15",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-15 (next field-sales lead-generation batch, following campaign-016). Owner specified CR0, CR1, CR2, CR3 (4 districts) — see geographyValidationFinding below for why the actual worked allocation is 3 districts.",
+  "description": "Jahangir Alam's field-sales allocation: owner specified CR0, CR1, CR2, CR3. CR1 does not exist as a deliverable UK postcode district in the authoritative geography source (see geographyValidationFinding) and was excluded, never substituted with a neighbouring district. Actual worked allocation: CR0, CR2, CR3 (3 districts).",
+  "geographyValidationFinding": {
+    "district": "CR1",
+    "status": "INVALID — does not exist",
+    "evidence": "Queried the authoritative Supabase postcode_reference table (project aspectlead-platform, rubhjkgygauuixiqouza) directly, read-only: zero rows anywhere with code='CR1' or a code starting 'CR1' (level district, sector, or otherwise). The full real CR-area district set present in the reference data is CR0, CR2, CR3, CR4, CR5, CR6, CR7, CR8, CR9, CR90 — CR1 does not appear at all. This matches known UK postal geography: Croydon's postcode-district numbering has a genuine gap at CR1 (never allocated as a standard geographic delivery district; CR9 is Croydon's own non-geographic/PO-Box-style code).",
+    "actionTaken": "CR1 excluded from live discovery/enrichment entirely — not run, not guessed, not substituted with a neighbouring district (CR9/CR90 were NOT added; explicitly instructed not to add neighbouring districts). Flagged prominently in the batch report for owner confirmation. This is the one blocker-class finding this batch encountered; it did not halt Alam's campaign or any other representative's work — the 3 remaining, confirmed-valid districts (CR0, CR2, CR3) were processed normally.",
+    "recordedPer": "P4 control instruction section 14 stop-condition example 'invalid postcode district' — treated as a non-halting, prominently-flagged finding for this one district within an otherwise valid 4-district allocation, consistent with 'record non-blocking issues and continue.'"
+  },
+  "resolutionNote": "TERRITORY MODEL (established 2026-08-05, docs/09_DECISIONS.md): postcode districts are NON-EXCLUSIVE across representatives. Alam's historical allocation is SM4-SM7 (field_sales) and his prior field-sales batch was campaign-016-alam-field-sales-allocation — both separate, immutable, completed prior campaigns, not touched here.",
+  "representativeIdentityValidation": {
+    "method": "Owner supplied 'Jahangir Alam' as the exact full name directly in this task's instructions (2026-08-15), explicitly stating 'His identity is known and approved for lead generation' and pre-authorising salesProRosterStatus=pending_owner_confirmation if the SalesPro roster does not yet contain him.",
+    "crossCheck": "Cross-checked against the customer master's own 'Sales Rep' column (input/customer-masters/2026-08-03/CustomersProjects81_raw_snapshot_2026-08-03.csv): neither 'Jahangir Alam' nor 'Alam' (as a Sales Rep value) appears — same as found in his prior campaign-016 config. Consistent, not a new finding.",
+    "extractedFields": {
+      "representativeFirstName": "Jahangir",
+      "representativeLastName": "Alam",
+      "representativeFullName": "Jahangir Alam",
+      "representativeEmail": "mjalam@magnafoodservice.co.uk"
+    },
+    "emailNote": "Email supplied directly by the owner in this task's instructions (locked identity, 2026-08-15) — not derived/guessed. Not fabricated.",
+    "judgement": "salesProRosterStatus = pending_owner_confirmation, per the owner's own explicit instruction this pass. This does NOT block lead production (explicit instruction). Global config/lead-production/sales-territories-v2.json already carries Alam as field_sales/mapsRequired=true (added 2026-08-08) — that is a separate, internal pipeline bookkeeping source (map-deliverable requirement only), not the Magna SalesPro CRM roster/dropdown, and this entry's presence does not confirm or fabricate his SalesPro roster entry."
+  },
+  "representative": {
+    "internalName": "Alam",
+    "role": "field_sales",
+    "representativeFullName": "Jahangir Alam",
+    "representativeEmail": "mjalam@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": "Jahangir Alam",
+    "salesProRosterStatus": "pending_owner_confirmation",
+    "regionRoute": "CR0, CR2, CR3",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["CR0", "CR2", "CR3"],
+    "districtCount": 3,
+    "areaDescription": "Croydon / Sanderstead / Caterham"
+  },
+  "sectorWhitelist": {
+    "CR0": ["CR0 0", "CR0 1", "CR0 2", "CR0 3", "CR0 4", "CR0 5", "CR0 6", "CR0 7", "CR0 8", "CR0 9"],
+    "CR2": ["CR2 0", "CR2 1", "CR2 6", "CR2 7", "CR2 8", "CR2 9"],
+    "CR3": ["CR3 0", "CR3 4", "CR3 5", "CR3 6", "CR3 7"]
+  },
+  "sectorWhitelistSource": "Derived from the authoritative Supabase postcode_reference table (level='sector', district=<code>), never manually invented. Used for geography validation only — one Just Eat discovery query per DISTRICT, not per sector.",
+  "alreadyCompletedElsewhere": {
+    "description": "None. CR0/CR2/CR3 confirmed genuinely new for Alam by direct filesystem search of output/territories/ and handover/ before this campaign started.",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["CR0", "CR2", "CR3"],
+    "districtCount": 3,
+    "processingOrder": ["CR0", "CR2", "CR3"]
+  },
+  "explicitlyExcluded": {
+    "sm4ThroughSm7": "Alam's original, already-completed, historical field-sales territory. Immutable. Never rerun.",
+    "cr1": "Owner-listed but does NOT exist as a deliverable UK postcode district — see geographyValidationFinding above. Not run, not substituted.",
+    "neighbouringDistricts": "No districts outside the exact owner-listed set are added — explicitly instructed not to add neighbouring districts (CR9/CR90 were NOT substituted for CR1)."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  },
+  "outputTemplate": "field-sales-31-column-v1",
+  "fieldSalesRoutingStatus": "pending",
+  "pipelineVersion": "temporary-lead-production-v1 (frozen baseline 16c3a7dc8fc912f1e1c5e747497a150e71528f4a, plus additive field-sales export template + CTO contact-position fix, 2026-08-08), commercial-review matching-coverage fix (2026-08-15)",
+  "customerMasterVersion": {
+    "snapshotDate": "2026-08-03",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1"
+  }
+}
