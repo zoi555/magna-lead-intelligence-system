@@ -1799,11 +1799,23 @@ live discovery or paid enrichment call for this batch.
   integration test, unrelated to this fix, cleared on immediate re-run). Full detail:
   `docs/11_ISSUES_LOG.md` ISS-0042, `docs/10_BUGS_AND_FIXES.md`, `VERIFY_BEFORE_CLAIMING.md`
   (2026-08-16 entries).
-- **Not done:** no live discovery or enrichment call has been made for campaigns 017-020 — all
-  four have config only. Not committed or pushed — reporting first, per the established pattern
-  of fixing/verifying before any live/paid call.
+- **Update (same session, later):** live discovery/enrichment for all four campaigns had already
+  run on 2026-08-15 before this fix was written. After the fix landed, `final-scoring` was
+  re-run for every district directly against the existing checkpoints (data-only, no new live/
+  paid call), and release files + zero-leakage certificates were regenerated. Directly verified in
+  the reprocessed data: BRIM Burgers - Barnet (campaign-017) and Rooster Chicken Purley
+  (campaign-020) are now both correctly routed to `customer_master_exclusion` and absent from
+  their delivered field-sales-final-review files — the fix works on the real records, not just the
+  test fixtures. Regenerated certificates: campaign-017 `masterResult: PASS` (0 confirmed leaks);
+  campaigns 018/019/020 `masterResult: FAIL`, but in every case from unresolved **probable**
+  matches only (018: 1, 019: 14, 020: 2 — `confirmedLeakCount: 0` in all three), the same
+  "held pending human review" population every prior campaign has produced, not a new defect.
+  Nothing copied to any representative's `current-release/` folder yet. Full detail:
+  `docs/11_ISSUES_LOG.md` ISS-0042 (2026-08-16, "Update" section).
 
-**Next action:** owner reviews the ISS-0042 fix (particularly the two real leaked-lead cases) and
-the reopened-then-closed commercial-review naming-coverage gap, then decides on committing/pushing
-this fix and on authorising live discovery for Ayesha (campaign-017), Nauman (campaign-018), Alam
-(campaign-019), and/or Manraj (campaign-020).
+**Next action:** owner reviews the ISS-0042 fix (particularly the two confirmed real-leak
+corrections, now verified against the live campaign data) and the reopened-then-closed
+commercial-review naming-coverage gap, then decides on committing/pushing this fix and on how the
+17 combined unresolved-probable holds across campaigns 018 (Nauman, 1), 019 (Alam, 14), and 020
+(Manraj, 2) should be resolved before any of the four campaigns' outputs are treated as
+release-ready.

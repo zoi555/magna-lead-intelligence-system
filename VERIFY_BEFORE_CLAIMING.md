@@ -735,8 +735,38 @@ cap, Notes rewrite, Lead Urgency recalibration, cross-representative combined Ma
   v1.json` (5 new alias/flag entries), `scripts/test-lead-production-commercial-review.ts`,
   `scripts/test-lead-production-customer-suppression-fix.ts`. Full narrative, real-case evidence,
   and root cause: `docs/11_ISSUES_LOG.md` ISS-0042, `docs/10_BUGS_AND_FIXES.md` (2026-08-16).
-- Remaining risk: this was a pre-flight fix — campaigns 017-020 (Ayesha EN4-EN9, Nauman, Alam,
-  Manraj) have config only (`assignments.csv`/`sales-territories-v2.json`/`territories.json`), no
-  live discovery has been run for any of the four representatives, and no owner authorisation to
-  start live/paid calls for this batch has been given yet. Not committed or pushed at the point
-  this entry was written — awaiting instruction.
+- Remaining risk (as first written): this was a pre-flight fix — campaigns 017-020 were believed
+  to have config only, no live discovery run yet. **This was stale by the time of the next check**
+  (below) — live discovery/enrichment for all four had in fact already run on 2026-08-15.
+
+## 2026-08-16 (same day, later) — ISS-0042 fix verified against the actual live campaign data, not just unit tests
+
+- Claim: "the ISS-0042 fix, once applied to campaigns 017-020's already-live data via a
+  checkpoint-only `final-scoring` re-run (no new live/paid call), correctly excludes both real
+  leaked leads found during pre-flight, and every remaining certificate FAIL is an ordinary
+  unresolved-probable hold, not a new defect."
+- Commands run: read the four campaigns' `.orchestrator-run-manifest.json`/checkpoint directories
+  directly — confirmed phase1 through website-stage checkpoints all dated 2026-08-15 (live data
+  already existed), and a second `final-scoring-stage-2026-08-16T21-5x*` checkpoint per district
+  in every campaign (data-only reprocessing against the fixed code, confirmed by inspecting
+  `run-final-scoring-stage-v2.ts`'s own checkpoint-input contract — it makes no external call).
+  Grepped the reprocessed `en5-v2-authoritative-master.json`/`en5-v2-customer-master-exclusions.
+  csv` (campaign-017) directly for `EN5-4550C39D` ("BRIM Burgers - Barnet") — found in the
+  customer-master-exclusions bucket, absent from `campaign-017-...-field-sales-final-review.csv`.
+  Grepped the reprocessed `cr8-v2-authoritative-master.json` (campaign-020) for "Rooster" — found
+  "Rooster Chicken Purley" in the customer-master-exclusions bucket with
+  `customerConflictReason` recorded verbatim as the new ISS-0042 full-index-rescan message
+  (`"...found a "confirmed" match no earlier stage ever suspected — customer R176..."`) — the real
+  code path firing on the real record. Read all four regenerated
+  `*-zero-leakage-certificate.json` files directly: campaign-017 `masterResult: PASS`,
+  `confirmedLeakCount: 0`; campaigns 018/019/020 `masterResult: FAIL`, `confirmedLeakCount: 0` in
+  all three, `unresolvedProbableLeadCount` 1/14/2 respectively.
+- Result: fix confirmed working against real production data, not only the unit-test fixtures.
+  018/019/020's FAILs are the ordinary held-for-human-review population every prior campaign in
+  this project has produced — not something a code fix resolves, and not evidence of a remaining
+  defect in this fix.
+- Remaining risk: nothing has been copied to any representative's `current-release/` folder for
+  these four campaigns. This fix is still **not committed or pushed**. The 17 combined unresolved-
+  probable holds across 018/019/020 still need the owner's usual per-lead review before those
+  campaigns can be considered release-ready; campaign-017 has no outstanding holds of this kind
+  and could be considered release-ready sooner, pending the owner's own review of the fix.

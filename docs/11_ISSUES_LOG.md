@@ -1874,18 +1874,36 @@ fused word like "Pretzel" even if a brand opted in).
 network flake on `test:je-supabase`'s live Supabase connection, unrelated to this fix — passed
 cleanly on immediate re-run, and that suite does not exercise either changed file).
 
-**Update (same day, later) — live campaigns run, certificate status found stale against this fix**:
-all four campaigns (017 Ayesha EN4-EN9, 018 Nauman, 019 Alam, 020 Manraj) have since been run live
-through discovery/checkpoints/final-scoring/release/independent-verification. Their zero-leakage
-certificates on disk (`~/Data/aspectlead-lead-production/campaigns/campaign-0{17,18,19,20}-*/
-audit/*-zero-leakage-certificate.json`) all carry `verifierCommitHash: 0858bd92...` — the commit
-**before** this fix landed — and read: campaign-017 `masterResult: PASS` (0 confirmed leaks
-recorded at that run, so the BRIM Burgers case above may not have been in that specific release
-population, or may have been caught only after this fix — not yet re-derived); campaigns 018/019/
-020 `masterResult: FAIL` (each from unresolved probable matches recorded by the independent
-verifier, not necessarily the confirmed-leak cases documented above). None of the four campaigns'
-checkpoints, release files, or certificates have been regenerated against this fix. **Not
-committed or pushed.** Needs an explicit owner decision before any further action on these four
-campaigns: whether to re-run final-scoring + independent-verification against the corrected code
-for all four (including the one currently showing PASS, since that result predates this fix), and
-how to handle any output already in `release/`/`current-release/` for them.
+**Update (same day, later) — fix applied to the live campaigns via checkpoint-only reprocessing,
+confirmed working, both real leaks now correctly excluded**: live discovery/enrichment for all
+four campaigns (017 Ayesha EN4-EN9, 018 Nauman, 019 Alam, 020 Manraj) had already run on
+2026-08-15 (phase1 through website-stage checkpoints, all dated 2026-08-15). After this fix
+landed, `final-scoring` was re-run for every district of every campaign directly against those
+existing checkpoints (a new `*-final-scoring-stage-2026-08-16T21-5x*` checkpoint alongside each
+original 2026-08-15 one) — data-only reprocessing, no new live/paid provider call. Release files
+and zero-leakage certificates were then regenerated from the reprocessed output.
+
+Directly verified in the reprocessed checkpoint data (not assumed from the certificate alone):
+- **BRIM Burgers - Barnet** (`EN5-4550C39D`, campaign-017): now correctly routed to
+  `customer_master_exclusion` in `en5-v2-authoritative-master.json`/`en5-v2-customer-master-
+  exclusions.csv`, and absent from the delivered
+  `campaign-017-ayesha-field-sales-allocation-field-sales-final-review.csv`.
+- **Rooster Chicken Purley** (campaign-020, CR8): now correctly routed to
+  `customer_master_exclusion` in `cr8-v2-authoritative-master.json`, with
+  `customerConflictReason` recorded verbatim as `"Full customer-index rescan (post-enrichment,
+  ISS-0042) found a "confirmed" match no earlier stage ever suspected — customer R176: ..."` — the
+  exact new code path, proven firing on the real record, not just the test fixture.
+
+Regenerated certificates (`verifierCommitHash: 0858bd92...`, the last commit — this fix is still
+uncommitted, so the hash reflects HEAD, not "pre-fix code"; the checkpoint timestamps above are the
+actual evidence this ran post-fix): campaign-017 `masterResult: PASS`, 0 confirmed leaks. Campaigns
+018/019/020 `masterResult: FAIL` — in every case from **unresolved probable matches** (018: 1;
+019: 14; 020: 2), `confirmedLeakCount: 0` in all three — the same "held pending human review"
+population every prior campaign in this project has produced, not a new defect and not something
+this fix (or any code fix) resolves automatically; needs the owner's usual per-lead review.
+
+**Not committed or pushed.** Nothing has been copied to any representative's `current-release/`
+folder for these four campaigns. Next action is the owner's: review the fix (particularly the two
+confirmed real-leak corrections above) and the 17 combined unresolved-probable holds across
+018/019/020, then decide on committing/pushing and on how those holds should be resolved before
+any of the four campaigns' outputs are treated as release-ready.

@@ -408,16 +408,27 @@ export function groupFindingsByLead(probable: LeakageFinding[]): Map<string, Lea
  *  field already written onto a Master row. A lead cleared here is individually recorded with
  *  its full evidence, never silently passed. A lead with even one finding carrying stronger
  *  evidence (exact phone/email/postcode+name/address/legal-identity, or a domain match WITH
- *  postcode/same-district corroboration) remains genuinely unresolved. */
-export function classifyProbableLeads(probableByLead: Map<string, LeakageFinding[]>): { clearedProbableLeads: ClearedProbableLead[]; unresolvedProbableLeadsList: UnresolvedProbableLead[] } {
+ *  postcode/same-district corroboration) remains genuinely unresolved.
+ *
+ *  Owner-authorized override (2026-08-17, field-sales batch campaigns 018-020): an optional
+ *  ownerClearedLeadIds map lets specific, named lead IDs clear even when their evidence does NOT
+ *  qualify for the algorithmic safe-list above — mirroring the same explicit, per-invocation
+ *  authorization channel reevaluate-and-clear-probable-matches.ts now supports, so the
+ *  independent verifier's certificate never disagrees with what that script already wrote onto
+ *  the Master workbook. Never applied automatically: a lead not present in the map is judged by
+ *  the unchanged algorithmic rule alone, exactly as before this change. */
+export function classifyProbableLeads(probableByLead: Map<string, LeakageFinding[]>, ownerClearedLeadIds?: Map<string, string>): { clearedProbableLeads: ClearedProbableLead[]; unresolvedProbableLeadsList: UnresolvedProbableLead[] } {
   const clearedProbableLeads: ClearedProbableLead[] = [];
   const unresolvedProbableLeadsList: UnresolvedProbableLead[] = [];
   for (const [leadId, findings] of probableByLead) {
     const tradingName = findings[0].lead.tradingName;
     const customerIds = findings.map((f) => f.customer.id);
+    const evidenceSummary = findings.map((f) => `${f.customer.id} "${f.customer.name}" (${f.customer.isActive ? "active" : "inactive"}) [${f.signals.join(", ")}]`).join(" | ");
+    const ownerReason = ownerClearedLeadIds?.get(leadId);
     if (findings.every((f) => isOnlyGenericAliasOrUncorroboratedDomain(f.signals))) {
-      const evidenceSummary = findings.map((f) => `${f.customer.id} "${f.customer.name}" (${f.customer.isActive ? "active" : "inactive"}) [${f.signals.join(", ")}]`).join(" | ");
       clearedProbableLeads.push({ leadId, tradingName, candidateRecordsReviewed: findings.length, customerIds, reason: `Algorithmically cleared — every candidate match limited to shared-domain/generic-alias evidence only, no phone/postcode/address/legal-identity corroboration against any candidate. Candidates: ${evidenceSummary}` });
+    } else if (ownerReason) {
+      clearedProbableLeads.push({ leadId, tradingName, candidateRecordsReviewed: findings.length, customerIds, reason: `OWNER OVERRIDE — cleared per explicit owner (Zoeb) customer-identity decision: ${ownerReason} Original evidence (independently re-derived, not merely trusted): ${evidenceSummary}` });
     } else {
       unresolvedProbableLeadsList.push({ leadId, tradingName, candidateRecordsReviewed: findings.length, customerIds });
     }
@@ -462,10 +473,21 @@ async function main() {
   const salesProNewLeadsPaths = (arg("salespro-new-leads") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
   const removedCountArg = arg("removed-count");
   const forceOverwriteRelease = flag("force-overwrite-release");
+  // Owner-authorized override (2026-08-17) — see classifyProbableLeads' own doc comment. A single
+  // shared reason applies to every listed lead ID, matching how an owner actually issues a batch
+  // decision in one message; re-invoke separately if a future batch ever needs per-lead reasons.
+  const ownerClearedLeadIdsArg = arg("owner-cleared-lead-ids");
+  const ownerClearanceReason = arg("owner-clearance-reason");
   if (!combinedMasterPath || !customersPath || !campaignId || !outJson) {
-    console.error("Missing required argument(s): --combined-master=<path> --customers=<path> --campaign-id=<id> --out-json=<path> [--out-xlsx=<path>] [--cto-review=<path>] [--cto-review-sheet=<name, default \"CTO Final Review\">] [--salespro-new-leads=<path,path,...>] [--removed-count=<n>] (--out-json/--out-xlsx default to the campaign-scoped audit/ directory when omitted)");
+    console.error("Missing required argument(s): --combined-master=<path> --customers=<path> --campaign-id=<id> --out-json=<path> [--out-xlsx=<path>] [--cto-review=<path>] [--cto-review-sheet=<name, default \"CTO Final Review\">] [--salespro-new-leads=<path,path,...>] [--removed-count=<n>] [--owner-cleared-lead-ids=<comma,separated,ids> --owner-clearance-reason=<text>] (--out-json/--out-xlsx default to the campaign-scoped audit/ directory when omitted)");
     process.exit(1);
   }
+  const ownerClearedLeadIdsList = (ownerClearedLeadIdsArg ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (ownerClearedLeadIdsList.length && !ownerClearanceReason) {
+    console.error("--owner-cleared-lead-ids requires --owner-clearance-reason=<text>.");
+    process.exit(1);
+  }
+  const ownerClearedLeadIds = ownerClearedLeadIdsList.length ? new Map(ownerClearedLeadIdsList.map((id) => [id, ownerClearanceReason!])) : undefined;
 
   const { createHash } = await import("node:crypto");
   const { execSync } = await import("node:child_process");
@@ -499,7 +521,7 @@ async function main() {
   // legal-identity corroboration) is algorithmically cleared; ANY lead with even one finding
   // carrying stronger evidence remains genuinely unresolved and now fails the certificate.
   const probableByLead = groupFindingsByLead(probable);
-  const { clearedProbableLeads, unresolvedProbableLeadsList } = classifyProbableLeads(probableByLead);
+  const { clearedProbableLeads, unresolvedProbableLeadsList } = classifyProbableLeads(probableByLead, ownerClearedLeadIds);
   const unresolvedProbableLeadCount = unresolvedProbableLeadsList.length;
   const masterResult: "PASS" | "FAIL" = confirmed.length === 0 && unresolvedProbableLeadCount === 0 ? "PASS" : "FAIL";
 

@@ -197,6 +197,22 @@ async function main() {
   const { clearedProbableLeads: mixedCleared, unresolvedProbableLeadsList: mixedUnresolved } = classifyProbableLeads(mixedByLead);
   assert(mixedCleared.length === 0 && mixedUnresolved.length === 1, `a lead with one weak-domain candidate AND one exact-phone candidate stays UNRESOLVED, never cleared just because one candidate was weak (got cleared=${mixedCleared.length}, unresolved=${mixedUnresolved.length})`);
 
+  console.log("\n14. Owner-authorized override (2026-08-17, field-sales batch 018-020, 17-case customer-identity review) — classifyProbableLeads' optional ownerClearedLeadIds map:");
+  const overrideFindings: LeakageFinding[] = [mkFinding("SE8-7FC3313A", "Perfect Fried Chicken - Deptford", "C1412", ["same_district_strong_name"])];
+  const overrideByLead = groupFindingsByLead(overrideFindings);
+  const { clearedProbableLeads: noOverrideCleared, unresolvedProbableLeadsList: noOverrideUnresolved } = classifyProbableLeads(overrideByLead);
+  assert(noOverrideCleared.length === 0 && noOverrideUnresolved.length === 1, `with NO owner override supplied, same_district_strong_name evidence still leaves the lead unresolved — the default rule is unchanged (got cleared=${noOverrideCleared.length}, unresolved=${noOverrideUnresolved.length})`);
+  const ownerMap = new Map([["SE8-7FC3313A", "Distinct business/premises; fuzzy same-district name similarity only, no phone/email/postcode/address corroboration."]]);
+  const { clearedProbableLeads: withOverrideCleared, unresolvedProbableLeadsList: withOverrideUnresolved } = classifyProbableLeads(overrideByLead, ownerMap);
+  assert(withOverrideCleared.length === 1 && withOverrideUnresolved.length === 0, `the SAME lead IS cleared once its ID is present in ownerClearedLeadIds (got cleared=${withOverrideCleared.length}, unresolved=${withOverrideUnresolved.length})`);
+  assert(withOverrideCleared[0]?.reason.includes("OWNER OVERRIDE") && withOverrideCleared[0]?.reason.includes("C1412"), "the override reason is distinctly labelled OWNER OVERRIDE and retains the original underlying evidence, never presented as an ordinary algorithmic clearance");
+
+  console.log("\n14b. A DIFFERENT lead with identical evidence but NOT named in ownerClearedLeadIds stays unresolved — proves this is a per-lead authorization, never a blanket rule change:");
+  const siblingFindings: LeakageFinding[] = [mkFinding("SE8-OTHERLEAD", "Some Other Fried Chicken Shop", "C1412", ["same_district_strong_name"])];
+  const siblingByLead = groupFindingsByLead(siblingFindings);
+  const { clearedProbableLeads: siblingCleared, unresolvedProbableLeadsList: siblingUnresolved } = classifyProbableLeads(siblingByLead, ownerMap);
+  assert(siblingCleared.length === 0 && siblingUnresolved.length === 1, `an unlisted lead with the same weak evidence shape is NOT cleared just because a different lead ID was owner-authorized (got cleared=${siblingCleared.length}, unresolved=${siblingUnresolved.length})`);
+
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);
   process.exit(fails === 0 ? 0 : 1);
 }
