@@ -1,0 +1,73 @@
+{
+  "campaignId": "campaign-024-ayesha-field-sales-allocation",
+  "campaignVersion": "v1",
+  "channel": "field_sales",
+  "effectiveDate": "2026-08-21",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-21 (next field-sales lead-generation batch, following campaigns 017-020)",
+  "description": "Ayesha Tahir's field-sales allocation: EXACTLY EN5, EN6, EN7, EN8, EN9, EN10 (6 districts). Territories are NON-EXCLUSIVE across representatives and across time (established 2026-08-05, docs/09_DECISIONS.md) — re-working EN5-EN9 is an explicit, intentional owner instruction, not an error.",
+  "resolutionNote": "TERRITORY MODEL (established 2026-08-05, docs/09_DECISIONS.md): postcode districts are NON-EXCLUSIVE across representatives AND may be worked again over time. Ayesha's historical allocation is NW1-NW10 (field_sales, ACCEPTED); her prior field-sales batches were campaign-015-ayesha-field-sales-allocation (EN1-EN3) and campaign-017-ayesha-field-sales-allocation (EN4-EN9) — both separate, immutable, completed prior campaigns, not touched or overwritten here.",
+  "historicalOverlap": {
+    "description": "EN5, EN6, EN7, EN8, EN9 (5 of this campaign's 6 districts) were already fully worked and released in campaign-017 (2026-08-17). This overlap is EXPLICITLY INTENTIONAL per the owner's 2026-08-21 instruction, not a scoping error. Only EN10 is a genuinely new district for Ayesha.",
+    "overlappingDistricts": ["EN5", "EN6", "EN7", "EN8", "EN9"],
+    "newDistrict": ["EN10"],
+    "priorOverlappingCampaignId": "campaign-017-ayesha-field-sales-allocation",
+    "priorOverlappingReleasePath": "/Users/homemac/Data/aspectlead-lead-production/campaigns/campaign-017-ayesha-field-sales-allocation/release/",
+    "policy": "Territorial overlap with campaign-017 is NOT itself a customer match, NOT an automatic exclusion, and NOT a blocker. Ordinary within-campaign deduplication and customer-master suppression still apply exactly as normal. Businesses discovered in this campaign that also appear in campaign-017's release are cross-referenced by trading name + postcode + phone and reported separately in the final release report as 'historical repeat leads' for owner visibility — never silently dropped, never silently merged."
+  },
+  "representativeIdentityValidation": {
+    "method": "Owner supplied 'Ayesha Tahir' as the exact full name AND her email (ayesha.tahir@magnafoodservice.co.uk) directly in this task's instructions (locked identity, 2026-08-21) — matches campaigns 015/017 for this exact person.",
+    "judgement": "Treated as CONFIRMED — consistent with campaigns 015/017's precedent for this same person."
+  },
+  "representative": {
+    "internalName": "Ayesha",
+    "role": "field_sales",
+    "representativeFullName": "Ayesha Tahir",
+    "representativeEmail": "ayesha.tahir@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": "Ayesha Tahir",
+    "salesProRosterStatus": "confirmed",
+    "regionRoute": "EN5, EN6, EN7, EN8, EN9, EN10",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["EN5", "EN6", "EN7", "EN8", "EN9", "EN10"],
+    "districtCount": 6,
+    "areaDescription": "East Barnet / Potters Bar border / Cheshunt / Broxbourne (EN10 is Hertfordshire, just north of EN9)"
+  },
+  "sectorWhitelist": {
+    "EN5": ["EN5 1", "EN5 2", "EN5 3", "EN5 4", "EN5 5", "EN5 9"],
+    "EN6": ["EN6 1", "EN6 2", "EN6 3", "EN6 4", "EN6 5", "EN6 9"],
+    "EN7": ["EN7 5", "EN7 6"],
+    "EN8": ["EN8 0", "EN8 1", "EN8 7", "EN8 8", "EN8 9"],
+    "EN9": ["EN9 1", "EN9 2", "EN9 3"],
+    "EN10": ["EN10 6", "EN10 7"]
+  },
+  "sectorWhitelistSource": "Derived from the authoritative Supabase postcode_reference table (level='sector', district=<code>), never manually invented. Used for geography validation only — one Just Eat discovery query per DISTRICT, not per sector.",
+  "alreadyCompletedElsewhere": {
+    "description": "EN5-EN9 were already worked in campaign-017 (2026-08-17). Per explicit owner instruction (2026-08-21), this is NOT treated as a blocker and the districts are NOT silently dropped — see 'historicalOverlap' above for the required cross-campaign repeat-lead handling. EN10 is genuinely new.",
+    "postcodeDistricts": ["EN5", "EN6", "EN7", "EN8", "EN9"],
+    "sourceCampaignId": "campaign-017-ayesha-field-sales-allocation",
+    "sourceOutputDir": "/Users/homemac/Data/aspectlead-lead-production/campaigns/campaign-017-ayesha-field-sales-allocation/"
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["EN5", "EN6", "EN7", "EN8", "EN9", "EN10"],
+    "districtCount": 6,
+    "processingOrder": ["EN5", "EN6", "EN7", "EN8", "EN9", "EN10"],
+    "note": "All 6 districts are run in this campaign (intentional re-run of EN5-EN9 plus new EN10) — 'new' here means 'in scope for this campaign', not 'never seen before'."
+  },
+  "explicitlyExcluded": {
+    "nw1ThroughNw10": "Ayesha's original, already-completed, historical field-sales territory. Immutable. Never rerun.",
+    "en1ThroughEn3": "Ayesha's prior field-sales batch (campaign-015). Immutable. Never rerun.",
+    "neighbouringDistricts": "No districts outside the exact owner-listed set (EN5-EN10) are added — explicitly instructed not to add neighbouring districts."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  },
+  "outputTemplate": "field-sales-31-column-v1",
+  "fieldSalesRoutingStatus": "pending",
+  "pipelineVersion": "temporary-lead-production-v1, commit 5a39325 baseline (owner probable-match clearance + release-gate work, 64cd5be)",
+  "customerMasterVersion": {
+    "snapshotDate": "2026-08-03",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1"
+  }
+}

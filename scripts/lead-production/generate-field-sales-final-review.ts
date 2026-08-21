@@ -13,9 +13,13 @@
 //     telesales one, only ever carries through an already-correct Master value.
 //
 // Field-sales-specific column rules (owner instruction, 2026-08-08):
-//   - Field Sales Rep = the approved field-sales representative (Master's own "Assigned
-//     Representative" — already stamped at Master-export time via --sales-rep-value, same
-//     mechanism as telesales; not re-derived here).
+//   - Field Sales Rep = the approved field-sales representative's FULL approved name (owner
+//     instruction, 2026-08-21 — internal shorthand, e.g. "Ayesha", must never appear in the final
+//     export). Master's own "Assigned Representative" (stamped at Master-export time via
+//     --sales-rep-value, same mechanism as telesales) still carries the internal shorthand — this
+//     exporter alone maps it to the full name via FIELD_SALES_REP_FULL_NAME_MAP, immediately
+//     before writing the row. The Master itself, the telesales exporter, and every other
+//     downstream consumer of "Assigned Representative" are untouched.
 //   - Sales Rep = always blank (mirrors the telesales exporter's "Field Sales Rep always blank"
 //     rule, inverted).
 //   - Customer NetSuite Account Code = always blank.
@@ -55,6 +59,21 @@ const FIELD_SALES_ADDRESS_COLUMNS = ["Address 1 - Line 1", "Address 1 - Line 2",
 const FIELD_SALES_ROUTE_PLANNING_COLUMNS = ["Week", "Day", "Stop Number"]; // always blank here — a separate workstream owns these
 export const FIELD_SALES_FINAL_REVIEW_COLUMNS = [...FIELD_SALES_ORIGINAL_20_COLUMNS, ...FIELD_SALES_ADDRESS_COLUMNS, "Note 1", "Note 2", ...FIELD_SALES_ROUTE_PLANNING_COLUMNS];
 
+// Owner-approved full-name mapping (locked, 2026-08-21) — "Field Sales Rep" in the final export
+// must never carry internal shorthand. Extend only on an explicit owner-approved addition; an
+// unmapped "Assigned Representative" value passes through unchanged rather than being blocked, so
+// this exporter never silently drops a row over a naming gap.
+export const FIELD_SALES_REP_FULL_NAME_MAP: Record<string, string> = {
+  Nauman: "Nauman Khan",
+  Manraj: "Manraj Dhillon",
+  Alam: "Jahangir Alam",
+  Ayesha: "Ayesha Tahir",
+};
+
+export function fieldSalesRepFullName(assignedRepresentative: string): string {
+  return FIELD_SALES_REP_FULL_NAME_MAP[assignedRepresentative] ?? assignedRepresentative;
+}
+
 export interface FieldSalesFinalReviewResult {
   rowCount: number;
   columnCount: number;
@@ -74,7 +93,7 @@ export function mapMasterRowToFieldSalesFinalReview(m: Record<string, unknown>):
     Phone: String(m["Main Phone"] ?? ""),
     Whatsapp: String(m["WhatsApp Number"] ?? ""),
     "Customer NetSuite Account Code": "", // field-sales row — always blank, per locked instruction
-    "Field Sales Rep": String(m["Assigned Representative"] ?? ""),
+    "Field Sales Rep": fieldSalesRepFullName(String(m["Assigned Representative"] ?? "")),
     "Sales Rep": "", // field-sales row — always blank, per locked instruction
     "Region/Route": String(m["Sales Territory"] ?? ""),
     Postcode: String(m["Full Postcode"] ?? ""),

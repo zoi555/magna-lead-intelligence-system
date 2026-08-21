@@ -66,12 +66,22 @@ async function findFileEndingWith(dir: string, suffix: string): Promise<string |
 async function runDistrict(district: string, rep: TerritoryRepresentative, args: {
   customers: string; registry: string; outRoot: string; live: boolean; requestPlanOnly: boolean; resume: boolean;
   discoveryRunIds: Map<string, string>; checkpointOverrides: Map<string, string>; maxCalls: { google: string | null; ch: string | null; chDocs: string | null };
+  groups: string | null; repAssignments: string | null;
 }): Promise<{ ok: boolean; stdout: string; districtOutDir: string }> {
   const districtOutDir = path.join(args.outRoot, district.toLowerCase());
   await fs.mkdir(districtOutDir, { recursive: true });
   const cliArgs = [
     `--territory=${district}`, `--customers=${args.customers}`, `--registry=${args.registry}`, `--out=${districtOutDir}`,
   ];
+  // Forwarded through to run-full-territory.ts's OWN, separately-named --groups (Phase-1
+  // large-group/franchise registry) and --assignments (the salesperson/territory assignment CSV,
+  // used only for map_required resolution — distinct from this wrapper's own --assignments,
+  // which is the sales-territories-v2.json representative/district config) flags. Both are
+  // optional here so every pre-existing caller of this wrapper that never supplied them keeps
+  // behaving exactly as before (phase1 stays request-plan/live-blocked with the same error it
+  // always gave, never silently degraded).
+  if (args.groups) cliArgs.push(`--groups=${args.groups}`);
+  if (args.repAssignments) cliArgs.push(`--assignments=${args.repAssignments}`);
   if (args.live) cliArgs.push("--live"); else cliArgs.push("--dry-run");
   if (args.requestPlanOnly) cliArgs.push("--request-plan-only");
   if (args.resume) cliArgs.push("--resume");
@@ -100,6 +110,14 @@ async function main() {
   const requestPlanOnly = flag("request-plan-only");
   const resume = flag("resume");
   const retryHeld = flag("retry-held");
+  // Phase-1 large-group/franchise registry, forwarded verbatim to run-full-territory.ts's own
+  // --groups flag — a SEPARATE control from the owner commercial-review-v1 KEEP/EXCLUDE registry
+  // (loaded independently via load-commercial-review.ts). Never merge the two.
+  const groups = arg("groups");
+  // The salesperson/territory assignment CSV (e.g. a campaign's assignments.csv), forwarded to
+  // run-full-territory.ts's own --assignments flag (map_required resolution only) — distinct
+  // from this wrapper's --assignments above, which is sales-territories-v2.json.
+  const repAssignments = arg("rep-assignments");
 
   if (!representativeName) { console.error("Missing required argument: --representative=<name>"); process.exit(1); }
   const missing = [!customers && "--customers=<path>", !registry && "--registry=<path>"].filter(Boolean);
@@ -146,7 +164,7 @@ async function main() {
   if (requestPlanOnly) {
     const plans: any[] = [];
     for (const district of rep.postcodeDistricts) {
-      const r = await runDistrict(district, rep, { customers: customers!, registry: registry!, outRoot, live: false, requestPlanOnly: true, resume: false, discoveryRunIds, checkpointOverrides, maxCalls });
+      const r = await runDistrict(district, rep, { customers: customers!, registry: registry!, outRoot, live: false, requestPlanOnly: true, resume: false, discoveryRunIds, checkpointOverrides, maxCalls, groups, repAssignments });
       const planPath = path.join(r.districtOutDir, "territory-request-plan.json");
       plans.push({ district, ok: r.ok, plan: (await exists(planPath)) ? await readJson(planPath) : null });
     }
@@ -164,7 +182,7 @@ async function main() {
     if (existing && existing.status.startsWith("held_") && !retryHeld) { console.log(`\n[${district}] held (${existing.status}), skipping — pass --retry-held to retry.`); continue; }
 
     console.log(`\n[${district}] running per-district orchestrator (rep: ${rep.representative})...`);
-    const result = await runDistrict(district, rep, { customers: customers!, registry: registry!, outRoot, live, requestPlanOnly: false, resume, discoveryRunIds, checkpointOverrides, maxCalls });
+    const result = await runDistrict(district, rep, { customers: customers!, registry: registry!, outRoot, live, requestPlanOnly: false, resume, discoveryRunIds, checkpointOverrides, maxCalls, groups, repAssignments });
     process.stdout.write(result.stdout.split("\n").map((l) => `    ${l}`).join("\n") + "\n");
 
     const record: DistrictRecord = {

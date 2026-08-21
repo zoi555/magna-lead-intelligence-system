@@ -1592,3 +1592,19 @@ candidate name per brand, proves the Sambal Express override both ways (absent f
 present in keep), proves an unregistered "large-sounding" brand is neither excluded nor kept
 (no size heuristic exists), and separately proves (not silently omits) the three known naming-
 coverage gaps above.
+
+## 2026-08-21 — live Just Eat discovery must run sequentially, not concurrently, on this pipeline
+
+Field-sales batch (campaigns 021-024) launched all 12 districts' `je:run` live discovery jobs in
+parallel. 10 of 12 failed — `ECONNRESET`/`fetch failed` Supabase write errors, plus one queued
+execution's worker-lease claimed by a completely different district's process ("aborted — lease
+lost to another worker"). Confirmed authoritatively via `discovery_runs.status` (not just log
+parsing, which was itself unreliable under the contention). Re-run strictly one district at a time:
+all 12 completed cleanly (real timings 53s-322s each with zero contention).
+
+**Decision:** the temporary lead-production pipeline's live discovery step (`scripts/je-run.ts` /
+`npm run je:run`) must be invoked for ONE postcode district at a time until someone deliberately
+engineers and tests safe concurrency (e.g. per-tenant worker-lease isolation, connection pooling
+sized for parallel writes). Not fixed here — explicitly out of scope for this batch, and a genuine
+architecture change, not a one-line fix. Any future session running multi-district discovery must
+default to sequential unless this is revisited.

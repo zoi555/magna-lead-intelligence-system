@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 1,
+  "note": "Campaign-scoped documentation copy only — mapsRequired for the live pipeline is resolved from the GLOBAL config/lead-production/sales-territories-v2.json (Nauman already has an entry there, field_sales, mapsRequired=true from his original RM1-RM14 allocation), never from this per-campaign file. SE15 is newly run for Nauman in this campaign.",
+  "representatives": [
+    {
+      "representative": "Nauman",
+      "role": "field_sales",
+      "salesTerritory": "SE15",
+      "postcodeDistricts": ["SE15"],
+      "districtCount": 1,
+      "mapsRequired": false
+    }
+  ]
+}

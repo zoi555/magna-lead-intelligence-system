@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 2,
+  "note": "Campaign-scoped documentation copy only — mapsRequired for the live pipeline is resolved from the GLOBAL config/lead-production/sales-territories-v2.json (Alam already has an entry there, field_sales, mapsRequired=true from his original SM4-SM7 allocation), never from this per-campaign file. Both districts (BR1-BR2) are newly run for Alam in this campaign.",
+  "representatives": [
+    {
+      "representative": "Alam",
+      "role": "field_sales",
+      "salesTerritory": "BR1, BR2",
+      "postcodeDistricts": ["BR1", "BR2"],
+      "districtCount": 2,
+      "mapsRequired": false
+    }
+  ]
+}

@@ -1924,3 +1924,34 @@ campaigns 013-016 for these same representatives are preserved under
 `previous-release-archived-2026-08-17/`, not deleted. Committed as `64cd5be` and pushed — current
 pushed HEAD on `feature/mvp-vertical-slice-001`. Full narrative: `PROJECT_STATUS.md` (2026-08-17
 entry).
+
+## ISS-0043 — OPEN — `test:je-supabase` fails at `deleteRunCascade` teardown with a Postgres statement timeout, not a functional regression (2026-08-21)
+
+**Found during the field-sales batch (campaigns 021-024) post-batch test pass.** All 10 substantive
+assertions in `test:je-supabase` pass every time (RPC claim, outlet/observation persistence,
+data-quality report, execution counter, FK enforcement, empty-queue claim, append-only enforcement,
+RLS tenant isolation, RLS raw-payload restriction). The test then fails at its own cleanup step —
+`SupabaseRepository.deleteRunCascade` (`src/lib/discovery-engine/repository/supabase.ts`), a single
+`DELETE FROM discovery_runs WHERE id = <run>` relying on `ON DELETE CASCADE` — with
+`{"code":"57014", "message":"canceling statement due to statement timeout"}`. Reproduced 3 times in
+a row (not a one-off flake): the plain run-to-run retry pattern that cleared this same test in the
+2026-08-16 ISS-0042 session no longer clears it.
+
+**Root cause (confirmed, not guessed):** this batch ran 12 live Just Eat discovery jobs (SE15,
+BR1-BR5, EN5-EN10) in one session, growing the discovery tables enormously — checked directly via
+`execute_sql`: `je_raw_observations` 138,978 rows, `je_field_provenance` 396,597 rows,
+`je_rating_history` 138,862 rows, `je_outlets` 20,385 rows. A cascade delete keyed off
+`discovery_runs.id` has to resolve through this much larger row volume than existed when this test
+was last verified; the timeout is consistent with the cascade now taking longer than Postgres'
+configured `statement_timeout`, not with any change in this session's code. No file this batch
+touched (`generate-field-sales-final-review.ts`, `run-sales-territory.ts`, the two test files) is
+anywhere near this code path.
+
+**Not fixed here** — per explicit instruction, no pipeline/schema redesign this task (a real fix
+would mean either an index on the cascading FK columns or a longer `statement_timeout` for this
+specific delete, both migration-scope changes outside this batch's remit). Recorded as open,
+infrastructure-scoped, not blocking: the substantive functionality this test protects (RLS,
+append-only observations, claim/heartbeat, execution counters) is proven working on every run: only
+its own teardown call is affected, and it never touches production data (the 4 released campaigns'
+data lives entirely outside this test's fixture rows). typecheck and build both clean; all other
+46 of 47 `test:lead-production-*`/`test:je-*` suites pass individually.

@@ -244,6 +244,21 @@ async function main() {
     assert(Array.isArray(plan.districts) && plan.districts.length === 5, `plan has exactly 5 per-district entries (got ${plan.districts?.length})`);
     assert(plan.districts.every((d: any) => ["EN1","EN2","EN3","EN4","EN5"].includes(d.district)), "every plan entry is one of Hassan's actual 5 districts, nothing extra/missing");
   }
+
+  console.log("\n--groups/--rep-assignments forwarding (2026-08-21 fix): run-sales-territory.ts must forward its OWN --groups/--rep-assignments to run-full-territory.ts's separately-named --groups/--assignments flags:");
+  console.log("  (DRY-RUN, not request-plan-only — phase1's own error text is only ever printed to stdout in this mode, and a fake --discovery-run-id is required to get past phase1's FIRST check so its SECOND check, the one this fix targets, is actually reached. Dry-run stops at the first failing stage, so nothing beyond phase1 ever runs — zero live/external calls either way.)");
+  const assignmentsCsv = "salesperson,role,territory,required_lead_count,map_required,notes\nHassan,telesales,EN1,0,false,test\n"; // Hassan's real role in the authoritative sales-territories-v2.json is telesales — must match or run-full-territory.ts's own assignment-role cross-check fails first
+  await fs.writeFile(path.join(fixturesDir, "assignments.csv"), assignmentsCsv);
+  const outDirNoGroups = path.join(tmpRoot, "out-no-groups");
+  const resNoGroups = spawnSync("npx", ["tsx", "scripts/lead-production/run-sales-territory.ts", "--representative=Hassan", `--customers=${path.join(fixturesDir, "customers.csv")}`, `--registry=${path.join(fixturesDir, "registry.json")}`, "--discovery-run-id=EN1=fake-run-id-for-test", `--out=${outDirNoGroups}`, "--dry-run"], { encoding: "utf8", cwd: process.cwd() });
+  assert(/requires --assignments=<path> and --groups=<path>/.test(resNoGroups.stdout), `baseline (no --groups/--rep-assignments) still fails phase1 on the missing-registry check exactly as before — unchanged pre-existing behaviour (stdout tail: ${resNoGroups.stdout.slice(-400)})`);
+
+  const outDirWithGroups = path.join(tmpRoot, "out-with-groups");
+  const resWithGroups = spawnSync("npx", ["tsx", "scripts/lead-production/run-sales-territory.ts", "--representative=Hassan", `--customers=${path.join(fixturesDir, "customers.csv")}`, `--registry=${path.join(fixturesDir, "registry.json")}`, `--groups=${path.join(fixturesDir, "registry.json")}`, `--rep-assignments=${path.join(fixturesDir, "assignments.csv")}`, "--discovery-run-id=EN1=fake-run-id-for-test", `--out=${outDirWithGroups}`, "--dry-run"], { encoding: "utf8", cwd: process.cwd() });
+  assert(!/requires --assignments=<path> and --groups=<path>/.test(resWithGroups.stdout), `once --groups/--rep-assignments are forwarded, phase1 no longer fails on the missing-registry check (stdout tail: ${resWithGroups.stdout.slice(-500)})`);
+  assert(resWithGroups.stdout.includes("Assignment: Hassan (telesales)"), `--rep-assignments genuinely reached run-full-territory.ts's own assignment-role validation, not just accepted and ignored (stdout tail: ${resWithGroups.stdout.slice(-500)})`);
+  assert(resWithGroups.stdout.includes("Run fake-run-id-for-test not found"), `--groups genuinely reached run-comparison.ts — EN1's phase1 now fails for run-comparison.ts's own real reason (a non-existent discovery run), proving the fix forwards the registry args without bypassing any real validation (stdout tail: ${resWithGroups.stdout.slice(-500)})`);
+
   await fs.rm(tmpRoot, { recursive: true, force: true });
 
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);

@@ -6,7 +6,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import * as XLSX from "xlsx";
-import { FIELD_SALES_FINAL_REVIEW_COLUMNS, generateFieldSalesFinalReview, mapMasterRowToFieldSalesFinalReview } from "./lead-production/generate-field-sales-final-review";
+import { FIELD_SALES_FINAL_REVIEW_COLUMNS, generateFieldSalesFinalReview, mapMasterRowToFieldSalesFinalReview, fieldSalesRepFullName } from "./lead-production/generate-field-sales-final-review";
 
 let fails = 0;
 const assert = (c: boolean, m: string) => { if (!c) { console.error("  ✗", m); fails++; } else console.log("  ✓", m); };
@@ -52,6 +52,21 @@ async function main() {
   assert(r2["Field Sales Rep"] === "Nauman Khan", `Field Sales Rep carries the exact Assigned Representative value (got "${r2["Field Sales Rep"]}")`);
   assert(r2["Region/Route"] === "SE10, SE18", `Region/Route carries the exact Sales Territory value (got "${r2["Region/Route"]}")`);
   assert(r2["Week"] === "" && r2["Day"] === "" && r2["Stop Number"] === "", "Week/Day/Stop Number are always blank — route-planning workstream populates these later, never this script");
+
+  console.log("\n2b. Field Sales Rep uses the owner-approved FULL name, never internal shorthand (locked, 2026-08-21):");
+  assert(fieldSalesRepFullName("Nauman") === "Nauman Khan", `Nauman -> Nauman Khan (got "${fieldSalesRepFullName("Nauman")}")`);
+  assert(fieldSalesRepFullName("Manraj") === "Manraj Dhillon", `Manraj -> Manraj Dhillon (got "${fieldSalesRepFullName("Manraj")}")`);
+  assert(fieldSalesRepFullName("Alam") === "Jahangir Alam", `Alam -> Jahangir Alam (got "${fieldSalesRepFullName("Alam")}")`);
+  assert(fieldSalesRepFullName("Ayesha") === "Ayesha Tahir", `Ayesha -> Ayesha Tahir (got "${fieldSalesRepFullName("Ayesha")}")`);
+  const r2bNauman = mapMasterRowToFieldSalesFinalReview(mkMasterRow({ "Assigned Representative": "Nauman" }));
+  assert(r2bNauman["Field Sales Rep"] === "Nauman Khan", `end-to-end row mapping resolves shorthand "Nauman" to "Nauman Khan" (got "${r2bNauman["Field Sales Rep"]}")`);
+  const r2bManraj = mapMasterRowToFieldSalesFinalReview(mkMasterRow({ "Assigned Representative": "Manraj" }));
+  assert(r2bManraj["Field Sales Rep"] === "Manraj Dhillon", `end-to-end row mapping resolves shorthand "Manraj" to "Manraj Dhillon" (got "${r2bManraj["Field Sales Rep"]}")`);
+  const r2bAlam = mapMasterRowToFieldSalesFinalReview(mkMasterRow({ "Assigned Representative": "Alam" }));
+  assert(r2bAlam["Field Sales Rep"] === "Jahangir Alam", `end-to-end row mapping resolves shorthand "Alam" to "Jahangir Alam" (got "${r2bAlam["Field Sales Rep"]}")`);
+  const r2bAyesha = mapMasterRowToFieldSalesFinalReview(mkMasterRow({ "Assigned Representative": "Ayesha" }));
+  assert(r2bAyesha["Field Sales Rep"] === "Ayesha Tahir", `end-to-end row mapping resolves shorthand "Ayesha" to "Ayesha Tahir" (got "${r2bAyesha["Field Sales Rep"]}")`);
+  assert(fieldSalesRepFullName("Some Unmapped Rep") === "Some Unmapped Rep", "an unmapped Assigned Representative value passes through unchanged rather than being blocked or blanked");
 
   console.log("\n3. Address block — permanent CTO corrections (owner instruction, 2026-08-08):");
   assert(r2["Address 1 - Line 1"] === "1 High Street" && r2["Address 1 - City"] === "Testville" && r2["Address 1 - Postcode"] === "AA1 1AA", "address fields carried through from the Master row under the new '- ' naming convention");
