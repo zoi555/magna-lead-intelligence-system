@@ -8,8 +8,9 @@ import { spawnSync } from "node:child_process";
 import * as XLSX from "xlsx";
 import { computeLeadId, resolveMasterFields } from "./lead-production/master-field-resolver";
 import type { Dossier } from "./lead-production/candidate-dossier";
-import { classify, type RowBundle } from "./lead-production/generate-master-export";
+import { classify, findHistoricalMatches, type RowBundle } from "./lead-production/generate-master-export";
 import { loadCommercialReviewRegistry } from "./lead-production/load-commercial-review";
+import { dedupeAcrossDistricts, type DistrictCandidateForDedup } from "./lead-production/district-reconciliation";
 
 let fails = 0;
 const assert = (c: boolean, m: string) => { if (!c) { console.error("  ✗", m); fails++; } else console.log("  ✓", m); };
@@ -193,6 +194,41 @@ async function main() {
     assert(!wb.SheetNames.includes("Reactivation"), "the representative workbook has no Reactivation sheet");
   }
   await fs.rm(outDir, { recursive: true, force: true });
+
+  console.log("\nHistorical cross-campaign policy (owner correction, 2026-08-21) — previously generated is neither an automatic pass nor an automatic exclusion:");
+  const histTmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "historical-policy-test-"));
+  const historicalWb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(historicalWb, XLSX.utils.json_to_sheet([
+    { "Permanent Lead ID": "RM1-HIST0001", "Assigned Representative": "Nauman", "Trading Name": "Repeat Chicken Shop", "Postcode District": "RM1", "Full Postcode": "RM1 1AA", "Main Phone": "020 7946 0001", Website: null, "Companies House Number": null },
+  ]), "Operationally Usable Leads");
+  const historicalPath = path.join(histTmpDir, "historical-master.xlsx");
+  XLSX.writeFile(historicalWb, historicalPath);
+
+  const repeatCandidateDossier = mkDossier({ candidateId: "c-repeat" }); // same postcode+phone as the historical fixture row above -> matches
+  const newCandidateDossier = mkDossier({ candidateId: "c-new" }, { telephone: "020 7946 9999", website: "https://brandnewplace.co.uk" });
+  const rowBundles: RowBundle[] = [
+    { dossier: repeatCandidateDossier, resolved: resolveMasterFields(repeatCandidateDossier, { territory: "RM1", representative: "Saif", role: "field_sales", salesTerritory: "RM1" }), district: "RM1" },
+    { dossier: newCandidateDossier, resolved: resolveMasterFields(newCandidateDossier, { territory: "RM1", representative: "Saif", role: "field_sales", salesTerritory: "RM1" }), district: "RM1" },
+  ];
+  const historicalMatches = await findHistoricalMatches(rowBundles, [{ district: "RM1" }], historicalPath);
+  assert(historicalMatches.length === 1 && historicalMatches[0].droppedCandidateId === "c-repeat", `findHistoricalMatches still correctly IDENTIFIES the repeat business for audit (got ${JSON.stringify(historicalMatches.map((m) => m.droppedCandidateId))})`);
+  assert(historicalMatches[0].historicalLeadId === "RM1-HIST0001" && historicalMatches[0].historicalRepresentative === "Nauman", "the audit record preserves the original campaign's Lead ID and representative — provenance, not a decision");
+  assert(rowBundles.length === 2, "1a. a lead released in an earlier campaign (c-repeat) is NOT removed from this campaign's candidate set — findHistoricalMatches returns only a match list, never a filtered row set, so there is nothing for the caller to accidentally exclude with");
+
+  console.log("\n1b. A lead already released historically is STILL removed if it is now a confirmed Magna customer (unrelated, unweakened control):");
+  const confirmedCustomerDossier = mkDossier({ candidateId: "c-repeat-now-customer", v1Bucket: "customer_master_exclusion", qualificationStatus: "customer_master_exclusion" }, { magna_customer_match_result: "confirmed_active_customer" });
+  const resolvedConfirmed = resolveMasterFields(confirmedCustomerDossier, { territory: "RM1", representative: "Saif", role: "field_sales", salesTerritory: "RM1" });
+  const confirmedRegistry = await loadCommercialReviewRegistry("config/lead-production/commercial-review-v1");
+  const confirmedBuckets = classify([{ dossier: confirmedCustomerDossier, resolved: resolvedConfirmed, district: "RM1" }], confirmedRegistry, "Saif");
+  assert(confirmedBuckets.customerMasterExclusions.length === 1 && confirmedBuckets.usable.length === 0, "a lead that is now a confirmed active customer still lands in Customer Master Exclusions, never Usable — historical-match policy change does not touch customer suppression at all");
+
+  console.log("\n1c. Within-CURRENT-campaign duplicate premises are still deduplicated (unrelated, unweakened control):");
+  const withinCampaignA: DistrictCandidateForDedup = { candidateId: "wc-a", district: "RM1", tradingName: "Same Premises Cafe", postcode: "RM1 2BB", phone: "020 7946 5555", website: null, companyNumber: null, finalOutcome: "qualified" };
+  const withinCampaignB: DistrictCandidateForDedup = { candidateId: "wc-b", district: "RM2", tradingName: "Same Premises Cafe", postcode: "RM1 2BB", phone: "020 7946 5555", website: null, companyNumber: null, finalOutcome: "qualified" };
+  const withinCampaignDedup = dedupeAcrossDistricts([withinCampaignA, withinCampaignB]);
+  assert(withinCampaignDedup.kept.length === 1, `the same real premises discovered twice within one campaign still collapses to 1 (got ${withinCampaignDedup.kept.length}) — within-campaign dedup is a completely separate control from cross-campaign historical matching and is untouched by this policy change`);
+
+  await fs.rm(histTmpDir, { recursive: true, force: true });
 
   console.log(`\n${fails === 0 ? "ALL PASSED" : `${fails} FAILURE(S)`}`);
   process.exit(fails === 0 ? 0 : 1);

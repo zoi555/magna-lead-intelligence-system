@@ -180,9 +180,11 @@ async function main() {
     if (removed) console.log(`Cross-district dedup: ${removed} duplicate(s) removed (same real premises independently discovered in two districts near a boundary).`);
   }
 
-  // Cross-CAMPAIGN dedup (2026-08-03, ISS-0033 resolution) — see generate-master-export.ts's
-  // loadAllRows() for the full rationale. No-op when --historical-usable-workbook is not
-  // supplied (every existing call site/test is unaffected).
+  // Cross-CAMPAIGN historical matching (2026-08-03, ISS-0033; policy corrected 2026-08-21) —
+  // see generate-master-export.ts's loadAllRows() for the full rationale. Owner policy
+  // (2026-08-21): historical campaign appearance is informational/audit only and must never
+  // exclude a candidate — `bundles` is deliberately left untouched; only the match list is
+  // collected for the audit CSV below. No-op when --historical-usable-workbook is not supplied.
   let historicalDuplicatesRemoved: HistoricalDuplicateMatch[] = [];
   if (historicalUsableWorkbook) {
     for (const d of districts) {
@@ -194,15 +196,13 @@ async function main() {
         companyNumber: b.dossier.fields.companies_house_number as string | null, finalOutcome: b.dossier.qualificationStatus,
       }));
       const result = dedupeAgainstHistoricalCampaign(dedupInput, historical);
-      const keptIds = new Set(result.kept.map((c) => c.candidateId));
-      bundles = bundles.filter((b) => b.district !== d.district || keptIds.has(b.dossier.candidateId));
       historicalDuplicatesRemoved.push(...result.matches);
     }
     if (historicalDuplicatesRemoved.length) {
-      console.log(`Cross-campaign dedup: ${historicalDuplicatesRemoved.length} candidate(s) already present in a prior campaign's released output — excluded from this campaign's release, prior campaign ownership unchanged.`);
+      console.log(`Historical cross-campaign matches: ${historicalDuplicatesRemoved.length} candidate(s) also appeared in a prior campaign's released output — INFORMATIONAL ONLY (owner policy, 2026-08-21: historical appearance is never an exclusion reason); all remain in this campaign's release, prior campaign ownership unchanged.`);
       await fs.writeFile(path.join(outArg, `${territoryPrefix}-historical-campaign-duplicates.csv`), writeCsv(
-        ["campaign_id", "tier", "dropped_candidate_id", "dropped_district", "historical_lead_id", "historical_representative"],
-        historicalDuplicatesRemoved.map((m) => ({ campaign_id: campaignId ?? "", tier: m.tier, dropped_candidate_id: m.droppedCandidateId, dropped_district: m.droppedDistrict, historical_lead_id: m.historicalLeadId, historical_representative: m.historicalRepresentative })),
+        ["campaign_id", "tier", "candidate_id", "district", "historical_lead_id", "historical_representative"],
+        historicalDuplicatesRemoved.map((m) => ({ campaign_id: campaignId ?? "", tier: m.tier, candidate_id: m.droppedCandidateId, district: m.droppedDistrict, historical_lead_id: m.historicalLeadId, historical_representative: m.historicalRepresentative })),
       ));
     }
   }

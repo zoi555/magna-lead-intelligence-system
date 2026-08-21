@@ -68,31 +68,41 @@ async function loadAllRows(districts: DistrictInput[], ctxFor: (district: string
     duplicatesRemoved = dedupResult.duplicateClusters;
   }
 
-  // Cross-CAMPAIGN dedup (2026-08-03, ISS-0033 resolution) — checks this run's candidates
-  // against a PRIOR campaign's already-released population (read-only reference data, never
-  // itself modified). Applies regardless of single/multi-district mode — this is exactly the
-  // RM1 pilot's own single-district ad-hoc case (Saif's new RM1 discovery vs Nauman's historical
-  // RM1 "Operationally Usable Leads"). A no-op when historicalUsableWorkbook is not supplied
-  // (every existing call site/test is unaffected).
-  let historicalDuplicatesRemoved: HistoricalDuplicateMatch[] = [];
-  if (historicalUsableWorkbook) {
-    for (const d of districts) {
-      const historical = await loadHistoricalUsableLeads(historicalUsableWorkbook, d.district);
-      if (!historical.length) continue;
-      const dedupInput: DistrictCandidateForDedup[] = rows.filter((r) => r.district === d.district).map((r) => ({
-        candidateId: r.dossier.candidateId, district: r.district, tradingName: r.dossier.tradingName,
-        postcode: r.dossier.postcode, phone: r.dossier.fields.telephone as string | null,
-        website: r.dossier.fields.website as string | null, companyNumber: r.dossier.fields.companies_house_number as string | null,
-        finalOutcome: r.dossier.qualificationStatus,
-      }));
-      const result = dedupeAgainstHistoricalCampaign(dedupInput, historical);
-      const keptIds = new Set(result.kept.map((c) => c.candidateId));
-      rows = rows.filter((r) => r.district !== d.district || keptIds.has(r.dossier.candidateId));
-      historicalDuplicatesRemoved.push(...result.matches);
-    }
-  }
+  const historicalDuplicatesRemoved = await findHistoricalMatches(rows, districts, historicalUsableWorkbook);
 
   return { rows, duplicatesRemoved, historicalDuplicatesRemoved };
+}
+
+// Cross-CAMPAIGN historical matching (2026-08-03, ISS-0033; policy corrected 2026-08-21) — checks
+// this run's candidates against a PRIOR campaign's already-released population (read-only
+// reference data, never itself modified) purely to record PROVENANCE — it is informational/audit
+// only and must NEVER remove a candidate from this campaign's release.
+//
+// Owner policy (2026-08-21, field-sales campaign 024 correction): territories are explicitly
+// non-exclusive and may be intentionally re-worked — a business released in an earlier campaign is
+// NOT automatically excluded from a later one. "Previously generated" is neither an automatic pass
+// NOR an automatic exclusion; every lead (previously seen or not) is judged solely by today's
+// current rules (customer suppression, group/brand/commercial-review controls, business-category,
+// phone requirement, trading status). This was previously implemented as an exclusion (filtering
+// the candidate rows) — that filtering has been permanently removed; this function returns ONLY
+// the match list for audit, never a filtered row set, so a future caller cannot silently
+// reintroduce exclusion-by-history through this function's return shape.
+export async function findHistoricalMatches(rows: RowBundle[], districts: { district: string }[], historicalUsableWorkbook: string | null): Promise<HistoricalDuplicateMatch[]> {
+  const historicalDuplicatesRemoved: HistoricalDuplicateMatch[] = [];
+  if (!historicalUsableWorkbook) return historicalDuplicatesRemoved;
+  for (const d of districts) {
+    const historical = await loadHistoricalUsableLeads(historicalUsableWorkbook, d.district);
+    if (!historical.length) continue;
+    const dedupInput: DistrictCandidateForDedup[] = rows.filter((r) => r.district === d.district).map((r) => ({
+      candidateId: r.dossier.candidateId, district: r.district, tradingName: r.dossier.tradingName,
+      postcode: r.dossier.postcode, phone: r.dossier.fields.telephone as string | null,
+      website: r.dossier.fields.website as string | null, companyNumber: r.dossier.fields.companies_house_number as string | null,
+      finalOutcome: r.dossier.qualificationStatus,
+    }));
+    const result = dedupeAgainstHistoricalCampaign(dedupInput, historical);
+    historicalDuplicatesRemoved.push(...result.matches);
+  }
+  return historicalDuplicatesRemoved;
 }
 
 function toLabelRow(schema: { canonicalName: string; masterFieldLabel: string }[], resolved: ResolvedMasterRow): Record<string, unknown> {
@@ -265,10 +275,10 @@ async function main() {
     ));
   }
   if (historicalDuplicatesRemoved.length) {
-    console.log(`Cross-campaign dedup: ${historicalDuplicatesRemoved.length} candidate(s) already present in a prior campaign's released output — excluded from this campaign's release, prior campaign ownership unchanged.`);
+    console.log(`Historical cross-campaign matches: ${historicalDuplicatesRemoved.length} candidate(s) also appeared in a prior campaign's released output — INFORMATIONAL ONLY (owner policy, 2026-08-21: historical appearance is never an exclusion reason); all remain in this campaign's release, prior campaign ownership unchanged.`);
     await fs.writeFile(path.join(outArg, "historical-campaign-duplicates.csv"), writeCsv(
-      ["campaign_id", "tier", "dropped_candidate_id", "dropped_district", "historical_lead_id", "historical_representative"],
-      historicalDuplicatesRemoved.map((m) => ({ campaign_id: campaignId ?? "", tier: m.tier, dropped_candidate_id: m.droppedCandidateId, dropped_district: m.droppedDistrict, historical_lead_id: m.historicalLeadId, historical_representative: m.historicalRepresentative })),
+      ["campaign_id", "tier", "candidate_id", "district", "historical_lead_id", "historical_representative"],
+      historicalDuplicatesRemoved.map((m) => ({ campaign_id: campaignId ?? "", tier: m.tier, candidate_id: m.droppedCandidateId, district: m.droppedDistrict, historical_lead_id: m.historicalLeadId, historical_representative: m.historicalRepresentative })),
     ));
   }
 
@@ -320,7 +330,7 @@ async function main() {
   addSheet(combinedWb, "Business Category Exclusions", rowsFor(buckets.businessCategoryExcluded));
   addSheet(combinedWb, "Key Accounts", rowsFor(buckets.keyAccounts));
 
-  const repSummaryRows = [{ "Campaign ID": campaignId ?? "n/a (first campaign / sales-territories-v2.json)", Representative: salesRepValue ?? representative, Role: role === "field_sales" ? "Field Sales" : "Telesales", "Sales Territory": salesTerritory, "Districts Included": districts.map((d) => d.district).join(", "), "Total Candidates": rows.length, Usable: buckets.usable.length, "Premium Level 0": buckets.premium.length, "Releasable Level 1": buckets.releasableL1.length, "Key Accounts": buckets.keyAccounts.length, "Held/Review": buckets.held.length + buckets.phoneResolutionExceptions.length + buckets.businessCategoryReviewRequired.length, "Phone Resolution Exceptions": buckets.phoneResolutionExceptions.length, "Business Category Review-Required/Insufficient-Evidence": buckets.businessCategoryReviewRequired.length, "Hard Rejects": buckets.hardRejects.length, "Customer Master Exclusions": buckets.customerMasterExclusions.length, "Excluded Groups": buckets.excludedGroups.length, "Commercial Review Brand Exclusions": buckets.brandExcluded.length, "Pharmacy/Chemist Exclusions": buckets.pharmacyChemistExcluded.length, "Café/Bubble-Tea Business-Category Exclusions": buckets.businessCategoryExcluded.length, "Historical Campaign Duplicates Excluded": historicalDuplicatesRemoved.length }];
+  const repSummaryRows = [{ "Campaign ID": campaignId ?? "n/a (first campaign / sales-territories-v2.json)", Representative: salesRepValue ?? representative, Role: role === "field_sales" ? "Field Sales" : "Telesales", "Sales Territory": salesTerritory, "Districts Included": districts.map((d) => d.district).join(", "), "Total Candidates": rows.length, Usable: buckets.usable.length, "Premium Level 0": buckets.premium.length, "Releasable Level 1": buckets.releasableL1.length, "Key Accounts": buckets.keyAccounts.length, "Held/Review": buckets.held.length + buckets.phoneResolutionExceptions.length + buckets.businessCategoryReviewRequired.length, "Phone Resolution Exceptions": buckets.phoneResolutionExceptions.length, "Business Category Review-Required/Insufficient-Evidence": buckets.businessCategoryReviewRequired.length, "Hard Rejects": buckets.hardRejects.length, "Customer Master Exclusions": buckets.customerMasterExclusions.length, "Excluded Groups": buckets.excludedGroups.length, "Commercial Review Brand Exclusions": buckets.brandExcluded.length, "Pharmacy/Chemist Exclusions": buckets.pharmacyChemistExcluded.length, "Café/Bubble-Tea Business-Category Exclusions": buckets.businessCategoryExcluded.length, "Historical Campaign Matches (informational only — not excluded)": historicalDuplicatesRemoved.length }];
   addSheet(combinedWb, "Representative Summary", repSummaryRows);
   addSheet(combinedWb, "Territory Summary", [{ "Campaign ID": campaignId ?? "n/a (first campaign / sales-territories-v2.json)", "Sales Territory": salesTerritory, Representative: salesRepValue ?? representative, "District Count": districts.length, "Total Candidates": rows.length }]);
 

@@ -1608,3 +1608,53 @@ engineers and tests safe concurrency (e.g. per-tenant worker-lease isolation, co
 sized for parallel writes). Not fixed here — explicitly out of scope for this batch, and a genuine
 architecture change, not a one-line fix. Any future session running multi-district discovery must
 default to sequential unless this is revisited.
+
+## 2026-08-21 — historical campaign appearance is audit/provenance only, never a release gate (owner decision)
+
+**Owner decision (Zoeb), 2026-08-21:** a lead must NOT be excluded merely because it appeared in a
+previous lead-production campaign. Territories are explicitly non-exclusive and may be
+intentionally re-worked, and the owner wants those repeated businesses released again where they
+still qualify — historical campaign matching is **provenance/audit information, not a release
+gate**. It is not an exclusion rule, not a suppression rule, and not an automatic keep either:
+"previously generated" carries no special status in either direction. Every lead, previously seen
+or not, is judged solely by TODAY's current rules — active/inactive customer suppression, confirmed
+customer exclusion, unresolved probable customer hold, current owner commercial brand rules, group
+controls, business-category rules, the phone requirement, trading-status rules, and current
+field-sales eligibility. Within-CURRENT-campaign duplicate premises are unaffected and still
+deduplicated exactly as before — that is a wholly separate control (`dedupeAcrossDistricts`) from
+cross-campaign historical matching.
+
+**Defect this exposed:** campaign-024 (Ayesha Tahir, EN5-EN10) intentionally re-worked EN5-EN9,
+already covered by campaign-017. `generate-master-export.ts` (and the identical pattern in
+`generate-salespro-export.ts`) was using its cross-campaign historical-match check
+(`dedupeAgainstHistoricalCampaign`, ISS-0033, 2026-08-03) to silently EXCLUDE 84 candidates from
+release purely because they matched a campaign-017 lead by exact phone/domain/company-number —
+the opposite of the owner's actual policy. Ayesha's field-sales release was wrongly reduced to 10
+leads when the correct figure, under current rules, is 87.
+
+**Fix:** the exclusion behaviour has been permanently removed. The historical-match check itself
+(`dedupeAgainstHistoricalCampaign` in `district-reconciliation.ts`) is unchanged and still correctly
+identifies real duplicate businesses — only its CALLERS changed: the matching logic was extracted
+into a new exported `findHistoricalMatches()` (`generate-master-export.ts`) which returns ONLY an
+audit match list — it does not take, mutate, filter, or return the campaign's row population, so a
+future caller cannot silently reintroduce exclusion-by-history through this function's own return
+shape. The existing `historical-campaign-duplicates.csv` audit artifact is preserved (historical
+Lead ID, historical representative, tier, campaign ID) — informational only, never consulted for
+the release decision. Not exposed in the 31-column field-sales/CTO export.
+
+**Campaign-024 corrected, re-verified against current rules (not assumed):** 218 canonical EN5-EN10
+candidates; 84 historical matches found; all 84 still usable today (0 excluded, 0 held, for a
+current reason — none had become a customer or hit a new exclusion since campaign-017); 77 of those
+84 are field-sales eligible; 10 genuinely new field-sales-eligible leads. **Final Ayesha field-sales
+eligible count: 87** (was wrongly 10). Master PASS, CTO PASS, confirmed leaks 0, unresolved
+probable 0. Corrected campaigns 021-024 combined total: **240** (Nauman 26 + Manraj 71 + Alam 56 +
+Ayesha 87) — supersedes the earlier, incorrect 163 total. The incorrect 10-lead release was
+archived, not deleted (`campaigns/campaign-024-.../release-INCORRECT-historical-exclusion-applied-
+2026-08-21/`, `audit-INCORRECT-.../`, and `representatives/ayesha/current-release-INCORRECT-
+historical-exclusion-applied-2026-08-21/`).
+
+**Regression coverage** (`test-lead-production-master-export.ts`): a lead matching a prior
+campaign's release is not removed from the candidate set; a historical lead that is now a confirmed
+active Magna customer still lands in Customer Master Exclusions, never Usable; within-current-
+campaign duplicate premises still collapse to one via the separate, untouched `dedupeAcrossDistricts`
+control; `findHistoricalMatches()` still correctly identifies and records the match for audit.
