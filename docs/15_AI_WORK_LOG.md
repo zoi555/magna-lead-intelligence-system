@@ -1617,6 +1617,31 @@ routes generate). Then wrote up the fix in `docs/11_ISSUES_LOG.md` (ISS-0042), `
 FIXES.md`, `VERIFY_BEFORE_CLAIMING.md`, and `PROJECT_STATUS.md` — none of which had been updated
 for this fix yet, per this project's rule that a fixed bug must be logged.
 
-**Not done:** no live discovery or enrichment call for campaigns 017-020 (config-only — no
-`release/`/`review/`/`audit/`/`manifests/` directories exist for any of the four yet); no commit
-or push. Full detail: `docs/11_ISSUES_LOG.md` ISS-0042.
+**Not done (at the time this entry was written):** no live discovery or enrichment call for
+campaigns 017-020 (config-only — no `release/`/`review/`/`audit/`/`manifests/` directories exist
+for any of the four yet); no commit or push. **Superseded within the same day** — see
+`PROJECT_STATUS.md`'s "same session, later" update immediately above: live discovery/enrichment
+for all four had in fact already run on 2026-08-15, before this entry was written. Full detail:
+`docs/11_ISSUES_LOG.md` ISS-0042.
+
+## 2026-08-17 — owner probable-match clearance applied and release-gate work committed (`64cd5be`); documentation synchronised to match
+
+Applied the owner's (Zoeb) explicit decision clearing all 17 combined unresolved probable-match
+holds across campaigns 018 (Nauman, 1), 019 (Alam, 14), and 020 (Manraj, 2) via a new per-lead-ID
+owner-authorisation channel (never automatic, never for a confirmed-tier finding). All four
+campaigns' certificates now read `masterResult: PASS`, `ctoResult: PASS`, `confirmedLeakCount: 0`,
+`unresolvedProbableLeadCount: 0`; 370 field-sales eligible leads released across the four
+representatives (Ayesha 110, Nauman 20, Jahangir Alam 158, Manraj 82) and copied to each
+representative's `current-release/` folder. 6 new regression assertions; 47/47 test suites,
+typecheck, build clean. Committed and pushed as `64cd5be`.
+
+Documentation-only follow-up pass (this entry): `PROJECT_STATUS.md`, `docs/11_ISSUES_LOG.md`
+(ISS-0042), and `VERIFY_BEFORE_CLAIMING.md` were still describing 018/019/020 as
+`masterResult: FAIL`, uncommitted, and "nothing copied to current-release" — accurate when
+written, but stale once `64cd5be` landed. Updated all three to record the resolved state, verified
+directly against the four campaigns' regenerated certificate JSON files, each representative's
+`current-release/final-review.csv` (parsed with a proper CSV reader, not `wc -l`, since embedded
+newlines in quoted address fields otherwise overcount rows), and `git rev-parse HEAD` /
+`origin/feature/mvp-vertical-slice-001` (both `64cd5be`, confirming committed and pushed). No
+campaign data, certificates, representative release files, or pipeline code were touched in this
+pass — documentation only.

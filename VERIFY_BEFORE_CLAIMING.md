@@ -765,8 +765,33 @@ cap, Notes rewrite, Lead Urgency recalibration, cross-representative combined Ma
   018/019/020's FAILs are the ordinary held-for-human-review population every prior campaign in
   this project has produced — not something a code fix resolves, and not evidence of a remaining
   defect in this fix.
-- Remaining risk: nothing has been copied to any representative's `current-release/` folder for
-  these four campaigns. This fix is still **not committed or pushed**. The 17 combined unresolved-
-  probable holds across 018/019/020 still need the owner's usual per-lead review before those
-  campaigns can be considered release-ready; campaign-017 has no outstanding holds of this kind
-  and could be considered release-ready sooner, pending the owner's own review of the fix.
+- Remaining risk (as first written): nothing had been copied to any representative's
+  `current-release/` folder for these four campaigns; the fix was not yet committed or pushed; the
+  17 combined unresolved-probable holds across 018/019/020 still needed the owner's usual per-lead
+  review. **This was resolved by the next check (below).**
+
+## 2026-08-17 — owner probable-match clearance applied and verified against the regenerated certificates and copied release files (commit `64cd5be`)
+
+- Claim: "the owner's (Zoeb) explicit 2026-08-17 decision clearing all 17 combined unresolved
+  probable-match holds across campaigns 018 (1), 019 (14), and 020 (2) is correctly applied
+  through a new per-lead-ID owner-authorisation channel, cannot touch any confirmed-tier finding,
+  does not change the algorithmic clearance behaviour for any other lead, and all four campaigns'
+  outputs are now genuinely release-ready — not just certified in isolation."
+- Commands run: read all four regenerated `*-zero-leakage-certificate.json` files directly —
+  `masterResult: PASS`, `ctoResult: PASS`, `confirmedLeakCount: 0`, `unresolvedProbableLeadCount: 0`
+  in all four. Read each certificate's `clearedMatches` array directly and counted `OWNER OVERRIDE`
+  entries per campaign: 018 → 1, 019 → 14, 020 → 2 (17 total) — matches the owner's decision
+  exactly, with the remaining cleared entries in each campaign tagged as pre-existing algorithmic
+  clears, not owner overrides. Confirmed `unresolvedProbableLeads` is an empty array in all four
+  certificates. Parsed each representative's `current-release/final-review.csv` with a proper CSV
+  reader (not `wc -l`, which overcounts due to embedded newlines inside quoted multi-line address
+  fields) — row counts: Ayesha 110, Nauman 20, Jahangir Alam 158, Manraj 82 = 370, matching the
+  campaigns' own field-sales-final-review release files byte-for-byte in row count. Confirmed
+  `git log`/`git rev-parse HEAD` and `origin/feature/mvp-vertical-slice-001` both resolve to
+  `64cd5be...` — committed and pushed.
+- Result: owner clearance verified correct and narrowly scoped (test suite includes an explicit
+  case proving a confirmed-tier finding remains non-overridable even when named); all four
+  campaigns are release-ready with no outstanding holds.
+- Remaining risk: none for campaigns 017-020. 47/47 test suites, typecheck, and build were last
+  re-run clean as part of the `64cd5be` commit itself (2026-08-16/17 entries above) — not
+  independently re-run again in this documentation-only pass.

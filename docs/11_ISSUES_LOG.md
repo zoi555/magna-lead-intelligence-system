@@ -1894,16 +1894,33 @@ Directly verified in the reprocessed checkpoint data (not assumed from the certi
   ISS-0042) found a "confirmed" match no earlier stage ever suspected — customer R176: ..."` — the
   exact new code path, proven firing on the real record, not just the test fixture.
 
-Regenerated certificates (`verifierCommitHash: 0858bd92...`, the last commit — this fix is still
-uncommitted, so the hash reflects HEAD, not "pre-fix code"; the checkpoint timestamps above are the
-actual evidence this ran post-fix): campaign-017 `masterResult: PASS`, 0 confirmed leaks. Campaigns
-018/019/020 `masterResult: FAIL` — in every case from **unresolved probable matches** (018: 1;
-019: 14; 020: 2), `confirmedLeakCount: 0` in all three — the same "held pending human review"
-population every prior campaign in this project has produced, not a new defect and not something
-this fix (or any code fix) resolves automatically; needs the owner's usual per-lead review.
+Regenerated certificates (`verifierCommitHash: 0858bd92...`, the last commit at the time — this fix
+was still uncommitted then, so the hash reflected HEAD, not "pre-fix code"; the checkpoint
+timestamps above are the actual evidence this ran post-fix): campaign-017 `masterResult: PASS`,
+0 confirmed leaks. Campaigns 018/019/020 `masterResult: FAIL` — in every case from **unresolved
+probable matches** (018: 1; 019: 14; 020: 2), `confirmedLeakCount: 0` in all three — the same
+"held pending human review" population every prior campaign in this project has produced, not a
+new defect and not something this fix (or any code fix) resolves automatically; needed the owner's
+usual per-lead review.
 
-**Not committed or pushed.** Nothing has been copied to any representative's `current-release/`
-folder for these four campaigns. Next action is the owner's: review the fix (particularly the two
-confirmed real-leak corrections above) and the 17 combined unresolved-probable holds across
-018/019/020, then decide on committing/pushing and on how those holds should be resolved before
-any of the four campaigns' outputs are treated as release-ready.
+**RESOLVED — 2026-08-17, commit `64cd5be`.** The owner (Zoeb) reviewed the fix and the 17 combined
+unresolved-probable holds across 018/019/020, and made an explicit per-lead-ID clearance decision:
+none of the 17 held leads had an exact shared phone, email, postcode, or address/premises identity
+with their candidate customer match — evidence was limited to fuzzy/generic same-district name
+similarity or the same brand appearing at different physical branches. This was applied through a
+new, narrowly-scoped owner-authorisation channel added to `reevaluate-and-clear-probable-matches.ts`
+and `verify-customer-leakage.ts`: a probable-tier match is released only when a human supplies the
+exact lead ID, reason, and timestamp on the command line — never automatically, and a confirmed-tier
+finding can never be overridden this way regardless of authorisation. The pre-existing algorithmic
+safe-list (generic-alias/uncorroborated-domain-only evidence) is unchanged for every lead not
+explicitly named.
+
+All four campaigns' certificates now read `masterResult: PASS`, `ctoResult: PASS`,
+`confirmedLeakCount: 0`, `unresolvedProbableLeadCount: 0`. Field-sales eligible leads released:
+campaign-017 (Ayesha) 110, campaign-018 (Nauman) 20, campaign-019 (Jahangir Alam) 158, campaign-020
+(Manraj) 82 — **370 total**. All four are copied into their representative's `current-release/`
+folder (`representatives/{ayesha,nauman,jahangir-alam,manraj}/current-release/`); the prior
+campaigns 013-016 for these same representatives are preserved under
+`previous-release-archived-2026-08-17/`, not deleted. Committed as `64cd5be` and pushed — current
+pushed HEAD on `feature/mvp-vertical-slice-001`. Full narrative: `PROJECT_STATUS.md` (2026-08-17
+entry).

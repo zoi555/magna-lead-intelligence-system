@@ -1810,12 +1810,44 @@ live discovery or paid enrichment call for this batch.
   campaigns 018/019/020 `masterResult: FAIL`, but in every case from unresolved **probable**
   matches only (018: 1, 019: 14, 020: 2 — `confirmedLeakCount: 0` in all three), the same
   "held pending human review" population every prior campaign has produced, not a new defect.
-  Nothing copied to any representative's `current-release/` folder yet. Full detail:
-  `docs/11_ISSUES_LOG.md` ISS-0042 (2026-08-16, "Update" section).
 
-**Next action:** owner reviews the ISS-0042 fix (particularly the two confirmed real-leak
-corrections, now verified against the live campaign data) and the reopened-then-closed
-commercial-review naming-coverage gap, then decides on committing/pushing this fix and on how the
-17 combined unresolved-probable holds across campaigns 018 (Nauman, 1), 019 (Alam, 14), and 020
-(Manraj, 2) should be resolved before any of the four campaigns' outputs are treated as
-release-ready.
+## 2026-08-17 — field-sales batch RELEASED: owner probable-match clearance applied, all four campaigns certificate PASS, current-release copied (commit `64cd5be`)
+
+Extended the customer-suppression decision layer with an explicit, per-lead-ID owner-authorisation
+channel (`reevaluate-and-clear-probable-matches.ts`, `verify-customer-leakage.ts`) so a named
+probable-tier match can be released only when a human supplies the exact lead ID, reason, and
+timestamp — never automatically, and never for a confirmed-tier finding regardless of
+authorisation. The pre-existing algorithmic safe-list (generic-alias/uncorroborated-domain-only
+evidence) is unchanged for every lead not explicitly named.
+
+Applied the owner's (Zoeb) explicit 2026-08-17 decision clearing all **17** unresolved probable
+customer-match holds across campaigns 018 (Nauman, 1), 019 (Alam, 14), and 020 (Manraj, 2) as
+false/weak matches — none had an exact shared phone, email, postcode, or address/premises
+identity; evidence was limited to fuzzy/generic same-district name similarity or the same brand
+appearing at different physical branches. Campaign 017 (Ayesha) was already PASS and untouched by
+this step.
+
+**All four campaigns now certificate PASS** (Master + CTO, `confirmedLeakCount: 0`,
+`unresolvedProbableLeadCount: 0`), and their releases have been copied to each representative's
+`current-release/` folder:
+
+| Campaign | Rep | Territory | Field-sales eligible leads |
+|---|---|---|---|
+| 017 | Ayesha Tahir | EN4, EN5, EN6, EN7, EN8, EN9 | 110 |
+| 018 | Nauman Khan | SE8 | 20 |
+| 019 | Jahangir Alam | CR0, CR2, CR3 (CR1 is not a valid UK postcode district — correctly not processed) | 158 |
+| 020 | Manraj Dhillon | CR4, CR5, CR6, CR7, CR8 | 82 |
+
+**Total = 370 field-sales eligible leads**, verified directly against each representative's
+`current-release/final-review.csv` (proper CSV parse, accounting for embedded newlines in
+multi-line address fields — a raw `wc -l` overcounts). Previous campaigns 013-016 for these same
+representatives are preserved under `previous-release-archived-2026-08-17/`, not deleted.
+
+6 new regression assertions cover: the owner-override clearing weak evidence, the default rule
+staying unchanged for any unlisted lead, and a confirmed-tier finding remaining non-overridable
+even when explicitly named. Verified: 47/47 `test:lead-production-*`/`test:je-*` suites, typecheck,
+build all clean. Committed as `64cd5be` and pushed — current pushed HEAD on
+`feature/mvp-vertical-slice-001`.
+
+**Next action:** none outstanding for campaigns 017-020 — all four are release-ready. Next
+decision is the owner's: authorise the next field-sales batch/live discovery run.
