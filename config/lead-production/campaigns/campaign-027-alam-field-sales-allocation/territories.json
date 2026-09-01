@@ -1,0 +1,64 @@
+{
+  "campaignId": "campaign-027-alam-field-sales-allocation",
+  "campaignVersion": "v1",
+  "channel": "field_sales",
+  "effectiveDate": "2026-08-31",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-08-31 (next field-sales lead-generation batch, following campaigns 021-024)",
+  "description": "Jahangir Alam's field-sales allocation: EXACTLY SE21, SE22, SE23, SE24, SE27 (5 districts). Territories are NON-EXCLUSIVE across representatives (established 2026-08-05, docs/09_DECISIONS.md).",
+  "resolutionNote": "TERRITORY MODEL: postcode districts are NON-EXCLUSIVE across representatives. Alam's historical field-sales allocation is SM4-SM7; his prior field-sales batches were campaign-016 (SM4-SM7 re-run), campaign-019 (CR0/CR2/CR3), and campaign-023 (BR1/BR2) — all separate, immutable, completed prior campaigns, not touched here.",
+  "representativeIdentityValidation": {
+    "method": "Owner supplied 'Jahangir Alam' as the exact full name AND his email (mjalam@magnafoodservice.co.uk) directly in this task's instructions (locked identity, 2026-08-31) — matches campaigns 016/019/023 for this exact person.",
+    "crossCheck": "Cross-checked against the customer master's own 'Sales Rep' column: neither 'Jahangir Alam' nor 'Alam' appears — same as found in every prior campaign. Consistent, not a new finding.",
+    "judgement": "salesProRosterStatus = pending_owner_confirmation, matching prior precedent. This does NOT block lead production. Final lead-production output nevertheless uses his full name ('Jahangir Alam')."
+  },
+  "representative": {
+    "internalName": "Alam",
+    "role": "field_sales",
+    "representativeFullName": "Jahangir Alam",
+    "representativeEmail": "mjalam@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": "Jahangir Alam",
+    "salesProRosterStatus": "pending_owner_confirmation",
+    "regionRoute": "SE21, SE22, SE23, SE24, SE27",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["SE21", "SE22", "SE23", "SE24", "SE27"],
+    "districtCount": 5,
+    "areaDescription": "Dulwich / East Dulwich / Forest Hill / Herne Hill / West Norwood"
+  },
+  "sectorWhitelist": {
+    "SE21": ["SE21 7", "SE21 8", "SE21 9"],
+    "SE22": ["SE22 0", "SE22 2", "SE22 8", "SE22 9"],
+    "SE23": ["SE23 1", "SE23 2", "SE23 3", "SE23 9"],
+    "SE24": ["SE24 0", "SE24 4", "SE24 9"],
+    "SE27": ["SE27 0", "SE27 7", "SE27 9"]
+  },
+  "sectorWhitelistSource": "Derived from the authoritative Supabase postcode_reference table (level='sector', district=<code>), never manually invented. Used for geography validation only — one Just Eat discovery query per DISTRICT, not per sector.",
+  "alreadyCompletedElsewhere": {
+    "description": "None. All 5 districts confirmed genuinely new for Alam — disjoint from every prior campaign's territory.",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["SE21", "SE22", "SE23", "SE24", "SE27"],
+    "districtCount": 5,
+    "processingOrder": ["SE21", "SE22", "SE23", "SE24", "SE27"]
+  },
+  "explicitlyExcluded": {
+    "sm4ThroughSm7": "Alam's original, already-completed, historical field-sales territory. Immutable. Never rerun.",
+    "priorFieldSalesBatches": "campaign-019 (CR0/CR2/CR3 — CR1 is not a valid UK postcode district and is not introduced), campaign-023 (BR1/BR2). Immutable. Never rerun.",
+    "neighbouringDistricts": "No districts outside the exact owner-listed set (SE21-24, SE27) are added — explicitly instructed not to add neighbouring districts or infer missing numbers."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04)",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  },
+  "outputTemplate": "field-sales-31-column-v1",
+  "fieldSalesRoutingStatus": "pending — mapping handoff Day 1 = Tuesday 2026-09-01, not populated into source lead files",
+  "pipelineVersion": "temporary-lead-production-v1, commit 7ed1d21 baseline (historical-repeat policy correction)",
+  "customerMasterVersion": {
+    "snapshotDate": "2026-08-03",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1"
+  }
+}
