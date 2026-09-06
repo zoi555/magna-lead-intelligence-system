@@ -1,0 +1,76 @@
+{
+  "campaignId": "campaign-030-ayesha-field-sales-allocation",
+  "campaignVersion": "v1",
+  "channel": "field_sales",
+  "effectiveDate": "2026-09-01",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-09-01 (next field-sales lead-generation batch, following campaigns 025-028)",
+  "description": "Ayesha Tahir's field-sales allocation: EXACTLY IG6, IG7, IG8, IG9, IG10, IG11 (6 districts). Territories are NON-EXCLUSIVE across representatives and across time.",
+  "resolutionNote": "TERRITORY MODEL: postcode districts are NON-EXCLUSIVE. Ayesha's historical field-sales allocation is NW1-NW10; her prior field-sales batches were campaign-015 (EN1-EN3), campaign-017 (EN4-EN9), campaign-024 (EN5-EN10), campaign-025 (IG1-IG5) — all separate, immutable, completed prior campaigns, not touched here.",
+  "historicalOverlap": {
+    "description": "IG6 was previously worked in campaign-005-naseh-full-allocation (Naseh, TELESALES, IG1-IG6). IG7-IG11 were previously worked in campaign-006-saad-full-allocation (Saad Rehman, TELESALES, full allocation). Per the 2026-08-21 owner policy (docs/09_DECISIONS.md), historical campaign appearance — regardless of channel or representative — is audit/provenance information ONLY and is never an exclusion reason.",
+    "priorOverlaps": [
+      { "district": "IG6", "priorCampaignId": "campaign-005-naseh-full-allocation", "priorChannel": "telesales", "priorRepresentative": "Naseh (Muhammad)" },
+      { "district": "IG7", "priorCampaignId": "campaign-006-saad-full-allocation", "priorChannel": "telesales", "priorRepresentative": "Saad Rehman" },
+      { "district": "IG8", "priorCampaignId": "campaign-006-saad-full-allocation", "priorChannel": "telesales", "priorRepresentative": "Saad Rehman" },
+      { "district": "IG9", "priorCampaignId": "campaign-006-saad-full-allocation", "priorChannel": "telesales", "priorRepresentative": "Saad Rehman" },
+      { "district": "IG10", "priorCampaignId": "campaign-006-saad-full-allocation", "priorChannel": "telesales", "priorRepresentative": "Saad Rehman" },
+      { "district": "IG11", "priorCampaignId": "campaign-006-saad-full-allocation", "priorChannel": "telesales", "priorRepresentative": "Saad Rehman" }
+    ],
+    "policy": "Historical matches are recorded in historical-campaign-duplicates.csv for audit only — they are NEVER removed from this campaign's release population. Two historical source workbooks are cross-referenced (campaign-005 for IG6, campaign-006 for IG7-IG11), since the current pipeline's --historical-usable-workbook accepts one workbook per invocation — both are checked and merged into one audit CSV."
+  },
+  "representativeIdentityValidation": {
+    "method": "Owner supplied 'Ayesha Tahir' as the exact full name AND her email (ayesha.tahir@magnafoodservice.co.uk) directly in this task's instructions (locked identity, 2026-09-01) — matches campaigns 015/017/024/025 for this exact person.",
+    "judgement": "Treated as CONFIRMED."
+  },
+  "representative": {
+    "internalName": "Ayesha",
+    "role": "field_sales",
+    "representativeFullName": "Ayesha Tahir",
+    "representativeEmail": "ayesha.tahir@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": "Ayesha Tahir",
+    "salesProRosterStatus": "confirmed",
+    "regionRoute": "IG6, IG7, IG8, IG9, IG10, IG11",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["IG6", "IG7", "IG8", "IG9", "IG10", "IG11"],
+    "districtCount": 6,
+    "areaDescription": "Hainault / Chigwell / Woodford Green / Buckhurst Hill / Loughton / Barking"
+  },
+  "sectorWhitelist": {
+    "IG6": ["IG6 1", "IG6 2", "IG6 3"],
+    "IG7": ["IG7 4", "IG7 5", "IG7 6"],
+    "IG8": ["IG8 0", "IG8 1", "IG8 7", "IG8 8", "IG8 9"],
+    "IG9": ["IG9 5", "IG9 6"],
+    "IG10": ["IG10 1", "IG10 2", "IG10 3", "IG10 4", "IG10 9"],
+    "IG11": ["IG11 0", "IG11 1", "IG11 7", "IG11 8", "IG11 9"]
+  },
+  "sectorWhitelistSource": "Derived from the authoritative Supabase postcode_reference table (level='sector', district=<code>), never manually invented. Used for geography validation only — one Just Eat discovery query per DISTRICT, not per sector.",
+  "alreadyCompletedElsewhere": {
+    "description": "IG6-IG11 previously worked under campaigns 005/006 (telesales). Per explicit owner instruction (2026-09-01), not a blocker, not silently dropped.",
+    "postcodeDistricts": ["IG6", "IG7", "IG8", "IG9", "IG10", "IG11"],
+    "sourceCampaignId": "campaign-005-naseh-full-allocation / campaign-006-saad-full-allocation"
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["IG6", "IG7", "IG8", "IG9", "IG10", "IG11"],
+    "districtCount": 6,
+    "processingOrder": ["IG6", "IG7", "IG8", "IG9", "IG10", "IG11"],
+    "note": "All 6 districts run live in this campaign — 'new' means 'in scope for this campaign', not 'never seen before'."
+  },
+  "explicitlyExcluded": {
+    "nw1ThroughNw10": "Ayesha's original, already-completed, historical field-sales territory. Immutable. Never rerun.",
+    "priorFieldSalesBatches": "campaign-015 (EN1-EN3), campaign-017 (EN4-EN9), campaign-024 (EN5-EN10), campaign-025 (IG1-IG5). Immutable. Never rerun.",
+    "neighbouringDistricts": "No districts outside the exact owner-listed set (IG6-IG11) are added."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04) — one district at a time, strictly sequential (established operational rule, docs/09_DECISIONS.md 2026-08-21).",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  },
+  "outputTemplate": "field-sales-31-column-v1",
+  "fieldSalesRoutingStatus": "pending — no mapping/routing performed in this task",
+  "pipelineVersion": "temporary-lead-production-v1, commit 47693b0 baseline",
+  "customerMasterVersion": {
+    "snapshotDate": "2026-08-03",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1"
+  }
+}

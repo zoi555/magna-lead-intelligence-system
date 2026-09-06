@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 4,
+  "note": "Campaign-scoped documentation copy only — mapsRequired for the live pipeline is resolved from the GLOBAL config/lead-production/sales-territories-v2.json (Nauman already has an entry there, field_sales, mapsRequired=true from his original RM1-RM14 allocation), never from this per-campaign file. SE19/SE20/SE25/SE26 are an INTENTIONAL repeat of Manraj Dhillon's campaign-028 territory — owner-directed, not a scoping error. Historical matches are audit/provenance only, never an exclusion.",
+  "representatives": [
+    {
+      "representative": "Nauman",
+      "role": "field_sales",
+      "salesTerritory": "SE19, SE20, SE25, SE26",
+      "postcodeDistricts": ["SE19", "SE20", "SE25", "SE26"],
+      "districtCount": 4,
+      "mapsRequired": false
+    }
+  ]
+}

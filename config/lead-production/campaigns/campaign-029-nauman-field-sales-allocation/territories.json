@@ -1,0 +1,60 @@
+{
+  "campaignId": "campaign-029-nauman-field-sales-allocation",
+  "campaignVersion": "v1",
+  "channel": "field_sales",
+  "effectiveDate": "2026-09-01",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-09-01 — INTENTIONAL repeat of Manraj Dhillon's campaign-028 territory (SE19, SE20, SE25, SE26), reassigned to Nauman Khan.",
+  "description": "Nauman Khan's field-sales allocation: EXACTLY SE19, SE20, SE25, SE26 (4 districts). Territories are NON-EXCLUSIVE across representatives and across time (established 2026-08-05, docs/09_DECISIONS.md; historical-repeat policy corrected 2026-08-21/2026-09-01).",
+  "resolutionNote": "TERRITORY MODEL: postcode districts are NON-EXCLUSIVE across representatives. Nauman's historical field-sales allocation is RM1-RM14; his prior field-sales batches were campaign-013/018 (SE8), campaign-021 (SE15), campaign-026 (SE5, SE17) — all separate, immutable, completed prior campaigns, not touched here.",
+  "historicalOverlap": {
+    "description": "SE19, SE20, SE25, SE26 were fully worked in campaign-028-manraj-field-sales-allocation (Manraj Dhillon, field_sales channel), released 2026-09-01. Per the 2026-08-21 owner policy (docs/09_DECISIONS.md), historical campaign appearance — regardless of representative — is audit/provenance information ONLY and is never an exclusion reason. The owner explicitly directed these leads be regenerated for Nauman Khan. Ordinary within-campaign deduplication and CURRENT customer-master suppression/commercial rules still apply exactly as normal — the candidate population is fully re-evaluated against today's rules, not copied from campaign-028.",
+    "priorOverlappingCampaignId": "campaign-028-manraj-field-sales-allocation",
+    "priorOverlappingChannel": "field_sales",
+    "priorOverlappingRepresentative": "Manraj Dhillon",
+    "priorOverlappingReleasePath": "/Users/homemac/Data/aspectlead-lead-production/campaigns/campaign-028-manraj-field-sales-allocation/release/",
+    "evidenceReuse": "Since this exact geography was fully discovered and enriched (Just Eat, Google Places, FSA, Companies House, website) under campaign-028 on the SAME customer-master snapshot and SAME commercial/group registries only hours earlier in the same session, campaign-028's existing per-district checkpoints (phase1/fsa/google/companies_house/website/public_profile/group_rescreen/final_scoring) are reused directly for campaign-029's Master export — no new discovery or paid provider calls were made. Only the Master-export stage (customer suppression, commercial-review, business-category, scoring/eligibility) was re-run, against the same current rules, with the representative reassigned to Nauman.",
+    "policy": "Historical matches are recorded in historical-campaign-duplicates.csv for audit only — they are NEVER removed from this campaign's release population."
+  },
+  "representativeIdentityValidation": {
+    "method": "Owner supplied 'Nauman Khan' as the exact full name AND his email (nauman.khan@magnafoodservice.co.uk) directly in this task's instructions (locked identity, 2026-09-01) — matches campaigns 013/018/021/026 for this exact person.",
+    "judgement": "Treated as CONFIRMED — consistent with prior precedent for this same person."
+  },
+  "representative": {
+    "internalName": "Nauman",
+    "role": "field_sales",
+    "representativeFullName": "Nauman Khan",
+    "representativeEmail": "nauman.khan@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": "Nauman Khan",
+    "salesProRosterStatus": "confirmed",
+    "regionRoute": "SE19, SE20, SE25, SE26",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["SE19", "SE20", "SE25", "SE26"],
+    "districtCount": 4,
+    "areaDescription": "Crystal Palace / Penge / South Norwood / Sydenham"
+  },
+  "sectorWhitelist": {
+    "SE19": ["SE19 1", "SE19 2", "SE19 3", "SE19 9"],
+    "SE20": ["SE20 7", "SE20 8", "SE20 9"],
+    "SE25": ["SE25 4", "SE25 5", "SE25 6", "SE25 9"],
+    "SE26": ["SE26 4", "SE26 5", "SE26 6", "SE26 9"]
+  },
+  "sectorWhitelistSource": "Derived from the authoritative Supabase postcode_reference table (level='sector', district=<code>), never manually invented.",
+  "explicitlyExcluded": {
+    "rm1ThroughRm14": "Nauman's original, already-completed, historical field-sales territory. Immutable. Never rerun.",
+    "priorFieldSalesBatches": "campaign-013/018 (SE8), campaign-021 (SE15), campaign-026 (SE5, SE17). Immutable. Never rerun.",
+    "neighbouringDistricts": "No districts outside the exact owner-listed set (SE19, SE20, SE25, SE26) are added."
+  },
+  "discoverySource": {
+    "leadDiscovery": "REUSED from campaign-028-manraj-field-sales-allocation's existing checkpoints — no new Just Eat discovery run for this campaign.",
+    "enrichmentStagesOnly": "REUSED from campaign-028's existing checkpoints (Google, Website, FSA, Companies House) — no new live/paid provider calls."
+  },
+  "outputTemplate": "field-sales-31-column-v1",
+  "fieldSalesRoutingStatus": "pending — no mapping/routing performed in this task",
+  "pipelineVersion": "temporary-lead-production-v1, commit 47693b0 baseline",
+  "customerMasterVersion": {
+    "snapshotDate": "2026-08-03",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 6,
+  "note": "Campaign-scoped documentation copy only — mapsRequired for the live pipeline is resolved from the GLOBAL config/lead-production/sales-territories-v2.json (Ayesha already has an entry there, field_sales, mapsRequired=true from her original NW1-NW10 allocation), never from this per-campaign file. IG6-IG11 overlap prior telesales campaigns (campaign-005 Naseh for IG6; campaign-006 Saad for IG7-IG11) — intentional per owner instruction; historical matches are audit/provenance only, never an exclusion.",
+  "representatives": [
+    {
+      "representative": "Ayesha",
+      "role": "field_sales",
+      "salesTerritory": "IG6, IG7, IG8, IG9, IG10, IG11",
+      "postcodeDistricts": ["IG6", "IG7", "IG8", "IG9", "IG10", "IG11"],
+      "districtCount": 6,
+      "mapsRequired": false
+    }
+  ]
+}
