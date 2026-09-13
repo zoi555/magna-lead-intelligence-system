@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 2,
+  "note": "Campaign-scoped documentation copy only — mapsRequired for the live pipeline is resolved from the GLOBAL config/lead-production/sales-territories-v2.json, never from this per-campaign file. SL2 and SL3 are both genuinely new for Ayesha and for the pipeline overall — no historical overlap found. Owner correction 2026-09-13: SL3 added to campaign-032 alongside the already-processed SL2. Internal lookup key stays 'Ayesha' (matches the global authoritative config, required for resolveMapRequired() to resolve correctly) — the full name 'Ayesha Tahir' is applied at every export/output boundary via --sales-rep-value, per representativeFullName in territories.json.",
+  "representatives": [
+    {
+      "representative": "Ayesha",
+      "role": "field_sales",
+      "salesTerritory": "SL2 + SL3",
+      "postcodeDistricts": ["SL2", "SL3"],
+      "districtCount": 2,
+      "mapsRequired": false
+    }
+  ]
+}

@@ -1955,3 +1955,36 @@ append-only observations, claim/heartbeat, execution counters) is proven working
 its own teardown call is affected, and it never touches production data (the 4 released campaigns'
 data lives entirely outside this test's fixture rows). typecheck and build both clean; all other
 46 of 47 `test:lead-production-*`/`test:je-*` suites pass individually.
+
+## ISS-0044 — OPEN — `address-components.ts`'s `premisesIdentifierConflict` does not block confirmation when a building/unit number fails to parse (rather than explicitly disagreeing) (2026-09-13)
+
+**Found during:** a campaign-032 SL2 owner audit of a low field-sales count, individually
+re-verifying all 19 customer-master exclusions. Two false-positive CONFIRMED-tier exclusions traced
+to this exact mechanism — see `docs/10_BUGS_AND_FIXES.md`, 2026-09-13 entry, for full detail and
+the two real cases (La Kasbah Casa Shawarma vs "Bam Bam", 27 vs 39 Stoke Rd; Britwell Plaice Fish &
+Chips vs "Jimmy's Cafe & Grill", Unit 3 vs Unit 2 Kennedy Parade).
+
+**Root cause:** `premisesIdentifierConflict = postcodeMatch && streetMatch === true &&
+(unitMatch === false || buildingNumberMatch === false)` only fires on an EXPLICIT disagreement
+(`=== false`). When the address parser fails to extract a comparable number from one side of the
+pair, `buildingNumberMatch` resolves to `undefined`/`null` instead of `false`, so the conflict
+guard never fires and `compatiblePremises` (which requires `buildingNumberMatch !== false`, not
+`=== true`) passes on postcode + street-name agreement alone — even when the raw address text
+plainly shows two different building/unit numbers.
+
+**Not fixed here, by explicit owner instruction** ("Do not weaken... exact postcode + premises
+matching... confirmed-tier safety controls generally" — the owner authorised only a scoped,
+exact-candidate-ID correction for the two known real cases, not a change to the shared matcher used
+by every other candidate). A proper fix would need `buildingNumberMatch`/`unitMatch` to
+distinguish "explicitly disagrees" from "failed to parse on at least one side" and treat the latter
+as inconclusive (falls through to the weaker `exact_postcode_and_*name*` routes) rather than as a
+pass for `compatiblePremises`. This affects `customer-match-materiality.ts`'s
+`scanFullCustomerIndex`/chain-materiality routes used by `run-final-scoring-stage-v2.ts`, and
+potentially the structurally similar logic in `verify-customer-leakage.ts` (which independently
+downgrades the same two cases to PROBABLE rather than CONFIRMED — worth checking why the two
+implementations disagree, next time this area is touched).
+
+**Until fixed:** any future CONFIRMED-tier customer exclusion whose only evidence is
+`exact_address_same_postcode`/`exact_address_uncertain_operator` (i.e. no phone/email/domain/strong
+name corroboration) should be spot-checked against the raw building/unit number before being
+trusted, especially on multi-unit parades or shared postcodes with several premises on one street.

@@ -185,6 +185,75 @@ async function main() {
     await fs.rm(tmpRoot, { recursive: true, force: true });
   }
 
+  // --- --owner-reinstated-confirmed-lead-ids (2026-09-13, SL2 false-positive customer-exclusion
+  // correction): a scoped, exact-candidate-ID-only mechanism to reverse a CONFIRMED-tier customer
+  // exclusion after explicit owner review — never a general matcher weakening. Fixture has THREE
+  // candidates, each a genuine confirmed exact-phone match to an unrelated-named customer record
+  // (deterministic, real "confirmed" tier via customer-match-materiality.ts's exact_phone route):
+  //   cand-la-kasbah        — synthetic proxy for the real "La Kasbah Casa Shawarma" SL2 case
+  //   cand-britwell-plaice  — synthetic proxy for the real "Britwell Plaice Fish & Chips" SL2 case
+  //   cand-unrelated        — a third confirmed match that is NEVER named in --owner-reinstated-
+  //                           confirmed-lead-ids, proving the mechanism cannot become a blanket rule
+  {
+    const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), "final-scoring-v2-reinstate-test-"));
+    const territory = "ZZ4";
+    const dirs = await genFixtureTerritoryWithConfirmedMatches(tmpRoot, territory);
+    const baseArgs = [
+      "tsx", "scripts/lead-production/run-final-scoring-stage-v2.ts",
+      `--phase1-dir=${dirs.phase1}`, `--fsa-dir=${dirs.fsa}`, `--google-checkpoint=${dirs.google}`,
+      `--companies-house-dir=${dirs.ch}`, `--website-dir=${dirs.website}`, `--public-profile-dir=${dirs.publicProfile}`,
+      `--group-rescreen-dir=${dirs.groupRescreen}`, `--customers=${dirs.customers}`, `--territory=${territory}`,
+    ];
+
+    // 1. Default run (no --owner-reinstated-* flags at all): all three confirmed matches must be
+    //    excluded, proving reinstatement is never automatic/default behaviour.
+    const outDefault = path.join(tmpRoot, "zz4-out-default");
+    const rDefault = spawnSync("npx", [...baseArgs, `--out=${outDefault}`], { cwd: path.resolve(__dirname, ".."), encoding: "utf8" });
+    assert(rDefault.status === 0, `baseline run exits 0 (stderr: ${(rDefault.stderr ?? "").slice(0, 500)})`);
+    const masterDefault: any[] = JSON.parse(await fs.readFile(path.join(outDefault, "zz4-v2-authoritative-master.json"), "utf8").catch(() => "[]"));
+    const byIdDefault = new Map(masterDefault.map((r) => [r.candidateId, r]));
+    assert(byIdDefault.get("cand-la-kasbah")?.qualificationStatus === "customer_master_exclusion", "1. a confirmed exclusion is NOT reinstated by default (La Kasbah proxy)");
+    assert(byIdDefault.get("cand-britwell-plaice")?.qualificationStatus === "customer_master_exclusion", "1. a confirmed exclusion is NOT reinstated by default (Britwell Plaice proxy)");
+    assert(byIdDefault.get("cand-unrelated")?.qualificationStatus === "customer_master_exclusion", "1. a confirmed exclusion is NOT reinstated by default (unrelated control candidate)");
+
+    // 2-5. Reinstate ONLY the two named candidates, in the same run as the unrelated control.
+    const ownerReason = "TEST OWNER REASON: different building number, different business identity, shared postcode alone is insufficient.";
+    const outReinstated = path.join(tmpRoot, "zz4-out-reinstated");
+    const rReinstated = spawnSync("npx", [
+      ...baseArgs, `--out=${outReinstated}`,
+      "--owner-reinstated-confirmed-lead-ids=cand-la-kasbah,cand-britwell-plaice",
+      `--owner-reinstated-reason=${ownerReason}`,
+    ], { cwd: path.resolve(__dirname, ".."), encoding: "utf8" });
+    assert(rReinstated.status === 0, `reinstated run exits 0 (stderr: ${(rReinstated.stderr ?? "").slice(0, 500)})`);
+    const masterReinstated: any[] = JSON.parse(await fs.readFile(path.join(outReinstated, "zz4-v2-authoritative-master.json"), "utf8").catch(() => "[]"));
+    const byIdReinstated = new Map(masterReinstated.map((r) => [r.candidateId, r]));
+
+    assert(byIdReinstated.get("cand-la-kasbah")?.qualificationStatus !== "customer_master_exclusion", "2/7. La Kasbah Casa Shawarma proxy IS reinstated by its exact candidate ID (no longer customer_master_exclusion)");
+    assert(byIdReinstated.get("cand-britwell-plaice")?.qualificationStatus !== "customer_master_exclusion", "2/7. Britwell Plaice Fish & Chips proxy IS reinstated by its exact candidate ID (no longer customer_master_exclusion)");
+    assert(byIdReinstated.get("cand-la-kasbah")?.qualificationStatus === "qualified", `La Kasbah proxy re-evaluated through the full pipeline and genuinely qualifies on its own merits (got ${byIdReinstated.get("cand-la-kasbah")?.qualificationStatus})`);
+    assert(byIdReinstated.get("cand-britwell-plaice")?.qualificationStatus === "qualified", `Britwell Plaice proxy re-evaluated through the full pipeline and genuinely qualifies on its own merits (got ${byIdReinstated.get("cand-britwell-plaice")?.qualificationStatus})`);
+
+    assert(byIdReinstated.get("cand-unrelated")?.qualificationStatus === "customer_master_exclusion", "3/5. an unlisted confirmed lead remains excluded in the SAME run that reinstates two other candidates — not a blanket matcher rule");
+
+    const laKasbahReason: string = byIdReinstated.get("cand-la-kasbah")?.changeReason ?? "";
+    assert(laKasbahReason.includes("OWNER CORRECTION") && laKasbahReason.includes(ownerReason), "4. the owner reinstatement records explicit correction provenance + the exact reason text");
+    assert(laKasbahReason.includes("Exact normalised phone match"), "4. the original match evidence text is preserved verbatim alongside the correction note, not deleted");
+    const unrelatedReason: string = byIdReinstated.get("cand-unrelated")?.v1LevelReason ?? "";
+    assert(!unrelatedReason.includes("OWNER CORRECTION"), "5. the unlisted control candidate's exclusion evidence carries no owner-correction text — the mechanism did not leak into it");
+
+    // 6. Existing normal confirmed-customer suppression is byte-identical for every candidate NOT
+    //    named in the reinstatement list, across the default and reinstated runs.
+    assert(JSON.stringify(byIdDefault.get("cand-unrelated")) === JSON.stringify(byIdReinstated.get("cand-unrelated")), "6. the unrelated control candidate's full row is unchanged between the default and reinstated runs — normal confirmed-customer suppression works unchanged");
+
+    // Fails closed: --owner-reinstated-confirmed-lead-ids without --owner-reinstated-reason must
+    // be a hard error, never a silent no-op or a silent full reinstatement.
+    const outMissingReason = path.join(tmpRoot, "zz4-out-missing-reason");
+    const rMissingReason = spawnSync("npx", [...baseArgs, `--out=${outMissingReason}`, "--owner-reinstated-confirmed-lead-ids=cand-la-kasbah"], { cwd: path.resolve(__dirname, ".."), encoding: "utf8" });
+    assert(rMissingReason.status !== 0, "--owner-reinstated-confirmed-lead-ids without --owner-reinstated-reason fails closed (non-zero exit), never a silent reinstatement");
+
+    await fs.rm(tmpRoot, { recursive: true, force: true });
+  }
+
   console.log(`\n${fails === 0 ? "All proofs passed." : `${fails} proof(s) FAILED.`}`);
   process.exit(fails === 0 ? 0 : 1);
 }
@@ -266,6 +335,83 @@ async function genFixtureTerritory(root: string, territory: string) {
   await writeCsvFile(customers, ["Customer ID", "Customer Name", "Postcode", "Phone", "Status"], [{ "Customer ID": "C1", "Customer Name": "Unrelated Customer Ltd", Postcode: "ZZ9 9ZZ", Phone: "01111111111", Status: "CUSTOMER-Closed Won" }]);
 
   return { phase1, fsa, google, ch, website, publicProfile, groupRescreen, v1FinalScoring, customers };
+}
+
+/** Three fixture candidates, each a genuine CONFIRMED customer match via an exact phone number
+ *  to a customer record with an unrelated trading name (a real, legitimate "confirmed" tier route
+ *  — customer-match-materiality.ts's exact_phone check fires regardless of name similarity, the
+ *  same route that correctly confirmed several genuine SL2 exclusions this session, e.g. "Punjab
+ *  Pizza & Grill" vs customer "WING IT"). Deliberately does NOT replicate the real address-parser
+ *  edge case (too fragile/implementation-specific for a fixture) — proves the
+ *  --owner-reinstated-confirmed-lead-ids mechanism itself, independent of which evidence route
+ *  produced the original "confirmed" tier. No --v1-final-scoring-dir supplied (v2 is the only
+ *  scoring pass), same as the ZZ2 no-baseline fixture. */
+async function genFixtureTerritoryWithConfirmedMatches(root: string, territory: string) {
+  const t = territory.toLowerCase();
+  const candidates = [
+    { id: "cand-la-kasbah", name: "La Kasbah Casa Shawarma (test fixture)", phone: "02080001111", custName: "Bam Bam (test fixture)" },
+    { id: "cand-britwell-plaice", name: "Britwell Plaice Fish & Chips (test fixture)", phone: "02080002222", custName: "Jimmy's Cafe & Grill (test fixture)" },
+    { id: "cand-unrelated", name: "Unrelated Control Diner (test fixture)", phone: "02080003333", custName: "Some Other Customer (test fixture)" },
+  ];
+  const phase1 = path.join(root, `${t}-phase1`);
+  const fsa = path.join(root, `${t}-fsa`);
+  const google = path.join(root, `${t}-google`);
+  const ch = path.join(root, `${t}-ch`);
+  const website = path.join(root, `${t}-web`);
+  const publicProfile = path.join(root, `${t}-pp`);
+  const groupRescreen = path.join(root, `${t}-gr`);
+  const customers = path.join(root, `${t}-customers.csv`);
+
+  await writeJson(path.join(phase1, "customer-match-results.json"), candidates.map((c) => ({
+    candidateId: c.id, outcome: "new_prospect", matchTier: "none", matchedCustomerId: null, rulesTriggered: [], nameSimilarity: null, preliminaryStatus: "clear_for_enrichment",
+    normalisedName: { candidateOriginal: c.name, candidateNormalised: c.name.toLowerCase(), customerOriginal: null, customerNormalised: null },
+    normalisedPostcode: { candidateOriginal: `${territory} 1AA`, candidateNormalised: `${territory} 1AA`, customerOriginal: null, customerNormalised: null },
+  })));
+
+  await writeJson(path.join(fsa, "fsa-results.json"), candidates.map((c) => ({
+    candidateId: c.id, candidateTradingName: c.name, candidatePostcode: `${territory} 1AA`, outcome: "exact_fsa_match",
+    plausibleEstablishments: [{ fhrsId: c.id, officialBusinessName: c.name, fsaAddress: "1 Test St", fsaPostcode: `${territory} 1AA`, businessType: "Restaurant", hygieneRating: "5", ratingStatus: "rated", ratingDate: "2025-01-01", localAuthority: "Test Council", nameSimilarity: 0.9, postcodeAgreement: true, addressAgreement: null, coordinateEvidence: null }],
+    evidenceTags: [], retrievalTimestamp: "2026-01-01T00:00:00Z", sourceResponseReference: "q", apiFailureReason: null, apiAttempts: 1,
+  })));
+  await writeCsvFile(path.join(fsa, "customer-match-resolution-after-fsa.csv"), ["candidate_id", "resolution_outcome"], candidates.map((c) => ({ candidate_id: c.id, resolution_outcome: "" })));
+
+  await writeJson(path.join(google, "google-results.json"), candidates.map((c) => ({
+    candidateId: c.id, candidateTradingName: c.name, candidatePostcode: `${territory} 1AA`, outcome: "exact_google_match",
+    plausibleResults: [{ placeId: `P-${c.id}`, officialName: c.name, formattedAddress: `1 Test St, ${territory} 1AA, UK`, addressComponents: [], postcode: `${territory} 1AA`, latitude: 51.5, longitude: -0.3, phone: c.phone, website: null, businessStatus: "OPERATIONAL", openingHours: [], primaryCategory: "restaurant", additionalCategories: ["food"], rating: 4.5, reviewCount: 50, nameSimilarity: 1, postcodeAgreement: true, distanceFromCandidateMetres: 0 }],
+    resultCount: 1, zeroResults: false, allReturnedResults: [], evidenceTags: [], retrievalTimestamp: "2026-01-01T00:00:00Z", sourceResponseReference: "q", apiFailureReason: null, apiAttempts: 1,
+  })));
+  // Deliberately unresolved at the chain stages (prior_matched_customer_id blank) — only the
+  // ISS-0042 full-index rescan inside run-final-scoring-stage-v2.ts (scanFullCustomerIndex) is
+  // meant to catch these, exactly like the real La Kasbah/Britwell Plaice cases it caught in
+  // production, neither of which any earlier stage ever suspected either.
+  await writeCsvFile(path.join(google, "customer-resolution-after-google.csv"), ["candidate_id", "resolution_outcome", "prior_matched_customer_id"], candidates.map((c) => ({ candidate_id: c.id, resolution_outcome: "unresolved_customer_match_after_google", prior_matched_customer_id: "" })));
+  await writeCsvFile(path.join(google, "physical-premises-results.csv"), ["candidate_id", "result", "evidence_tags"], candidates.map((c) => ({ candidate_id: c.id, result: "verified_physical_premises", evidence_tags: "" })));
+  await writeCsvFile(path.join(google, "fsa-resolution-after-google.csv"), ["candidate_id", "resolution", "top_fsa_fhrs_id", "top_fsa_name"], candidates.map((c) => ({ candidate_id: c.id, resolution: "fsa_resolved_exact", top_fsa_fhrs_id: c.id, top_fsa_name: c.name })));
+
+  await writeJson(path.join(ch, "companies-house-population-manifest.json"), { eligibleIds: candidates.map((c) => c.id) });
+  await writeJson(path.join(ch, "companies-house-results.json"), candidates.map((c) => ({ candidateId: c.id, candidateTradingName: c.name, candidatePostcode: `${territory} 1AA`, outcome: "no_company_record", companiesHouseStatus: null, plausibleCompanies: [], evidenceTags: [], searchQueriesUsed: [], retrievalTimestamp: "2026-01-01T00:00:00Z", apiFailureReason: null, apiAttempts: 1 })));
+  await writeCsvFile(path.join(ch, "customer-resolution-after-companies-house.csv"), ["candidate_id", "resolution_outcome", "prior_matched_customer_id"], candidates.map((c) => ({ candidate_id: c.id, resolution_outcome: "unresolved_customer_match_after_companies_house", prior_matched_customer_id: "" })));
+  await writeCsvFile(path.join(ch, "financial-calculations.csv"), ["candidate_id", "financialStrengthBand_result", "companySizeBand_result", "likelyPurchasingCapacityBand_result", "financial_data_confidence", "companyAgeYears_result"], candidates.map((c) => ({ candidate_id: c.id, financialStrengthBand_result: "not_available", companySizeBand_result: "not_available", likelyPurchasingCapacityBand_result: "not_available", financial_data_confidence: "not_available", companyAgeYears_result: "not_available" })));
+  await writeCsvFile(path.join(ch, "decision-maker-candidates.csv"), ["candidate_id", "company_number", "full_name", "likely_role", "rank", "source_type", "evidence_tags"], []);
+  await writeCsvFile(path.join(ch, "company-profiles.csv"), ["candidate_id", "company_number", "company_name", "company_status", "incorporation_date", "registered_office_address"], []);
+  await writeCsvFile(path.join(ch, "filed-accounts-data.csv"), ["candidate_id", "company_number", "accounts_type", "turnover_result", "grossProfit_result", "netAssets_result", "employeeCount_result"], []);
+
+  // No candidate phone comes from the website stage — the valid UK phone each candidate needs to
+  // qualify (once reinstated) comes from Google's plausibleResults[0].phone above instead.
+  await writeJson(path.join(website, "website-extracted-data.json"), candidates.map((c) => ({ candidateId: c.id, officialDomain: null, phone: { value: null }, email: { value: null }, hasContactForm: { value: false }, openingHours: { value: null }, cuisineTags: [], serviceModel: {} })));
+  await writeJson(path.join(website, "product-fit-results.json"), candidates.map((c) => ({ candidateId: c.id, indicators: {} })));
+
+  await writeCsvFile(path.join(publicProfile, "public-profile-results.csv"), ["candidate_id", "outcome", "profile_url"], []);
+
+  await writeJson(path.join(groupRescreen, "final-group-rescreen-results.json"), candidates.map((c) => ({ candidateId: c.id, classification: "independent_single_site", defaultOutcome: null, evidenceSources: [], evidenceTags: [] })));
+
+  // Each customer's own phone EXACTLY matches its paired candidate's Google-listed phone, but the
+  // trading names are deliberately unrelated — proving the match is genuinely "confirmed" (exact
+  // phone), not a name-similarity coincidence, exactly like the real "Punjab Pizza & Grill" vs
+  // "WING IT" case this session.
+  await writeCsvFile(customers, ["Customer ID", "Customer Name", "Postcode", "Phone", "Status"], candidates.map((c, i) => ({ "Customer ID": `TC${i + 1}`, "Customer Name": c.custName, Postcode: "ZZ9 9ZZ", Phone: c.phone, Status: "CUSTOMER-Closed Won" })));
+
+  return { phase1, fsa, google, ch, website, publicProfile, groupRescreen, customers };
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

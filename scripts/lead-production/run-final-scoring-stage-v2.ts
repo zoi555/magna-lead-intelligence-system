@@ -121,6 +121,19 @@ async function main() {
   const outArg = arg("out");
   const territory = arg("territory") ?? "UB1";
 
+  // Owner correction of a CONFIRMED-tier customer-master-exclusion decision (2026-09-13, SL2
+  // false-positive address-match audit) — NOT a general override mechanism. Scoped to exact
+  // raw candidate IDs only, requires an explicit reason, and treats the named candidate(s) as
+  // having NO customer conflict at all (not merely "probable") so they re-enter hard
+  // gates/scoring/qualification-v2 exactly like any other candidate — never assumed eligible.
+  // The original match evidence is never deleted: it is preserved verbatim inside each
+  // affected row's own changeReason/customerConflictReason fields (written to this stage's
+  // evidence register), alongside the correction note. Never weakens assessCustomerMatchMateriality
+  // or scanFullCustomerIndex themselves — those run unchanged for every other candidate.
+  const ownerReinstatedConfirmedIds = new Set((arg("owner-reinstated-confirmed-lead-ids") ?? "").split(",").map((s) => s.trim()).filter(Boolean));
+  const ownerReinstatedReason = arg("owner-reinstated-reason");
+  if (ownerReinstatedConfirmedIds.size && !ownerReinstatedReason) { console.error("--owner-reinstated-confirmed-lead-ids requires --owner-reinstated-reason=<text>."); process.exit(1); }
+
   // --v1-final-scoring-dir is OPTIONAL: when supplied (as for the UB1 calibration audit), every
   // row also carries a before/after comparison against that prior run. A brand-new territory
   // with no prior run at all supplies nothing here — v2 is simply THE scoring pass, not a diff.
@@ -394,7 +407,11 @@ async function main() {
     const materiality = moreMaterial(chainMateriality, fullScan.result);
     const materialityFromFullScanOnly = materiality === fullScan.result && fullScan.result !== chainMateriality && fullScan.result.outcomeTier !== "none";
     const conflictSuspectedBefore = hasUnresolvedCustomerConflictBefore || materialityFromFullScanOnly;
-    if (materiality.outcomeTier === "confirmed") {
+    const ownerReinstated = materiality.outcomeTier === "confirmed" && ownerReinstatedConfirmedIds.has(candidateId);
+    const ownerReinstatementNote = ownerReinstated
+      ? `OWNER CORRECTION (Owner Zoeb, exact candidate ID only, not a policy change) — originally excluded as a CONFIRMED customer-master match; owner reviewed and determined this is a different business at a different premises: ${ownerReinstatedReason} Original match evidence (preserved, not deleted): ${materiality.reason}`
+      : null;
+    if (materiality.outcomeTier === "confirmed" && !ownerReinstated) {
       masterRows.push({
         candidateId, tradingName, postcode, phone: null, website: null,
         v1Bucket: "customer_master_exclusion", v1Level: null, v1Channel: v1Row?.channel ?? null, v1Score: null,
@@ -409,8 +426,11 @@ async function main() {
       });
       continue;
     }
-    const hasUnresolvedCustomerConflictAfter = materiality.outcomeTier === "probable";
-    const customerConflictMaterialityChanged = conflictSuspectedBefore !== hasUnresolvedCustomerConflictAfter;
+    // ownerReinstated candidates are treated as having NO customer conflict at all (not merely
+    // "probable") — they fall through to normal hard-gates/scoring/qualification-v2 evaluation
+    // below, exactly like any other candidate never suspected of a customer match.
+    const hasUnresolvedCustomerConflictAfter = !ownerReinstated && materiality.outcomeTier === "probable";
+    const customerConflictMaterialityChanged = ownerReinstated || conflictSuspectedBefore !== hasUnresolvedCustomerConflictAfter;
 
     const finalOutcome = assignFinalOutcome(candidateId, gates, scoring, channel, hasUnresolvedCustomerConflictAfter, !!validPhone);
     const qualification = classifyQualificationV2({ hardGates: gates, materialCustomerConflict: hasUnresolvedCustomerConflictAfter, channelSuitability: channel, hasValidPhone: !!validPhone, stagesWithDecisiveEvidence, totalStagesConsidered: 4 });
@@ -418,7 +438,8 @@ async function main() {
     const outcomeChanged = googleReclassified || customerConflictMaterialityChanged;
     const changeReasonParts: string[] = [];
     if (googleReclassified) changeReasonParts.push(`Google reclassified ${googleOutcomeBefore} -> ${googleOutcomeAfter} (corrected name-similarity after the apostrophe-tokenisation fix).`);
-    if (customerConflictMaterialityChanged) changeReasonParts.push(`Customer-match hold materiality: ${materiality.reason}`);
+    if (ownerReinstatementNote) changeReasonParts.push(ownerReinstatementNote);
+    else if (customerConflictMaterialityChanged) changeReasonParts.push(`Customer-match hold materiality: ${materiality.reason}`);
 
     // Section 2's required "why not released" classification, judged against the ORIGINAL v1
     // outcome when one exists (what actually blocked this candidate before this session's

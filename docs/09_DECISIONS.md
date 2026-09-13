@@ -1658,3 +1658,33 @@ campaign's release is not removed from the candidate set; a historical lead that
 active Magna customer still lands in Customer Master Exclusions, never Usable; within-current-
 campaign duplicate premises still collapse to one via the separate, untouched `dedupeAcrossDistricts`
 control; `findHistoricalMatches()` still correctly identifies and records the match for audit.
+
+## 2026-09-13 — scoped owner correction channel for CONFIRMED-tier customer-match exclusions (campaign-032 SL2)
+
+**Decision:** added `--owner-reinstated-confirmed-lead-ids`/`--owner-reinstated-reason` to
+`run-final-scoring-stage-v2.ts`. This is a NEW, narrow escape hatch, not a general policy change:
+it accepts only exact raw candidate IDs, requires an explicit owner reason, and treats the named
+candidate(s) as having no customer conflict at all (not merely downgraded to "probable") so they
+re-enter hard gates/scoring/qualification-v2 exactly like any other candidate — never assumed
+eligible. `assessCustomerMatchMateriality`/`scanFullCustomerIndex` themselves are completely
+unchanged and run identically for every other candidate; verified by diffing all 43 other SL2
+candidates' outcomes before/after (0 unintended changes).
+
+**Why:** a live SL2 owner audit found two CONFIRMED-tier customer-master exclusions
+(`customer-match-materiality.ts`'s component-address route, ISS-0042) that were false positives —
+La Kasbah Casa Shawarma (27 Stoke Rd) matched customer A716 "Bam Bam" (39 Stoke Rd), and Britwell
+Plaice Fish & Chips (Unit 3, Kennedy Parade) matched customer J130 "Jimmy's Cafe & Grill" (Unit 2,
+Kennedy Parade) — both same postcode/street, different building/unit number, unrelated trading
+names. The existing owner-override mechanism (`--owner-cleared-lead-ids` on
+`verify-customer-leakage.ts`) only applies to PROBABLE-tier holds; there was no sanctioned way to
+correct a CONFIRMED-tier exclusion without either editing raw checkpoint data (destroys the audit
+trail) or weakening the matcher generally (rejected by the owner explicitly).
+
+**Boundary (owner-specified, non-negotiable):** never a blanket rule; applies only to the exact
+candidate IDs supplied; does not weaken exact-phone/exact-email/exact-postcode+premises matching
+or confirmed-tier controls generally. Original match evidence is preserved verbatim (not deleted)
+inside the corrected row's own `changeReason`/`customerConflictReason` fields.
+
+**Provenance trail:** the superseded final-scoring checkpoint directory is left on disk unchanged;
+the district's `.orchestrator-run-manifest.json` `final_scoring` stage entry gets `isOverride:
+true` plus an `overrideReason` pointing at both the old and new directories.
