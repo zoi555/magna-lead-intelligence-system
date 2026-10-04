@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 5,
+  "note": "Campaign-scoped documentation copy only — mapsRequired for the live pipeline is resolved from the GLOBAL config/lead-production/sales-territories-v2.json, never from this per-campaign file. HP19, HP22, HP14, HP13 and HP7 are all genuinely new for Ayesha and for the pipeline overall — no historical overlap found. Internal lookup key stays 'Ayesha' (matches the global authoritative config, required for resolveMapRequired() to resolve correctly) — the full name 'Ayesha Tahir' is applied at every export/output boundary via --sales-rep-value, per representativeFullName in territories.json.",
+  "representatives": [
+    {
+      "representative": "Ayesha",
+      "role": "field_sales",
+      "salesTerritory": "HP19 + HP22 + HP14 + HP13 + HP7",
+      "postcodeDistricts": ["HP19", "HP22", "HP14", "HP13", "HP7"],
+      "districtCount": 5,
+      "mapsRequired": false
+    }
+  ]
+}

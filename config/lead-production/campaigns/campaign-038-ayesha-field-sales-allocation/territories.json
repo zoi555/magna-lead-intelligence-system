@@ -1,0 +1,67 @@
+{
+  "campaignId": "campaign-038-ayesha-field-sales-allocation",
+  "campaignVersion": "v1",
+  "channel": "field_sales",
+  "effectiveDate": "2026-10-04",
+  "sourceOfAllocation": "Owner-provided allocation, 2026-10-04 (next field-sales lead-generation batch, following campaigns 035-036).",
+  "description": "Ayesha Tahir's field-sales allocation: HP19, HP22, HP14, HP13, HP7 (5 districts). Owner-supplied area references: HP19/HP22 = Aylesbury, HP14/HP13 = High Wycombe, HP7 = Amersham. Territories are NON-EXCLUSIVE across representatives (established 2026-08-05, docs/09_DECISIONS.md).",
+  "resolutionNote": "TERRITORY MODEL: postcode districts are NON-EXCLUSIVE across representatives. Ayesha's prior field-sales batches were campaign-005 (IG6-region), campaign-006, campaign-024 (EN5-EN10), campaign-030 (IG6-IG11), campaign-032 (SL2 + SL3), campaign-034 (PE3, PE4, PE5), campaign-036 (SG3, SG4) — all separate, immutable, completed prior campaigns, not touched here.",
+  "historicalOverlap": {
+    "description": "No prior campaign covered HP19, HP22, HP14, HP13 or HP7 — confirmed by direct search of every campaign's territories.json currentFullAllocation.postcodeDistricts before this campaign started. Genuinely new districts for Ayesha and for the pipeline overall.",
+    "postcodeDistricts": [],
+    "priorOverlappingCampaignId": null
+  },
+  "representativeIdentityValidation": {
+    "method": "Owner supplied 'Ayesha Tahir' as the exact full name AND her email (ayesha.tahir@magnafoodservice.co.uk) directly in this task's instructions (locked identity, 2026-10-04) — matches campaigns 005/006/024/030/032/034/036 for this exact person.",
+    "judgement": "Treated as CONFIRMED — consistent with prior precedent for this same person."
+  },
+  "representative": {
+    "internalName": "Ayesha",
+    "role": "field_sales",
+    "representativeFullName": "Ayesha Tahir",
+    "representativeEmail": "ayesha.tahir@magnafoodservice.co.uk",
+    "salesProRepresentativeValue": "Ayesha Tahir",
+    "salesProRosterStatus": "confirmed",
+    "regionRoute": "HP19 + HP22 + HP14 + HP13 + HP7",
+    "mapsRequired": false
+  },
+  "currentFullAllocation": {
+    "postcodeDistricts": ["HP19", "HP22", "HP14", "HP13", "HP7"],
+    "districtCount": 5,
+    "areaDescription": "Aylesbury (HP19, HP22) + High Wycombe (HP14, HP13) + Amersham (HP7)"
+  },
+  "sectorWhitelist": {
+    "HP19": ["HP19 0", "HP19 7", "HP19 8", "HP19 9"],
+    "HP22": ["HP22 0", "HP22 3", "HP22 4", "HP22 5", "HP22 6", "HP22 7", "HP22 9"],
+    "HP14": ["HP14 3", "HP14 4"],
+    "HP13": ["HP13 5", "HP13 6", "HP13 7"],
+    "HP7": ["HP7 0", "HP7 9"]
+  },
+  "sectorWhitelistSource": "Derived from the authoritative Supabase postcode_reference table (level='sector', district=<code>), never manually invented. Used for geography validation only — one Just Eat discovery query per DISTRICT, not per sector.",
+  "alreadyCompletedElsewhere": {
+    "description": "None. HP19, HP22, HP14, HP13 and HP7 confirmed genuinely new for Ayesha and for the pipeline overall.",
+    "postcodeDistricts": [],
+    "sourceCampaignId": null,
+    "sourceOutputDir": null
+  },
+  "newDistrictsForThisCampaign": {
+    "postcodeDistricts": ["HP19", "HP22", "HP14", "HP13", "HP7"],
+    "districtCount": 5,
+    "processingOrder": ["HP19", "HP22", "HP14", "HP13", "HP7"]
+  },
+  "explicitlyExcluded": {
+    "priorFieldSalesBatches": "campaign-005, campaign-006, campaign-024 (EN5-EN10), campaign-030 (IG6-IG11), campaign-032 (SL2 + SL3), campaign-034 (PE3, PE4, PE5), campaign-036 (SG3, SG4). Immutable. Never rerun.",
+    "neighbouringDistricts": "No districts outside the exact owner-listed set (HP19, HP22, HP14, HP13, HP7) are added. HP20/HP21/HP11/HP12/HP6 belong exclusively to campaign-037 (Nauman Khan) — not touched in this campaign."
+  },
+  "discoverySource": {
+    "leadDiscovery": "Just Eat only (v3 enriched endpoint, je-enriched-bypostcode-v3-2026-08-04) — sequential discovery (established operational rule, docs/09_DECISIONS.md 2026-08-21): HP19, then HP22, then HP14, then HP13, then HP7.",
+    "enrichmentStagesOnly": ["Google", "Website", "FSA", "Companies House"]
+  },
+  "outputTemplate": "field-sales-31-column-v1",
+  "fieldSalesRoutingStatus": "pending — no mapping/routing performed in this task",
+  "pipelineVersion": "temporary-lead-production-v1, commit 84ac30d baseline",
+  "customerMasterVersion": {
+    "snapshotDate": "2026-08-03",
+    "sha256Checksum": "f1b23cce93d878f6fb6764e5dbce36812d579aaa6ac9d14c9342f8f2e6e683f1"
+  }
+}

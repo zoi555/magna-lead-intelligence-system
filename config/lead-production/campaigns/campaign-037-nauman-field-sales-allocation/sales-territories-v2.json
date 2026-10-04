@@ -1,0 +1,16 @@
+{
+  "assignmentVersion": "v2",
+  "totalRepresentatives": 1,
+  "totalDistricts": 5,
+  "note": "Campaign-scoped documentation copy only — mapsRequired for the live pipeline is resolved from the GLOBAL config/lead-production/sales-territories-v2.json, never from this per-campaign file. HP20, HP21, HP11, HP12 and HP6 are all genuinely new for Nauman and for the pipeline overall — no historical overlap found. Internal lookup key stays 'Nauman' (matches the global authoritative config, required for resolveMapRequired() to resolve correctly) — the full name 'Nauman Khan' is applied at every export/output boundary via --sales-rep-value, per representativeFullName in territories.json.",
+  "representatives": [
+    {
+      "representative": "Nauman",
+      "role": "field_sales",
+      "salesTerritory": "HP20 + HP21 + HP11 + HP12 + HP6",
+      "postcodeDistricts": ["HP20", "HP21", "HP11", "HP12", "HP6"],
+      "districtCount": 5,
+      "mapsRequired": false
+    }
+  ]
+}
